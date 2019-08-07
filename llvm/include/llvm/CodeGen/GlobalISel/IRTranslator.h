@@ -62,7 +62,7 @@ class IRTranslator : public MachineFunctionPass {
 public:
   static char ID;
 
-private:
+protected:
   /// Interface used to lower the everything related to calls.
   const CallLowering *CLI;
 
@@ -200,17 +200,17 @@ private:
   /// the function.
   ///
   /// \return true if the materialization succeeded.
-  bool translate(const Constant &C, Register Reg);
+  virtual bool translate(const Constant &C, Register Reg);
 
   /// Translate an LLVM bitcast into generic IR. Either a COPY or a G_BITCAST is
   /// emitted.
-  bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM load instruction into generic IR.
-  bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM store instruction into generic IR.
-  bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM string intrinsic (memcpy, memset, ...).
   bool translateMemFunc(const CallInst &CI, MachineIRBuilder &MIRBuilder,
@@ -218,8 +218,8 @@ private:
 
   void getStackGuard(Register DstReg, MachineIRBuilder &MIRBuilder);
 
-  bool translateOverflowIntrinsic(const CallInst &CI, unsigned Op,
-                                  MachineIRBuilder &MIRBuilder);
+  virtual bool translateOverflowIntrinsic(const CallInst &CI, unsigned Op,
+                                          MachineIRBuilder &MIRBuilder);
 
   /// Helper function for translateSimpleIntrinsic.
   /// \return The generic opcode for \p IntrinsicID if \p IntrinsicID is a
@@ -240,8 +240,8 @@ private:
   /// Returns true if the value should be split into multiple LLTs.
   /// If \p Offsets is given then the split type's offsets will be stored in it.
   /// If \p Offsets is not empty it will be cleared first.
-  bool valueIsSplit(const Value &V,
-                    SmallVectorImpl<uint64_t> *Offsets = nullptr);
+  virtual bool valueIsSplit(const Value &V,
+                            SmallVectorImpl<uint64_t> *Offsets = nullptr);
 
   /// Common code for translating normal calls or invokes.
   bool translateCallSite(const ImmutableCallSite &CS,
@@ -330,13 +330,16 @@ private:
 
   bool translateIndirectBr(const User &U, MachineIRBuilder &MIRBuilder);
 
-  bool translateExtractValue(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateExtractValue(const User &U,
+                                     MachineIRBuilder &MIRBuilder);
 
-  bool translateInsertValue(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateInsertValue(const User &U,
+                                    MachineIRBuilder &MIRBuilder);
 
   bool translateSelect(const User &U, MachineIRBuilder &MIRBuilder);
 
-  bool translateGetElementPtr(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateGetElementPtr(const User &U,
+                                      MachineIRBuilder &MIRBuilder);
 
   bool translateAlloca(const User &U, MachineIRBuilder &MIRBuilder);
 
@@ -448,9 +451,11 @@ private:
 
   bool translateExtractElement(const User &U, MachineIRBuilder &MIRBuilder);
 
-  bool translateShuffleVector(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateShuffleVector(const User &U,
+                                      MachineIRBuilder &MIRBuilder);
 
-  bool translateAtomicCmpXchg(const User &U, MachineIRBuilder &MIRBuilder);
+  virtual bool translateAtomicCmpXchg(const User &U,
+                                      MachineIRBuilder &MIRBuilder);
   bool translateAtomicRMW(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateFence(const User &U, MachineIRBuilder &MIRBuilder);
 
@@ -553,7 +558,7 @@ private:
   /// Non-aggregate types have just one corresponding VReg and the list can be
   /// used as a single "unsigned". Aggregates get flattened. If such VRegs do
   /// not exist, they are created.
-  ArrayRef<Register> getOrCreateVRegs(const Value &Val);
+  virtual ArrayRef<Register> getOrCreateVRegs(const Value &Val);
 
   Register getOrCreateVReg(const Value &Val) {
     auto Regs = getOrCreateVRegs(Val);
@@ -575,7 +580,7 @@ private:
   /// Get the alignment of the given memory operation instruction. This will
   /// either be the explicitly specified value or the ABI-required alignment for
   /// the type being accessed (according to the Module's DataLayout).
-  unsigned getMemOpAlignment(const Instruction &I);
+  virtual unsigned getMemOpAlignment(const Instruction &I);
 
   /// Get the MachineBasicBlock that represents \p BB. Specifically, the block
   /// returned will be the head of the translated block (suitable for branch

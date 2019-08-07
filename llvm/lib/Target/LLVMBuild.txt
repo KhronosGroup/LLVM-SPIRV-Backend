@@ -32,6 +32,7 @@ subdirectories =
  PowerPC
  RISCV
  Sparc
+ SPIRV
  SystemZ
  WebAssembly
  X86
