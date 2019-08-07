@@ -790,6 +790,10 @@ AsmParser::AsmParser(SourceMgr &SM, MCContext &Ctx, MCStreamer &Out,
   case MCContext::IsXCOFF:
     PlatformParser.reset(createXCOFFAsmParser());
     break;
+  case MCObjectFileInfo::IsSPIRV:
+    report_fatal_error(
+        "Need to implement createSPIRVAsmParser for SPIRV format.");
+    break;
   }
 
   PlatformParser->Initialize(*this);

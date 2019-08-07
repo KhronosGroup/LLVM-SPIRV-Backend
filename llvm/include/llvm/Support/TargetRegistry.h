@@ -111,6 +111,11 @@ MCStreamer *createXCOFFStreamer(MCContext &Ctx,
                                 std::unique_ptr<MCObjectWriter> &&OW,
                                 std::unique_ptr<MCCodeEmitter> &&CE,
                                 bool RelaxAll);
+MCStreamer *createSPIRVStreamer(MCContext &Ctx,
+                                std::unique_ptr<MCAsmBackend> &&TAB,
+                                std::unique_ptr<MCObjectWriter> &&OW,
+                                std::unique_ptr<MCCodeEmitter> &&CE,
+                                bool RelaxAll);
 
 MCRelocationInfo *createMCRelocationInfo(const Triple &TT, MCContext &Ctx);
 
@@ -200,6 +205,11 @@ public:
                       std::unique_ptr<MCObjectWriter> &&OW,
                       std::unique_ptr<MCCodeEmitter> &&Emitter, bool RelaxAll);
   using XCOFFStreamerCtorTy =
+      MCStreamer *(*)(const Triple &T, MCContext &Ctx,
+                      std::unique_ptr<MCAsmBackend> &&TAB,
+                      std::unique_ptr<MCObjectWriter> &&OW,
+                      std::unique_ptr<MCCodeEmitter> &&Emitter, bool RelaxAll);
+  using SPIRVStreamerCtorTy =
       MCStreamer *(*)(const Triple &T, MCContext &Ctx,
                       std::unique_ptr<MCAsmBackend> &&TAB,
                       std::unique_ptr<MCObjectWriter> &&OW,
@@ -305,6 +315,7 @@ private:
   ELFStreamerCtorTy ELFStreamerCtorFn = nullptr;
   WasmStreamerCtorTy WasmStreamerCtorFn = nullptr;
   XCOFFStreamerCtorTy XCOFFStreamerCtorFn = nullptr;
+  SPIRVStreamerCtorTy SPIRVStreamerCtorFn = nullptr;
 
   /// Construction function for this target's null TargetStreamer, if
   /// registered (default = nullptr).
@@ -574,6 +585,14 @@ public:
                                 std::move(Emitter), RelaxAll);
       else
         S = createXCOFFStreamer(Ctx, std::move(TAB), std::move(OW),
+                                std::move(Emitter), RelaxAll);
+      break;
+    case Triple::SPIRV:
+      if (SPIRVStreamerCtorFn)
+        S = SPIRVStreamerCtorFn(T, Ctx, std::move(TAB), std::move(OW),
+                                std::move(Emitter), RelaxAll);
+      else
+        S = createSPIRVStreamer(Ctx, std::move(TAB), std::move(OW),
                                 std::move(Emitter), RelaxAll);
       break;
     }
@@ -962,6 +981,10 @@ struct TargetRegistry {
 
   static void RegisterXCOFFStreamer(Target &T, Target::XCOFFStreamerCtorTy Fn) {
     T.XCOFFStreamerCtorFn = Fn;
+  }
+  
+  static void RegisterSPIRVStreamer(Target &T, Target::SPIRVStreamerCtorTy Fn) {
+    T.SPIRVStreamerCtorFn = Fn;
   }
 
   static void RegisterNullTargetStreamer(Target &T,

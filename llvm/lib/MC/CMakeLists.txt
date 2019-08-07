@@ -42,6 +42,7 @@ add_llvm_component_library(LLVMMC
   MCSectionWasm.cpp
   MCSectionXCOFF.cpp
   MCStreamer.cpp
+  MCSPIRVStreamer.cpp
   MCSubtargetInfo.cpp
   MCSymbol.cpp
   MCSymbolELF.cpp
@@ -57,6 +58,7 @@ add_llvm_component_library(LLVMMC
   MCXCOFFObjectTargetWriter.cpp
   MCXCOFFStreamer.cpp
   MachObjectWriter.cpp
+  SPIRVObjectWriter.cpp
   StringTableBuilder.cpp
   SubtargetFeature.cpp
   WasmObjectWriter.cpp

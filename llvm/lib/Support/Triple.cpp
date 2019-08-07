@@ -78,6 +78,9 @@ StringRef Triple::getArchTypeName(ArchType Kind) {
   case x86:            return "i386";
   case x86_64:         return "x86_64";
   case xcore:          return "xcore";
+  case spirv32:        return "spirv32";
+  case spirv64:        return "spirv64";
+  case spirvlogical:   return "spirvlogical";
   }
 
   llvm_unreachable("Invalid ArchType!");
@@ -158,6 +161,10 @@ StringRef Triple::getArchTypePrefix(ArchType Kind) {
 
   case ve:          return "ve";
   case csky:        return "csky";
+  
+  case spirv32:
+  case spirv64:
+  case spirvlogical: return "spirv";
   }
 }
 
@@ -252,6 +259,8 @@ StringRef Triple::getEnvironmentTypeName(EnvironmentType Kind) {
   case MuslEABIHF: return "musleabihf";
   case MuslX32: return "muslx32";
   case Simulator: return "simulator";
+  case OpenCL: return "opencl";
+  case Vulkan: return "vulkan";
   }
 
   llvm_unreachable("Invalid EnvironmentType!");
@@ -332,6 +341,9 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("renderscript64", renderscript64)
     .Case("ve", ve)
     .Case("csky", csky)
+    .Case("spirv32", spirv32)
+    .Case("spirv64", spirv64)
+    .Case("spirvlogical", spirvlogical)
     .Default(UnknownArch);
 }
 
@@ -465,6 +477,9 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("wasm32", Triple::wasm32)
     .Case("wasm64", Triple::wasm64)
     .Case("csky", Triple::csky)
+    .Case("spirv32", Triple::spirv32)
+    .Case("spirv64", Triple::spirv64)
+    .Case("spirvlogical", Triple::spirvlogical)
     .Default(Triple::UnknownArch);
 
   // Some architectures require special parsing logic just to compute the
@@ -564,6 +579,8 @@ static Triple::EnvironmentType parseEnvironment(StringRef EnvironmentName) {
       .StartsWith("coreclr", Triple::CoreCLR)
       .StartsWith("simulator", Triple::Simulator)
       .StartsWith("macabi", Triple::MacABI)
+      .StartsWith("opencl", Triple::OpenCL)
+      .StartsWith("vulkan", Triple::Vulkan)
       .Default(Triple::UnknownEnvironment);
 }
 
@@ -577,6 +594,7 @@ static Triple::ObjectFormatType parseFormat(StringRef EnvironmentName) {
     .EndsWith("goff", Triple::GOFF)
     .EndsWith("macho", Triple::MachO)
     .EndsWith("wasm", Triple::Wasm)
+    .EndsWith("spirv", Triple::SPIRV)
     .Default(Triple::UnknownObjectFormat);
 }
 
@@ -675,6 +693,7 @@ static StringRef getObjectFormatTypeName(Triple::ObjectFormatType Kind) {
   case Triple::MachO: return "macho";
   case Triple::Wasm:  return "wasm";
   case Triple::XCOFF: return "xcoff";
+  case Triple::SPIRV: return "spirv";
   }
   llvm_unreachable("unknown object format type");
 }
@@ -753,6 +772,11 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::wasm32:
   case Triple::wasm64:
     return Triple::Wasm;
+
+  case Triple::spirv32:
+  case Triple::spirv64:
+  case Triple::spirvlogical:
+    return Triple::SPIRV;
   }
   llvm_unreachable("unknown architecture");
 }
@@ -1268,6 +1292,7 @@ void Triple::setOSAndEnvironmentName(StringRef Str) {
 static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   switch (Arch) {
   case llvm::Triple::UnknownArch:
+  case llvm::Triple::spirvlogical:
     return 0;
 
   case llvm::Triple::avr:
@@ -1305,6 +1330,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::wasm32:
   case llvm::Triple::x86:
   case llvm::Triple::xcore:
+  case llvm::Triple::spirv32:
     return 32;
 
   case llvm::Triple::aarch64:
@@ -1328,6 +1354,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::ve:
   case llvm::Triple::wasm64:
   case llvm::Triple::x86_64:
+  case llvm::Triple::spirv64:
     return 64;
   }
   llvm_unreachable("Invalid architecture value");
@@ -1390,6 +1417,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::wasm32:
   case Triple::x86:
   case Triple::xcore:
+  case Triple::spirv32:
     // Already 32-bit.
     break;
 
@@ -1409,6 +1437,8 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::spir64:         T.setArch(Triple::spir);    break;
   case Triple::wasm64:         T.setArch(Triple::wasm32);  break;
   case Triple::x86_64:         T.setArch(Triple::x86);     break;
+  case Triple::spirv64:        T.setArch(Triple::spirv32); break;
+  case Triple::spirvlogical:   T.setArch(Triple::spirv32); break;
   }
   return T;
 }
@@ -1455,6 +1485,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::ve:
   case Triple::wasm64:
   case Triple::x86_64:
+  case Triple::spirv64:
     // Already 64-bit.
     break;
 
@@ -1477,6 +1508,8 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::thumbeb:         T.setArch(Triple::aarch64_be); break;
   case Triple::wasm32:          T.setArch(Triple::wasm64);     break;
   case Triple::x86:             T.setArch(Triple::x86_64);     break;
+  case Triple::spirv32:         T.setArch(Triple::spirv64);    break;
+  case Triple::spirvlogical:    T.setArch(Triple::spirv64);    break;
   }
   return T;
 }
@@ -1516,6 +1549,9 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::xcore:
   case Triple::ve:
   case Triple::csky:
+  case Triple::spirv32:
+  case Triple::spirv64:
+  case Triple::spirvlogical:
 
   // ARM is intentionally unsupported here, changing the architecture would
   // drop any arch suffixes.
@@ -1612,6 +1648,9 @@ bool Triple::isLittleEndian() const {
   case Triple::x86:
   case Triple::x86_64:
   case Triple::xcore:
+  case Triple::spirv32:
+  case Triple::spirv64:
+  case Triple::spirvlogical:
     return true;
   default:
     return false;

@@ -56,6 +56,7 @@ namespace llvm {
   class MCSectionMachO;
   class MCSectionWasm;
   class MCSectionXCOFF;
+  class MCSectionSPIRV;
   class MCStreamer;
   class MCSymbol;
   class MCSymbolELF;
@@ -75,7 +76,7 @@ namespace llvm {
     using DiagHandlerTy =
         std::function<void(const SMDiagnostic &, bool, const SourceMgr &,
                            std::vector<const MDNode *> &)>;
-    enum Environment { IsMachO, IsELF, IsGOFF, IsCOFF, IsWasm, IsXCOFF };
+    enum Environment { IsMachO, IsELF, IsGOFF, IsCOFF, IsWasm, IsXCOFF, IsSPIRV };
 
   private:
     Environment Env;
@@ -119,6 +120,7 @@ namespace llvm {
     SpecificBumpPtrAllocator<MCSectionWasm> WasmAllocator;
     SpecificBumpPtrAllocator<MCSectionXCOFF> XCOFFAllocator;
     SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
+    SpecificBumpPtrAllocator<MCSectionSPIRV> SPIRVAllocator;
 
     /// Bindings of names to symbols.
     SymbolTable Symbols;
@@ -647,6 +649,8 @@ namespace llvm {
         Optional<XCOFF::CsectProperties> CsectProp = None,
         bool MultiSymbolsAllowed = false, const char *BeginSymName = nullptr,
         Optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags = None);
+
+    MCSectionSPIRV *getSPIRVSection();
 
     // Create and save a copy of STI and return a reference to the copy.
     MCSubtargetInfo &getSubtargetCopy(const MCSubtargetInfo &STI);
