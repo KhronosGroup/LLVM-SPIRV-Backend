@@ -73,5 +73,5 @@ uint64_t SPIRVObjectWriter::writeObject(MCAssembler &Asm,
 std::unique_ptr<MCObjectWriter>
 llvm::createSPIRVObjectWriter(std::unique_ptr<MCSPIRVObjectTargetWriter> MOTW,
                               raw_pwrite_stream &OS) {
-  return llvm::make_unique<SPIRVObjectWriter>(std::move(MOTW), OS);
+  return std::make_unique<SPIRVObjectWriter>(std::move(MOTW), OS);
 }

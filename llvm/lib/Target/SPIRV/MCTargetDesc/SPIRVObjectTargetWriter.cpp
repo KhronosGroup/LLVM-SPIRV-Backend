@@ -21,5 +21,5 @@ public:
 } // namespace
 
 std::unique_ptr<MCObjectTargetWriter> llvm::createSPIRVObjectTargetWriter() {
-  return llvm::make_unique<SPIRVObjectTargetWriter>();
+  return std::make_unique<SPIRVObjectTargetWriter>();
 }
