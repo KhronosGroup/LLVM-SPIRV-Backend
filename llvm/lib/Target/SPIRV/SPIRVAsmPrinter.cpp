@@ -48,7 +48,7 @@ public:
   void EmitInstruction(const MachineInstr *MI) override;
 
   void EmitFunctionHeader() override {}
-  void EmitBasicBlockStart(const MachineBasicBlock &MBB) const override {}
+  void EmitBasicBlockStart(const MachineBasicBlock &MBB) override {}
   void EmitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
   void EmitGlobalVariable(const GlobalVariable *GV) override {}
 };
