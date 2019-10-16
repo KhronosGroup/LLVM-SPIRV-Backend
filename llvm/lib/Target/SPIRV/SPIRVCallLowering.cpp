@@ -133,21 +133,23 @@ bool SPIRVCallLowering::lowerFormalArguments(
 }
 
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
-                                  CallingConv::ID CallConv,
-                                  const MachineOperand &Callee,
-                                  const ArgInfo &OrigRet,
-                                  ArrayRef<ArgInfo> OrigArgs,
-                                  const MDNode *KnownCallees) const {
+                                  CallLoweringInfo &Info) const {
+  // TODO It's not clear if Info needs to be updated in any way.
+  //      Why isn't it a const&?
+  //      See https://reviews.llvm.org/D65850#inline-620779
+  // TODO assert Info.CallConv has an appropriate value.
+  // TODO Handle IsMustTailCall, IsTailCall, LoweredTailCall and IsVarArg.
 
-  auto funcName = Callee.getGlobal()->getGlobalIdentifier();
+  auto funcName = Info.Callee.getGlobal()->getGlobalIdentifier();
 
   size_t n;
   int status;
   char *demangledName = itaniumDemangle(funcName.c_str(), nullptr, &n, &status);
 
-  assert(OrigRet.Regs.size() < 2 && "Call returns multiple vregs");
+  assert(Info.OrigRet.Regs.size() < 2 && "Call returns multiple vregs");
 
-  Register resVReg = OrigRet.Regs.empty() ? Register(0) : OrigRet.Regs[0];
+  Register resVReg =
+      Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
   bool doubleUnderscore =
       funcName.size() >= 2 && funcName[0] == '_' && funcName[1] == '_';
   if (status == demangle_success || doubleUnderscore) {
@@ -156,13 +158,13 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
       // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp
       SmallVector<Register, 8> argVRegs;
-      for (auto Arg : OrigArgs) {
+      for (auto Arg : Info.OrigArgs) {
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
         argVRegs.push_back(Arg.Regs[0]);
       }
       return generateOpenCLBuiltinCall(
           doubleUnderscore ? funcName : demangledName, MIRBuilder, resVReg,
-          OrigRet.Ty, argVRegs, TR);
+          Info.OrigRet.Ty, argVRegs, TR);
     }
     report_fatal_error("Unable to handle this environment's built-in funcs.");
   } else {
@@ -186,15 +188,16 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     if (!resVReg.isValid()) {
       resVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     }
-    SPIRVType *retType = TR->assignTypeToVReg(OrigRet.Ty, resVReg, MIRBuilder);
+    SPIRVType *retType =
+        TR->assignTypeToVReg(Info.OrigRet.Ty, resVReg, MIRBuilder);
 
     // Emit the OpFunctionCall and its args
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
                    .addDef(resVReg)
                    .addUse(TR->getSPIRVTypeID(retType))
-                   .add(Callee);
+                   .add(Info.Callee);
 
-    for (const auto &arg : OrigArgs) {
+    for (const auto &arg : Info.OrigArgs) {
       assert(arg.Regs.size() == 1 && "Call arg has multiple VRegs");
       MIB.addUse(arg.Regs[0]);
     }
