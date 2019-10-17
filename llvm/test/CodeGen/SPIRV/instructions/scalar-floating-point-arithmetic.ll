@@ -2,7 +2,7 @@
 
 target triple = "spirv32-unknown-unknown"
 
-; DISABLED-CHECK-DAG: OpName [[SCALAR_FNEG:%.+]] "scalar_fneg"
+; CHECK-DAG: OpName [[SCALAR_FNEG:%.+]] "scalar_fneg"
 ; CHECK-DAG: OpName [[SCALAR_FADD:%.+]] "scalar_fadd"
 ; CHECK-DAG: OpName [[SCALAR_FSUB:%.+]] "scalar_fsub"
 ; CHECK-DAG: OpName [[SCALAR_FMUL:%.+]] "scalar_fmul"
@@ -20,20 +20,18 @@ target triple = "spirv32-unknown-unknown"
 
 
 ; Test fneg on scalar:
-; FIXME: Uncomment this test once we have rebased onto a more recent LLVM
-;        version -- IRTranslator::translateFNeg was fixed.
-; define float @scalar_fneg(float %a, float %unused) {
-;     %c = fneg float %a
-;     ret float %c
-; }
+define float @scalar_fneg(float %a, float %unused) {
+    %c = fneg float %a
+    ret float %c
+}
 
-; DISABLED-CHECK: [[SCALAR_FNEG]] = OpFunction [[SCALAR]] None [[SCALAR_FN]]
-; DISABLED-CHECK-NEXT: [[A:%.+]] = OpFunctionParameter [[SCALAR]]
-; DISABLED-CHECK-NEXT: [[B:%.+]] = OpFunctionParameter [[SCALAR]]
-; DISABLED-CHECK: OpLabel
-; DISABLED-CHECK: [[C:%.+]] = OpFNegate [[SCALAR]] [[A]]
-; DISABLED-CHECK: OpReturnValue [[C]]
-; DISABLED-CHECK-NEXT: OpFunctionEnd
+; CHECK: [[SCALAR_FNEG]] = OpFunction [[SCALAR]] None [[SCALAR_FN]]
+; CHECK-NEXT: [[A:%.+]] = OpFunctionParameter [[SCALAR]]
+; CHECK-NEXT: [[B:%.+]] = OpFunctionParameter [[SCALAR]]
+; CHECK: OpLabel
+; CHECK: [[C:%.+]] = OpFNegate [[SCALAR]] [[A]]
+; CHECK: OpReturnValue [[C]]
+; CHECK-NEXT: OpFunctionEnd
 
 
 ; Test fadd on scalar:

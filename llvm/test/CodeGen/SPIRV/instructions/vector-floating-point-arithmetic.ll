@@ -2,7 +2,7 @@
 
 target triple = "spirv32-unknown-unknown"
 
-; DISABLED-CHECK-DAG: OpName [[VECTOR_FNEG:%.+]] "vector_fneg"
+; CHECK-DAG: OpName [[VECTOR_FNEG:%.+]] "vector_fneg"
 ; CHECK-DAG: OpName [[VECTOR_FADD:%.+]] "vector_fadd"
 ; CHECK-DAG: OpName [[VECTOR_FSUB:%.+]] "vector_fsub"
 ; CHECK-DAG: OpName [[VECTOR_FMUL:%.+]] "vector_fmul"
@@ -20,20 +20,18 @@ target triple = "spirv32-unknown-unknown"
 
 
 ; Test fneg on vector:
-; FIXME: Uncomment this test once we have rebased onto a more recent LLVM
-;        version -- IRTranslator::translateFNeg was fixed.
-; define <2 x half> @vector_fneg(<2 x half> %a, <2 x half> %unused) {
-;     %c = fneg <2 x half> %a
-;     ret <2 x half> %c
-; }
+define <2 x half> @vector_fneg(<2 x half> %a, <2 x half> %unused) {
+    %c = fneg <2 x half> %a
+    ret <2 x half> %c
+}
 
-; DISABLED-CHECK: [[VECTOR_FNEG]] = OpFunction [[VECTOR]] None [[VECTOR_FN]]
-; DISABLED-CHECK-NEXT: [[A:%.+]] = OpFunctionParameter [[VECTOR]]
-; DISABLED-CHECK-NEXT: [[B:%.+]] = OpFunctionParameter [[VECTOR]]
-; DISABLED-CHECK: OpLabel
-; DISABLED-CHECK: [[C:%.+]] = OpFNegate [[VECTOR]] [[A]]
-; DISABLED-CHECK: OpReturnValue [[C]]
-; DISABLED-CHECK-NEXT: OpFunctionEnd
+; CHECK: [[VECTOR_FNEG]] = OpFunction [[VECTOR]] None [[VECTOR_FN]]
+; CHECK-NEXT: [[A:%.+]] = OpFunctionParameter [[VECTOR]]
+; CHECK-NEXT: [[B:%.+]] = OpFunctionParameter [[VECTOR]]
+; CHECK: OpLabel
+; CHECK: [[C:%.+]] = OpFNegate [[VECTOR]] [[A]]
+; CHECK: OpReturnValue [[C]]
+; CHECK-NEXT: OpFunctionEnd
 
 
 ; Test fadd on vector:
