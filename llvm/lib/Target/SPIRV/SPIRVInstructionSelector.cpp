@@ -673,8 +673,7 @@ static Scope::Scope getScope(SyncScope::ID ord) {
   case SyncScope::System:
     return Scope::Device;
   default:
-    // TODO is there any other way that more scopes could be defined?
-    return Scope::Device;
+    llvm_unreachable("Unsupported synchronization scope ID.");
   }
 }
 
