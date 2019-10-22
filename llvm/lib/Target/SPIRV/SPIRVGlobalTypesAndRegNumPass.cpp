@@ -842,14 +842,12 @@ static void addGlobalRequirements(const SPIRVRequirementHandler &reqs,
   reqs.checkSatisfiable(ST);
   setMetaBlock(MIRBuilder, MB_Capabilities);
 
-  const auto *minCaps = reqs.getMinimalCapabilities();
-  for (const auto cap : *minCaps) {
+  for (const auto &cap : reqs.getMinimalCapabilities()) {
     MIRBuilder.buildInstr(SPIRV::OpCapability).addImm(cap);
   }
 
   // Generate the final OpExtensions with strings instead of enums
-  const auto *exts = reqs.getExtensions();
-  for (const auto ext : *exts) {
+  for (const auto &ext : reqs.getExtensions()) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtension);
     addStringImm(getExtensionName(ext), MIB);
   }
@@ -867,11 +865,11 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   initMetaBlockBuilder(M, MMI, MIRBuilder);
 
   const auto &metaMF = MIRBuilder.getMF();
-  const auto *ST = static_cast<const SPIRVSubtarget *>(&metaMF.getSubtarget());
+  const auto &ST = static_cast<const SPIRVSubtarget &>(metaMF.getSubtarget());
 
   SPIRVRequirementHandler reqs;
 
-  addHeaderOps(M, MIRBuilder, reqs, *ST);
+  addHeaderOps(M, MIRBuilder, reqs, ST);
 
   SmallVector<LocalToGlobalRegTable *, 8> aliasMaps;
   BEGIN_FOR_MF_IN_MODULE(M, MMI)
@@ -904,7 +902,7 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
     reqs.addCapability(Capability::Linkage);
   }
 
-  addGlobalRequirements(reqs, *ST, MIRBuilder);
+  addGlobalRequirements(reqs, ST, MIRBuilder);
 
   // Cleanup
   for (const auto d : aliasMaps) {
