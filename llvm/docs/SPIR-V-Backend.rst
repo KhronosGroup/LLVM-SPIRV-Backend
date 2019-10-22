@@ -232,10 +232,8 @@ The main functions being executed, in that order:
 
 -  SPIRVAddRequirements::runOnMachineFunction
 
-   SPIRVAddRequirements iterates over all instructions and inserts
-   OpCapability instructions whenever the other instructions do
-   something that requires them (e.g. an OpTypeInt instruction with a
-   width of 64 requires the Int64 capability to be explicitly declared).
+   SPIRVAddRequirements iterates over all instructions and inserts the
+   required OpCapability or OpExtension instructions.
 
 -  SPIRVGlobalTypesAndRegNum::runOnModule
 

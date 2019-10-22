@@ -11,11 +11,11 @@ tablegen(LLVM SPIRVGenSubtargetInfo.inc -gen-subtarget)
 add_public_tablegen_target(SPIRVCommonTableGen)
 
 add_llvm_target(SPIRVCodeGen
+  SPIRVAddRequirementsPass.cpp
   SPIRVAsmPrinter.cpp
   SPIRVBasicBlockDominance.cpp
   SPIRVBlockLabeler.cpp
   SPIRVCallLowering.cpp
-  SPIRVCapabilitiesPass.cpp
   SPIRVCapabilityUtils.cpp
   SPIRVEnums.cpp
   SPIRVEnumRequirements.cpp
