@@ -40,9 +40,9 @@ private:
 public:
   uint32_t getMinVersion() const { return minVersion; }
   uint32_t getMaxVersion() const { return maxVersion; }
-  const CapabilityList *getMinimalCapabilities() const { return &minimalCaps; };
-  const std::set<Extension::Extension> *getExtensions() const {
-    return &allExtensions;
+  const CapabilityList &getMinimalCapabilities() const { return minimalCaps; };
+  const std::set<Extension::Extension> &getExtensions() const {
+    return allExtensions;
   };
 
   // Add a list of capabilities, ensuring allCaps captures all the implicitly
