@@ -21,7 +21,7 @@ class SPIRVSubtarget;
 class SPIRVFrameLowering : public TargetFrameLowering {
 public:
   explicit SPIRVFrameLowering(const SPIRVSubtarget &sti)
-      : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 8, 0) {}
+      : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, Align(8), 0) {}
 
   void emitPrologue(MachineFunction &MF,
                     MachineBasicBlock &MBB) const override {}
