@@ -51,24 +51,57 @@ Major New Features
 Improvements to Clang's diagnostics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- ...
+- -Wtautological-overlap-compare will warn on negative numbers and non-int
+  types.
+- -Wtautological-compare for self comparisons and
+  -Wtautological-overlap-compare will now look through member and array
+  access to determine if two operand expressions are the same.
+- -Wtautological-bitwise-compare is a new warning group.  This group has the
+  current warning which diagnoses the tautological comparison of a bitwise
+  operation and a constant.  The group also has the new warning which diagnoses
+  when a bitwise-or with a non-negative value is converted to a bool, since
+  that bool will always be true.
+- -Wbitwise-conditional-parentheses will warn on operator precedence issues
+  when mixing bitwise-and (&) and bitwise-or (|) operator with the
+  conditional operator (?:).
 
 Non-comprehensive list of changes in this release
 -------------------------------------------------
 
-- ...
+* In both C and C++ (C17 ``6.5.6p8``, C++ ``[expr.add]``), pointer arithmetic is
+  only permitted within arrays. In particular, the behavior of a program is not
+  defined if it adds a non-zero offset (or in C, any offset) to a null pointer,
+  or if it forms a null pointer by subtracting an integer from a non-null
+  pointer, and the LLVM optimizer now uses those guarantees for transformations.
+  This may lead to unintended behavior in code that performs these operations.
+  The Undefined Behavior Sanitizer ``-fsanitize=pointer-overflow`` check has
+  been extended to detect these cases, so that code relying on them can be
+  detected and fixed.
 
+- For X86 target, -march=skylake-avx512, -march=icelake-client,
+  -march=icelake-server, -march=cascadelake, -march=cooperlake will default to
+  not using 512-bit zmm registers in vectorized code unless 512-bit intrinsics
+  are used in the source code. 512-bit operations are known to cause the CPUs
+  to run at a lower frequency which can impact performance. This behavior can be
+  changed by passing -mprefer-vector-width=512 on the command line.
 
 New Compiler Flags
 ------------------
 
-- ...
+- The -fgnuc-version= flag now controls the value of ``__GNUC__`` and related
+  macros. This flag does not enable or disable any GCC extensions implemented in
+  Clang. Setting the version to zero causes Clang to leave ``__GNUC__`` and
+  other GNU-namespaced macros, such as ``__GXX_WEAK__``, undefined.
 
 Deprecated Compiler Flags
 -------------------------
 
 The following options are deprecated and ignored. They will be removed in
 future versions of Clang.
+
+- -mmpx used to enable the __MPX__ preprocessor define for the Intel MPX
+  instructions. There were no MPX intrinsics.
+- -mno-mpx used to disable -mmpx and is the default behavior.
 
 - ...
 
@@ -90,7 +123,18 @@ Attribute Changes in Clang
 Windows Support
 ---------------
 
-- ...
+- Previous Clang versions contained a work-around to avoid an issue with the
+  standard library headers in Visual Studio 2019 versions prior to 16.3. This
+  work-around has now been removed, and users of Visual Studio 2019 are
+  encouraged to upgrade to 16.3 or later, otherwise they may see link errors as
+  below:
+
+  .. code-block:: console
+
+    error LNK2005: "bool const std::_Is_integral<int>" (??$_Is_integral@H@std@@3_NB) already defined
+
+
+
 
 C Language Changes in Clang
 ---------------------------
@@ -105,7 +149,10 @@ C11 Feature Support
 C++ Language Changes in Clang
 -----------------------------
 
-- ...
+- The behaviour of the `gnu_inline` attribute now matches GCC, for cases
+  where used without the `extern` keyword. As this is a change compared to
+  how it behaved in previous Clang versions, a warning is emitted for this
+  combination.
 
 C++1z Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
@@ -125,7 +172,10 @@ OpenCL C Language Changes in Clang
 ABI Changes in Clang
 --------------------
 
-- ...
+- gcc passes vectors of __int128 in memory on X86-64. Clang historically
+  broke the vectors into multiple scalars using two 64-bit values for each
+  element. Clang now matches the gcc behavior on Linux and NetBSD. You can
+  switch back to old API behavior with flag: -fclang-abi-compat=9.0.
 
 OpenMP Support in Clang
 -----------------------
@@ -144,6 +194,12 @@ These are major API changes that have happened since the 9.0.0 release of
 Clang. If upgrading an external codebase that uses Clang as a library,
 this section should help get you past the largest hurdles of upgrading.
 
+- libTooling APIs that transfer ownership of `FrontendAction` objects now pass
+  them by `unique_ptr`, making the ownership transfer obvious in the type
+  system. `FrontendActionFactory::create()` now returns a
+  `unique_ptr<FrontendAction>`. `runToolOnCode`, `runToolOnCodeWithArgs`,
+  `ToolInvocation::ToolInvocation()` now take a `unique_ptr<FrontendAction>`.
+
 Build System Changes
 --------------------
 
@@ -157,7 +213,15 @@ release of Clang. Users of the build system should adjust accordingly.
   install-clang-headers target now installs clang's API headers (corresponding
   to its libraries), which is consistent with the install-llvm-headers target.
 
--  ...
+- In 9.0.0 and later Clang added a new target, clang-cpp, which generates a
+  shared library comprised of all the clang component libraries and exporting
+  the clang C++ APIs. Additionally the build system gained the new
+  "CLANG_LINK_CLANG_DYLIB" option, which defaults Off, and when set to On, will
+  force clang (and clang-based tools) to link the clang-cpp library instead of
+  statically linking clang's components. This option will reduce the size of
+  binary distributions at the expense of compiler performance.
+
+- ...
 
 AST Matchers
 ------------
@@ -167,7 +231,17 @@ AST Matchers
 clang-format
 ------------
 
-- ...
+- The ``Standard`` style option specifies which version of C++ should be used
+  when parsing and formatting C++ code. The set of allowed values has changed:
+
+  - ``Latest`` will always enable new C++ language features.
+  - ``c++03``, ``c++11``, ``c++14``, ``c++17``, ``c++20`` will pin to exactly
+    that language version.
+  - ``Auto`` is the default and detects style from the code (this is unchanged).
+
+  The previous values of ``Cpp03`` and ``Cpp11`` are deprecated. Note that
+  ``Cpp11`` is treated as ``Latest``, as this was always clang-format's behavior.
+  (One motivation for this change is the new name describes the behavior better).
 
 libclang
 --------
@@ -178,6 +252,9 @@ libclang
 Static Analyzer
 ---------------
 
+- The Clang analyzer checker ``DeadStores`` gets a new option called
+  ``WarnForDeadNestedAssignments`` to detect nested dead assignments
+  (enabled by default).
 - ...
 
 .. _release-notes-ubsan:
@@ -185,7 +262,40 @@ Static Analyzer
 Undefined Behavior Sanitizer (UBSan)
 ------------------------------------
 
-- ...
+- * The ``pointer-overflow`` check was extended added to catch the cases where
+    a non-zero offset is applied to a null pointer, or the result of
+    applying the offset is a null pointer.
+
+    .. code-block:: c++
+
+      #include <cstdint> // for intptr_t
+
+      static char *getelementpointer_inbounds(char *base, unsigned long offset) {
+        // Potentially UB.
+        return base + offset;
+      }
+
+      char *getelementpointer_unsafe(char *base, unsigned long offset) {
+        // Always apply offset. UB if base is ``nullptr`` and ``offset`` is not
+        // zero, or if ``base`` is non-``nullptr`` and ``offset`` is
+        // ``-reinterpret_cast<intptr_t>(base)``.
+        return getelementpointer_inbounds(base, offset);
+      }
+
+      char *getelementpointer_safe(char *base, unsigned long offset) {
+        // Cast pointer to integer, perform usual arithmetic addition,
+        // and cast to pointer. This is legal.
+        char *computed =
+            reinterpret_cast<char *>(reinterpret_cast<intptr_t>(base) + offset);
+        // If either the pointer becomes non-``nullptr``, or becomes
+        // ``nullptr``, we must use ``computed`` result.
+        if (((base == nullptr) && (computed != nullptr)) ||
+            ((base != nullptr) && (computed == nullptr)))
+          return computed;
+        // Else we can use ``getelementpointer_inbounds()``.
+        return getelementpointer_inbounds(base, offset);
+      }
+
 
 Core Analysis Improvements
 ==========================

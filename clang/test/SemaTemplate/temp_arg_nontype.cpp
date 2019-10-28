@@ -482,3 +482,27 @@ namespace dependent_backreference {
   template<short S> void a() { X<short, S, &arr> x; }
   template<short S> void b() { X<int, S, &arr> x; } // expected-note {{substituting}}
 }
+
+namespace instantiation_dependent {
+  template<typename T, __typeof(sizeof(T))> void f(int);
+  template<typename T, __typeof(sizeof(0))> int &f(...);
+  int &rf = f<struct incomplete, 0>(0);
+
+  int arr[sizeof(sizeof(int))];
+  template<typename T, int (*)[sizeof(sizeof(T))]> void g(int);
+  template<typename T, int (*)[sizeof(sizeof(int))]> int &g(...);
+  int &rg = g<struct incomplete, &arr>(0);
+}
+
+namespace complete_array_from_incomplete {
+  template <typename T, const char* const A[static_cast<int>(T::kNum)]>
+  class Base {};
+  template <class T, const char* const A[]>
+  class Derived : public Base<T, A> {};
+
+  struct T {
+    static const int kNum = 3;
+  };
+  extern const char *const kStrs[3] = {};
+  Derived<T, kStrs> d;
+}

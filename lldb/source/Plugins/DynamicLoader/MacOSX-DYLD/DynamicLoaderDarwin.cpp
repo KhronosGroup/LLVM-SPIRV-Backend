@@ -100,6 +100,18 @@ ModuleSP DynamicLoaderDarwin::FindTargetModuleForImageInfo(
   const ModuleList &target_images = target.GetImages();
   ModuleSpec module_spec(image_info.file_spec);
   module_spec.GetUUID() = image_info.uuid;
+
+  // macCatalyst support: Request matching os/environment.
+  {
+    auto &target_triple = target.GetArchitecture().GetTriple();
+    if (target_triple.getOS() == llvm::Triple::IOS &&
+        target_triple.getEnvironment() == llvm::Triple::MacABI) {
+      // Request the macCatalyst variant of frameworks that have both
+      // a PLATFORM_MACOS and a PLATFORM_MACCATALYST load command.
+      module_spec.GetArchitecture() = ArchSpec(target_triple);
+    }
+  }
+
   ModuleSP module_sp(target_images.FindFirstModule(module_spec));
 
   if (module_sp && !module_spec.GetUUID().IsValid() &&
@@ -384,6 +396,10 @@ bool DynamicLoaderDarwin::JSONImageInformationIntoImageInfo(
         image_infos[i].os_type = llvm::Triple::WatchOS;
       // NEED_BRIDGEOS_TRIPLE else if (os_name == "bridgeos")
       // NEED_BRIDGEOS_TRIPLE   image_infos[i].os_type = llvm::Triple::BridgeOS;
+      else if (os_name == "maccatalyst") {
+        image_infos[i].os_type = llvm::Triple::IOS;
+        image_infos[i].os_env = llvm::Triple::MacABI;
+      }
     }
     if (image->HasKey("min_version_os_sdk")) {
       image_infos[i].min_version_os_sdk =
@@ -654,6 +670,20 @@ bool DynamicLoaderDarwin::AddModulesUsingImageInfos(
         target_images.AppendIfNeeded(image_module_sp);
         loaded_module_list.AppendIfNeeded(image_module_sp);
       }
+
+      // macCataylst support:
+      // Update the module's platform with the DYLD info.
+      ArchSpec dyld_spec = image_infos[idx].GetArchitecture();
+      if (dyld_spec.GetTriple().getOS() == llvm::Triple::IOS &&
+          dyld_spec.GetTriple().getEnvironment() == llvm::Triple::MacABI) {
+        image_module_sp->MergeArchitecture(dyld_spec);
+        const auto &target_triple = target.GetArchitecture().GetTriple();
+        // If dyld reports the process as being loaded as MACCATALYST,
+        // force-update the target's architecture to MACCATALYST.
+        if (!(target_triple.getOS() == llvm::Triple::IOS &&
+              target_triple.getEnvironment() == llvm::Triple::MacABI))
+          target.SetArchitecture(dyld_spec);
+      }
     }
   }
 
@@ -709,6 +739,20 @@ void DynamicLoaderDarwin::Segment::PutToLog(Log *log,
                 name.AsCString(""), vmaddr + slide, vmaddr + slide + vmsize,
                 slide);
   }
+}
+
+lldb_private::ArchSpec DynamicLoaderDarwin::ImageInfo::GetArchitecture() const {
+  // Update the module's platform with the DYLD info.
+  lldb_private::ArchSpec arch_spec(lldb_private::eArchTypeMachO, header.cputype,
+                                   header.cpusubtype);
+  if (os_type == llvm::Triple::IOS && os_env == llvm::Triple::MacABI) {
+    llvm::Triple triple(llvm::Twine("x86_64-apple-ios") + min_version_os_sdk +
+                        "-macabi");
+    ArchSpec maccatalyst_spec(triple);
+    if (arch_spec.IsCompatibleMatch(maccatalyst_spec))
+      arch_spec.MergeFrom(maccatalyst_spec);
+  }
+  return arch_spec;
 }
 
 const DynamicLoaderDarwin::Segment *
@@ -933,15 +977,13 @@ DynamicLoaderDarwin::GetStepThroughTrampolinePlan(Thread &thread,
   return thread_plan_sp;
 }
 
-size_t DynamicLoaderDarwin::FindEquivalentSymbols(
+void DynamicLoaderDarwin::FindEquivalentSymbols(
     lldb_private::Symbol *original_symbol, lldb_private::ModuleList &images,
     lldb_private::SymbolContextList &equivalent_symbols) {
   ConstString trampoline_name = original_symbol->GetMangled().GetName(
       original_symbol->GetLanguage(), Mangled::ePreferMangled);
   if (!trampoline_name)
-    return 0;
-
-  size_t initial_size = equivalent_symbols.GetSize();
+    return;
 
   static const char *resolver_name_regex = "(_gc|_non_gc|\\$[A-Za-z0-9\\$]+)$";
   std::string equivalent_regex_buf("^");
@@ -949,11 +991,9 @@ size_t DynamicLoaderDarwin::FindEquivalentSymbols(
   equivalent_regex_buf.append(resolver_name_regex);
 
   RegularExpression equivalent_name_regex(equivalent_regex_buf);
-  const bool append = true;
   images.FindSymbolsMatchingRegExAndType(equivalent_name_regex, eSymbolTypeCode,
-                                         equivalent_symbols, append);
+                                         equivalent_symbols);
 
-  return equivalent_symbols.GetSize() - initial_size;
 }
 
 lldb::ModuleSP DynamicLoaderDarwin::GetPThreadLibraryModule() {
@@ -964,8 +1004,8 @@ lldb::ModuleSP DynamicLoaderDarwin::GetPThreadLibraryModule() {
     module_spec.GetFileSpec().GetFilename().SetCString(
         "libsystem_pthread.dylib");
     ModuleList module_list;
-    if (m_process->GetTarget().GetImages().FindModules(module_spec,
-                                                       module_list)) {
+    m_process->GetTarget().GetImages().FindModules(module_spec, module_list);
+    if (!module_list.IsEmpty()) {
       if (module_list.GetSize() == 1) {
         module_sp = module_list.GetModuleAtIndex(0);
         if (module_sp)

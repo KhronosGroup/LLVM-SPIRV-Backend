@@ -221,7 +221,7 @@ are no syntax errors may indicate that a function was declared but never called.
   Options *GetOptions() override { return &m_options; }
 
   void IOHandlerActivated(IOHandler &io_handler, bool interactive) override {
-    StreamFileSP output_sp(io_handler.GetOutputStreamFile());
+    StreamFileSP output_sp(io_handler.GetOutputStreamFileSP());
     if (output_sp && interactive) {
       output_sp->PutCString(g_reader_instructions);
       output_sp->Flush();
@@ -238,7 +238,7 @@ are no syntax errors may indicate that a function was declared but never called.
       if (!bp_options)
         continue;
 
-      auto cmd_data = llvm::make_unique<BreakpointOptions::CommandData>();
+      auto cmd_data = std::make_unique<BreakpointOptions::CommandData>();
       cmd_data->user_source.SplitIntoLines(line.c_str(), line.size());
       bp_options->SetCommandDataCallback(cmd_data);
     }
@@ -260,7 +260,7 @@ are no syntax errors may indicate that a function was declared but never called.
   SetBreakpointCommandCallback(std::vector<BreakpointOptions *> &bp_options_vec,
                                const char *oneliner) {
     for (auto bp_options : bp_options_vec) {
-      auto cmd_data = llvm::make_unique<BreakpointOptions::CommandData>();
+      auto cmd_data = std::make_unique<BreakpointOptions::CommandData>();
 
       cmd_data->user_source.AppendString(oneliner);
       cmd_data->stop_on_error = m_options.m_stop_on_error;
@@ -324,7 +324,7 @@ are no syntax errors may indicate that a function was declared but never called.
         break;
 
       default:
-        break;
+        llvm_unreachable("Unimplemented option");
       }
       return error;
     }
@@ -361,16 +361,9 @@ are no syntax errors may indicate that a function was declared but never called.
 
 protected:
   bool DoExecute(Args &command, CommandReturnObject &result) override {
-    Target *target = GetSelectedOrDummyTarget(m_options.m_use_dummy);
+    Target &target = GetSelectedOrDummyTarget(m_options.m_use_dummy);
 
-    if (target == nullptr) {
-      result.AppendError("There is not a current executable; there are no "
-                         "breakpoints to which to add commands");
-      result.SetStatus(eReturnStatusFailed);
-      return false;
-    }
-
-    const BreakpointList &breakpoints = target->GetBreakpointList();
+    const BreakpointList &breakpoints = target.GetBreakpointList();
     size_t num_breakpoints = breakpoints.GetSize();
 
     if (num_breakpoints == 0) {
@@ -389,7 +382,7 @@ protected:
 
     BreakpointIDList valid_bp_ids;
     CommandObjectMultiwordBreakpoint::VerifyBreakpointOrLocationIDs(
-        command, target, result, &valid_bp_ids,
+        command, &target, result, &valid_bp_ids,
         BreakpointName::Permissions::PermissionKinds::listPerm);
 
     m_bp_options_vec.clear();
@@ -401,7 +394,7 @@ protected:
         BreakpointID cur_bp_id = valid_bp_ids.GetBreakpointIDAtIndex(i);
         if (cur_bp_id.GetBreakpointID() != LLDB_INVALID_BREAK_ID) {
           Breakpoint *bp =
-              target->GetBreakpointByID(cur_bp_id.GetBreakpointID()).get();
+              target.GetBreakpointByID(cur_bp_id.GetBreakpointID()).get();
           BreakpointOptions *bp_options = nullptr;
           if (cur_bp_id.GetLocationID() == LLDB_INVALID_BREAK_ID) {
             // This breakpoint does not have an associated location.
@@ -516,9 +509,7 @@ public:
         break;
 
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -538,16 +529,9 @@ public:
 
 protected:
   bool DoExecute(Args &command, CommandReturnObject &result) override {
-    Target *target = GetSelectedOrDummyTarget(m_options.m_use_dummy);
+    Target &target = GetSelectedOrDummyTarget(m_options.m_use_dummy);
 
-    if (target == nullptr) {
-      result.AppendError("There is not a current executable; there are no "
-                         "breakpoints from which to delete commands");
-      result.SetStatus(eReturnStatusFailed);
-      return false;
-    }
-
-    const BreakpointList &breakpoints = target->GetBreakpointList();
+    const BreakpointList &breakpoints = target.GetBreakpointList();
     size_t num_breakpoints = breakpoints.GetSize();
 
     if (num_breakpoints == 0) {
@@ -565,7 +549,7 @@ protected:
 
     BreakpointIDList valid_bp_ids;
     CommandObjectMultiwordBreakpoint::VerifyBreakpointOrLocationIDs(
-        command, target, result, &valid_bp_ids,
+        command, &target, result, &valid_bp_ids,
         BreakpointName::Permissions::PermissionKinds::listPerm);
 
     if (result.Succeeded()) {
@@ -574,7 +558,7 @@ protected:
         BreakpointID cur_bp_id = valid_bp_ids.GetBreakpointIDAtIndex(i);
         if (cur_bp_id.GetBreakpointID() != LLDB_INVALID_BREAK_ID) {
           Breakpoint *bp =
-              target->GetBreakpointByID(cur_bp_id.GetBreakpointID()).get();
+              target.GetBreakpointByID(cur_bp_id.GetBreakpointID()).get();
           if (cur_bp_id.GetLocationID() != LLDB_INVALID_BREAK_ID) {
             BreakpointLocationSP bp_loc_sp(
                 bp->FindLocationByID(cur_bp_id.GetLocationID()));
@@ -605,10 +589,10 @@ private:
 class CommandObjectBreakpointCommandList : public CommandObjectParsed {
 public:
   CommandObjectBreakpointCommandList(CommandInterpreter &interpreter)
-      : CommandObjectParsed(interpreter, "list", "List the script or set of "
-                                                 "commands to be executed when "
-                                                 "the breakpoint is hit.",
-                            nullptr) {
+      : CommandObjectParsed(interpreter, "list",
+                            "List the script or set of commands to be "
+                            "executed when the breakpoint is hit.",
+                            nullptr, eCommandRequiresTarget) {
     CommandArgumentEntry arg;
     CommandArgumentData bp_id_arg;
 
@@ -628,14 +612,7 @@ public:
 
 protected:
   bool DoExecute(Args &command, CommandReturnObject &result) override {
-    Target *target = GetDebugger().GetSelectedTarget().get();
-
-    if (target == nullptr) {
-      result.AppendError("There is not a current executable; there are no "
-                         "breakpoints for which to list commands");
-      result.SetStatus(eReturnStatusFailed);
-      return false;
-    }
+    Target *target = &GetSelectedTarget();
 
     const BreakpointList &breakpoints = target->GetBreakpointList();
     size_t num_breakpoints = breakpoints.GetSize();

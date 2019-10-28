@@ -131,29 +131,70 @@ int getMaskedMIMGOp(unsigned Opc, unsigned NewChannels) {
 struct MUBUFInfo {
   uint16_t Opcode;
   uint16_t BaseOpcode;
-  uint8_t dwords;
+  uint8_t elements;
   bool has_vaddr;
   bool has_srsrc;
   bool has_soffset;
 };
 
+struct MTBUFInfo {
+  uint16_t Opcode;
+  uint16_t BaseOpcode;
+  uint8_t elements;
+  bool has_vaddr;
+  bool has_srsrc;
+  bool has_soffset;
+};
+
+#define GET_MTBUFInfoTable_DECL
+#define GET_MTBUFInfoTable_IMPL
 #define GET_MUBUFInfoTable_DECL
 #define GET_MUBUFInfoTable_IMPL
 #include "AMDGPUGenSearchableTables.inc"
+
+int getMTBUFBaseOpcode(unsigned Opc) {
+  const MTBUFInfo *Info = getMTBUFInfoFromOpcode(Opc);
+  return Info ? Info->BaseOpcode : -1;
+}
+
+int getMTBUFOpcode(unsigned BaseOpc, unsigned Elements) {
+  const MTBUFInfo *Info = getMTBUFInfoFromBaseOpcodeAndElements(BaseOpc, Elements);
+  return Info ? Info->Opcode : -1;
+}
+
+int getMTBUFElements(unsigned Opc) {
+  const MTBUFInfo *Info = getMTBUFOpcodeHelper(Opc);
+  return Info ? Info->elements : 0;
+}
+
+bool getMTBUFHasVAddr(unsigned Opc) {
+  const MTBUFInfo *Info = getMTBUFOpcodeHelper(Opc);
+  return Info ? Info->has_vaddr : false;
+}
+
+bool getMTBUFHasSrsrc(unsigned Opc) {
+  const MTBUFInfo *Info = getMTBUFOpcodeHelper(Opc);
+  return Info ? Info->has_srsrc : false;
+}
+
+bool getMTBUFHasSoffset(unsigned Opc) {
+  const MTBUFInfo *Info = getMTBUFOpcodeHelper(Opc);
+  return Info ? Info->has_soffset : false;
+}
 
 int getMUBUFBaseOpcode(unsigned Opc) {
   const MUBUFInfo *Info = getMUBUFInfoFromOpcode(Opc);
   return Info ? Info->BaseOpcode : -1;
 }
 
-int getMUBUFOpcode(unsigned BaseOpc, unsigned Dwords) {
-  const MUBUFInfo *Info = getMUBUFInfoFromBaseOpcodeAndDwords(BaseOpc, Dwords);
+int getMUBUFOpcode(unsigned BaseOpc, unsigned Elements) {
+  const MUBUFInfo *Info = getMUBUFInfoFromBaseOpcodeAndElements(BaseOpc, Elements);
   return Info ? Info->Opcode : -1;
 }
 
-int getMUBUFDwords(unsigned Opc) {
+int getMUBUFElements(unsigned Opc) {
   const MUBUFInfo *Info = getMUBUFOpcodeHelper(Opc);
-  return Info ? Info->dwords : 0;
+  return Info ? Info->elements : 0;
 }
 
 bool getMUBUFHasVAddr(unsigned Opc) {
@@ -514,7 +555,7 @@ bool isReadOnlySegment(const GlobalValue *GV) {
 }
 
 bool shouldEmitConstantsToTextSection(const Triple &TT) {
-  return TT.getOS() != Triple::AMDHSA;
+  return TT.getOS() == Triple::AMDPAL;
 }
 
 int getIntegerAttribute(const Function &F, StringRef Name, int Default) {

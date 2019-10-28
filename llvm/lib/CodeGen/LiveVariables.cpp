@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/LiveVariables.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -214,7 +215,7 @@ MachineInstr *LiveVariables::FindLastPartialDef(unsigned Reg,
     MachineOperand &MO = LastDef->getOperand(i);
     if (!MO.isReg() || !MO.isDef() || MO.getReg() == 0)
       continue;
-    unsigned DefReg = MO.getReg();
+    Register DefReg = MO.getReg();
     if (TRI->isSubRegister(Reg, DefReg)) {
       for (MCSubRegIterator SubRegs(DefReg, TRI, /*IncludeSelf=*/true);
            SubRegs.isValid(); ++SubRegs)
@@ -519,7 +520,7 @@ void LiveVariables::runOnInstr(MachineInstr &MI,
     }
     if (!MO.isReg() || MO.getReg() == 0)
       continue;
-    unsigned MOReg = MO.getReg();
+    Register MOReg = MO.getReg();
     if (MO.isUse()) {
       if (!(Register::isPhysicalRegister(MOReg) && MRI->isReserved(MOReg)))
         MO.setIsKill(false);
@@ -690,7 +691,7 @@ void LiveVariables::removeVirtualRegistersKilled(MachineInstr &MI) {
     MachineOperand &MO = MI.getOperand(i);
     if (MO.isReg() && MO.isKill()) {
       MO.setIsKill(false);
-      unsigned Reg = MO.getReg();
+      Register Reg = MO.getReg();
       if (Register::isVirtualRegister(Reg)) {
         bool removed = getVarInfo(Reg).removeKill(MI);
         assert(removed && "kill not in register's VarInfo?");

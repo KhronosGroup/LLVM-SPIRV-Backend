@@ -85,9 +85,7 @@ protected:
         m_clear.SetOptionWasSet();
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -215,13 +213,12 @@ public:
     return "";
   }
 
-  int HandleArgumentCompletion(
-      CompletionRequest &request,
-      OptionElementVector &opt_element_vector) override {
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
     CommandCompletions::InvokeCommonCompletionCallbacks(
         GetCommandInterpreter(), CommandCompletions::eDiskFileCompletion,
         request, nullptr);
-    return request.GetNumberOfMatches();
   }
 
   Options *GetOptions() override { return &m_options; }
@@ -254,9 +251,7 @@ protected:
         break;
 
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -288,7 +283,7 @@ protected:
       return false;
     }
 
-    FileSpec cmd_file(command[0].ref);
+    FileSpec cmd_file(command[0].ref());
     FileSystem::Instance().Resolve(cmd_file);
     ExecutionContext *exe_ctx = nullptr; // Just use the default context.
 
@@ -371,9 +366,7 @@ protected:
         break;
 
       default:
-        error.SetErrorStringWithFormat("invalid short option character '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -553,7 +546,7 @@ protected:
 
     // Get the alias command.
 
-    auto alias_command = args[0].ref;
+    auto alias_command = args[0].ref();
     if (alias_command.startswith("-")) {
       result.AppendError("aliases starting with a dash are not supported");
       if (alias_command == "--help" || alias_command == "--long-help") {
@@ -660,8 +653,8 @@ protected:
     }
 
     // Save these in std::strings since we're going to shift them off.
-    const std::string alias_command(args[0].ref);
-    const std::string actual_command(args[1].ref);
+    const std::string alias_command(args[0].ref());
+    const std::string actual_command(args[1].ref());
 
     args.Shift(); // Shift the alias command word off the argument vector.
     args.Shift(); // Shift the old command word off the argument vector.
@@ -693,7 +686,7 @@ protected:
         OptionArgVectorSP(new OptionArgVector);
 
     while (cmd_obj->IsMultiwordObject() && !args.empty()) {
-      auto sub_command = args[0].ref;
+      auto sub_command = args[0].ref();
       assert(!sub_command.empty());
       subcommand_obj_sp = cmd_obj->GetSubcommandSP(sub_command);
       if (!subcommand_obj_sp) {
@@ -787,7 +780,7 @@ protected:
       return false;
     }
 
-    auto command_name = args[0].ref;
+    auto command_name = args[0].ref();
     cmd_obj = m_interpreter.GetCommandObject(command_name);
     if (!cmd_obj) {
       result.AppendErrorWithFormat(
@@ -866,9 +859,10 @@ protected:
                                    "defined regular expression command names",
                                    GetCommandName().str().c_str());
       result.SetStatus(eReturnStatusFailed);
+      return false;
     }
 
-    auto command_name = args[0].ref;
+    auto command_name = args[0].ref();
     if (!m_interpreter.CommandExists(command_name)) {
       StreamString error_msg_stream;
       const bool generate_upropos = true;
@@ -951,7 +945,7 @@ a number follows 'f':"
 
 protected:
   void IOHandlerActivated(IOHandler &io_handler, bool interactive) override {
-    StreamFileSP output_sp(io_handler.GetOutputStreamFile());
+    StreamFileSP output_sp(io_handler.GetOutputStreamFileSP());
     if (output_sp && interactive) {
       output_sp->PutCString("Enter one or more sed substitution commands in "
                             "the form: 's/<regex>/<subst>/'.\nTerminate the "
@@ -966,11 +960,9 @@ protected:
     if (m_regex_cmd_up) {
       StringList lines;
       if (lines.SplitIntoLines(data)) {
-        const size_t num_lines = lines.GetSize();
         bool check_only = false;
-        for (size_t i = 0; i < num_lines; ++i) {
-          llvm::StringRef bytes_strref(lines[i]);
-          Status error = AppendRegexSubstitution(bytes_strref, check_only);
+        for (const std::string &line : lines) {
+          Status error = AppendRegexSubstitution(line, check_only);
           if (error.Fail()) {
             if (!GetDebugger().GetCommandInterpreter().GetBatchCommandMode()) {
               StreamSP out_stream = GetDebugger().GetAsyncOutputStream();
@@ -996,8 +988,8 @@ protected:
     }
 
     Status error;
-    auto name = command[0].ref;
-    m_regex_cmd_up = llvm::make_unique<CommandObjectRegexCommand>(
+    auto name = command[0].ref();
+    m_regex_cmd_up = std::make_unique<CommandObjectRegexCommand>(
         m_interpreter, name, m_options.GetHelp(), m_options.GetSyntax(), 10, 0,
         true);
 
@@ -1021,7 +1013,7 @@ protected:
     } else {
       for (auto &entry : command.entries().drop_front()) {
         bool check_only = false;
-        error = AppendRegexSubstitution(entry.ref, check_only);
+        error = AppendRegexSubstitution(entry.ref(), check_only);
         if (error.Fail())
           break;
       }
@@ -1164,9 +1156,7 @@ private:
         m_syntax.assign(option_arg);
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1296,8 +1286,6 @@ public:
 
   bool IsRemovable() const override { return true; }
 
-  StructuredData::GenericSP GetImplementingObject() { return m_cmd_obj_sp; }
-
   ScriptedCommandSynchronicity GetSynchronicity() { return m_synchro; }
 
   llvm::StringRef GetHelp() override {
@@ -1392,13 +1380,12 @@ public:
 
   ~CommandObjectCommandsScriptImport() override = default;
 
-  int HandleArgumentCompletion(
-      CompletionRequest &request,
-      OptionElementVector &opt_element_vector) override {
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
     CommandCompletions::InvokeCommonCompletionCallbacks(
         GetCommandInterpreter(), CommandCompletions::eDiskFileCompletion,
         request, nullptr);
-    return request.GetNumberOfMatches();
   }
 
   Options *GetOptions() override { return &m_options; }
@@ -1420,9 +1407,7 @@ protected:
         m_allow_reload = true;
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1574,9 +1559,7 @@ protected:
               option_arg.str().c_str());
         break;
       default:
-        error.SetErrorStringWithFormat("unrecognized option '%c'",
-                                       short_option);
-        break;
+        llvm_unreachable("Unimplemented option");
       }
 
       return error;
@@ -1602,7 +1585,7 @@ protected:
   };
 
   void IOHandlerActivated(IOHandler &io_handler, bool interactive) override {
-    StreamFileSP output_sp(io_handler.GetOutputStreamFile());
+    StreamFileSP output_sp(io_handler.GetOutputStreamFileSP());
     if (output_sp && interactive) {
       output_sp->PutCString(g_python_command_instructions);
       output_sp->Flush();
@@ -1611,7 +1594,7 @@ protected:
 
   void IOHandlerInputComplete(IOHandler &io_handler,
                               std::string &data) override {
-    StreamFileSP error_sp = io_handler.GetErrorStreamFile();
+    StreamFileSP error_sp = io_handler.GetErrorStreamFileSP();
 
     ScriptInterpreter *interpreter = GetDebugger().GetScriptInterpreter();
     if (interpreter) {
@@ -1673,7 +1656,7 @@ protected:
     }
 
     // Store the options in case we get multi-line input
-    m_cmd_name = command[0].ref;
+    m_cmd_name = command[0].ref();
     m_short_help.assign(m_options.m_short_help);
     m_synchronicity = m_options.m_synchronicity;
 
@@ -1742,6 +1725,12 @@ public:
   ~CommandObjectCommandsScriptList() override = default;
 
   bool DoExecute(Args &command, CommandReturnObject &result) override {
+    if (command.GetArgumentCount() != 0) {
+      result.AppendError("'command script list' doesn't take any arguments");
+      result.SetStatus(eReturnStatusFailed);
+      return false;
+    }
+
     m_interpreter.GetHelp(result, CommandInterpreter::eCommandTypesUserDef);
 
     result.SetStatus(eReturnStatusSuccessFinishResult);
@@ -1762,6 +1751,12 @@ public:
 
 protected:
   bool DoExecute(Args &command, CommandReturnObject &result) override {
+    if (command.GetArgumentCount() != 0) {
+      result.AppendError("'command script clear' doesn't take any arguments");
+      result.SetStatus(eReturnStatusFailed);
+      return false;
+    }
+
     m_interpreter.RemoveAllUser();
 
     result.SetStatus(eReturnStatusSuccessFinishResult);
@@ -1803,7 +1798,7 @@ protected:
       return false;
     }
 
-    auto cmd_name = command[0].ref;
+    auto cmd_name = command[0].ref();
 
     if (cmd_name.empty() || !m_interpreter.HasUserCommands() ||
         !m_interpreter.UserCommandExists(cmd_name)) {

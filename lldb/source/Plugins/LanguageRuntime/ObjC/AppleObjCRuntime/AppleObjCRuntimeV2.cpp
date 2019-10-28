@@ -582,9 +582,9 @@ protected:
     case 0:
       break;
     case 1: {
-      regex_up.reset(new RegularExpression());
-      if (!regex_up->Compile(llvm::StringRef::withNullAsEmpty(
-              command.GetArgumentAtIndex(0)))) {
+      regex_up.reset(new RegularExpression(
+          llvm::StringRef::withNullAsEmpty(command.GetArgumentAtIndex(0))));
+      if (!regex_up->IsValid()) {
         result.AppendError(
             "invalid argument - please provide a valid regular expression");
         result.SetStatus(lldb::eReturnStatusFailed);
@@ -1601,7 +1601,7 @@ AppleObjCRuntimeV2::UpdateISAToDescriptorMapSharedCache() {
     // use that in our jitted expression.  Else fall back to the old
     // class_getName.
     static ConstString g_class_getName_symbol_name("class_getName");
-    static ConstString g_class_getNameRaw_symbol_name("class_getNameRaw");
+    static ConstString g_class_getNameRaw_symbol_name("objc_debug_class_getNameRaw");
     ConstString class_name_getter_function_name = g_class_getName_symbol_name;
 
     ObjCLanguageRuntime *objc_runtime = ObjCLanguageRuntime::Get(*process);
@@ -2029,8 +2029,8 @@ lldb::addr_t AppleObjCRuntimeV2::LookupRuntimeSymbol(ConstString name) {
   if (name_cstr) {
     llvm::StringRef name_strref(name_cstr);
 
-    static const llvm::StringRef ivar_prefix("OBJC_IVAR_$_");
-    static const llvm::StringRef class_prefix("OBJC_CLASS_$_");
+    llvm::StringRef ivar_prefix("OBJC_IVAR_$_");
+    llvm::StringRef class_prefix("OBJC_CLASS_$_");
 
     if (name_strref.startswith(ivar_prefix)) {
       llvm::StringRef ivar_skipped_prefix =
@@ -2640,8 +2640,9 @@ bool AppleObjCRuntimeV2::GetCFBooleanValuesIfNeeded() {
   std::function<lldb::addr_t(ConstString)> get_symbol =
       [this](ConstString sym) -> lldb::addr_t {
     SymbolContextList sc_list;
-    if (GetProcess()->GetTarget().GetImages().FindSymbolsWithNameAndType(
-            sym, lldb::eSymbolTypeData, sc_list) == 1) {
+    GetProcess()->GetTarget().GetImages().FindSymbolsWithNameAndType(
+        sym, lldb::eSymbolTypeData, sc_list);
+    if (sc_list.GetSize() == 1) {
       SymbolContext sc;
       sc_list.GetContextAtIndex(0, sc);
       if (sc.symbol)

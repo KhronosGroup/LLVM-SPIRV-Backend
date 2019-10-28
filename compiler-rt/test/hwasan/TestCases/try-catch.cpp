@@ -1,5 +1,8 @@
-// RUN: %clangxx_hwasan %s -o %t && %run %t 2>&1 | FileCheck %s --check-prefix=GOOD
-// RUN: %clangxx_hwasan %s -mllvm -hwasan-instrument-landing-pads=0 -o %t && not %run %t 2>&1 | FileCheck %s --check-prefix=BAD
+// This test is broken with shared libstdc++ / libc++ on Android.
+// RUN: %clangxx_hwasan -static-libstdc++ %s -o %t && %run %t 2>&1 | FileCheck %s --check-prefix=GOOD
+// RUN: %clangxx_hwasan -static-libstdc++ -DNO_SANITIZE_F %s -o %t && %run %t 2>&1 | FileCheck %s --check-prefix=GOOD
+// RUN: %clangxx_hwasan_oldrt -static-libstdc++ %s -o %t && %run %t 2>&1 | FileCheck %s --check-prefix=GOOD
+// RUN: %clangxx_hwasan_oldrt -static-libstdc++ %s -mllvm -hwasan-instrument-landing-pads=0 -o %t && not %run %t 2>&1 | FileCheck %s --check-prefix=BAD
 
 // C++ tests on x86_64 require instrumented libc++/libstdc++.
 // REQUIRES: aarch64-target-arch
@@ -40,6 +43,9 @@ __attribute__((noinline, no_sanitize("hwaddress"))) void after_catch() {
 
 
 __attribute__((noinline))
+#ifdef NO_SANITIZE_F
+__attribute__((no_sanitize("hwaddress")))
+#endif
 void f() {
   char x[1000];
   try {

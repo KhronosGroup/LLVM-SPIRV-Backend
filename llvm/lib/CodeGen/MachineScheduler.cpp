@@ -82,6 +82,10 @@ cl::opt<bool>
 DumpCriticalPathLength("misched-dcpl", cl::Hidden,
                        cl::desc("Print critical path length to stdout"));
 
+cl::opt<bool> VerifyScheduling(
+    "verify-misched", cl::Hidden,
+    cl::desc("Verify machine instrs before and after machine scheduling"));
+
 } // end namespace llvm
 
 #ifndef NDEBUG
@@ -121,9 +125,6 @@ static cl::opt<bool> EnableCyclicPath("misched-cyclicpath", cl::Hidden,
 static cl::opt<bool> EnableMemOpCluster("misched-cluster", cl::Hidden,
                                         cl::desc("Enable memop clustering."),
                                         cl::init(true));
-
-static cl::opt<bool> VerifyScheduling("verify-misched", cl::Hidden,
-  cl::desc("Verify machine instrs before and after machine scheduling"));
 
 // DAG subtrees must have at least this many nodes.
 static const unsigned MinSubtreeSize = 8;
@@ -198,6 +199,7 @@ char &llvm::MachineSchedulerID = MachineScheduler::ID;
 INITIALIZE_PASS_BEGIN(MachineScheduler, DEBUG_TYPE,
                       "Machine Instruction Scheduler", false, false)
 INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
 INITIALIZE_PASS_DEPENDENCY(SlotIndexes)
 INITIALIZE_PASS_DEPENDENCY(LiveIntervals)
@@ -210,7 +212,7 @@ MachineScheduler::MachineScheduler() : MachineSchedulerBase(ID) {
 
 void MachineScheduler::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
-  AU.addRequiredID(MachineDominatorsID);
+  AU.addRequired<MachineDominatorTree>();
   AU.addRequired<MachineLoopInfo>();
   AU.addRequired<AAResultsWrapperPass>();
   AU.addRequired<TargetPassConfig>();
@@ -234,7 +236,7 @@ PostMachineScheduler::PostMachineScheduler() : MachineSchedulerBase(ID) {
 
 void PostMachineScheduler::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
-  AU.addRequiredID(MachineDominatorsID);
+  AU.addRequired<MachineDominatorTree>();
   AU.addRequired<MachineLoopInfo>();
   AU.addRequired<TargetPassConfig>();
   MachineFunctionPass::getAnalysisUsage(AU);
@@ -933,7 +935,7 @@ void ScheduleDAGMILive::collectVRegUses(SUnit &SU) {
     if (TrackLaneMasks && !MO.isUse())
       continue;
 
-    unsigned Reg = MO.getReg();
+    Register Reg = MO.getReg();
     if (!Register::isVirtualRegister(Reg))
       continue;
 
@@ -985,7 +987,7 @@ void ScheduleDAGMILive::enterRegion(MachineBasicBlock *bb,
          "ShouldTrackLaneMasks requires ShouldTrackPressure");
 }
 
-// Setup the register pressure trackers for the top scheduled top and bottom
+// Setup the register pressure trackers for the top scheduled and bottom
 // scheduled regions.
 void ScheduleDAGMILive::initRegPressure() {
   VRegUses.clear();
@@ -1538,14 +1540,14 @@ namespace llvm {
 std::unique_ptr<ScheduleDAGMutation>
 createLoadClusterDAGMutation(const TargetInstrInfo *TII,
                              const TargetRegisterInfo *TRI) {
-  return EnableMemOpCluster ? llvm::make_unique<LoadClusterMutation>(TII, TRI)
+  return EnableMemOpCluster ? std::make_unique<LoadClusterMutation>(TII, TRI)
                             : nullptr;
 }
 
 std::unique_ptr<ScheduleDAGMutation>
 createStoreClusterDAGMutation(const TargetInstrInfo *TII,
                               const TargetRegisterInfo *TRI) {
-  return EnableMemOpCluster ? llvm::make_unique<StoreClusterMutation>(TII, TRI)
+  return EnableMemOpCluster ? std::make_unique<StoreClusterMutation>(TII, TRI)
                             : nullptr;
 }
 
@@ -1657,7 +1659,7 @@ namespace llvm {
 std::unique_ptr<ScheduleDAGMutation>
 createCopyConstrainDAGMutation(const TargetInstrInfo *TII,
                                const TargetRegisterInfo *TRI) {
-  return llvm::make_unique<CopyConstrain>(TII, TRI);
+  return std::make_unique<CopyConstrain>(TII, TRI);
 }
 
 } // end namespace llvm
@@ -1687,12 +1689,12 @@ void CopyConstrain::constrainLocalCopy(SUnit *CopySU, ScheduleDAGMILive *DAG) {
 
   // Check for pure vreg copies.
   const MachineOperand &SrcOp = Copy->getOperand(1);
-  unsigned SrcReg = SrcOp.getReg();
+  Register SrcReg = SrcOp.getReg();
   if (!Register::isVirtualRegister(SrcReg) || !SrcOp.readsReg())
     return;
 
   const MachineOperand &DstOp = Copy->getOperand(0);
-  unsigned DstReg = DstOp.getReg();
+  Register DstReg = DstOp.getReg();
   if (!Register::isVirtualRegister(DstReg) || DstOp.isDead())
     return;
 
@@ -3297,7 +3299,7 @@ void GenericScheduler::schedNode(SUnit *SU, bool IsTopNode) {
 /// default scheduler if the target does not set a default.
 ScheduleDAGMILive *llvm::createGenericSchedLive(MachineSchedContext *C) {
   ScheduleDAGMILive *DAG =
-      new ScheduleDAGMILive(C, llvm::make_unique<GenericScheduler>(C));
+      new ScheduleDAGMILive(C, std::make_unique<GenericScheduler>(C));
   // Register DAG post-processors.
   //
   // FIXME: extend the mutation API to allow earlier mutations to instantiate
@@ -3449,7 +3451,7 @@ void PostGenericScheduler::schedNode(SUnit *SU, bool IsTopNode) {
 }
 
 ScheduleDAGMI *llvm::createGenericSchedPostRA(MachineSchedContext *C) {
-  return new ScheduleDAGMI(C, llvm::make_unique<PostGenericScheduler>(C),
+  return new ScheduleDAGMI(C, std::make_unique<PostGenericScheduler>(C),
                            /*RemoveKillFlags=*/true);
 }
 
@@ -3560,10 +3562,10 @@ public:
 } // end anonymous namespace
 
 static ScheduleDAGInstrs *createILPMaxScheduler(MachineSchedContext *C) {
-  return new ScheduleDAGMILive(C, llvm::make_unique<ILPScheduler>(true));
+  return new ScheduleDAGMILive(C, std::make_unique<ILPScheduler>(true));
 }
 static ScheduleDAGInstrs *createILPMinScheduler(MachineSchedContext *C) {
-  return new ScheduleDAGMILive(C, llvm::make_unique<ILPScheduler>(false));
+  return new ScheduleDAGMILive(C, std::make_unique<ILPScheduler>(false));
 }
 
 static MachineSchedRegistry ILPMaxRegistry(
@@ -3657,7 +3659,7 @@ static ScheduleDAGInstrs *createInstructionShuffler(MachineSchedContext *C) {
   assert((TopDown || !ForceTopDown) &&
          "-misched-topdown incompatible with -misched-bottomup");
   return new ScheduleDAGMILive(
-      C, llvm::make_unique<InstructionShuffler>(Alternate, TopDown));
+      C, std::make_unique<InstructionShuffler>(Alternate, TopDown));
 }
 
 static MachineSchedRegistry ShufflerRegistry(

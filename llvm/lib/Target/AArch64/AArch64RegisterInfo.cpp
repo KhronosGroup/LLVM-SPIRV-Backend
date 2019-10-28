@@ -64,8 +64,9 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     return CSR_AArch64_AAPCS_SwiftError_SaveList;
   if (MF->getFunction().getCallingConv() == CallingConv::PreserveMost)
     return CSR_AArch64_RT_MostRegs_SaveList;
-  else
-    return CSR_AArch64_AAPCS_SaveList;
+  if (MF->getSubtarget<AArch64Subtarget>().isTargetDarwin())
+    return CSR_Darwin_AArch64_AAPCS_SaveList;
+  return CSR_AArch64_AAPCS_SaveList;
 }
 
 const MCPhysReg *AArch64RegisterInfo::getCalleeSavedRegsViaCopy(
@@ -446,11 +447,14 @@ void AArch64RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineInstr &MI = *II;
   MachineBasicBlock &MBB = *MI.getParent();
   MachineFunction &MF = *MBB.getParent();
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
   const AArch64InstrInfo *TII =
       MF.getSubtarget<AArch64Subtarget>().getInstrInfo();
   const AArch64FrameLowering *TFI = getFrameLowering(MF);
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  bool Tagged =
+      MI.getOperand(FIOperandNum).getTargetFlags() & AArch64II::MO_TAGGED;
   unsigned FrameReg;
 
   // Special handling of dbg_value, stackmap and patchpoint instructions.
@@ -476,11 +480,35 @@ void AArch64RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   StackOffset Offset;
   if (MI.getOpcode() == AArch64::TAGPstack) {
     // TAGPstack must use the virtual frame register in its 3rd operand.
-    const MachineFrameInfo &MFI = MF.getFrameInfo();
     const AArch64FunctionInfo *AFI = MF.getInfo<AArch64FunctionInfo>();
     FrameReg = MI.getOperand(3).getReg();
     Offset = {MFI.getObjectOffset(FrameIndex) +
                   AFI->getTaggedBasePointerOffset(),
+              MVT::i8};
+  } else if (Tagged) {
+    StackOffset SPOffset = {
+        MFI.getObjectOffset(FrameIndex) + (int64_t)MFI.getStackSize(), MVT::i8};
+    if (MFI.hasVarSizedObjects() ||
+        isAArch64FrameOffsetLegal(MI, SPOffset, nullptr, nullptr, nullptr) !=
+            (AArch64FrameOffsetCanUpdate | AArch64FrameOffsetIsLegal)) {
+      // Can't update to SP + offset in place. Precalculate the tagged pointer
+      // in a scratch register.
+      Offset = TFI->resolveFrameIndexReference(
+          MF, FrameIndex, FrameReg, /*PreferFP=*/false, /*ForSimm=*/true);
+      Register ScratchReg =
+          MF.getRegInfo().createVirtualRegister(&AArch64::GPR64RegClass);
+      emitFrameOffset(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg, Offset,
+                      TII);
+      BuildMI(MBB, MI, MI.getDebugLoc(), TII->get(AArch64::LDG), ScratchReg)
+          .addReg(ScratchReg)
+          .addReg(ScratchReg)
+          .addImm(0);
+      MI.getOperand(FIOperandNum)
+          .ChangeToRegister(ScratchReg, false, false, true);
+      return;
+    }
+    FrameReg = AArch64::SP;
+    Offset = {MFI.getObjectOffset(FrameIndex) + (int64_t)MFI.getStackSize(),
               MVT::i8};
   } else {
     Offset = TFI->resolveFrameIndexReference(
@@ -497,7 +525,7 @@ void AArch64RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // If we get here, the immediate doesn't fit into the instruction.  We folded
   // as much as possible above.  Handle the rest, providing a register that is
   // SP+LargeImm.
-  unsigned ScratchReg =
+  Register ScratchReg =
       MF.getRegInfo().createVirtualRegister(&AArch64::GPR64RegClass);
   emitFrameOffset(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg, Offset, TII);
   MI.getOperand(FIOperandNum).ChangeToRegister(ScratchReg, false, false, true);

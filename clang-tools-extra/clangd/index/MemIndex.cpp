@@ -21,7 +21,7 @@ std::unique_ptr<SymbolIndex> MemIndex::build(SymbolSlab Slab, RefSlab Refs,
   // Store Slab size before it is moved.
   const auto BackingDataSize = Slab.bytes() + Refs.bytes();
   auto Data = std::make_pair(std::move(Slab), std::move(Refs));
-  return llvm::make_unique<MemIndex>(Data.first, Data.second, Relations,
+  return std::make_unique<MemIndex>(Data.first, Data.second, Relations,
                                      std::move(Data), BackingDataSize);
 }
 
@@ -92,7 +92,8 @@ void MemIndex::relations(
       Req.Limit.getValueOr(std::numeric_limits<uint32_t>::max());
   for (const SymbolID &Subject : Req.Subjects) {
     LookupRequest LookupReq;
-    auto It = Relations.find(std::make_pair(Subject, Req.Predicate));
+    auto It = Relations.find(
+        std::make_pair(Subject, static_cast<uint8_t>(Req.Predicate)));
     if (It != Relations.end()) {
       for (const auto &Obj : It->second) {
         if (Remaining > 0) {

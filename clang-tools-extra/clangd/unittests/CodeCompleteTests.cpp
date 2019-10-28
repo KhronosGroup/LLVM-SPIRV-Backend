@@ -18,6 +18,7 @@
 #include "TestFS.h"
 #include "TestIndex.h"
 #include "TestTU.h"
+#include "Threading.h"
 #include "index/Index.h"
 #include "index/MemIndex.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
@@ -27,6 +28,8 @@
 #include "llvm/Testing/Support/Error.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <condition_variable>
+#include <mutex>
 
 namespace clang {
 namespace clangd {
@@ -939,6 +942,25 @@ TEST(CompletionTest, IgnoreCompleteInExcludedPPBranchWithRecoveryContext) {
 
   EXPECT_TRUE(Results.Completions.empty());
 }
+
+TEST(CompletionTest, DefaultArgs) {
+  clangd::CodeCompleteOptions Opts;
+  std::string Context = R"cpp(
+    int X(int A = 0);
+    int Y(int A, int B = 0);
+    int Z(int A, int B = 0, int C = 0, int D = 0);
+  )cpp";
+  EXPECT_THAT(completions(Context + "int y = X^", {}, Opts).Completions,
+              UnorderedElementsAre(Labeled("X(int A = 0)")));
+  EXPECT_THAT(completions(Context + "int y = Y^", {}, Opts).Completions,
+              UnorderedElementsAre(AllOf(Labeled("Y(int A, int B = 0)"),
+                                         SnippetSuffix("(${1:int A})"))));
+  EXPECT_THAT(completions(Context + "int y = Z^", {}, Opts).Completions,
+              UnorderedElementsAre(
+                  AllOf(Labeled("Z(int A, int B = 0, int C = 0, int D = 0)"),
+                        SnippetSuffix("(${1:int A})"))));
+}
+
 SignatureHelp signatures(llvm::StringRef Text, Position Point,
                          std::vector<Symbol> IndexSymbols = {}) {
   std::unique_ptr<SymbolIndex> Index;
@@ -1093,8 +1115,9 @@ public:
   bool
   fuzzyFind(const FuzzyFindRequest &Req,
             llvm::function_ref<void(const Symbol &)> Callback) const override {
-    std::lock_guard<std::mutex> Lock(Mut);
+    std::unique_lock<std::mutex> Lock(Mut);
     Requests.push_back(Req);
+    ReceivedRequestCV.notify_one();
     return true;
   }
 
@@ -1112,8 +1135,10 @@ public:
   // isn't used in production code.
   size_t estimateMemoryUsage() const override { return 0; }
 
-  const std::vector<FuzzyFindRequest> consumeRequests() const {
-    std::lock_guard<std::mutex> Lock(Mut);
+  const std::vector<FuzzyFindRequest> consumeRequests(size_t Num) const {
+    std::unique_lock<std::mutex> Lock(Mut);
+    EXPECT_TRUE(wait(Lock, ReceivedRequestCV, timeoutSeconds(30),
+                     [this, Num] { return Requests.size() == Num; }));
     auto Reqs = std::move(Requests);
     Requests = {};
     return Reqs;
@@ -1121,16 +1146,21 @@ public:
 
 private:
   // We need a mutex to handle async fuzzy find requests.
+  mutable std::condition_variable ReceivedRequestCV;
   mutable std::mutex Mut;
   mutable std::vector<FuzzyFindRequest> Requests;
 };
 
-std::vector<FuzzyFindRequest> captureIndexRequests(llvm::StringRef Code) {
+// Clients have to consume exactly Num requests.
+std::vector<FuzzyFindRequest> captureIndexRequests(llvm::StringRef Code,
+                                                   size_t Num = 1) {
   clangd::CodeCompleteOptions Opts;
   IndexRequestCollector Requests;
   Opts.Index = &Requests;
   completions(Code, {}, Opts);
-  return Requests.consumeRequests();
+  const auto Reqs = Requests.consumeRequests(Num);
+  EXPECT_EQ(Reqs.size(), Num);
+  return Reqs;
 }
 
 TEST(CompletionTest, UnqualifiedIdQuery) {
@@ -2079,18 +2109,15 @@ TEST(CompletionTest, EnableSpeculativeIndexRequest) {
 
   auto CompleteAtPoint = [&](StringRef P) {
     cantFail(runCodeComplete(Server, File, Test.point(P), Opts));
-    // Sleep for a while to make sure asynchronous call (if applicable) is also
-    // triggered before callback is invoked.
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   };
 
   CompleteAtPoint("1");
-  auto Reqs1 = Requests.consumeRequests();
+  auto Reqs1 = Requests.consumeRequests(1);
   ASSERT_EQ(Reqs1.size(), 1u);
   EXPECT_THAT(Reqs1[0].Scopes, UnorderedElementsAre("ns1::"));
 
   CompleteAtPoint("2");
-  auto Reqs2 = Requests.consumeRequests();
+  auto Reqs2 = Requests.consumeRequests(1);
   // Speculation succeeded. Used speculative index result.
   ASSERT_EQ(Reqs2.size(), 1u);
   EXPECT_EQ(Reqs2[0], Reqs1[0]);
@@ -2098,7 +2125,7 @@ TEST(CompletionTest, EnableSpeculativeIndexRequest) {
   CompleteAtPoint("3");
   // Speculation failed. Sent speculative index request and the new index
   // request after sema.
-  auto Reqs3 = Requests.consumeRequests();
+  auto Reqs3 = Requests.consumeRequests(2);
   ASSERT_EQ(Reqs3.size(), 2u);
 }
 
@@ -2525,6 +2552,25 @@ TEST(CompletionTest, NamespaceDoubleInsertion) {
                              {cls("foo::ns::ABCDE")}, Opts);
   EXPECT_THAT(Results.Completions,
               UnorderedElementsAre(AllOf(Qualifier(""), Named("ABCDE"))));
+}
+
+TEST(CompletionTest, DerivedMethodsAreAlwaysVisible) {
+  // Despite the fact that base method matches the ref-qualifier better,
+  // completion results should only include the derived method.
+  auto Completions = completions(R"cpp(
+    struct deque_base {
+      float size();
+      double size() const;
+    };
+    struct deque : deque_base {
+        int size() const;
+    };
+
+    auto x = deque().^
+  )cpp")
+                         .Completions;
+  EXPECT_THAT(Completions,
+              ElementsAre(AllOf(ReturnType("int"), Named("size"))));
 }
 
 TEST(NoCompileCompletionTest, Basic) {

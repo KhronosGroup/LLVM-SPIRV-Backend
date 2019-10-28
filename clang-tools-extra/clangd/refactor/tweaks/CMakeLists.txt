@@ -16,14 +16,18 @@ add_clang_library(clangDaemonTweaks OBJECT
   DumpAST.cpp
   ExpandAutoType.cpp
   ExpandMacro.cpp
+  ExtractFunction.cpp
   ExtractVariable.cpp
   RawStringLiteral.cpp
+  RemoveUsingNamespace.cpp
   SwapIfBranches.cpp
 
   LINK_LIBS
   clangAST
   clangBasic
   clangDaemon
+  clangLex
   clangToolingCore
+  clangToolingRefactoring
   clangToolingSyntax
   )

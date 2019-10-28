@@ -906,6 +906,11 @@ public:
     return skipRValueSubobjectAdjustments(CommaLHSs, Adjustments);
   }
 
+  /// Checks that the two Expr's will refer to the same value as a comparison
+  /// operand.  The caller must ensure that the values referenced by the Expr's
+  /// are not modified between E1 and E2 or the result my be invalid.
+  static bool isSameComparisonOperand(const Expr* E1, const Expr* E2);
+
   static bool classof(const Stmt *T) {
     return T->getStmtClass() >= firstExprConstant &&
            T->getStmtClass() <= lastExprConstant;
@@ -4495,6 +4500,8 @@ public:
 
   // Explicit InitListExpr's originate from source code (and have valid source
   // locations). Implicit InitListExpr's are created by the semantic analyzer.
+  // FIXME: This is wrong; InitListExprs created by semantic analysis have
+  // valid source locations too!
   bool isExplicit() const {
     return LBraceLoc.isValid() && RBraceLoc.isValid();
   }
@@ -4828,6 +4835,10 @@ public:
   /// initializer value itself, if present.
   SourceLocation getEqualOrColonLoc() const { return EqualOrColonLoc; }
   void setEqualOrColonLoc(SourceLocation L) { EqualOrColonLoc = L; }
+
+  /// Whether this designated initializer should result in direct-initialization
+  /// of the designated subobject (eg, '{.foo{1, 2, 3}}').
+  bool isDirectInit() const { return EqualOrColonLoc.isInvalid(); }
 
   /// Determines whether this designated initializer used the
   /// deprecated GNU syntax for designated initializers.

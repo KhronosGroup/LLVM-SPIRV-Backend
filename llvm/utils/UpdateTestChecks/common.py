@@ -72,6 +72,17 @@ SCRUB_KILL_COMMENT_RE = re.compile(r'^ *#+ +kill:.*\n')
 SCRUB_LOOP_COMMENT_RE = re.compile(
     r'# =>This Inner Loop Header:.*|# in Loop:.*', flags=re.M)
 
+
+def error(msg, test_file=None):
+  if test_file:
+    msg = '{}: {}'.format(msg, test_file)
+  print('ERROR: {}'.format(msg), file=sys.stderr)
+
+def warn(msg, test_file=None):
+  if test_file:
+    msg = '{}: {}'.format(msg, test_file)
+  print('WARNING: {}'.format(msg), file=sys.stderr)
+
 def scrub_body(body):
   # Scrub runs of whitespace out of the assembly, but leave the leading
   # whitespace in place.
@@ -108,7 +119,7 @@ def build_function_body_dictionary(function_re, scrubber, scrubber_args, raw_too
     if 'analysis' in m.groupdict():
       analysis = m.group('analysis')
       if analysis.lower() != 'cost model analysis':
-        print('WARNING: Unsupported analysis mode: %r!' % (analysis,), file=sys.stderr)
+        warn('Unsupported analysis mode: %r!' % (analysis,))
     if func.startswith('stress'):
       # We only use the last line of the function body for stress tests.
       scrubbed_body = '\n'.join(scrubbed_body.splitlines()[-1:])
@@ -123,8 +134,7 @@ def build_function_body_dictionary(function_re, scrubber, scrubber_args, raw_too
           continue
         else:
           if prefix == prefixes[-1]:
-            print('WARNING: Found conflicting asm under the '
-                                 'same prefix: %r!' % (prefix,), file=sys.stderr)
+            warn('Found conflicting asm under the same prefix: %r!' % (prefix,))
           else:
             func_dict[prefix][func] = None
             continue
@@ -257,10 +267,12 @@ def add_checks(output_lines, comment_marker, prefix_list, func_dict, func_name, 
       output_lines.append(comment_marker)
       break
 
-def add_ir_checks(output_lines, comment_marker, prefix_list, func_dict, func_name):
+def add_ir_checks(output_lines, comment_marker, prefix_list, func_dict,
+                  func_name, preserve_names):
   # Label format is based on IR string.
   check_label_format = '{} %s-LABEL: @%s('.format(comment_marker)
-  add_checks(output_lines, comment_marker, prefix_list, func_dict, func_name, check_label_format, False, False)
+  add_checks(output_lines, comment_marker, prefix_list, func_dict, func_name,
+             check_label_format, False, preserve_names)
 
 def add_analyze_checks(output_lines, comment_marker, prefix_list, func_dict, func_name):
   check_label_format = '{} %s-LABEL: \'%s\''.format(comment_marker)
@@ -272,8 +284,8 @@ def check_prefix(prefix):
         hint = ""
         if ',' in prefix:
           hint = " Did you mean '--check-prefixes=" + prefix + "'?"
-        print(("WARNING: Supplied prefix '%s' is invalid. Prefix must contain only alphanumeric characters, hyphens and underscores." + hint) %
-              (prefix), file=sys.stderr)
+        warn(("Supplied prefix '%s' is invalid. Prefix must contain only alphanumeric characters, hyphens and underscores." + hint) %
+             (prefix))
 
 
 def verify_filecheck_prefixes(fc_cmd):
@@ -287,5 +299,4 @@ def verify_filecheck_prefixes(fc_cmd):
       for prefix in prefixes:
         check_prefix(prefix)
         if prefixes.count(prefix) > 1:
-          print("WARNING: Supplied prefix '%s' is not unique in the prefix list." %
-                (prefix,), file=sys.stderr)
+          warn("Supplied prefix '%s' is not unique in the prefix list." % (prefix,))

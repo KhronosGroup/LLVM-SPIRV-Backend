@@ -42,7 +42,7 @@ public:
       llvm::function_ref<void(ASTContext &CTx)> Process;
     };
 
-    return llvm::make_unique<Consumer>(Process);
+    return std::make_unique<Consumer>(Process);
   }
 
 private:
@@ -84,7 +84,7 @@ private:
 std::vector<VisitEvent> collectEvents(llvm::StringRef Code) {
   CollectInterestingEvents Visitor;
   clang::tooling::runToolOnCode(
-      new ProcessASTAction(
+      std::make_unique<ProcessASTAction>(
           [&](clang::ASTContext &Ctx) { Visitor.TraverseAST(Ctx); }),
       Code);
   return std::move(Visitor).takeEvents();

@@ -32,6 +32,7 @@ using SymbolID = std::array<uint8_t, 20>;
 struct Info;
 struct FunctionInfo;
 struct EnumInfo;
+struct BaseRecordInfo;
 
 enum class InfoType {
   IT_default,
@@ -60,7 +61,7 @@ struct CommentInfo {
       return false;
 
     return std::equal(Children.begin(), Children.end(), Other.Children.begin(),
-                      llvm::deref<llvm::equal>{});
+                      llvm::deref<std::equal_to<>>{});
   }
 
   // This operator is used to sort a vector of CommentInfos.
@@ -81,7 +82,7 @@ struct CommentInfo {
     if (FirstCI == SecondCI) {
       return std::lexicographical_compare(
           Children.begin(), Children.end(), Other.Children.begin(),
-          Other.Children.end(), llvm::deref<llvm::less>());
+          Other.Children.end(), llvm::deref<std::less<>>());
     }
 
     return false;
@@ -130,6 +131,9 @@ struct Reference {
     return std::tie(USR, Name, RefType) ==
            std::tie(Other.USR, Other.Name, Other.RefType);
   }
+
+  bool mergeable(const Reference &Other);
+  void merge(Reference &&I);
 
   SymbolID USR = SymbolID(); // Unique identifer for referenced decl
   SmallString<16> Name;      // Name of type (possibly unresolved).
@@ -195,16 +199,20 @@ struct MemberTypeInfo : public FieldTypeInfo {
            std::tie(Other.Type, Other.Name, Other.Access);
   }
 
-  AccessSpecifier Access = AccessSpecifier::AS_none; // Access level associated
-                                                     // with this info (public,
-                                                     // protected, private,
-                                                     // none).
+  // Access level associated with this info (public, protected, private, none).
+  // AS_public is set as default because the bitcode writer requires the enum
+  // with value 0 to be used as the default.
+  // (AS_public = 0, AS_protected = 1, AS_private = 2, AS_none = 3)
+  AccessSpecifier Access = AccessSpecifier::AS_public;
 };
 
 struct Location {
   Location() = default;
   Location(int LineNumber, SmallString<16> Filename)
       : LineNumber(LineNumber), Filename(std::move(Filename)) {}
+  Location(int LineNumber, SmallString<16> Filename, bool IsFileInRootDir)
+      : LineNumber(LineNumber), Filename(std::move(Filename)),
+        IsFileInRootDir(IsFileInRootDir) {}
 
   bool operator==(const Location &Other) const {
     return std::tie(LineNumber, Filename) ==
@@ -220,8 +228,9 @@ struct Location {
            std::tie(Other.LineNumber, Other.Filename);
   }
 
-  int LineNumber;           // Line number of this Location.
-  SmallString<32> Filename; // File for this Location.
+  int LineNumber;               // Line number of this Location.
+  SmallString<32> Filename;     // File for this Location.
+  bool IsFileInRootDir = false; // Indicates if file is inside root directory
 };
 
 /// A base struct for Infos.
@@ -231,6 +240,8 @@ struct Info {
   Info(InfoType IT, SymbolID USR) : USR(USR), IT(IT) {}
   Info(InfoType IT, SymbolID USR, StringRef Name)
       : USR(USR), IT(IT), Name(Name) {}
+  Info(InfoType IT, SymbolID USR, StringRef Name, StringRef Path)
+      : USR(USR), IT(IT), Name(Name), Path(Path) {}
   Info(const Info &Other) = delete;
   Info(Info &&Other) = default;
 
@@ -262,6 +273,8 @@ struct NamespaceInfo : public Info {
   NamespaceInfo(SymbolID USR) : Info(InfoType::IT_namespace, USR) {}
   NamespaceInfo(SymbolID USR, StringRef Name)
       : Info(InfoType::IT_namespace, USR, Name) {}
+  NamespaceInfo(SymbolID USR, StringRef Name, StringRef Path)
+      : Info(InfoType::IT_namespace, USR, Name, Path) {}
 
   void merge(NamespaceInfo &&I);
 
@@ -280,6 +293,8 @@ struct SymbolInfo : public Info {
   SymbolInfo(InfoType IT) : Info(IT) {}
   SymbolInfo(InfoType IT, SymbolID USR) : Info(IT, USR) {}
   SymbolInfo(InfoType IT, SymbolID USR, StringRef Name) : Info(IT, USR, Name) {}
+  SymbolInfo(InfoType IT, SymbolID USR, StringRef Name, StringRef Path)
+      : Info(IT, USR, Name, Path) {}
 
   void merge(SymbolInfo &&I);
 
@@ -300,7 +315,10 @@ struct FunctionInfo : public SymbolInfo {
   TypeInfo ReturnType;   // Info about the return type of this function.
   llvm::SmallVector<FieldTypeInfo, 4> Params; // List of parameters.
   // Access level for this method (public, private, protected, none).
-  AccessSpecifier Access = AccessSpecifier::AS_none;
+  // AS_public is set as default because the bitcode writer requires the enum
+  // with value 0 to be used as the default.
+  // (AS_public = 0, AS_protected = 1, AS_private = 2, AS_none = 3)
+  AccessSpecifier Access = AccessSpecifier::AS_public;
 };
 
 // TODO: Expand to allow for documenting templating, inheritance access,
@@ -311,6 +329,8 @@ struct RecordInfo : public SymbolInfo {
   RecordInfo(SymbolID USR) : SymbolInfo(InfoType::IT_record, USR) {}
   RecordInfo(SymbolID USR, StringRef Name)
       : SymbolInfo(InfoType::IT_record, USR, Name) {}
+  RecordInfo(SymbolID USR, StringRef Name, StringRef Path)
+      : SymbolInfo(InfoType::IT_record, USR, Name, Path) {}
 
   void merge(RecordInfo &&I);
 
@@ -326,13 +346,31 @@ struct RecordInfo : public SymbolInfo {
   llvm::SmallVector<Reference, 4>
       VirtualParents; // List of virtual base/parent records.
 
-  // Records are references because they will be properly
-  // documented in their own info, while the entirety of Functions and Enums are
-  // included here because they should not have separate documentation from
-  // their scope.
+  std::vector<BaseRecordInfo>
+      Bases; // List of base/parent records; this includes inherited methods and
+             // attributes
+
+  // Records are references because they will be properly documented in their
+  // own info, while the entirety of Functions and Enums are included here
+  // because they should not have separate documentation from their scope.
   std::vector<Reference> ChildRecords;
   std::vector<FunctionInfo> ChildFunctions;
   std::vector<EnumInfo> ChildEnums;
+};
+
+struct BaseRecordInfo : public RecordInfo {
+  BaseRecordInfo() : RecordInfo() {}
+  BaseRecordInfo(SymbolID USR, StringRef Name, StringRef Path, bool IsVirtual,
+                 AccessSpecifier Access, bool IsParent)
+      : RecordInfo(USR, Name, Path), IsVirtual(IsVirtual), Access(Access),
+        IsParent(IsParent) {}
+
+  // Indicates if base corresponds to a virtual inheritance
+  bool IsVirtual = false;
+  // Access level associated with this inherited info (public, protected,
+  // private).
+  AccessSpecifier Access = AccessSpecifier::AS_public;
+  bool IsParent = false; // Indicates if this base is a direct parent
 };
 
 // TODO: Expand to allow for documenting templating.
@@ -350,12 +388,16 @@ struct EnumInfo : public SymbolInfo {
 
 struct Index : public Reference {
   Index() = default;
+  Index(StringRef Name) : Reference(Name) {}
+  Index(StringRef Name, StringRef JumpToSection)
+      : Reference(Name), JumpToSection(JumpToSection) {}
   Index(SymbolID USR, StringRef Name, InfoType IT, StringRef Path)
       : Reference(USR, Name, IT, Path) {}
   // This is used to look for a USR in a vector of Indexes using std::find
   bool operator==(const SymbolID &Other) const { return USR == Other; }
-  bool operator<(const Index &Other) const { return Name < Other.Name; }
+  bool operator<(const Index &Other) const;
 
+  llvm::Optional<SmallString<16>> JumpToSection;
   std::vector<Index> Children;
 
   void sort();
@@ -371,15 +413,20 @@ mergeInfos(std::vector<std::unique_ptr<Info>> &Values);
 
 struct ClangDocContext {
   ClangDocContext() = default;
-  ClangDocContext(tooling::ExecutionContext *ECtx, bool PublicOnly,
-                  StringRef OutDirectory,
+  ClangDocContext(tooling::ExecutionContext *ECtx, StringRef ProjectName,
+                  bool PublicOnly, StringRef OutDirectory, StringRef SourceRoot,
+                  StringRef RepositoryUrl,
                   std::vector<std::string> UserStylesheets,
-                  std::vector<std::string> JsScripts)
-      : ECtx(ECtx), PublicOnly(PublicOnly), OutDirectory(OutDirectory),
-        UserStylesheets(UserStylesheets), JsScripts(JsScripts) {}
+                  std::vector<std::string> JsScripts);
   tooling::ExecutionContext *ECtx;
-  bool PublicOnly;
-  std::string OutDirectory;
+  std::string ProjectName; // Name of project clang-doc is documenting.
+  bool PublicOnly; // Indicates if only public declarations are documented.
+  std::string OutDirectory; // Directory for outputting generated files.
+  std::string SourceRoot;   // Directory where processed files are stored. Links
+                            // to definition locations will only be generated if
+                            // the file is in this dir.
+  // URL of repository that hosts code used for links to definition locations.
+  llvm::Optional<std::string> RepositoryUrl;
   // Path of CSS stylesheets that will be copied to OutDirectory and used to
   // style all HTML files.
   std::vector<std::string> UserStylesheets;

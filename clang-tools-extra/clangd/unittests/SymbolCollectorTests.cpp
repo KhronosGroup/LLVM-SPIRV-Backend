@@ -14,6 +14,7 @@
 #include "clang/Basic/FileSystemOptions.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Index/IndexingAction.h"
+#include "clang/Index/IndexingOptions.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
@@ -200,31 +201,31 @@ public:
                            CommentHandler *PragmaHandler)
       : COpts(std::move(COpts)), PragmaHandler(PragmaHandler) {}
 
-  clang::FrontendAction *create() override {
-    class WrappedIndexAction : public WrapperFrontendAction {
+  std::unique_ptr<FrontendAction> create() override {
+    class IndexAction : public ASTFrontendAction {
     public:
-      WrappedIndexAction(std::shared_ptr<SymbolCollector> C,
-                         const index::IndexingOptions &Opts,
-                         CommentHandler *PragmaHandler)
-          : WrapperFrontendAction(
-                index::createIndexingAction(C, Opts, nullptr)),
+      IndexAction(std::shared_ptr<index::IndexDataConsumer> DataConsumer,
+                  const index::IndexingOptions &Opts,
+                  CommentHandler *PragmaHandler)
+          : DataConsumer(std::move(DataConsumer)), Opts(Opts),
             PragmaHandler(PragmaHandler) {}
 
       std::unique_ptr<ASTConsumer>
       CreateASTConsumer(CompilerInstance &CI, llvm::StringRef InFile) override {
         if (PragmaHandler)
           CI.getPreprocessor().addCommentHandler(PragmaHandler);
-        return WrapperFrontendAction::CreateASTConsumer(CI, InFile);
+        return createIndexingASTConsumer(DataConsumer, Opts, CI.getPreprocessorPtr());
       }
 
       bool BeginInvocation(CompilerInstance &CI) override {
         // Make the compiler parse all comments.
         CI.getLangOpts().CommentOpts.ParseAllComments = true;
-        return WrapperFrontendAction::BeginInvocation(CI);
+        return true;
       }
 
     private:
-      index::IndexingOptions IndexOpts;
+      std::shared_ptr<index::IndexDataConsumer> DataConsumer;
+      index::IndexingOptions Opts;
       CommentHandler *PragmaHandler;
     };
     index::IndexingOptions IndexOpts;
@@ -232,8 +233,8 @@ public:
         index::IndexingOptions::SystemSymbolFilterKind::All;
     IndexOpts.IndexFunctionLocals = false;
     Collector = std::make_shared<SymbolCollector>(COpts);
-    return new WrappedIndexAction(Collector, std::move(IndexOpts),
-                                  PragmaHandler);
+    return std::make_unique<IndexAction>(Collector, std::move(IndexOpts),
+                                         PragmaHandler);
   }
 
   std::shared_ptr<SymbolCollector> Collector;
@@ -258,7 +259,7 @@ public:
     llvm::IntrusiveRefCntPtr<FileManager> Files(
         new FileManager(FileSystemOptions(), InMemoryFileSystem));
 
-    auto Factory = llvm::make_unique<SymbolIndexActionFactory>(
+    auto Factory = std::make_unique<SymbolIndexActionFactory>(
         CollectorOpts, PragmaHandler.get());
 
     std::vector<std::string> Args = {"symbol_collector", "-fsyntax-only",
@@ -625,6 +626,23 @@ TEST_F(SymbolCollectorTest, Refs) {
   EXPECT_THAT(Refs, Not(Contains(Pair(findSymbol(MainSymbols, "c").ID, _))));
 }
 
+TEST_F(SymbolCollectorTest, NameReferences) {
+  CollectorOpts.RefFilter = RefKind::All;
+  CollectorOpts.RefsInHeaders = true;
+  Annotations Header(R"(
+    class [[Foo]] {
+    public:
+      [[Foo]]() {}
+      ~[[Foo]]() {}
+    };
+  )");
+  CollectorOpts.RefFilter = RefKind::All;
+  runSymbolCollector(Header.code(), "");
+  // When we find references for class Foo, we expect to see all
+  // constructor/destructor references.
+  EXPECT_THAT(Refs, Contains(Pair(findSymbol(Symbols, "Foo").ID,
+                                  HaveRanges(Header.ranges()))));
+}
 
 TEST_F(SymbolCollectorTest, HeaderAsMainFile) {
   CollectorOpts.RefFilter = RefKind::All;
@@ -672,8 +690,7 @@ TEST_F(SymbolCollectorTest, Relations) {
   const Symbol &Base = findSymbol(Symbols, "Base");
   const Symbol &Derived = findSymbol(Symbols, "Derived");
   EXPECT_THAT(Relations,
-              Contains(Relation{Base.ID, index::SymbolRole::RelationBaseOf,
-                                Derived.ID}));
+              Contains(Relation{Base.ID, RelationKind::BaseOf, Derived.ID}));
 }
 
 TEST_F(SymbolCollectorTest, References) {
@@ -973,7 +990,7 @@ TEST_F(SymbolCollectorTest, CanonicalSTLHeader) {
   CanonicalIncludes Includes;
   auto Language = LangOptions();
   Language.CPlusPlus = true;
-  addSystemHeadersMapping(&Includes, Language);
+  Includes.addSystemHeadersMapping(Language);
   CollectorOpts.Includes = &Includes;
   runSymbolCollector("namespace std { class string {}; }", /*Main=*/"");
   EXPECT_THAT(Symbols,

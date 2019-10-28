@@ -188,7 +188,7 @@ namespace {
       else {
         auto It = ValueCache.find_as(Val);
         if (It == ValueCache.end()) {
-          ValueCache[Val] = make_unique<ValueCacheEntryTy>(Val, this);
+          ValueCache[Val] = std::make_unique<ValueCacheEntryTy>(Val, this);
           It = ValueCache.find_as(Val);
           assert(It != ValueCache.end() && "Val was just added to the map!");
         }
@@ -432,8 +432,12 @@ namespace {
                            BasicBlock *BB);
   bool solveBlockValueOverflowIntrinsic(
       ValueLatticeElement &BBLV, WithOverflowInst *WO, BasicBlock *BB);
+  bool solveBlockValueSaturatingIntrinsic(ValueLatticeElement &BBLV,
+                                          SaturatingInst *SI, BasicBlock *BB);
   bool solveBlockValueIntrinsic(ValueLatticeElement &BBLV, IntrinsicInst *II,
                                 BasicBlock *BB);
+  bool solveBlockValueExtractValue(ValueLatticeElement &BBLV,
+                                   ExtractValueInst *EVI, BasicBlock *BB);
   void intersectAssumeOrGuardBlockValueConstantRange(Value *Val,
                                                      ValueLatticeElement &BBLV,
                                                      Instruction *BBI);
@@ -648,9 +652,7 @@ bool LazyValueInfoImpl::solveBlockValueImpl(ValueLatticeElement &Res,
       return solveBlockValueBinaryOp(Res, BO, BB);
 
     if (auto *EVI = dyn_cast<ExtractValueInst>(BBI))
-      if (auto *WO = dyn_cast<WithOverflowInst>(EVI->getAggregateOperand()))
-        if (EVI->getNumIndices() == 1 && *EVI->idx_begin() == 0)
-          return solveBlockValueOverflowIntrinsic(Res, WO, BB);
+      return solveBlockValueExtractValue(Res, EVI, BB);
 
     if (auto *II = dyn_cast<IntrinsicInst>(BBI))
       return solveBlockValueIntrinsic(Res, II, BB);
@@ -1090,8 +1092,22 @@ bool LazyValueInfoImpl::solveBlockValueBinaryOp(ValueLatticeElement &BBLV,
     return true;
   }
 
-  return solveBlockValueBinaryOpImpl(BBLV, BO, BB,
-      [BO](const ConstantRange &CR1, const ConstantRange &CR2) {
+  if (auto *OBO = dyn_cast<OverflowingBinaryOperator>(BO)) {
+    unsigned NoWrapKind = 0;
+    if (OBO->hasNoUnsignedWrap())
+      NoWrapKind |= OverflowingBinaryOperator::NoUnsignedWrap;
+    if (OBO->hasNoSignedWrap())
+      NoWrapKind |= OverflowingBinaryOperator::NoSignedWrap;
+
+    return solveBlockValueBinaryOpImpl(
+        BBLV, BO, BB,
+        [BO, NoWrapKind](const ConstantRange &CR1, const ConstantRange &CR2) {
+          return CR1.overflowingBinaryOp(BO->getOpcode(), CR2, NoWrapKind);
+        });
+  }
+
+  return solveBlockValueBinaryOpImpl(
+      BBLV, BO, BB, [BO](const ConstantRange &CR1, const ConstantRange &CR2) {
         return CR1.binaryOp(BO->getOpcode(), CR2);
       });
 }
@@ -1104,35 +1120,74 @@ bool LazyValueInfoImpl::solveBlockValueOverflowIntrinsic(
       });
 }
 
-bool LazyValueInfoImpl::solveBlockValueIntrinsic(
-    ValueLatticeElement &BBLV, IntrinsicInst *II, BasicBlock *BB) {
-  switch (II->getIntrinsicID()) {
+bool LazyValueInfoImpl::solveBlockValueSaturatingIntrinsic(
+    ValueLatticeElement &BBLV, SaturatingInst *SI, BasicBlock *BB) {
+  switch (SI->getIntrinsicID()) {
   case Intrinsic::uadd_sat:
-    return solveBlockValueBinaryOpImpl(BBLV, II, BB,
-        [](const ConstantRange &CR1, const ConstantRange &CR2) {
+    return solveBlockValueBinaryOpImpl(
+        BBLV, SI, BB, [](const ConstantRange &CR1, const ConstantRange &CR2) {
           return CR1.uadd_sat(CR2);
         });
   case Intrinsic::usub_sat:
-    return solveBlockValueBinaryOpImpl(BBLV, II, BB,
-        [](const ConstantRange &CR1, const ConstantRange &CR2) {
+    return solveBlockValueBinaryOpImpl(
+        BBLV, SI, BB, [](const ConstantRange &CR1, const ConstantRange &CR2) {
           return CR1.usub_sat(CR2);
         });
   case Intrinsic::sadd_sat:
-    return solveBlockValueBinaryOpImpl(BBLV, II, BB,
-        [](const ConstantRange &CR1, const ConstantRange &CR2) {
+    return solveBlockValueBinaryOpImpl(
+        BBLV, SI, BB, [](const ConstantRange &CR1, const ConstantRange &CR2) {
           return CR1.sadd_sat(CR2);
         });
   case Intrinsic::ssub_sat:
-    return solveBlockValueBinaryOpImpl(BBLV, II, BB,
-        [](const ConstantRange &CR1, const ConstantRange &CR2) {
+    return solveBlockValueBinaryOpImpl(
+        BBLV, SI, BB, [](const ConstantRange &CR1, const ConstantRange &CR2) {
           return CR1.ssub_sat(CR2);
         });
+  default:
+    llvm_unreachable("All llvm.sat intrinsic are handled.");
+  }
+}
+
+bool LazyValueInfoImpl::solveBlockValueIntrinsic(ValueLatticeElement &BBLV,
+                                                 IntrinsicInst *II,
+                                                 BasicBlock *BB) {
+  if (auto *SI = dyn_cast<SaturatingInst>(II))
+    return solveBlockValueSaturatingIntrinsic(BBLV, SI, BB);
+
+  switch (II->getIntrinsicID()) {
   default:
     LLVM_DEBUG(dbgs() << " compute BB '" << BB->getName()
                       << "' - overdefined (unknown intrinsic).\n");
     BBLV = ValueLatticeElement::getOverdefined();
     return true;
   }
+}
+
+bool LazyValueInfoImpl::solveBlockValueExtractValue(
+    ValueLatticeElement &BBLV, ExtractValueInst *EVI, BasicBlock *BB) {
+  if (auto *WO = dyn_cast<WithOverflowInst>(EVI->getAggregateOperand()))
+    if (EVI->getNumIndices() == 1 && *EVI->idx_begin() == 0)
+      return solveBlockValueOverflowIntrinsic(BBLV, WO, BB);
+
+  // Handle extractvalue of insertvalue to allow further simplification
+  // based on replaced with.overflow intrinsics.
+  if (Value *V = SimplifyExtractValueInst(
+          EVI->getAggregateOperand(), EVI->getIndices(),
+          EVI->getModule()->getDataLayout())) {
+    if (!hasBlockValue(V, BB)) {
+      if (pushBlockValue({ BB, V }))
+        return false;
+      BBLV = ValueLatticeElement::getOverdefined();
+      return true;
+    }
+    BBLV = getBlockValue(V, BB);
+    return true;
+  }
+
+  LLVM_DEBUG(dbgs() << " compute BB '" << BB->getName()
+                    << "' - overdefined (unknown extractvalue).\n");
+  BBLV = ValueLatticeElement::getOverdefined();
+  return true;
 }
 
 static ValueLatticeElement getValueFromICmpCondition(Value *Val, ICmpInst *ICI,
@@ -1575,7 +1630,7 @@ bool LazyValueInfoWrapperPass::runOnFunction(Function &F) {
   DominatorTreeWrapperPass *DTWP =
       getAnalysisIfAvailable<DominatorTreeWrapperPass>();
   Info.DT = DTWP ? &DTWP->getDomTree() : nullptr;
-  Info.TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+  Info.TLI = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
 
   if (Info.PImpl)
     getImpl(Info.PImpl, Info.AC, &DL, Info.DT).clear();

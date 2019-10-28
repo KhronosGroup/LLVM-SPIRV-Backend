@@ -384,7 +384,9 @@ static bool isWeakObjectWithRWAccess(GlobalValueSummary *GVS) {
 
 static void thinLTOInternalizeAndPromoteGUID(
     GlobalValueSummaryList &GVSummaryList, GlobalValue::GUID GUID,
-    function_ref<bool(StringRef, GlobalValue::GUID)> isExported) {
+    function_ref<bool(StringRef, GlobalValue::GUID)> isExported,
+    function_ref<bool(GlobalValue::GUID, const GlobalValueSummary *)>
+        isPrevailing) {
   for (auto &S : GVSummaryList) {
     if (isExported(S->modulePath(), GUID)) {
       if (GlobalValue::isLocalLinkage(S->linkage()))
@@ -393,6 +395,8 @@ static void thinLTOInternalizeAndPromoteGUID(
                // Ignore local and appending linkage values since the linker
                // doesn't resolve them.
                !GlobalValue::isLocalLinkage(S->linkage()) &&
+               (!GlobalValue::isInterposableLinkage(S->linkage()) ||
+                isPrevailing(GUID, S.get())) &&
                S->linkage() != GlobalValue::AppendingLinkage &&
                // We can't internalize available_externally globals because this
                // can break function pointer equality.
@@ -411,9 +415,12 @@ static void thinLTOInternalizeAndPromoteGUID(
 // as external and non-exported values as internal.
 void llvm::thinLTOInternalizeAndPromoteInIndex(
     ModuleSummaryIndex &Index,
-    function_ref<bool(StringRef, GlobalValue::GUID)> isExported) {
+    function_ref<bool(StringRef, GlobalValue::GUID)> isExported,
+    function_ref<bool(GlobalValue::GUID, const GlobalValueSummary *)>
+        isPrevailing) {
   for (auto &I : Index)
-    thinLTOInternalizeAndPromoteGUID(I.second.SummaryList, I.first, isExported);
+    thinLTOInternalizeAndPromoteGUID(I.second.SummaryList, I.first, isExported,
+                                     isPrevailing);
 }
 
 // Requires a destructor for std::vector<InputModule>.
@@ -460,8 +467,8 @@ BitcodeModule &InputFile::getSingleBitcodeModule() {
 LTO::RegularLTOState::RegularLTOState(unsigned ParallelCodeGenParallelismLevel,
                                       Config &Conf)
     : ParallelCodeGenParallelismLevel(ParallelCodeGenParallelismLevel),
-      Ctx(Conf), CombinedModule(llvm::make_unique<Module>("ld-temp.o", Ctx)),
-      Mover(llvm::make_unique<IRMover>(*CombinedModule)) {}
+      Ctx(Conf), CombinedModule(std::make_unique<Module>("ld-temp.o", Ctx)),
+      Mover(std::make_unique<IRMover>(*CombinedModule)) {}
 
 LTO::ThinLTOState::ThinLTOState(ThinBackend Backend)
     : Backend(Backend), CombinedIndex(/*HaveGVs*/ false) {
@@ -755,7 +762,8 @@ LTO::addRegularLTO(BitcodeModule BM, ArrayRef<InputFile::Symbol> Syms,
       // For now they aren't reported correctly by ModuleSymbolTable.
       auto &CommonRes = RegularLTO.Commons[Sym.getIRName()];
       CommonRes.Size = std::max(CommonRes.Size, Sym.getCommonSize());
-      CommonRes.Align = std::max(CommonRes.Align, Sym.getCommonAlignment());
+      CommonRes.Align =
+          std::max(CommonRes.Align, MaybeAlign(Sym.getCommonAlignment()));
       CommonRes.Prevailing |= Res.Prevailing;
     }
 
@@ -900,8 +908,7 @@ Error LTO::run(AddStreamFn AddStream, NativeObjectCache Cache) {
         GlobalValue::dropLLVMManglingEscape(Res.second.IRName));
 
     if (Res.second.VisibleOutsideSummary && Res.second.Prevailing)
-      GUIDPreservedSymbols.insert(GlobalValue::getGUID(
-          GlobalValue::dropLLVMManglingEscape(Res.second.IRName)));
+      GUIDPreservedSymbols.insert(GUID);
 
     GUIDPrevailingResolutions[GUID] =
         Res.second.Prevailing ? PrevailingType::Yes : PrevailingType::No;
@@ -997,12 +1004,24 @@ Error LTO::runRegularLTO(AddStreamFn AddStream) {
         GV->setLinkage(GlobalValue::InternalLinkage);
     }
 
+    RegularLTO.CombinedModule->addModuleFlag(Module::Error, "LTOPostLink", 1);
+
     if (Conf.PostInternalizeModuleHook &&
         !Conf.PostInternalizeModuleHook(0, *RegularLTO.CombinedModule))
       return Error::success();
   }
   return backend(Conf, AddStream, RegularLTO.ParallelCodeGenParallelismLevel,
                  std::move(RegularLTO.CombinedModule), ThinLTO.CombinedIndex);
+}
+
+static const char *libcallRoutineNames[] = {
+#define HANDLE_LIBCALL(code, name) name,
+#include "llvm/IR/RuntimeLibcalls.def"
+#undef HANDLE_LIBCALL
+};
+
+ArrayRef<const char*> LTO::getRuntimeLibcallSymbols() {
+  return makeArrayRef(libcallRoutineNames);
 }
 
 /// This class defines the interface to the ThinLTO backend.
@@ -1142,7 +1161,7 @@ ThinBackend lto::createInProcessThinBackend(unsigned ParallelismLevel) {
   return [=](Config &Conf, ModuleSummaryIndex &CombinedIndex,
              const StringMap<GVSummaryMapTy> &ModuleToDefinedGVSummaries,
              AddStreamFn AddStream, NativeObjectCache Cache) {
-    return llvm::make_unique<InProcessThinBackend>(
+    return std::make_unique<InProcessThinBackend>(
         Conf, CombinedIndex, ParallelismLevel, ModuleToDefinedGVSummaries,
         AddStream, Cache);
   };
@@ -1232,7 +1251,7 @@ ThinBackend lto::createWriteIndexesThinBackend(
   return [=](Config &Conf, ModuleSummaryIndex &CombinedIndex,
              const StringMap<GVSummaryMapTy> &ModuleToDefinedGVSummaries,
              AddStreamFn AddStream, NativeObjectCache Cache) {
-    return llvm::make_unique<WriteIndexesThinBackend>(
+    return std::make_unique<WriteIndexesThinBackend>(
         Conf, CombinedIndex, ModuleToDefinedGVSummaries, OldPrefix, NewPrefix,
         ShouldEmitImportsFiles, LinkedObjectsFile, OnWrite);
   };
@@ -1288,11 +1307,6 @@ Error LTO::runThinLTO(AddStreamFn AddStream, NativeObjectCache Cache,
     ComputeCrossModuleImport(ThinLTO.CombinedIndex, ModuleToDefinedGVSummaries,
                              ImportLists, ExportLists);
 
-  // Update local devirtualized targets that were exported by cross-module
-  // importing
-  updateIndexWPDForExports(ThinLTO.CombinedIndex, ExportLists,
-                           LocalWPDTargetsMap);
-
   // Figure out which symbols need to be internalized. This also needs to happen
   // at -O0 because summary-based DCE is implemented using internalization, and
   // we must apply DCE consistently with the full LTO module in order to avoid
@@ -1322,12 +1336,19 @@ Error LTO::runThinLTO(AddStreamFn AddStream, NativeObjectCache Cache,
             ExportList->second.count(GUID)) ||
            ExportedGUIDs.count(GUID);
   };
-  thinLTOInternalizeAndPromoteInIndex(ThinLTO.CombinedIndex, isExported);
+
+  // Update local devirtualized targets that were exported by cross-module
+  // importing or by other devirtualizations marked in the ExportedGUIDs set.
+  updateIndexWPDForExports(ThinLTO.CombinedIndex, isExported,
+                           LocalWPDTargetsMap);
 
   auto isPrevailing = [&](GlobalValue::GUID GUID,
                           const GlobalValueSummary *S) {
     return ThinLTO.PrevailingModuleForGUID[GUID] == S->modulePath();
   };
+  thinLTOInternalizeAndPromoteInIndex(ThinLTO.CombinedIndex, isExported,
+                                      isPrevailing);
+
   auto recordNewLinkage = [&](StringRef ModuleIdentifier,
                               GlobalValue::GUID GUID,
                               GlobalValue::LinkageTypes NewLinkage) {
@@ -1382,7 +1403,7 @@ lto::setupStatsFile(StringRef StatsFilename) {
   llvm::EnableStatistics(false);
   std::error_code EC;
   auto StatsFile =
-      llvm::make_unique<ToolOutputFile>(StatsFilename, EC, sys::fs::OF_None);
+      std::make_unique<ToolOutputFile>(StatsFilename, EC, sys::fs::OF_None);
   if (EC)
     return errorCodeToError(EC);
 

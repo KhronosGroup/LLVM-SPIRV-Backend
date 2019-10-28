@@ -50,6 +50,7 @@
 #include "lldb/lldb-private.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Threading.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace lldb_private {
@@ -1195,6 +1196,9 @@ public:
   ///     VersionTuple is returner.
   virtual llvm::VersionTuple GetHostOSVersion() { return llvm::VersionTuple(); }
 
+  /// \return the macCatalyst version of the host OS.
+  virtual llvm::VersionTuple GetHostMacCatalystVersion() { return {}; }
+
   /// Get the target object pointer for this module.
   ///
   /// \return
@@ -2268,6 +2272,8 @@ public:
   void ClearPreResumeAction(PreResumeActionCallback callback, void *baton);
 
   ProcessRunLock &GetRunLock();
+  
+  bool CurrentThreadIsPrivateStateThread();
 
   virtual Status SendEventData(const char *data) {
     Status return_error("Sending an event is not supported for this process.");
@@ -2461,6 +2467,11 @@ public:
   virtual Status GetTraceConfig(lldb::user_id_t uid, TraceOptions &options) {
     return Status("Not implemented");
   }
+
+  // This calls a function of the form "void * (*)(void)".
+  bool CallVoidArgVoidPtrReturn(const Address *address,
+                                lldb::addr_t &returned_func,
+                                bool trap_exceptions = false);
 
 protected:
   void SetState(lldb::EventSP &event_sp);
@@ -2741,7 +2752,7 @@ protected:
   enum { eCanJITDontKnow = 0, eCanJITYes, eCanJITNo } m_can_jit;
   
   std::unique_ptr<UtilityFunction> m_dlopen_utility_func_up;
-  std::once_flag m_dlopen_utility_func_flag_once;
+  llvm::once_flag m_dlopen_utility_func_flag_once;
 
   size_t RemoveBreakpointOpcodesFromBuffer(lldb::addr_t addr, size_t size,
                                            uint8_t *buf) const;

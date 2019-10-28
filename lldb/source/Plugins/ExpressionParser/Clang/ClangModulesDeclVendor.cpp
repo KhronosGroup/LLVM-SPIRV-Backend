@@ -147,7 +147,8 @@ void StoringDiagnosticConsumer::DumpDiagnostics(Stream &error_stream) {
   }
 }
 
-ClangModulesDeclVendor::ClangModulesDeclVendor() {}
+ClangModulesDeclVendor::ClangModulesDeclVendor()
+    : ClangDeclVendor(eClangModuleDeclVendor) {}
 
 ClangModulesDeclVendor::~ClangModulesDeclVendor() {}
 
@@ -162,9 +163,7 @@ ClangModulesDeclVendorImpl::ClangModulesDeclVendorImpl(
       m_parser(std::move(parser)), m_origin_map() {
 
   // Initialize our ClangASTContext.
-  auto target_opts = m_compiler_invocation->getTargetOpts();
-  m_ast_context.reset(new ClangASTContext(target_opts.Triple.c_str()));
-  m_ast_context->setASTContext(&m_compiler_instance->getASTContext());
+  m_ast_context.reset(new ClangASTContext(m_compiler_instance->getASTContext()));
 }
 
 void ClangModulesDeclVendorImpl::ReportModuleExportsHelper(
@@ -572,8 +571,9 @@ ClangModulesDeclVendorImpl::DoGetModule(clang::ModuleIdPath path,
 
 clang::ExternalASTMerger::ImporterSource
 ClangModulesDeclVendorImpl::GetImporterSource() {
-  return {m_compiler_instance->getASTContext(),
-          m_compiler_instance->getFileManager(), m_origin_map};
+  return clang::ExternalASTMerger::ImporterSource(
+      m_compiler_instance->getASTContext(),
+      m_compiler_instance->getFileManager(), m_origin_map);
 }
 
 static const char *ModuleImportBufferName = "LLDBModulesMemoryBuffer";

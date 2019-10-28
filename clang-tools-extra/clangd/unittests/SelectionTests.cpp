@@ -210,6 +210,15 @@ TEST(SelectionTest, CommonAncestor) {
           )cpp",
           "FunctionProtoTypeLoc",
       },
+      {
+          R"cpp(
+            struct S {
+              int foo;
+              int bar() { return [[f^oo]]; }
+            };
+          )cpp",
+          "MemberExpr", // Not implicit CXXThisExpr!
+      },
 
       // Point selections.
       {"void foo() { [[^foo]](); }", "DeclRefExpr"},
@@ -261,10 +270,34 @@ TEST(SelectionTest, CommonAncestor) {
              struct Foo<U<int>*> {};
           )cpp",
           "TemplateTemplateParmDecl"},
+
+      // Foreach has a weird AST, ensure we can select parts of the range init.
+      // This used to fail, because the DeclStmt for C claimed the whole range.
+      {
+          R"cpp(
+            struct Str {
+              const char *begin();
+              const char *end();
+            };
+            Str makeStr(const char*);
+            void loop() {
+              for (const char* C : [[mak^eStr("foo"^)]])
+                ;
+            }
+          )cpp",
+          "CallExpr"},
   };
   for (const Case &C : Cases) {
     Annotations Test(C.Code);
-    auto AST = TestTU::withCode(Test.code()).build();
+
+    TestTU TU;
+    TU.Code = Test.code();
+
+    // FIXME: Auto-completion in a template requires disabling delayed template
+    // parsing.
+    TU.ExtraArgs.push_back("-fno-delayed-template-parsing");
+
+    auto AST = TU.build();
     auto T = makeSelectionTree(C.Code, AST);
     EXPECT_EQ("TranslationUnitDecl", nodeKind(&T.root())) << C.Code;
 
@@ -329,6 +362,8 @@ TEST(SelectionTest, Selected) {
         #define ECHO(X) X
         ECHO(EC^HO([[$C[[int]]) EC^HO(a]]));
       ]])cpp",
+      R"cpp( $C[[^$C[[int]] a^]]; )cpp",
+      R"cpp( $C[[^$C[[int]] a = $C[[5]]^]]; )cpp",
   };
   for (const char *C : Cases) {
     Annotations Test(C);
@@ -346,6 +381,25 @@ TEST(SelectionTest, Selected) {
   }
 }
 
+TEST(SelectionTest, PathologicalPreprocessor) {
+  const char *Case = R"cpp(
+#define MACRO while(1)
+    void test() {
+#include "Expand.inc"
+        br^eak;
+    }
+  )cpp";
+  Annotations Test(Case);
+  auto TU = TestTU::withCode(Test.code());
+  TU.AdditionalFiles["Expand.inc"] = "MACRO\n";
+  auto AST = TU.build();
+  EXPECT_THAT(AST.getDiagnostics(), ::testing::IsEmpty());
+  auto T = makeSelectionTree(Case, AST);
+
+  EXPECT_EQ("BreakStmt", T.commonAncestor()->kind());
+  EXPECT_EQ("WhileStmt", T.commonAncestor()->Parent->kind());
+}
+
 TEST(SelectionTest, Implicit) {
   const char* Test = R"cpp(
     struct S { S(const char*); };
@@ -361,6 +415,8 @@ TEST(SelectionTest, Implicit) {
   EXPECT_EQ("CXXConstructExpr", nodeKind(Str->Parent->Parent));
   EXPECT_EQ(Str, &Str->Parent->Parent->ignoreImplicit())
       << "Didn't unwrap " << nodeKind(&Str->Parent->Parent->ignoreImplicit());
+
+  EXPECT_EQ("CXXConstructExpr", nodeKind(&Str->outerImplicit()));
 }
 
 } // namespace

@@ -20,7 +20,7 @@ def normalize(dict_var):
                     normalize(e)
         elif type(v) is unicode:
             st = v.encode('utf-8')
-            if re.match(r"0x[0-9A-Fa-f]+", v):
+            if v != "0x0" and re.match(r"0x[0-9A-Fa-f]+", v):
                 dict_var[k] = u'0x{{.*}}'
             elif os.path.isfile(v):
                 dict_var[k] = u'{{.*}}'
@@ -131,10 +131,10 @@ def main():
             index = 0
             for append_line in append_str.splitlines()[2:]:
                 if index == 0:
-                    out_str += '// CHECK: %s\n' %(append_line)
+                    out_str += '// CHECK: %s\n' %(append_line.rstrip())
                     index += 1
                 else:
-                    out_str += '// CHECK-NEXT: %s\n' %(append_line)
+                    out_str += '// CHECK-NEXT: %s\n' %(append_line.rstrip())
                     
             f.write(out_str)
     

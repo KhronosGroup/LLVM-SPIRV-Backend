@@ -48,7 +48,7 @@ public:
     if (!DL)
       return DL.takeError();
 
-    auto ES = llvm::make_unique<ExecutionSession>();
+    auto ES = std::make_unique<ExecutionSession>();
 
     auto LCTMgr = createLocalLazyCallThroughManager(
         JTMB->getTargetTriple(), *ES,
@@ -95,39 +95,37 @@ private:
     exit(1);
   }
 
-  SpeculativeJIT(std::unique_ptr<ExecutionSession> ES, DataLayout DL,
-                 orc::JITTargetMachineBuilder JTMB,
-                 std::unique_ptr<LazyCallThroughManager> LCTMgr,
-                 IndirectStubsManagerBuilderFunction ISMBuilder,
-                 DynamicLibrarySearchGenerator ProcessSymbolsGenerator)
+  SpeculativeJIT(
+      std::unique_ptr<ExecutionSession> ES, DataLayout DL,
+      orc::JITTargetMachineBuilder JTMB,
+      std::unique_ptr<LazyCallThroughManager> LCTMgr,
+      IndirectStubsManagerBuilderFunction ISMBuilder,
+      std::unique_ptr<DynamicLibrarySearchGenerator> ProcessSymbolsGenerator)
       : ES(std::move(ES)), DL(std::move(DL)), LCTMgr(std::move(LCTMgr)),
         CompileLayer(*this->ES, ObjLayer,
                      ConcurrentIRCompiler(std::move(JTMB))),
         S(Imps, *this->ES),
-        SpeculateLayer(*this->ES, CompileLayer, S, BlockFreqQuery()),
+        SpeculateLayer(*this->ES, CompileLayer, S, Mangle, BlockFreqQuery()),
         CODLayer(*this->ES, SpeculateLayer, *this->LCTMgr,
                  std::move(ISMBuilder)) {
-    this->ES->getMainJITDylib().setGenerator(
+    this->ES->getMainJITDylib().addGenerator(
         std::move(ProcessSymbolsGenerator));
     this->CODLayer.setImplMap(&Imps);
     this->ES->setDispatchMaterialization(
 
         [this](JITDylib &JD, std::unique_ptr<MaterializationUnit> MU) {
-          // FIXME: Switch to move capture once we have c  14.
+          // FIXME: Switch to move capture once we have C++14.
           auto SharedMU = std::shared_ptr<MaterializationUnit>(std::move(MU));
           auto Work = [SharedMU, &JD]() { SharedMU->doMaterialize(JD); };
           CompileThreads.async(std::move(Work));
         });
-    JITEvaluatedSymbol SpeculatorSymbol(JITTargetAddress(&S),
-                                        JITSymbolFlags::Exported);
-    ExitOnErr(this->ES->getMainJITDylib().define(
-        absoluteSymbols({{Mangle("__orc_speculator"), SpeculatorSymbol}})));
+    ExitOnErr(S.addSpeculationRuntime(this->ES->getMainJITDylib(), Mangle));
     LocalCXXRuntimeOverrides CXXRuntimeoverrides;
     ExitOnErr(CXXRuntimeoverrides.enable(this->ES->getMainJITDylib(), Mangle));
   }
 
   static std::unique_ptr<SectionMemoryManager> createMemMgr() {
-    return llvm::make_unique<SectionMemoryManager>();
+    return std::make_unique<SectionMemoryManager>();
   }
 
   std::unique_ptr<ExecutionSession> ES;
@@ -167,7 +165,7 @@ int main(int argc, char *argv[]) {
   // Load the IR inputs.
   for (const auto &InputFile : InputFiles) {
     SMDiagnostic Err;
-    auto Ctx = llvm::make_unique<LLVMContext>();
+    auto Ctx = std::make_unique<LLVMContext>();
     auto M = parseIRFile(InputFile, Err, *Ctx);
     if (!M) {
       Err.print(argv[0], errs());

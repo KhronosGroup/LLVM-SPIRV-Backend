@@ -1083,6 +1083,7 @@ void SelectionDAG::clear() {
   ExternalSymbols.clear();
   TargetExternalSymbols.clear();
   MCSymbols.clear();
+  SDCallSiteDbgInfo.clear();
   std::fill(CondCodeNodes.begin(), CondCodeNodes.end(),
             static_cast<CondCodeSDNode*>(nullptr));
   std::fill(ValueTypeNodes.begin(), ValueTypeNodes.end(),
@@ -1897,20 +1898,19 @@ SDValue SelectionDAG::expandVAArg(SDNode *Node) {
   EVT VT = Node->getValueType(0);
   SDValue Tmp1 = Node->getOperand(0);
   SDValue Tmp2 = Node->getOperand(1);
-  unsigned Align = Node->getConstantOperandVal(3);
+  const MaybeAlign MA(Node->getConstantOperandVal(3));
 
   SDValue VAListLoad = getLoad(TLI.getPointerTy(getDataLayout()), dl, Tmp1,
                                Tmp2, MachinePointerInfo(V));
   SDValue VAList = VAListLoad;
 
-  if (Align > TLI.getMinStackArgumentAlignment()) {
-    assert(((Align & (Align-1)) == 0) && "Expected Align to be a power of 2");
-
+  if (MA && *MA > TLI.getMinStackArgumentAlignment()) {
     VAList = getNode(ISD::ADD, dl, VAList.getValueType(), VAList,
-                     getConstant(Align - 1, dl, VAList.getValueType()));
+                     getConstant(MA->value() - 1, dl, VAList.getValueType()));
 
-    VAList = getNode(ISD::AND, dl, VAList.getValueType(), VAList,
-                     getConstant(-(int64_t)Align, dl, VAList.getValueType()));
+    VAList =
+        getNode(ISD::AND, dl, VAList.getValueType(), VAList,
+                getConstant(-(int64_t)MA->value(), dl, VAList.getValueType()));
   }
 
   // Increment the pointer, VAList, to the next vaarg
@@ -2380,13 +2380,37 @@ SDValue SelectionDAG::getSplatValue(SDValue V) {
 /// If a SHL/SRA/SRL node has a constant or splat constant shift amount that
 /// is less than the element bit-width of the shift node, return it.
 static const APInt *getValidShiftAmountConstant(SDValue V) {
+  unsigned BitWidth = V.getScalarValueSizeInBits();
   if (ConstantSDNode *SA = isConstOrConstSplat(V.getOperand(1))) {
     // Shifting more than the bitwidth is not valid.
     const APInt &ShAmt = SA->getAPIntValue();
-    if (ShAmt.ult(V.getScalarValueSizeInBits()))
+    if (ShAmt.ult(BitWidth))
       return &ShAmt;
   }
   return nullptr;
+}
+
+/// If a SHL/SRA/SRL node has constant vector shift amounts that are all less
+/// than the element bit-width of the shift node, return the minimum value.
+static const APInt *getValidMinimumShiftAmountConstant(SDValue V) {
+  unsigned BitWidth = V.getScalarValueSizeInBits();
+  auto *BV = dyn_cast<BuildVectorSDNode>(V.getOperand(1));
+  if (!BV)
+    return nullptr;
+  const APInt *MinShAmt = nullptr;
+  for (unsigned i = 0, e = BV->getNumOperands(); i != e; ++i) {
+    auto *SA = dyn_cast<ConstantSDNode>(BV->getOperand(i));
+    if (!SA)
+      return nullptr;
+    // Shifting more than the bitwidth is not valid.
+    const APInt &ShAmt = SA->getAPIntValue();
+    if (ShAmt.uge(BitWidth))
+      return nullptr;
+    if (MinShAmt && MinShAmt->ule(ShAmt))
+      continue;
+    MinShAmt = &ShAmt;
+  }
+  return MinShAmt;
 }
 
 /// Determine which bits of Op are known to be either zero or one and return
@@ -2422,7 +2446,7 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     return Known;
   }
 
-  if (Depth >= 6)
+  if (Depth >= MaxRecursionDepth)
     return Known;  // Limit search depth.
 
   KnownBits Known2;
@@ -2567,14 +2591,13 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
     SDValue Src = Op.getOperand(0);
     ConstantSDNode *SubIdx = dyn_cast<ConstantSDNode>(Op.getOperand(1));
     unsigned NumSrcElts = Src.getValueType().getVectorNumElements();
+    APInt DemandedSrc = APInt::getAllOnesValue(NumSrcElts);
     if (SubIdx && SubIdx->getAPIntValue().ule(NumSrcElts - NumElts)) {
       // Offset the demanded elts by the subvector index.
       uint64_t Idx = SubIdx->getZExtValue();
-      APInt DemandedSrc = DemandedElts.zextOrSelf(NumSrcElts).shl(Idx);
-      Known = computeKnownBits(Src, DemandedSrc, Depth + 1);
-    } else {
-      Known = computeKnownBits(Src, Depth + 1);
+      DemandedSrc = DemandedElts.zextOrSelf(NumSrcElts).shl(Idx);
     }
+    Known = computeKnownBits(Src, DemandedSrc, Depth + 1);
     break;
   }
   case ISD::SCALAR_TO_VECTOR: {
@@ -2785,25 +2808,9 @@ KnownBits SelectionDAG::computeKnownBits(SDValue Op, const APInt &DemandedElts,
       Known.One.lshrInPlace(Shift);
       // High bits are known zero.
       Known.Zero.setHighBits(Shift);
-    } else if (auto *BV = dyn_cast<BuildVectorSDNode>(Op.getOperand(1))) {
-      // If the shift amount is a vector of constants see if we can bound
-      // the number of upper zero bits.
-      unsigned ShiftAmountMin = BitWidth;
-      for (unsigned i = 0; i != BV->getNumOperands(); ++i) {
-        if (auto *C = dyn_cast<ConstantSDNode>(BV->getOperand(i))) {
-          const APInt &ShAmt = C->getAPIntValue();
-          if (ShAmt.ult(BitWidth)) {
-            ShiftAmountMin = std::min<unsigned>(ShiftAmountMin,
-                                                ShAmt.getZExtValue());
-            continue;
-          }
-        }
-        // Don't know anything.
-        ShiftAmountMin = 0;
-        break;
-      }
-
-      Known.Zero.setHighBits(ShiftAmountMin);
+    } else if (const APInt *ShMinAmt = getValidMinimumShiftAmountConstant(Op)) {
+      // Minimum shift high bits are known zero.
+      Known.Zero.setHighBits(ShMinAmt->getZExtValue());
     }
     break;
   case ISD::SRA:
@@ -3412,7 +3419,7 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
     return Val.getNumSignBits();
   }
 
-  if (Depth >= 6)
+  if (Depth >= MaxRecursionDepth)
     return 1;  // Limit search depth.
 
   if (!DemandedElts)
@@ -3714,6 +3721,18 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
     Tmp = ComputeNumSignBits(Op.getOperand(0), Depth+1);
     if (Tmp == 1) return 1;  // Early out.
     return std::min(Tmp, Tmp2)-1;
+  case ISD::MUL: {
+    // The output of the Mul can be at most twice the valid bits in the inputs.
+    unsigned SignBitsOp0 = ComputeNumSignBits(Op.getOperand(0), Depth + 1);
+    if (SignBitsOp0 == 1)
+      break;
+    unsigned SignBitsOp1 = ComputeNumSignBits(Op.getOperand(1), Depth + 1);
+    if (SignBitsOp1 == 1)
+      break;
+    unsigned OutValidBits =
+        (VTBits - SignBitsOp0 + 1) + (VTBits - SignBitsOp1 + 1);
+    return OutValidBits > VTBits ? 1 : VTBits - OutValidBits + 1;
+  }
   case ISD::TRUNCATE: {
     // Check if the sign bits of source go down as far as the truncated value.
     unsigned NumSrcBits = Op.getOperand(0).getScalarValueSizeInBits();
@@ -3802,13 +3821,13 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
     SDValue Src = Op.getOperand(0);
     ConstantSDNode *SubIdx = dyn_cast<ConstantSDNode>(Op.getOperand(1));
     unsigned NumSrcElts = Src.getValueType().getVectorNumElements();
+    APInt DemandedSrc = APInt::getAllOnesValue(NumSrcElts);
     if (SubIdx && SubIdx->getAPIntValue().ule(NumSrcElts - NumElts)) {
       // Offset the demanded elts by the subvector index.
       uint64_t Idx = SubIdx->getZExtValue();
-      APInt DemandedSrc = DemandedElts.zextOrSelf(NumSrcElts).shl(Idx);
-      return ComputeNumSignBits(Src, DemandedSrc, Depth + 1);
+      DemandedSrc = DemandedElts.zextOrSelf(NumSrcElts).shl(Idx);
     }
-    return ComputeNumSignBits(Src, Depth + 1);
+    return ComputeNumSignBits(Src, DemandedSrc, Depth + 1);
   }
   case ISD::CONCAT_VECTORS: {
     // Determine the minimum number of sign bits across all demanded
@@ -3961,7 +3980,7 @@ bool SelectionDAG::isKnownNeverNaN(SDValue Op, bool SNaN, unsigned Depth) const 
   if (getTarget().Options.NoNaNsFPMath || Op->getFlags().hasNoNaNs())
     return true;
 
-  if (Depth >= 6)
+  if (Depth >= MaxRecursionDepth)
     return false; // Limit search depth.
 
   // TODO: Handle vectors.
@@ -5141,22 +5160,6 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
     if (N2C && N2C->isNullValue())
       return N1;
     break;
-  case ISD::FP_ROUND_INREG: {
-    EVT EVT = cast<VTSDNode>(N2)->getVT();
-    assert(VT == N1.getValueType() && "Not an inreg round!");
-    assert(VT.isFloatingPoint() && EVT.isFloatingPoint() &&
-           "Cannot FP_ROUND_INREG integer types");
-    assert(EVT.isVector() == VT.isVector() &&
-           "FP_ROUND_INREG type should be vector iff the operand "
-           "type is vector!");
-    assert((!EVT.isVector() ||
-            EVT.getVectorNumElements() == VT.getVectorNumElements()) &&
-           "Vector element counts must match in FP_ROUND_INREG");
-    assert(EVT.bitsLE(VT) && "Not rounding down!");
-    (void)EVT;
-    if (cast<VTSDNode>(N2)->getVT() == VT) return N1;  // Not actually rounding.
-    break;
-  }
   case ISD::FP_ROUND:
     assert(VT.isFloatingPoint() &&
            N1.getValueType().isFloatingPoint() &&
@@ -5367,7 +5370,6 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
       std::swap(N1, N2);
     } else {
       switch (Opcode) {
-      case ISD::FP_ROUND_INREG:
       case ISD::SIGN_EXTEND_INREG:
       case ISD::SUB:
         return getUNDEF(VT);     // fold op(undef, arg2) -> undef
@@ -5755,7 +5757,7 @@ static void chainLoadsAndStoresForMemcpy(SelectionDAG &DAG, const SDLoc &dl,
 
 static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
                                        SDValue Chain, SDValue Dst, SDValue Src,
-                                       uint64_t Size, unsigned Align,
+                                       uint64_t Size, unsigned Alignment,
                                        bool isVol, bool AlwaysInline,
                                        MachinePointerInfo DstPtrInfo,
                                        MachinePointerInfo SrcPtrInfo) {
@@ -5780,15 +5782,15 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
   if (FI && !MFI.isFixedObjectIndex(FI->getIndex()))
     DstAlignCanChange = true;
   unsigned SrcAlign = DAG.InferPtrAlignment(Src);
-  if (Align > SrcAlign)
-    SrcAlign = Align;
+  if (Alignment > SrcAlign)
+    SrcAlign = Alignment;
   ConstantDataArraySlice Slice;
   bool CopyFromConstant = isMemSrcFromConstant(Src, Slice);
   bool isZeroConstant = CopyFromConstant && Slice.Array == nullptr;
   unsigned Limit = AlwaysInline ? ~0U : TLI.getMaxStoresPerMemcpy(OptSize);
 
   if (!TLI.findOptimalMemOpLowering(
-          MemOps, Limit, Size, (DstAlignCanChange ? 0 : Align),
+          MemOps, Limit, Size, (DstAlignCanChange ? 0 : Alignment),
           (isZeroConstant ? 0 : SrcAlign), /*IsMemset=*/false,
           /*ZeroMemset=*/false, /*MemcpyStrSrc=*/CopyFromConstant,
           /*AllowOverlap=*/!isVol, DstPtrInfo.getAddrSpace(),
@@ -5803,15 +5805,15 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
     // realignment.
     const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
     if (!TRI->needsStackRealignment(MF))
-      while (NewAlign > Align &&
-             DL.exceedsNaturalStackAlignment(llvm::Align(NewAlign)))
-          NewAlign /= 2;
+      while (NewAlign > Alignment &&
+             DL.exceedsNaturalStackAlignment(Align(NewAlign)))
+        NewAlign /= 2;
 
-    if (NewAlign > Align) {
+    if (NewAlign > Alignment) {
       // Give the stack frame object a larger alignment if needed.
       if (MFI.getObjectAlignment(FI->getIndex()) < NewAlign)
         MFI.setObjectAlignment(FI->getIndex(), NewAlign);
-      Align = NewAlign;
+      Alignment = NewAlign;
     }
   }
 
@@ -5854,10 +5856,9 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
       }
       Value = getMemsetStringVal(VT, dl, DAG, TLI, SubSlice);
       if (Value.getNode()) {
-        Store = DAG.getStore(Chain, dl, Value,
-                             DAG.getMemBasePlusOffset(Dst, DstOff, dl),
-                             DstPtrInfo.getWithOffset(DstOff), Align,
-                             MMOFlags);
+        Store = DAG.getStore(
+            Chain, dl, Value, DAG.getMemBasePlusOffset(Dst, DstOff, dl),
+            DstPtrInfo.getWithOffset(DstOff), Alignment, MMOFlags);
         OutChains.push_back(Store);
       }
     }
@@ -5885,7 +5886,7 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, const SDLoc &dl,
 
       Store = DAG.getTruncStore(
           Chain, dl, Value, DAG.getMemBasePlusOffset(Dst, DstOff, dl),
-          DstPtrInfo.getWithOffset(DstOff), VT, Align, MMOFlags);
+          DstPtrInfo.getWithOffset(DstOff), VT, Alignment, MMOFlags);
       OutStoreChains.push_back(Store);
     }
     SrcOff += VTSize;
@@ -6552,7 +6553,7 @@ SDValue SelectionDAG::getMergeValues(ArrayRef<SDValue> Ops, const SDLoc &dl) {
 SDValue SelectionDAG::getMemIntrinsicNode(
     unsigned Opcode, const SDLoc &dl, SDVTList VTList, ArrayRef<SDValue> Ops,
     EVT MemVT, MachinePointerInfo PtrInfo, unsigned Align,
-    MachineMemOperand::Flags Flags, unsigned Size, const AAMDNodes &AAInfo) {
+    MachineMemOperand::Flags Flags, uint64_t Size, const AAMDNodes &AAInfo) {
   if (Align == 0)  // Ensure that codegen never sees alignment 0
     Align = getEVTAlignment(MemVT);
 
@@ -7755,16 +7756,22 @@ SDNode* SelectionDAG::mutateStrictFPToFP(SDNode *Node) {
   case ISD::STRICT_FLOG:       NewOpc = ISD::FLOG;       break;
   case ISD::STRICT_FLOG10:     NewOpc = ISD::FLOG10;     break;
   case ISD::STRICT_FLOG2:      NewOpc = ISD::FLOG2;      break;
+  case ISD::STRICT_LRINT:      NewOpc = ISD::LRINT;      break;
+  case ISD::STRICT_LLRINT:     NewOpc = ISD::LLRINT;     break;
   case ISD::STRICT_FRINT:      NewOpc = ISD::FRINT;      break;
   case ISD::STRICT_FNEARBYINT: NewOpc = ISD::FNEARBYINT; break;
   case ISD::STRICT_FMAXNUM:    NewOpc = ISD::FMAXNUM;    break;
   case ISD::STRICT_FMINNUM:    NewOpc = ISD::FMINNUM;    break;
   case ISD::STRICT_FCEIL:      NewOpc = ISD::FCEIL;      break;
   case ISD::STRICT_FFLOOR:     NewOpc = ISD::FFLOOR;     break;
+  case ISD::STRICT_LROUND:     NewOpc = ISD::LROUND;     break;
+  case ISD::STRICT_LLROUND:    NewOpc = ISD::LLROUND;    break;
   case ISD::STRICT_FROUND:     NewOpc = ISD::FROUND;     break;
   case ISD::STRICT_FTRUNC:     NewOpc = ISD::FTRUNC;     break;
   case ISD::STRICT_FP_ROUND:   NewOpc = ISD::FP_ROUND;   break;
   case ISD::STRICT_FP_EXTEND:  NewOpc = ISD::FP_EXTEND;  break;
+  case ISD::STRICT_FP_TO_SINT: NewOpc = ISD::FP_TO_SINT; break;
+  case ISD::STRICT_FP_TO_UINT: NewOpc = ISD::FP_TO_UINT; break;
   }
 
   assert(Node->getNumValues() == 2 && "Unexpected number of results!");
@@ -7914,6 +7921,7 @@ MachineSDNode *SelectionDAG::getMachineNode(unsigned Opcode, const SDLoc &DL,
     CSEMap.InsertNode(N, IP);
 
   InsertNode(N);
+  NewSDValueDbgMsg(SDValue(N, 0), "Creating new machine node: ", this);
   return N;
 }
 
@@ -8975,7 +8983,7 @@ bool SDValue::reachesChainWithoutSideEffects(SDValue Dest,
 
   // Loads don't have side effects, look through them.
   if (LoadSDNode *Ld = dyn_cast<LoadSDNode>(*this)) {
-    if (!Ld->isVolatile())
+    if (Ld->isUnordered())
       return Ld->getChain().reachesChainWithoutSideEffects(Dest, Depth-1);
   }
   return false;
@@ -9001,15 +9009,27 @@ SelectionDAG::matchBinOpReduction(SDNode *Extract, ISD::NodeType &BinOp,
       !isNullConstant(Extract->getOperand(1)))
     return SDValue();
 
-  SDValue Op = Extract->getOperand(0);
-  unsigned Stages = Log2_32(Op.getValueType().getVectorNumElements());
-
   // Match against one of the candidate binary ops.
+  SDValue Op = Extract->getOperand(0);
   if (llvm::none_of(CandidateBinOps, [Op](ISD::NodeType BinOp) {
         return Op.getOpcode() == unsigned(BinOp);
       }))
     return SDValue();
+
+  // Floating-point reductions may require relaxed constraints on the final step
+  // of the reduction because they may reorder intermediate operations.
   unsigned CandidateBinOp = Op.getOpcode();
+  if (Op.getValueType().isFloatingPoint()) {
+    SDNodeFlags Flags = Op->getFlags();
+    switch (CandidateBinOp) {
+    case ISD::FADD:
+      if (!Flags.hasNoSignedZeros() || !Flags.hasAllowReassociation())
+        return SDValue();
+      break;
+    default:
+      llvm_unreachable("Unhandled FP opcode for binop reduction");
+    }
+  }
 
   // Matching failed - attempt to see if we did enough stages that a partial
   // reduction from a subvector is possible.
@@ -9040,6 +9060,7 @@ SelectionDAG::matchBinOpReduction(SDNode *Extract, ISD::NodeType &BinOp,
   // While a partial reduction match would be:
   // <2,3,u,u,u,u,u,u>
   // <1,u,u,u,u,u,u,u>
+  unsigned Stages = Log2_32(Op.getValueType().getVectorNumElements());
   SDValue PrevOp;
   for (unsigned i = 0; i < Stages; ++i) {
     unsigned MaskEnd = (1 << i);
@@ -9128,8 +9149,7 @@ SDValue SelectionDAG::UnrollVectorOp(SDNode *N, unsigned ResNE) {
                                getShiftAmountOperand(Operands[0].getValueType(),
                                                      Operands[1])));
       break;
-    case ISD::SIGN_EXTEND_INREG:
-    case ISD::FP_ROUND_INREG: {
+    case ISD::SIGN_EXTEND_INREG: {
       EVT ExtVT = cast<VTSDNode>(Operands[1])->getVT().getVectorElementType();
       Scalars.push_back(getNode(N->getOpcode(), dl, EltVT,
                                 Operands[0],
@@ -9200,6 +9220,9 @@ bool SelectionDAG::areNonVolatileConsecutiveLoads(LoadSDNode *LD,
                                                   unsigned Bytes,
                                                   int Dist) const {
   if (LD->isVolatile() || Base->isVolatile())
+    return false;
+  // TODO: probably too restrictive for atomics, revisit
+  if (!LD->isSimple())
     return false;
   if (LD->isIndexed() || Base->isIndexed())
     return false;

@@ -82,7 +82,7 @@
 ...
 ---
 name:            _ZN11xercesc_2_79HashXMLCh6equalsEPKvS2_
-alignment:       4
+alignment:       16
 exposesReturnsTwice: false
 legalized:       false
 regBankSelected: false
@@ -212,7 +212,7 @@ body:             |
   ; CHECK:        successors: %bb.11(0x80000000)
   ; CHECK:        B %bb.11
 
-  ; CHECK:      bb.8.while.body.i (align 4):
+  ; CHECK:      bb.8.while.body.i (align 16):
   ; CHECK:        successors: %bb.11(0x04000000), %bb.9(0x7c000000)
   ; CHECK:        BCC 76, killed renamable $cr0, %bb.11
 

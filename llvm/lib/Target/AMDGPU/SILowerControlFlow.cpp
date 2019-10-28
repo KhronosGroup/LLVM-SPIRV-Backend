@@ -55,7 +55,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/LiveIntervals.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
-#include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -80,16 +79,12 @@ class SILowerControlFlow : public MachineFunctionPass {
 private:
   const SIRegisterInfo *TRI = nullptr;
   const SIInstrInfo *TII = nullptr;
-  MachineRegisterInfo *MRI = nullptr;
   LiveIntervals *LIS = nullptr;
-  MachineDominatorTree *DT = nullptr;
-  MachineLoopInfo *MLI = nullptr;
-
+  MachineRegisterInfo *MRI = nullptr;
 
   const TargetRegisterClass *BoolRC = nullptr;
   unsigned AndOpc;
   unsigned OrOpc;
-  unsigned OrTermOpc;
   unsigned XorOpc;
   unsigned MovTermOpc;
   unsigned Andn2TermOpc;
@@ -102,6 +97,8 @@ private:
   void emitIfBreak(MachineInstr &MI);
   void emitLoop(MachineInstr &MI);
   void emitEndCf(MachineInstr &MI);
+
+  Register getSaveExec(MachineInstr* MI);
 
   void findMaskOperands(MachineInstr &MI, unsigned OpNo,
                         SmallVectorImpl<MachineOperand> &Src) const;
@@ -126,7 +123,7 @@ public:
     AU.addPreservedID(LiveVariablesID);
     AU.addPreservedID(MachineLoopInfoID);
     AU.addPreservedID(MachineDominatorsID);
-
+    AU.setPreservesCFG();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -149,7 +146,7 @@ char &llvm::SILowerControlFlowID = SILowerControlFlow::ID;
 
 static bool isSimpleIf(const MachineInstr &MI, const MachineRegisterInfo *MRI,
                        const SIInstrInfo *TII) {
-  unsigned SaveExecReg = MI.getOperand(0).getReg();
+  Register SaveExecReg = MI.getOperand(0).getReg();
   auto U = MRI->use_instr_nodbg_begin(SaveExecReg);
 
   if (U == MRI->use_instr_nodbg_end() ||
@@ -180,17 +177,31 @@ static bool isSimpleIf(const MachineInstr &MI, const MachineRegisterInfo *MRI,
   return true;
 }
 
+Register SILowerControlFlow::getSaveExec(MachineInstr *MI) {
+  MachineBasicBlock *MBB = MI->getParent();
+  MachineOperand &SaveExec = MI->getOperand(0);
+  assert(SaveExec.getSubReg() == AMDGPU::NoSubRegister);
+
+  Register SaveExecReg = SaveExec.getReg();
+  unsigned FalseTermOpc =
+      TII->isWave32() ? AMDGPU::S_MOV_B32_term : AMDGPU::S_MOV_B64_term;
+  MachineBasicBlock::iterator I = (MI);
+  MachineBasicBlock::iterator J = std::next(I);
+  if (J != MBB->end() && J->getOpcode() == FalseTermOpc &&
+      J->getOperand(1).isReg() && J->getOperand(1).getReg() == SaveExecReg) {
+    SaveExecReg = J->getOperand(0).getReg();
+    J->eraseFromParent();
+  }
+  return SaveExecReg;
+}
+
 void SILowerControlFlow::emitIf(MachineInstr &MI) {
   MachineBasicBlock &MBB = *MI.getParent();
   const DebugLoc &DL = MI.getDebugLoc();
   MachineBasicBlock::iterator I(&MI);
-
-  MachineOperand &SaveExec = MI.getOperand(0);
-  MachineOperand &Cond = MI.getOperand(1);
-  assert(SaveExec.getSubReg() == AMDGPU::NoSubRegister &&
-         Cond.getSubReg() == AMDGPU::NoSubRegister);
-
-  Register SaveExecReg = SaveExec.getReg();
+  Register SaveExecReg = getSaveExec(&MI);
+  MachineOperand& Cond = MI.getOperand(1);
+  assert(Cond.getSubReg() == AMDGPU::NoSubRegister);
 
   MachineOperand &ImpDefSCC = MI.getOperand(4);
   assert(ImpDefSCC.getReg() == AMDGPU::SCC && ImpDefSCC.isDef());
@@ -209,7 +220,7 @@ void SILowerControlFlow::emitIf(MachineInstr &MI) {
     .addReg(Exec)
     .addReg(Exec, RegState::ImplicitDefine);
 
-  unsigned Tmp = MRI->createVirtualRegister(BoolRC);
+  Register Tmp = MRI->createVirtualRegister(BoolRC);
 
   MachineInstr *And =
     BuildMI(MBB, I, DL, TII->get(AndOpc), Tmp)
@@ -254,7 +265,7 @@ void SILowerControlFlow::emitIf(MachineInstr &MI) {
   LIS->InsertMachineInstrInMaps(*SetExec);
   LIS->InsertMachineInstrInMaps(*NewBr);
 
-  LIS->removeAllRegUnitsForPhysReg(Exec);
+  LIS->removeAllRegUnitsForPhysReg(AMDGPU::EXEC);
   MI.eraseFromParent();
 
   // FIXME: Is there a better way of adjusting the liveness? It shouldn't be
@@ -271,8 +282,7 @@ void SILowerControlFlow::emitElse(MachineInstr &MI) {
   MachineBasicBlock &MBB = *MI.getParent();
   const DebugLoc &DL = MI.getDebugLoc();
 
-  Register DstReg = MI.getOperand(0).getReg();
-  assert(MI.getOperand(0).getSubReg() == AMDGPU::NoSubRegister);
+  Register DstReg = getSaveExec(&MI);
 
   bool ExecModified = MI.getOperand(3).getImm() != 0;
   MachineBasicBlock::iterator Start = MBB.begin();
@@ -338,13 +348,13 @@ void SILowerControlFlow::emitElse(MachineInstr &MI) {
     LIS->createAndComputeVirtRegInterval(SaveReg);
 
   // Let this be recomputed.
-  LIS->removeAllRegUnitsForPhysReg(Exec);
+  LIS->removeAllRegUnitsForPhysReg(AMDGPU::EXEC);
 }
 
 void SILowerControlFlow::emitIfBreak(MachineInstr &MI) {
   MachineBasicBlock &MBB = *MI.getParent();
   const DebugLoc &DL = MI.getDebugLoc();
-  auto Dst = MI.getOperand(0).getReg();
+  auto Dst = getSaveExec(&MI);
 
   // Skip ANDing with exec if the break condition is already masked by exec
   // because it is a V_CMP in the same basic block. (We know the break
@@ -403,99 +413,27 @@ void SILowerControlFlow::emitLoop(MachineInstr &MI) {
   MI.eraseFromParent();
 }
 
-// Insert \p Inst (which modifies exec) at \p InsPt in \p MBB, such that \p MBB
-// is split as necessary to keep the exec modification in its own block.
-static MachineBasicBlock *insertInstWithExecFallthrough(MachineBasicBlock &MBB,
-                                                        MachineInstr &MI,
-                                                        MachineInstr *NewMI,
-                                                        MachineDominatorTree *DT,
-                                                        LiveIntervals *LIS,
-                                                        MachineLoopInfo *MLI) {
-  assert(NewMI->isTerminator());
-
-  MachineBasicBlock::iterator InsPt = MI.getIterator();
-  if (std::next(MI.getIterator()) == MBB.end()) {
-    // Don't bother with a new block.
-    MBB.insert(InsPt, NewMI);
-    if (LIS)
-      LIS->ReplaceMachineInstrInMaps(MI, *NewMI);
-    MI.eraseFromParent();
-    return &MBB;
-  }
-
-  MachineFunction *MF = MBB.getParent();
-  MachineBasicBlock *SplitMBB
-    = MF->CreateMachineBasicBlock(MBB.getBasicBlock());
-
-  MF->insert(++MachineFunction::iterator(MBB), SplitMBB);
-
-  // FIXME: This is working around a MachineDominatorTree API defect.
-  //
-  // If a previous pass split a critical edge, it may not have been applied to
-  // the DomTree yet. applySplitCriticalEdges is lazily applied, and inspects
-  // the CFG of the given block. Make sure to call a dominator tree method that
-  // will flush this cache before touching the successors of the block.
-  MachineDomTreeNode *NodeMBB = nullptr;
-  if (DT)
-    NodeMBB = DT->getNode(&MBB);
-
-  // Move everything to the new block, except the end_cf pseudo.
-  SplitMBB->splice(SplitMBB->begin(), &MBB, MBB.begin(), MBB.end());
-
-  SplitMBB->transferSuccessorsAndUpdatePHIs(&MBB);
-  MBB.addSuccessor(SplitMBB, BranchProbability::getOne());
-
-  MBB.insert(MBB.end(), NewMI);
-
-  if (DT) {
-    std::vector<MachineDomTreeNode *> Children = NodeMBB->getChildren();
-    DT->addNewBlock(SplitMBB, &MBB);
-
-    // Reparent all of the children to the new block body.
-    auto *SplitNode = DT->getNode(SplitMBB);
-    for (auto *Child : Children)
-      DT->changeImmediateDominator(Child, SplitNode);
-  }
-
-  if (MLI) {
-    if (MachineLoop *Loop = MLI->getLoopFor(&MBB))
-      Loop->addBasicBlockToLoop(SplitMBB, MLI->getBase());
-  }
-
-  if (LIS) {
-    LIS->insertMBBInMaps(SplitMBB);
-    LIS->ReplaceMachineInstrInMaps(MI, *NewMI);
-  }
-
-  // All live-ins are forwarded.
-  for (auto &LiveIn : MBB.liveins())
-    SplitMBB->addLiveIn(LiveIn);
-
-  MI.eraseFromParent();
-  return SplitMBB;
-}
-
 void SILowerControlFlow::emitEndCf(MachineInstr &MI) {
   MachineBasicBlock &MBB = *MI.getParent();
+  MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
+  unsigned CFMask = MI.getOperand(0).getReg();
+  MachineInstr *Def = MRI.getUniqueVRegDef(CFMask);
   const DebugLoc &DL = MI.getDebugLoc();
 
-  MachineBasicBlock::iterator InsPt = MBB.begin();
+  MachineBasicBlock::iterator InsPt =
+      Def && Def->getParent() == &MBB ? std::next(MachineBasicBlock::iterator(Def))
+                               : MBB.begin();
+  MachineInstr *NewMI = BuildMI(MBB, InsPt, DL, TII->get(OrOpc), Exec)
+                            .addReg(Exec)
+                            .add(MI.getOperand(0));
 
-  // First, move the instruction. It's unnecessarily difficult to update
-  // LiveIntervals when there's a change in control flow, so move the
-  // instruction before changing the blocks.
-  MBB.splice(InsPt, &MBB, MI.getIterator());
   if (LIS)
-    LIS->handleMove(MI);
+    LIS->ReplaceMachineInstrInMaps(MI, *NewMI);
 
-  MachineFunction *MF = MBB.getParent();
+  MI.eraseFromParent();
 
-  // Create instruction without inserting it yet.
-  MachineInstr *NewMI
-    = BuildMI(*MF, DL, TII->get(OrTermOpc), Exec)
-    .addReg(Exec)
-    .add(MI.getOperand(0));
-  insertInstWithExecFallthrough(MBB, MI, NewMI, DT, LIS, MLI);
+  if (LIS)
+    LIS->handleMove(*NewMI);
 }
 
 // Returns replace operands for a logical operation, either single result
@@ -517,7 +455,7 @@ void SILowerControlFlow::findMaskOperands(MachineInstr &MI, unsigned OpNo,
   // A copy with implcitly defined exec inserted earlier is an exclusion, it
   // does not really modify exec.
   for (auto I = Def->getIterator(); I != MI.getIterator(); ++I)
-    if (I->modifiesRegister(Exec, TRI) &&
+    if (I->modifiesRegister(AMDGPU::EXEC, TRI) &&
         !(I->isCopy() && I->getOperand(0).getReg() != Exec))
       return;
 
@@ -546,7 +484,7 @@ void SILowerControlFlow::combineMasks(MachineInstr &MI) {
   else if (Ops[1].isIdenticalTo(Ops[2])) UniqueOpndIdx = 1;
   else return;
 
-  unsigned Reg = MI.getOperand(OpToReplace).getReg();
+  Register Reg = MI.getOperand(OpToReplace).getReg();
   MI.RemoveOperand(OpToReplace);
   MI.addOperand(Ops[UniqueOpndIdx]);
   if (MRI->use_empty(Reg))
@@ -560,16 +498,12 @@ bool SILowerControlFlow::runOnMachineFunction(MachineFunction &MF) {
 
   // This doesn't actually need LiveIntervals, but we can preserve them.
   LIS = getAnalysisIfAvailable<LiveIntervals>();
-  DT = getAnalysisIfAvailable<MachineDominatorTree>();
-  MLI = getAnalysisIfAvailable<MachineLoopInfo>();
-
   MRI = &MF.getRegInfo();
   BoolRC = TRI->getBoolRC();
 
   if (ST.isWave32()) {
     AndOpc = AMDGPU::S_AND_B32;
     OrOpc = AMDGPU::S_OR_B32;
-    OrTermOpc = AMDGPU::S_OR_B32_term;
     XorOpc = AMDGPU::S_XOR_B32;
     MovTermOpc = AMDGPU::S_MOV_B32_term;
     Andn2TermOpc = AMDGPU::S_ANDN2_B32_term;
@@ -579,7 +513,6 @@ bool SILowerControlFlow::runOnMachineFunction(MachineFunction &MF) {
   } else {
     AndOpc = AMDGPU::S_AND_B64;
     OrOpc = AMDGPU::S_OR_B64;
-    OrTermOpc = AMDGPU::S_OR_B64_term;
     XorOpc = AMDGPU::S_XOR_B64;
     MovTermOpc = AMDGPU::S_MOV_B64_term;
     Andn2TermOpc = AMDGPU::S_ANDN2_B64_term;
@@ -592,11 +525,11 @@ bool SILowerControlFlow::runOnMachineFunction(MachineFunction &MF) {
   for (MachineFunction::iterator BI = MF.begin(), BE = MF.end();
        BI != BE; BI = NextBB) {
     NextBB = std::next(BI);
-    MachineBasicBlock *MBB = &*BI;
+    MachineBasicBlock &MBB = *BI;
 
     MachineBasicBlock::iterator I, Next, Last;
 
-    for (I = MBB->begin(), Last = MBB->end(); I != MBB->end(); I = Next) {
+    for (I = MBB.begin(), Last = MBB.end(); I != MBB.end(); I = Next) {
       Next = std::next(I);
       MachineInstr &MI = *I;
 
@@ -617,24 +550,10 @@ bool SILowerControlFlow::runOnMachineFunction(MachineFunction &MF) {
         emitLoop(MI);
         break;
 
-      case AMDGPU::SI_END_CF: {
-        MachineInstr *NextMI = nullptr;
-
-        if (Next != MBB->end())
-          NextMI = &*Next;
-
+      case AMDGPU::SI_END_CF:
         emitEndCf(MI);
-
-        if (NextMI) {
-          MBB = NextMI->getParent();
-          Next = NextMI->getIterator();
-          Last = MBB->end();
-        }
-
-        NextBB = std::next(MBB->getIterator());
-        BE = MF.end();
         break;
-      }
+
       case AMDGPU::S_AND_B64:
       case AMDGPU::S_OR_B64:
       case AMDGPU::S_AND_B32:
@@ -650,7 +569,7 @@ bool SILowerControlFlow::runOnMachineFunction(MachineFunction &MF) {
       }
 
       // Replay newly inserted code to combine masks
-      Next = (Last == MBB->end()) ? MBB->begin() : Last;
+      Next = (Last == MBB.end()) ? MBB.begin() : Last;
     }
   }
 

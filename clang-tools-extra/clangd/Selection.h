@@ -40,7 +40,6 @@
 
 namespace clang {
 namespace clangd {
-class ParsedAST;
 
 // A selection can partially or completely cover several AST nodes.
 // The SelectionTree contains nodes that are covered, and their parents.
@@ -110,6 +109,9 @@ public:
     // If this node is a wrapper with no syntax (e.g. implicit cast), return
     // its contents. (If multiple wrappers are present, unwraps all of them).
     const Node& ignoreImplicit() const;
+    // If this node is inside a wrapper with no syntax (e.g. implicit cast),
+    // return that wrapper. (If multiple are present, unwraps all of them).
+    const Node& outerImplicit() const;
   };
   // The most specific common ancestor of all the selected nodes.
   // Returns nullptr if the common ancestor is the root.

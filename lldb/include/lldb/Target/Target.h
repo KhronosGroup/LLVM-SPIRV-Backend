@@ -139,6 +139,8 @@ public:
 
   bool GetEnableSyntheticValue() const;
 
+  uint32_t GetMaxZeroPaddingInFloatFormat() const;
+
   uint32_t GetMaximumNumberOfChildrenToDisplay() const;
 
   uint32_t GetMaximumSizeOfStringSummary() const;
@@ -533,7 +535,7 @@ public:
 
   static const lldb::TargetPropertiesSP &GetGlobalProperties();
 
-  std::recursive_mutex &GetAPIMutex() { return m_mutex; }
+  std::recursive_mutex &GetAPIMutex();
 
   void DeleteCurrentProcess();
 
@@ -598,7 +600,7 @@ public:
       const FileSpecList *containingModules,
       const FileSpecList *source_file_list,
       const std::unordered_set<std::string> &function_names,
-      RegularExpression &source_regex, bool internal, bool request_hardware,
+      RegularExpression source_regex, bool internal, bool request_hardware,
       LazyBool move_to_nearest_code);
 
   // Use this to create a breakpoint from a load address
@@ -621,7 +623,7 @@ public:
   // target setting, else we use the values passed in
   lldb::BreakpointSP CreateFuncRegexBreakpoint(
       const FileSpecList *containingModules,
-      const FileSpecList *containingSourceFiles, RegularExpression &func_regexp,
+      const FileSpecList *containingSourceFiles, RegularExpression func_regexp,
       lldb::LanguageType requested_language, LazyBool skip_prologue,
       bool internal, bool request_hardware);
 
@@ -1106,6 +1108,11 @@ public:
 
   lldb::ExpressionVariableSP GetPersistentVariable(ConstString name);
 
+  /// Return the next available number for numbered persistent variables.
+  unsigned GetNextPersistentVariableIndex() {
+    return m_next_persistent_variable_index++;
+  }
+
   lldb::addr_t GetPersistentSymbol(ConstString name);
 
   /// This method will return the address of the starting function for
@@ -1281,6 +1288,12 @@ protected:
   lldb::PlatformSP m_platform_sp; ///< The platform for this target.
   std::recursive_mutex m_mutex; ///< An API mutex that is used by the lldb::SB*
                                 /// classes make the SB interface thread safe
+  /// When the private state thread calls SB API's - usually because it is 
+  /// running OS plugin or Python ThreadPlan code - it should not block on the
+  /// API mutex that is held by the code that kicked off the sequence of events
+  /// that led us to run the code.  We hand out this mutex instead when we 
+  /// detect that code is running on the private state thread.
+  std::recursive_mutex m_private_mutex; 
   Arch m_arch;
   ModuleList m_images; ///< The list of images for this process (shared
                        /// libraries and anything dynamically loaded).
@@ -1315,6 +1328,7 @@ protected:
   bool m_valid;
   bool m_suppress_stop_hooks;
   bool m_is_dummy_target;
+  unsigned m_next_persistent_variable_index = 0;
 
   static void ImageSearchPathsChanged(const PathMappingList &path_list,
                                       void *baton);

@@ -650,7 +650,7 @@ template <typename T>
 class TestVisitor : public clang::RecursiveASTVisitor<T> {
 public:
   bool runOver(StringRef Code) {
-    return runToolOnCode(new TestAction(this), Code);
+    return runToolOnCode(std::make_unique<TestAction>(this), Code);
   }
 
 protected:
@@ -680,7 +680,7 @@ private:
       Visitor->SM = &compiler.getSourceManager();
       Visitor->Context = &compiler.getASTContext();
       /// TestConsumer will be deleted by the framework calling us.
-      return llvm::make_unique<FindConsumer>(Visitor);
+      return std::make_unique<FindConsumer>(Visitor);
     }
 
   private:

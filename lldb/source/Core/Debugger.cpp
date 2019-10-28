@@ -257,7 +257,14 @@ Status Debugger::SetPropertyValue(const ExecutionContext *exe_ctx,
                                   llvm::StringRef value) {
   bool is_load_script =
       (property_path == "target.load-script-from-symbol-file");
-  bool is_escape_non_printables = (property_path == "escape-non-printables");
+  // These properties might change how we visualize data.
+  bool invalidate_data_vis = (property_path == "escape-non-printables");
+  invalidate_data_vis |=
+      (property_path == "target.max-zero-padding-in-float-format");
+  if (invalidate_data_vis) {
+    DataVisualization::ForceUpdate();
+  }
+
   TargetSP target_sp;
   LoadScriptFromSymFile load_script_old_value;
   if (is_load_script && exe_ctx->GetTargetSP()) {
@@ -270,12 +277,12 @@ Status Debugger::SetPropertyValue(const ExecutionContext *exe_ctx,
     // FIXME it would be nice to have "on-change" callbacks for properties
     if (property_path == g_debugger_properties[ePropertyPrompt].name) {
       llvm::StringRef new_prompt = GetPrompt();
-      std::string str = lldb_utility::ansi::FormatAnsiTerminalCodes(
+      std::string str = lldb_private::ansi::FormatAnsiTerminalCodes(
           new_prompt, GetUseColor());
       if (str.length())
         new_prompt = str;
       GetCommandInterpreter().UpdatePrompt(new_prompt);
-      auto bytes = llvm::make_unique<EventDataBytes>(new_prompt);
+      auto bytes = std::make_unique<EventDataBytes>(new_prompt);
       auto prompt_change_event_sp = std::make_shared<Event>(
           CommandInterpreter::eBroadcastBitResetPrompt, bytes.release());
       GetCommandInterpreter().BroadcastEvent(prompt_change_event_sp);
@@ -290,18 +297,14 @@ Status Debugger::SetPropertyValue(const ExecutionContext *exe_ctx,
         std::list<Status> errors;
         StreamString feedback_stream;
         if (!target_sp->LoadScriptingResources(errors, &feedback_stream)) {
-          StreamFileSP stream_sp(GetErrorFile());
-          if (stream_sp) {
-            for (auto error : errors) {
-              stream_sp->Printf("%s\n", error.AsCString());
-            }
-            if (feedback_stream.GetSize())
-              stream_sp->PutCString(feedback_stream.GetString());
+          Stream &s = GetErrorStream();
+          for (auto error : errors) {
+            s.Printf("%s\n", error.AsCString());
           }
+          if (feedback_stream.GetSize())
+            s.PutCString(feedback_stream.GetString());
         }
       }
-    } else if (is_escape_non_printables) {
-      DataVisualization::ForceUpdate();
     }
   }
   return error;
@@ -345,7 +348,7 @@ void Debugger::SetPrompt(llvm::StringRef p) {
   m_collection_sp->SetPropertyAtIndexAsString(nullptr, idx, p);
   llvm::StringRef new_prompt = GetPrompt();
   std::string str =
-      lldb_utility::ansi::FormatAnsiTerminalCodes(new_prompt, GetUseColor());
+      lldb_private::ansi::FormatAnsiTerminalCodes(new_prompt, GetUseColor());
   if (str.length())
     new_prompt = str;
   GetCommandInterpreter().UpdatePrompt(new_prompt);
@@ -695,16 +698,16 @@ TargetSP Debugger::FindTargetWithProcess(Process *process) {
 Debugger::Debugger(lldb::LogOutputCallback log_callback, void *baton)
     : UserID(g_unique_id++),
       Properties(std::make_shared<OptionValueProperties>()),
-      m_input_file_sp(std::make_shared<StreamFile>(stdin, false)),
-      m_output_file_sp(std::make_shared<StreamFile>(stdout, false)),
-      m_error_file_sp(std::make_shared<StreamFile>(stderr, false)),
+      m_input_file_sp(std::make_shared<NativeFile>(stdin, false)),
+      m_output_stream_sp(std::make_shared<StreamFile>(stdout, false)),
+      m_error_stream_sp(std::make_shared<StreamFile>(stderr, false)),
       m_input_recorder(nullptr),
       m_broadcaster_manager_sp(BroadcasterManager::MakeBroadcasterManager()),
       m_terminal_state(), m_target_list(*this), m_platform_list(),
       m_listener_sp(Listener::MakeListener("lldb.Debugger")),
       m_source_manager_up(), m_source_file_cache(),
       m_command_interpreter_up(
-          llvm::make_unique<CommandInterpreter>(*this, false)),
+          std::make_unique<CommandInterpreter>(*this, false)),
       m_script_interpreter_sp(), m_input_reader_stack(), m_instance_name(),
       m_loaded_plugins(), m_event_handler_thread(), m_io_handler_thread(),
       m_sync_broadcaster(nullptr, "lldb.debugger.sync"),
@@ -720,6 +723,9 @@ Debugger::Debugger(lldb::LogOutputCallback log_callback, void *baton)
   PlatformSP default_platform_sp(Platform::GetHostPlatform());
   assert(default_platform_sp);
   m_platform_list.Append(default_platform_sp, true);
+
+  m_dummy_target_sp = m_target_list.GetDummyTarget(*this);
+  assert(m_dummy_target_sp.get() && "Couldn't construct dummy target?");
 
   m_collection_sp->Initialize(g_debugger_properties);
   m_collection_sp->AppendProperty(
@@ -749,7 +755,7 @@ Debugger::Debugger(lldb::LogOutputCallback log_callback, void *baton)
   if (term && !strcmp(term, "dumb"))
     SetUseColor(false);
   // Turn off use-color if we don't write to a terminal with color support.
-  if (!m_output_file_sp->GetFile().GetIsTerminalWithColors())
+  if (!GetOutputFile().GetIsTerminalWithColors())
     SetUseColor(false);
 
 #if defined(_WIN32) && defined(ENABLE_VIRTUAL_TERMINAL_PROCESSING)
@@ -790,8 +796,7 @@ void Debugger::Clear() {
     // Close the input file _before_ we close the input read communications
     // class as it does NOT own the input file, our m_input_file does.
     m_terminal_state.Clear();
-    if (m_input_file_sp)
-      m_input_file_sp->GetFile().Close();
+    GetInputFile().Close();
 
     m_command_interpreter_up->Clear();
   });
@@ -816,57 +821,29 @@ void Debugger::SetAsyncExecution(bool async_execution) {
 
 repro::DataRecorder *Debugger::GetInputRecorder() { return m_input_recorder; }
 
-void Debugger::SetInputFileHandle(FILE *fh, bool tranfer_ownership,
-                                  repro::DataRecorder *recorder) {
+void Debugger::SetInputFile(FileSP file_sp, repro::DataRecorder *recorder) {
+  assert(file_sp && file_sp->IsValid());
   m_input_recorder = recorder;
-  if (m_input_file_sp)
-    m_input_file_sp->GetFile().SetStream(fh, tranfer_ownership);
-  else
-    m_input_file_sp = std::make_shared<StreamFile>(fh, tranfer_ownership);
-
-  File &in_file = m_input_file_sp->GetFile();
-  if (!in_file.IsValid())
-    in_file.SetStream(stdin, true);
-
+  m_input_file_sp = file_sp;
   // Save away the terminal state if that is relevant, so that we can restore
   // it in RestoreInputState.
   SaveInputTerminalState();
 }
 
-void Debugger::SetOutputFileHandle(FILE *fh, bool tranfer_ownership) {
-  if (m_output_file_sp)
-    m_output_file_sp->GetFile().SetStream(fh, tranfer_ownership);
-  else
-    m_output_file_sp = std::make_shared<StreamFile>(fh, tranfer_ownership);
-
-  File &out_file = m_output_file_sp->GetFile();
-  if (!out_file.IsValid())
-    out_file.SetStream(stdout, false);
-
-  // Do not create the ScriptInterpreter just for setting the output file
-  // handle as the constructor will know how to do the right thing on its own.
-  if (ScriptInterpreter *script_interpreter =
-          GetScriptInterpreter(/*can_create=*/false))
-    script_interpreter->ResetOutputFileHandle(fh);
+void Debugger::SetOutputFile(FileSP file_sp) {
+  assert(file_sp && file_sp->IsValid());
+  m_output_stream_sp = std::make_shared<StreamFile>(file_sp);
 }
 
-void Debugger::SetErrorFileHandle(FILE *fh, bool tranfer_ownership) {
-  if (m_error_file_sp)
-    m_error_file_sp->GetFile().SetStream(fh, tranfer_ownership);
-  else
-    m_error_file_sp = std::make_shared<StreamFile>(fh, tranfer_ownership);
-
-  File &err_file = m_error_file_sp->GetFile();
-  if (!err_file.IsValid())
-    err_file.SetStream(stderr, false);
+void Debugger::SetErrorFile(FileSP file_sp) {
+  assert(file_sp && file_sp->IsValid());
+  m_error_stream_sp = std::make_shared<StreamFile>(file_sp);
 }
 
 void Debugger::SaveInputTerminalState() {
-  if (m_input_file_sp) {
-    File &in_file = m_input_file_sp->GetFile();
-    if (in_file.GetDescriptor() != File::kInvalidDescriptor)
-      m_terminal_state.Save(in_file.GetDescriptor(), true);
-  }
+  int fd = GetInputFile().GetDescriptor();
+  if (fd != File::kInvalidDescriptor)
+    m_terminal_state.Save(fd, true);
 }
 
 void Debugger::RestoreInputTerminalState() { m_terminal_state.Restore(); }
@@ -947,8 +924,9 @@ bool Debugger::CheckTopIOHandlerTypes(IOHandler::Type top_type,
 }
 
 void Debugger::PrintAsync(const char *s, size_t len, bool is_stdout) {
-  lldb::StreamFileSP stream = is_stdout ? GetOutputFile() : GetErrorFile();
-  m_input_reader_stack.PrintAsync(stream.get(), s, len);
+  lldb_private::StreamFile &stream =
+      is_stdout ? GetOutputStream() : GetErrorStream();
+  m_input_reader_stack.PrintAsync(&stream, s, len);
 }
 
 ConstString Debugger::GetTopIOHandlerControlSequence(char ch) {
@@ -985,8 +963,7 @@ void Debugger::RunIOHandler(const IOHandlerSP &reader_sp) {
   }
 }
 
-void Debugger::AdoptTopIOHandlerFilesIfInvalid(StreamFileSP &in,
-                                               StreamFileSP &out,
+void Debugger::AdoptTopIOHandlerFilesIfInvalid(FileSP &in, StreamFileSP &out,
                                                StreamFileSP &err) {
   // Before an IOHandler runs, it must have in/out/err streams. This function
   // is called when one ore more of the streams are nullptr. We use the top
@@ -996,37 +973,34 @@ void Debugger::AdoptTopIOHandlerFilesIfInvalid(StreamFileSP &in,
   std::lock_guard<std::recursive_mutex> guard(m_input_reader_stack.GetMutex());
   IOHandlerSP top_reader_sp(m_input_reader_stack.Top());
   // If no STDIN has been set, then set it appropriately
-  if (!in) {
+  if (!in || !in->IsValid()) {
     if (top_reader_sp)
-      in = top_reader_sp->GetInputStreamFile();
+      in = top_reader_sp->GetInputFileSP();
     else
-      in = GetInputFile();
-
+      in = GetInputFileSP();
     // If there is nothing, use stdin
     if (!in)
-      in = std::make_shared<StreamFile>(stdin, false);
+      in = std::make_shared<NativeFile>(stdin, false);
   }
   // If no STDOUT has been set, then set it appropriately
-  if (!out) {
+  if (!out || !out->GetFile().IsValid()) {
     if (top_reader_sp)
-      out = top_reader_sp->GetOutputStreamFile();
+      out = top_reader_sp->GetOutputStreamFileSP();
     else
-      out = GetOutputFile();
-
+      out = GetOutputStreamSP();
     // If there is nothing, use stdout
     if (!out)
       out = std::make_shared<StreamFile>(stdout, false);
   }
   // If no STDERR has been set, then set it appropriately
-  if (!err) {
+  if (!err || !err->GetFile().IsValid()) {
     if (top_reader_sp)
-      err = top_reader_sp->GetErrorStreamFile();
+      err = top_reader_sp->GetErrorStreamFileSP();
     else
-      err = GetErrorFile();
-
+      err = GetErrorStreamSP();
     // If there is nothing, use stderr
     if (!err)
-      err = std::make_shared<StreamFile>(stdout, false);
+      err = std::make_shared<StreamFile>(stderr, false);
   }
 }
 
@@ -1194,7 +1168,7 @@ bool Debugger::EnableLog(llvm::StringRef channel,
         LLDB_LOG_OPTION_PREPEND_TIMESTAMP | LLDB_LOG_OPTION_PREPEND_THREAD_NAME;
   } else if (log_file.empty()) {
     log_stream_sp = std::make_shared<llvm::raw_fd_ostream>(
-        GetOutputFile()->GetFile().GetDescriptor(), !should_close, unbuffered);
+        GetOutputFile().GetDescriptor(), !should_close, unbuffered);
   } else {
     auto pos = m_log_streams.find(log_file);
     if (pos != m_log_streams.end())
@@ -1239,7 +1213,7 @@ ScriptInterpreter *Debugger::GetScriptInterpreter(bool can_create) {
 
 SourceManager &Debugger::GetSourceManager() {
   if (!m_source_manager_up)
-    m_source_manager_up = llvm::make_unique<SourceManager>(shared_from_this());
+    m_source_manager_up = std::make_unique<SourceManager>(shared_from_this());
   return *m_source_manager_up;
 }
 
@@ -1589,8 +1563,7 @@ bool Debugger::StartIOHandlerThread() {
 
 void Debugger::StopIOHandlerThread() {
   if (m_io_handler_thread.IsJoinable()) {
-    if (m_input_file_sp)
-      m_input_file_sp->GetFile().Close();
+    GetInputFile().Close();
     m_io_handler_thread.Join(nullptr);
   }
 }
@@ -1601,10 +1574,6 @@ void Debugger::JoinIOHandlerThread() {
     m_io_handler_thread.Join(&result);
     m_io_handler_thread = LLDB_INVALID_HOST_THREAD;
   }
-}
-
-Target *Debugger::GetDummyTarget() {
-  return m_target_list.GetDummyTarget(*this).get();
 }
 
 Target *Debugger::GetSelectedOrDummyTarget(bool prefer_dummy) {
@@ -1623,13 +1592,11 @@ Status Debugger::RunREPL(LanguageType language, const char *repl_options) {
   FileSpec repl_executable;
 
   if (language == eLanguageTypeUnknown) {
-    std::set<LanguageType> repl_languages;
+    LanguageSet repl_languages = Language::GetLanguagesSupportingREPLs();
 
-    Language::GetLanguagesSupportingREPLs(repl_languages);
-
-    if (repl_languages.size() == 1) {
-      language = *repl_languages.begin();
-    } else if (repl_languages.empty()) {
+    if (auto single_lang = repl_languages.GetSingularLanguage()) {
+      language = *single_lang;
+    } else if (repl_languages.Empty()) {
       err.SetErrorStringWithFormat(
           "LLDB isn't configured with REPL support for any languages.");
       return err;

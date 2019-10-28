@@ -7,63 +7,75 @@
 //===----------------------------------------------------------------------===//
 // \file
 /// Contains the Analyses and Result Interpretation to select likely functions
-/// to Speculatively compile before they are called. [Experimentation]
+/// to Speculatively compile before they are called. [Purely Experimentation]
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_EXECUTIONENGINE_ORC_SPECULATEANALYSES_H
 #define LLVM_EXECUTIONENGINE_ORC_SPECULATEANALYSES_H
 
+#include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/Speculation.h"
 
 #include <vector>
 
-namespace {
-using namespace llvm;
-std::vector<const BasicBlock *> findBBwithCalls(const Function &F,
-                                                bool IndirectCall = false) {
-  std::vector<const BasicBlock *> BBs;
-
-  auto findCallInst = [&IndirectCall](const Instruction &I) {
-    if (auto Call = dyn_cast<CallBase>(&I)) {
-      if (Call->isIndirectCall())
-        return IndirectCall;
-      else
-        return true;
-    } else
-      return false;
-  };
-  for (auto &BB : F)
-    if (findCallInst(*BB.getTerminator()) ||
-        llvm::any_of(BB.instructionsWithoutDebug(), findCallInst))
-      BBs.emplace_back(&BB);
-
-  return BBs;
-}
-} // namespace
-
 namespace llvm {
 
 namespace orc {
 
-// Direct calls in high frequency basic blocks are extracted.
-class BlockFreqQuery {
-private:
+// Provides common code.
+class SpeculateQuery {
+protected:
   void findCalles(const BasicBlock *, DenseSet<StringRef> &);
+  bool isStraightLine(const Function &F);
+
+public:
+  using ResultTy = Optional<DenseMap<StringRef, DenseSet<StringRef>>>;
+};
+
+// Direct calls in high frequency basic blocks are extracted.
+class BlockFreqQuery : public SpeculateQuery {
   size_t numBBToGet(size_t);
 
 public:
-  using ResultTy = Optional<DenseMap<StringRef, DenseSet<StringRef>>>;
-
   // Find likely next executables based on IR Block Frequency
-  ResultTy operator()(Function &F, FunctionAnalysisManager &FAM);
+  ResultTy operator()(Function &F);
 };
 
-// Walk the CFG by exploting BranchProbabilityInfo
-class CFGWalkQuery {
+// This Query generates a sequence of basic blocks which follows the order of
+// execution.
+// A handful of BB with higher block frequencies are taken, then path to entry
+// and end BB are discovered by traversing up & down the CFG.
+class SequenceBBQuery : public SpeculateQuery {
+  struct WalkDirection {
+    bool Upward = true, Downward = true;
+    // the block associated contain a call
+    bool CallerBlock = false;
+  };
+
 public:
-  using ResultTy = Optional<DenseMap<StringRef, DenseSet<StringRef>>>;
-  ResultTy operator()(Function &F, FunctionAnalysisManager &FAM);
+  using VisitedBlocksInfoTy = DenseMap<const BasicBlock *, WalkDirection>;
+  using BlockListTy = SmallVector<const BasicBlock *, 8>;
+  using BackEdgesInfoTy =
+      SmallVector<std::pair<const BasicBlock *, const BasicBlock *>, 8>;
+  using BlockFreqInfoTy =
+      SmallVector<std::pair<const BasicBlock *, uint64_t>, 8>;
+
+private:
+  std::size_t getHottestBlocks(std::size_t TotalBlocks);
+  BlockListTy rearrangeBB(const Function &, const BlockListTy &);
+  BlockListTy queryCFG(Function &, const BlockListTy &);
+  void traverseToEntryBlock(const BasicBlock *, const BlockListTy &,
+                            const BackEdgesInfoTy &,
+                            const BranchProbabilityInfo *,
+                            VisitedBlocksInfoTy &);
+  void traverseToExitBlock(const BasicBlock *, const BlockListTy &,
+                           const BackEdgesInfoTy &,
+                           const BranchProbabilityInfo *,
+                           VisitedBlocksInfoTy &);
+
+public:
+  ResultTy operator()(Function &F);
 };
 
 } // namespace orc

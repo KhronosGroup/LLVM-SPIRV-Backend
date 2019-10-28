@@ -29,7 +29,7 @@ std::unique_ptr<SymbolIndex> Dex::build(SymbolSlab Symbols, RefSlab Refs,
   // There is no need to include "Rels" in Data because the relations are self-
   // contained, without references into a backing store.
   auto Data = std::make_pair(std::move(Symbols), std::move(Refs));
-  return llvm::make_unique<Dex>(Data.first, Data.second, Rels, std::move(Data),
+  return std::make_unique<Dex>(Data.first, Data.second, Rels, std::move(Data),
                                 Size);
 }
 
@@ -271,7 +271,8 @@ void Dex::relations(
       Req.Limit.getValueOr(std::numeric_limits<uint32_t>::max());
   for (const SymbolID &Subject : Req.Subjects) {
     LookupRequest LookupReq;
-    auto It = Relations.find(std::make_pair(Subject, Req.Predicate));
+    auto It = Relations.find(
+        std::make_pair(Subject, static_cast<uint8_t>(Req.Predicate)));
     if (It != Relations.end()) {
       for (const auto &Object : It->second) {
         if (Remaining > 0) {

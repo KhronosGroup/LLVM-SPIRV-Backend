@@ -196,8 +196,8 @@ public:
     return LocalMemorySize;
   }
 
-  unsigned getAlignmentForImplicitArgPtr() const {
-    return isAmdHsaOS() ? 8 : 4;
+  Align getAlignmentForImplicitArgPtr() const {
+    return isAmdHsaOS() ? Align(8) : Align(4);
   }
 
   /// Returns the offset in bytes from the start of the input buffer
@@ -238,10 +238,8 @@ public:
       return 16;
     return AMDGPU::getIntegerAttribute(F, "amdgpu-implicitarg-num-bytes", 0);
   }
-  uint64_t getExplicitKernArgSize(const Function &F,
-                                  unsigned &MaxAlign) const;
-  unsigned getKernArgSegmentSize(const Function &F,
-                                 unsigned &MaxAlign) const;
+  uint64_t getExplicitKernArgSize(const Function &F, Align &MaxAlign) const;
+  unsigned getKernArgSegmentSize(const Function &F, Align &MaxAlign) const;
 
   virtual ~AMDGPUSubtarget() {}
 };
@@ -368,6 +366,7 @@ protected:
   bool CaymanISA;
   bool CFALUBug;
   bool LDSMisalignedBug;
+  bool HasMFMAInlineLiteralBug;
   bool HasVertexCache;
   short TexVTXClauseSize;
   bool ScalarizeGlobal;
@@ -422,7 +421,7 @@ public:
     return CallLoweringInfo.get();
   }
 
-  const InstructionSelector *getInstructionSelector() const override {
+  InstructionSelector *getInstructionSelector() const override {
     return InstSelector.get();
   }
 
@@ -547,6 +546,14 @@ public:
   }
 
   bool hasSwap() const {
+    return GFX9Insts;
+  }
+
+  bool hasScalarPackInsts() const {
+    return GFX9Insts;
+  }
+
+  bool hasScalarMulHiInsts() const {
     return GFX9Insts;
   }
 
@@ -859,9 +866,7 @@ public:
   // on the pointer value itself may rely on the alignment / known low bits of
   // the pointer. Set this to something above the minimum to avoid needing
   // dynamic realignment in common cases.
-  unsigned getStackAlignment() const {
-    return 16;
-  }
+  Align getStackAlignment() const { return Align(16); }
 
   bool enableMachineScheduler() const override {
     return true;
@@ -949,6 +954,14 @@ public:
     return HasDPP;
   }
 
+  bool hasDPPBroadcasts() const {
+    return HasDPP && getGeneration() < GFX10;
+  }
+
+  bool hasDPPWavefrontShifts() const {
+    return HasDPP && getGeneration() < GFX10;
+  }
+
   bool hasDPP8() const {
     return HasDPP8;
   }
@@ -977,6 +990,10 @@ public:
 
   bool hasSGPRInitBug() const {
     return SGPRInitBug;
+  }
+
+  bool hasMFMAInlineLiteralBug() const {
+    return HasMFMAInlineLiteralBug;
   }
 
   bool has12DWordStoreHazard() const {
@@ -1238,9 +1255,7 @@ public:
     return Gen;
   }
 
-  unsigned getStackAlignment() const {
-    return 4;
-  }
+  Align getStackAlignment() const { return Align(4); }
 
   R600Subtarget &initializeSubtargetDependencies(const Triple &TT,
                                                  StringRef GPU, StringRef FS);

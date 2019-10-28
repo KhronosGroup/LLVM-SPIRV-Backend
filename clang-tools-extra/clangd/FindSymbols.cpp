@@ -8,9 +8,9 @@
 #include "FindSymbols.h"
 
 #include "AST.h"
-#include "ClangdUnit.h"
 #include "FuzzyMatch.h"
 #include "Logger.h"
+#include "ParsedAST.h"
 #include "Quality.h"
 #include "SourceCode.h"
 #include "index/Index.h"
@@ -43,18 +43,11 @@ llvm::Expected<Location> symbolToLocation(const Symbol &Sym,
                                           llvm::StringRef HintPath) {
   // Prefer the definition over e.g. a function declaration in a header
   auto &CD = Sym.Definition ? Sym.Definition : Sym.CanonicalDeclaration;
-  auto Uri = URI::parse(CD.FileURI);
-  if (!Uri) {
-    return llvm::make_error<llvm::StringError>(
-        formatv("Could not parse URI '{0}' for symbol '{1}'.", CD.FileURI,
-                Sym.Name),
-        llvm::inconvertibleErrorCode());
-  }
-  auto Path = URI::resolve(*Uri, HintPath);
+  auto Path = URI::resolve(CD.FileURI, HintPath);
   if (!Path) {
     return llvm::make_error<llvm::StringError>(
-        formatv("Could not resolve path for URI '{0}' for symbol '{1}'.",
-                Uri->toString(), Sym.Name),
+        formatv("Could not resolve path for symbol '{0}': {1}",
+                Sym.Name, llvm::toString(Path.takeError())),
         llvm::inconvertibleErrorCode());
   }
   Location L;
@@ -176,14 +169,14 @@ llvm::Optional<DocumentSymbol> declToSym(ASTContext &Ctx, const NamedDecl &ND) {
   return SI;
 }
 
-/// A helper class to build an outline for the parse AST. It traverse the AST
+/// A helper class to build an outline for the parse AST. It traverses the AST
 /// directly instead of using RecursiveASTVisitor (RAV) for three main reasons:
-///    - there is no way to keep RAV from traversing subtrees we're not
+///    - there is no way to keep RAV from traversing subtrees we are not
 ///      interested in. E.g. not traversing function locals or implicit template
 ///      instantiations.
-///    - it's easier to combine results of recursive passes, e.g.
+///    - it's easier to combine results of recursive passes,
 ///    - visiting decls is actually simple, so we don't hit the complicated
-///      cases that RAV mostly helps with (types and expressions, etc.)
+///      cases that RAV mostly helps with (types, expressions, etc.)
 class DocumentOutline {
 public:
   DocumentOutline(ParsedAST &AST) : AST(AST) {}

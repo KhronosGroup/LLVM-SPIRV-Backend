@@ -191,7 +191,7 @@ getReservedRegs(const MachineFunction &MF) const {
   markSuperRegs(Reserved, ARM::PC);
   markSuperRegs(Reserved, ARM::FPSCR);
   markSuperRegs(Reserved, ARM::APSR_NZCV);
-  if (TFI->hasFP(MF))
+  if (TFI->hasFP(MF) || STI.isTargetDarwin())
     markSuperRegs(Reserved, getFramePointerReg(STI));
   if (hasBasePointer(MF))
     markSuperRegs(Reserved, BasePtr);
@@ -223,7 +223,7 @@ isAsmClobberable(const MachineFunction &MF, unsigned PhysReg) const {
 
 const TargetRegisterClass *
 ARMBaseRegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC,
-                                               const MachineFunction &) const {
+                                               const MachineFunction &MF) const {
   const TargetRegisterClass *Super = RC;
   TargetRegisterClass::sc_iterator I = RC->getSuperClasses();
   do {
@@ -231,11 +231,13 @@ ARMBaseRegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC,
     case ARM::GPRRegClassID:
     case ARM::SPRRegClassID:
     case ARM::DPRRegClassID:
+    case ARM::GPRPairRegClassID:
+      return Super;
     case ARM::QPRRegClassID:
     case ARM::QQPRRegClassID:
     case ARM::QQQQPRRegClassID:
-    case ARM::GPRPairRegClassID:
-      return Super;
+      if (MF.getSubtarget<ARMSubtarget>().hasNEON())
+        return Super;
     }
     Super = *I++;
   } while (Super);
@@ -669,7 +671,7 @@ void ARMBaseRegisterInfo::resolveFrameIndex(MachineInstr &MI, unsigned BaseReg,
     Done = rewriteARMFrameIndex(MI, i, BaseReg, Off, TII);
   else {
     assert(AFI->isThumb2Function());
-    Done = rewriteT2FrameIndex(MI, i, BaseReg, Off, TII);
+    Done = rewriteT2FrameIndex(MI, i, BaseReg, Off, TII, this);
   }
   assert(Done && "Unable to resolve frame index!");
   (void)Done;
@@ -781,7 +783,7 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     Done = rewriteARMFrameIndex(MI, FIOperandNum, FrameReg, Offset, TII);
   else {
     assert(AFI->isThumb2Function());
-    Done = rewriteT2FrameIndex(MI, FIOperandNum, FrameReg, Offset, TII);
+    Done = rewriteT2FrameIndex(MI, FIOperandNum, FrameReg, Offset, TII, this);
   }
   if (Done)
     return;
@@ -789,21 +791,32 @@ ARMBaseRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // If we get here, the immediate doesn't fit into the instruction.  We folded
   // as much as possible above, handle the rest, providing a register that is
   // SP+LargeImm.
-  assert((Offset ||
-          (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode4 ||
-          (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode6) &&
-         "This code isn't needed if offset already handled!");
+  assert(
+      (Offset ||
+       (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode4 ||
+       (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrMode6 ||
+       (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrModeT2_i7 ||
+       (MI.getDesc().TSFlags & ARMII::AddrModeMask) == ARMII::AddrModeT2_i7s2 ||
+       (MI.getDesc().TSFlags & ARMII::AddrModeMask) ==
+           ARMII::AddrModeT2_i7s4) &&
+      "This code isn't needed if offset already handled!");
 
   unsigned ScratchReg = 0;
   int PIdx = MI.findFirstPredOperandIdx();
   ARMCC::CondCodes Pred = (PIdx == -1)
     ? ARMCC::AL : (ARMCC::CondCodes)MI.getOperand(PIdx).getImm();
   Register PredReg = (PIdx == -1) ? Register() : MI.getOperand(PIdx+1).getReg();
-  if (Offset == 0)
+
+  const MCInstrDesc &MCID = MI.getDesc();
+  const TargetRegisterClass *RegClass =
+      TII.getRegClass(MCID, FIOperandNum, this, *MI.getParent()->getParent());
+
+  if (Offset == 0 &&
+      (Register::isVirtualRegister(FrameReg) || RegClass->contains(FrameReg)))
     // Must be addrmode4/6.
     MI.getOperand(FIOperandNum).ChangeToRegister(FrameReg, false, false, false);
   else {
-    ScratchReg = MF.getRegInfo().createVirtualRegister(&ARM::GPRRegClass);
+    ScratchReg = MF.getRegInfo().createVirtualRegister(RegClass);
     if (!AFI->isThumbFunction())
       emitARMRegPlusImmediate(MBB, II, MI.getDebugLoc(), ScratchReg, FrameReg,
                               Offset, Pred, PredReg, TII);

@@ -59,7 +59,7 @@ endif()
 # LLVM_EXTERNAL_${project}_SOURCE_DIR using LLVM_ALL_PROJECTS
 # This allows an easy way of setting up a build directory for llvm and another
 # one for llvm+clang+... using the same sources.
-set(LLVM_ALL_PROJECTS "clang;clang-tools-extra;compiler-rt;debuginfo-tests;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;openmp;parallel-libs;polly;pstl")
+set(LLVM_ALL_PROJECTS "clang;clang-tools-extra;compiler-rt;debuginfo-tests;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;openmp;parallel-libs;polly;pstl")
 set(LLVM_ENABLE_PROJECTS "" CACHE STRING
 	"Semicolon-separated list of projects to build (${LLVM_ALL_PROJECTS}), or \"all\".")
 if( LLVM_ENABLE_PROJECTS STREQUAL "all" )
@@ -391,6 +391,7 @@ else()
   option(LLVM_ENABLE_LOCAL_SUBMODULE_VISIBILITY "Compile with -fmodules-local-submodule-visibility." ON)
 endif()
 option(LLVM_ENABLE_LIBCXX "Use libc++ if available." OFF)
+option(LLVM_STATIC_LINK_CXX_STDLIB "Statically link the standard library." OFF)
 option(LLVM_ENABLE_LLD "Use lld as C and C++ linker." OFF)
 option(LLVM_ENABLE_PEDANTIC "Compile with pedantic enabled." ON)
 option(LLVM_ENABLE_WERROR "Fail and stop if a warning is triggered." OFF)
@@ -617,6 +618,9 @@ mark_as_advanced(LLVM_TARGET_TRIPLE_ENV)
 
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR OFF CACHE BOOL
   "Enable per-target runtimes directory")
+
+set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
+  "Profiling data file to use when compiling in order to improve runtime performance.")
 
 # All options referred to from HandleLLVMOptions have to be specified
 # BEFORE this include, otherwise options will not be correctly set on
@@ -880,17 +884,6 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 # use export_executable_symbols(target).
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
-set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
-  "Profiling data file to use when compiling in order to improve runtime performance.")
-
-if(LLVM_PROFDATA_FILE AND EXISTS ${LLVM_PROFDATA_FILE})
-  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" )
-    add_definitions("-fprofile-instr-use=${LLVM_PROFDATA_FILE}")
-  else()
-    message(FATAL_ERROR "LLVM_PROFDATA_FILE can only be specified when compiling with clang")
-  endif()
-endif()
-
 include(AddLLVM)
 include(TableGen)
 
@@ -1104,4 +1097,8 @@ if (LLVM_INCLUDE_BENCHMARKS)
 
   add_subdirectory(utils/benchmark)
   add_subdirectory(benchmarks)
+endif()
+
+if (LLVM_INCLUDE_UTILS AND LLVM_INCLUDE_TOOLS)
+  add_subdirectory(utils/llvm-locstats)
 endif()

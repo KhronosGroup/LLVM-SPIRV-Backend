@@ -26,8 +26,6 @@
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/CodeGen/DAGCombine.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
@@ -58,6 +56,7 @@
 
 namespace llvm {
 
+class AAResults;
 class BlockAddress;
 class Constant;
 class ConstantFP;
@@ -66,6 +65,7 @@ class DataLayout;
 struct fltSemantics;
 class GlobalValue;
 struct KnownBits;
+class LegacyDivergenceAnalysis;
 class LLVMContext;
 class MachineBasicBlock;
 class MachineConstantPoolValue;
@@ -269,7 +269,13 @@ class SelectionDAG {
 
   using CallSiteInfo = MachineFunction::CallSiteInfo;
   using CallSiteInfoImpl = MachineFunction::CallSiteInfoImpl;
-  DenseMap<const SDNode *, CallSiteInfo> SDCallSiteInfo;
+
+  struct CallSiteDbgInfo {
+    CallSiteInfo CSInfo;
+    MDNode *HeapAllocSite = nullptr;
+  };
+
+  DenseMap<const SDNode *, CallSiteDbgInfo> SDCallSiteDbgInfo;
 
   uint16_t NextPersistentId = 0;
 
@@ -382,7 +388,11 @@ private:
     Node->OperandList = nullptr;
   }
   void CreateTopologicalOrder(std::vector<SDNode*>& Order);
+
 public:
+  // Maximum depth for recursive analysis such as computeKnownBits, etc.
+  static constexpr unsigned MaxRecursionDepth = 6;
+
   explicit SelectionDAG(const TargetMachine &TM, CodeGenOpt::Level);
   SelectionDAG(const SelectionDAG &) = delete;
   SelectionDAG &operator=(const SelectionDAG &) = delete;
@@ -489,7 +499,7 @@ public:
   /// certain types of nodes together, or eliminating superfluous nodes.  The
   /// Level argument controls whether Combine is allowed to produce nodes and
   /// types that are illegal on the target.
-  void Combine(CombineLevel Level, AliasAnalysis *AA,
+  void Combine(CombineLevel Level, AAResults *AA,
                CodeGenOpt::Level OptLevel);
 
   /// This transforms the SelectionDAG into a SelectionDAG that
@@ -1031,7 +1041,7 @@ public:
     unsigned Align = 0,
     MachineMemOperand::Flags Flags
     = MachineMemOperand::MOLoad | MachineMemOperand::MOStore,
-    unsigned Size = 0,
+    uint64_t Size = 0,
     const AAMDNodes &AAInfo = AAMDNodes());
 
   SDValue getMemIntrinsicNode(unsigned Opcode, const SDLoc &dl, SDVTList VTList,
@@ -1665,14 +1675,26 @@ public:
   }
 
   void addCallSiteInfo(const SDNode *CallNode, CallSiteInfoImpl &&CallInfo) {
-    SDCallSiteInfo[CallNode] = std::move(CallInfo);
+    SDCallSiteDbgInfo[CallNode].CSInfo = std::move(CallInfo);
   }
 
   CallSiteInfo getSDCallSiteInfo(const SDNode *CallNode) {
-    auto I = SDCallSiteInfo.find(CallNode);
-    if (I != SDCallSiteInfo.end())
-      return std::move(I->second);
+    auto I = SDCallSiteDbgInfo.find(CallNode);
+    if (I != SDCallSiteDbgInfo.end())
+      return std::move(I->second).CSInfo;
     return CallSiteInfo();
+  }
+
+  void addHeapAllocSite(const SDNode *Node, MDNode *MD) {
+    SDCallSiteDbgInfo[Node].HeapAllocSite = MD;
+  }
+
+  /// Return the HeapAllocSite type associated with the SDNode, if it exists.
+  MDNode *getHeapAllocSite(const SDNode *Node) {
+    auto It = SDCallSiteDbgInfo.find(Node);
+    if (It == SDCallSiteDbgInfo.end())
+      return nullptr;
+    return It->second.HeapAllocSite;
   }
 
 private:

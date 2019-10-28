@@ -120,6 +120,7 @@ def FeatureSVE2BitPerm : SubtargetFeature<"sve2-bitperm", "HasSVE2BitPerm", "tru
 
 def FeatureZCRegMove : SubtargetFeature<"zcm", "HasZeroCycleRegMove", "true",
                                         "Has zero-cycle register moves">;
+
 def FeatureZCZeroingGP : SubtargetFeature<"zcz-gp", "HasZeroCycleZeroingGP", "true",
                                         "Has zero-cycle zeroing instructions for generic registers">;
 
@@ -284,6 +285,10 @@ def FeatureSEL2 : SubtargetFeature<
     "sel2", "HasSEL2", "true",
     "Enable v8.4-A Secure Exception Level 2 extension">;
 
+def FeaturePMU : SubtargetFeature<
+    "pmu", "HasPMU", "true",
+    "Enable v8.4-A PMU extension">;
+
 def FeatureTLB_RMI : SubtargetFeature<
     "tlb-rmi", "HasTLB_RMI", "true",
     "Enable v8.4-A TLB Range and Maintenance Instructions">;
@@ -379,7 +384,7 @@ def HasV8_3aOps : SubtargetFeature<"v8.3a", "HasV8_3aOps", "true",
 def HasV8_4aOps : SubtargetFeature<"v8.4a", "HasV8_4aOps", "true",
   "Support ARM v8.4a instructions", [HasV8_3aOps, FeatureDotProd,
   FeatureNV, FeatureRASv8_4, FeatureMPAM, FeatureDIT,
-  FeatureTRACEV8_4, FeatureAM, FeatureSEL2, FeatureTLB_RMI,
+  FeatureTRACEV8_4, FeatureAM, FeatureSEL2, FeaturePMU, FeatureTLB_RMI,
   FeatureFMI, FeatureRCPC_IMMO]>;
 
 def HasV8_5aOps : SubtargetFeature<
@@ -405,6 +410,7 @@ include "AArch64Schedule.td"
 include "AArch64InstrInfo.td"
 include "AArch64SchedPredicates.td"
 include "AArch64SchedPredExynos.td"
+include "AArch64Combine.td"
 
 def AArch64InstrInfo : InstrInfo;
 

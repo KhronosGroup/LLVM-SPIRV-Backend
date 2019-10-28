@@ -27,6 +27,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -122,8 +123,7 @@ opt<bool> ShowOrigins{
 opt<bool> EnableBackgroundIndex{
     "background-index",
     cat(Features),
-    desc("Index project code in the background and persist index on disk. "
-         "Experimental"),
+    desc("Index project code in the background and persist index on disk."),
     init(true),
 };
 
@@ -267,7 +267,8 @@ list<std::string> TweakList{
 opt<unsigned> WorkerThreadsCount{
     "j",
     cat(Misc),
-    desc("Number of async workers used by clangd"),
+    desc("Number of async workers used by clangd. Background index also "
+         "uses this many workers."),
     init(getDefaultAsyncThreadsCount()),
 };
 
@@ -308,7 +309,8 @@ opt<PCHStorageFlag> PCHStorage{
 opt<bool> Sync{
     "sync",
     cat(Misc),
-    desc("Parse on main thread. If set, -j is ignored"),
+    desc("Handle client requests on main thread. Background index still uses "
+         "its own thread."),
     init(false),
     Hidden,
 };
@@ -372,7 +374,7 @@ opt<bool> PrettyPrint{
     init(false),
 };
 
-/// \brief Supports a test URI scheme with relaxed constraints for lit tests.
+/// Supports a test URI scheme with relaxed constraints for lit tests.
 /// The path in a test URI will be combined with a platform-specific fake
 /// directory to form an absolute path. For example, test:///a.cpp is resolved
 /// C:\clangd-test\a.cpp on Windows and /clangd-test/a.cpp on Unix.
@@ -583,7 +585,7 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
   if (EnableIndex && !IndexFile.empty()) {
     // Load the index asynchronously. Meanwhile SwapIndex returns no results.
     SwapIndex *Placeholder;
-    StaticIdx.reset(Placeholder = new SwapIndex(llvm::make_unique<MemIndex>()));
+    StaticIdx.reset(Placeholder = new SwapIndex(std::make_unique<MemIndex>()));
     AsyncIndexLoad = runAsync<void>([Placeholder] {
       if (auto Idx = loadIndex(IndexFile, /*UseDex=*/true))
         Placeholder->reset(std::move(Idx));
@@ -639,7 +641,7 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
   if (EnableClangTidy) {
     auto OverrideClangTidyOptions = tidy::ClangTidyOptions::getDefaults();
     OverrideClangTidyOptions.Checks = ClangTidyChecks;
-    ClangTidyOptProvider = llvm::make_unique<tidy::FileOptionsProvider>(
+    ClangTidyOptProvider = std::make_unique<tidy::FileOptionsProvider>(
         tidy::ClangTidyGlobalOptions(),
         /* Default */ tidy::ClangTidyOptions::getDefaults(),
         /* Override */ OverrideClangTidyOptions, FSProvider.getFileSystem());
@@ -669,6 +671,24 @@ clangd accepts flags on the commandline, and in the CLANGD_FLAGS environment var
       /*UseDirBasedCDB=*/CompileArgsFrom == FilesystemCompileArgs,
       OffsetEncodingFromFlag, Opts);
   llvm::set_thread_name("clangd.main");
-  return LSPServer.run() ? 0
-                         : static_cast<int>(ErrorResultCode::NoShutdownRequest);
+  int ExitCode = LSPServer.run()
+                     ? 0
+                     : static_cast<int>(ErrorResultCode::NoShutdownRequest);
+  log("LSP finished, exiting with status {0}", ExitCode);
+
+  // There may still be lingering background threads (e.g. slow requests
+  // whose results will be dropped, background index shutting down).
+  //
+  // These should terminate quickly, and ~ClangdLSPServer blocks on them.
+  // However if a bug causes them to run forever, we want to ensure the process
+  // eventually exits. As clangd isn't directly user-facing, an editor can
+  // "leak" clangd processes. Crashing in this case contains the damage.
+  //
+  // This is more portable than sys::WatchDog, and yields a stack trace.
+  std::thread([] {
+    std::this_thread::sleep_for(std::chrono::minutes(5));
+    std::abort();
+  }).detach();
+
+  return ExitCode;
 }

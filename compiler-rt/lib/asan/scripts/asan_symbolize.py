@@ -21,12 +21,14 @@ script itself.
 """
 import argparse
 import bisect
+import errno
 import getopt
 import logging
 import os
 import re
 import subprocess
 import sys
+from distutils.spawn import find_executable
 
 symbolizers = {}
 demangle = False
@@ -153,6 +155,7 @@ class Addr2LineSymbolizer(Symbolizer):
     addr2line_tool = 'addr2line'
     if binutils_prefix:
       addr2line_tool = binutils_prefix + addr2line_tool
+    logging.debug('addr2line binary is %s' % find_executable(addr2line_tool))
     cmd = [addr2line_tool, '-fi']
     if demangle:
       cmd += ['--demangle']
@@ -174,14 +177,43 @@ class Addr2LineSymbolizer(Symbolizer):
       is_first_frame = True
       while True:
         function_name = self.pipe.stdout.readline().rstrip()
+        logging.debug("read function_name='%s' from addr2line" % function_name)
+        # If llvm-symbolizer is installed as addr2line, older versions of
+        # llvm-symbolizer will print -1 when presented with -1 and not print
+        # a second line. In that case we will block for ever trying to read the
+        # file name. This also happens for non-existent files, in which case GNU
+        # addr2line exits immediate, but llvm-symbolizer does not (see
+        # https://llvm.org/PR42754).
+        if function_name == '-1':
+          logging.debug("got function '-1' -> no more input")
+          break
         file_name = self.pipe.stdout.readline().rstrip()
+        logging.debug("read file_name='%s' from addr2line" % file_name)
         if is_first_frame:
           is_first_frame = False
-        elif function_name in ['', '??']:
-          assert file_name == function_name
+        elif function_name == '??':
+          assert file_name == '??:0', file_name
+          logging.debug("got function '??' -> no more input")
           break
-        lines.append((function_name, file_name));
-    except Exception:
+        elif not function_name:
+          assert not file_name, file_name
+          logging.debug("got empty function name -> no more input")
+          break
+        if not function_name and not file_name:
+          logging.debug("got empty function and file name -> unknown function")
+          function_name = '??'
+          file_name = '??:0'
+        lines.append((function_name, file_name))
+    except IOError as e:
+      # EPIPE happens if addr2line exits early (which some implementations do
+      # if an invalid file is passed).
+      if e.errno == errno.EPIPE:
+        logging.debug("addr2line exited early (broken pipe), returncode=%d" % self.pipe.poll())
+      else:
+        logging.debug("unexpected I/O exception communicating with addr2line", exc_info=e)
+      lines.append(('??', '??:0'))
+    except Exception as e:
+      logging.debug("got unknown exception communicating with addr2line", exc_info=e)
       lines.append(('??', '??:0'))
     return ['%s in %s %s' % (addr, function, fix_filename(file)) for (function, file) in lines]
 
@@ -431,10 +463,13 @@ class SymbolizationLoop(object):
     assert result
     return result
 
-  def get_symbolized_lines(self, symbolized_lines):
+  def get_symbolized_lines(self, symbolized_lines, inc_frame_counter=True):
     if not symbolized_lines:
+      if inc_frame_counter:
+        self.frame_no += 1
       return [self.current_line]
     else:
+      assert inc_frame_counter
       result = []
       for symbolized_frame in symbolized_lines:
         result.append('    #%s %s' % (str(self.frame_no), symbolized_frame.rstrip()))
@@ -464,15 +499,17 @@ class SymbolizationLoop(object):
     match = re.match(stack_trace_line_format, line)
     if not match:
       logging.debug('Line "{}" does not match regex'.format(line))
-      return [self.current_line]
+      # Not a frame line so don't increment the frame counter.
+      return self.get_symbolized_lines(None, inc_frame_counter=False)
     logging.debug(line)
     _, frameno_str, addr, binary, offset = match.groups()
+
     if not self.using_module_map and not os.path.isabs(binary):
       # Do not try to symbolicate if the binary is just the module file name
       # and a module map is unavailable.
       # FIXME(dliew): This is currently necessary for reports on Darwin that are
       # partially symbolicated by `atos`.
-      return [self.current_line]
+      return self.get_symbolized_lines(None)
     arch = ""
     # Arch can be embedded in the filename, e.g.: "libabc.dylib:x86_64h"
     colon_pos = binary.rfind(":")
@@ -491,7 +528,7 @@ class SymbolizationLoop(object):
     if binary is None:
       # The binary filter has told us this binary can't be symbolized.
       logging.debug('Skipping symbolication of binary "%s"', original_binary)
-      return [self.current_line]
+      return self.get_symbolized_lines(None)
     symbolized_line = self.symbolize_address(addr, binary, offset, arch)
     if not symbolized_line:
       if original_binary != binary:

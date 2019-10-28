@@ -14,48 +14,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/FileCheck.h"
+#include "FileCheckImpl.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <cstdint>
 #include <list>
-#include <map>
 #include <tuple>
 #include <utility>
 
 using namespace llvm;
-
-bool FileCheckNumericVariable::isValueKnownAtMatchTime() const {
-  if (Value)
-    return true;
-
-  return ExpressionAST != nullptr;
-}
-
-void FileCheckNumericVariable::setValue(uint64_t NewValue) {
-  if (ExpressionAST != nullptr) {
-    // Caller is expected to call setValue only if substitution was successful.
-    assert(NewValue == cantFail(ExpressionAST->eval(),
-                                "Failed to evaluate associated expression when "
-                                "sanity checking value") &&
-           "Value being set to different from variable evaluation");
-  }
-  Value = NewValue;
-  // Clear pointer to AST to ensure it is not used after the numeric
-  // substitution defining this variable is processed since it's the
-  // substitution that owns the pointer.
-  ExpressionAST = nullptr;
-}
 
 Expected<uint64_t> FileCheckNumericVariableUse::eval() const {
   Optional<uint64_t> Value = NumericVariable->getValue();
   if (Value)
     return *Value;
 
-  FileCheckExpressionAST *ExpressionAST = NumericVariable->getExpressionAST();
-  if (!ExpressionAST)
-    return make_error<FileCheckUndefVarError>(Name);
-
-  return ExpressionAST->eval();
+  return make_error<FileCheckUndefVarError>(Name);
 }
 
 Expected<uint64_t> FileCheckASTBinop::eval() const {
@@ -125,7 +100,7 @@ FileCheckPattern::parseVariable(StringRef &Str, const SourceMgr &SM) {
 
 // StringRef holding all characters considered as horizontal whitespaces by
 // FileCheck input canonicalization.
-StringRef SpaceChars = " \t";
+constexpr StringLiteral SpaceChars = " \t";
 
 // Parsing helper function that strips the first character in S and returns it.
 static char popFront(StringRef &S) {
@@ -141,8 +116,7 @@ char FileCheckNotFoundError::ID = 0;
 Expected<FileCheckNumericVariable *>
 FileCheckPattern::parseNumericVariableDefinition(
     StringRef &Expr, FileCheckPatternContext *Context,
-    Optional<size_t> LineNumber, FileCheckExpressionAST *ExpressionAST,
-    const SourceMgr &SM) {
+    Optional<size_t> LineNumber, const SourceMgr &SM) {
   Expected<VariableProperties> ParseVarResult = parseVariable(Expr, SM);
   if (!ParseVarResult)
     return ParseVarResult.takeError();
@@ -169,8 +143,7 @@ FileCheckPattern::parseNumericVariableDefinition(
   if (VarTableIter != Context->GlobalNumericVariableTable.end())
     DefinedNumericVariable = VarTableIter->second;
   else
-    DefinedNumericVariable =
-        Context->makeNumericVariable(Name, LineNumber, ExpressionAST);
+    DefinedNumericVariable = Context->makeNumericVariable(Name, LineNumber);
 
   return DefinedNumericVariable;
 }
@@ -202,14 +175,13 @@ FileCheckPattern::parseNumericVariableUse(StringRef Name, bool IsPseudo,
   }
 
   Optional<size_t> DefLineNumber = NumericVariable->getDefLineNumber();
-  if (DefLineNumber && LineNumber && *DefLineNumber == *LineNumber &&
-      !NumericVariable->isValueKnownAtMatchTime())
+  if (DefLineNumber && LineNumber && *DefLineNumber == *LineNumber)
     return FileCheckErrorDiagnostic::get(
         SM, Name,
         "numeric variable '" + Name +
-            "' defined from input on the same line as used");
+            "' defined earlier in the same CHECK directive");
 
-  return llvm::make_unique<FileCheckNumericVariableUse>(Name, NumericVariable);
+  return std::make_unique<FileCheckNumericVariableUse>(Name, NumericVariable);
 }
 
 Expected<std::unique_ptr<FileCheckExpressionAST>>
@@ -234,7 +206,7 @@ FileCheckPattern::parseNumericOperand(StringRef &Expr, AllowedOperand AO,
   // Otherwise, parse it as a literal.
   uint64_t LiteralValue;
   if (!Expr.consumeInteger(/*Radix=*/10, LiteralValue))
-    return llvm::make_unique<FileCheckExpressionLiteral>(LiteralValue);
+    return std::make_unique<FileCheckExpressionLiteral>(LiteralValue);
 
   return FileCheckErrorDiagnostic::get(SM, Expr,
                                        "invalid operand format '" + Expr + "'");
@@ -287,7 +259,7 @@ Expected<std::unique_ptr<FileCheckExpressionAST>> FileCheckPattern::parseBinop(
     return RightOpResult;
 
   Expr = Expr.ltrim(SpaceChars);
-  return llvm::make_unique<FileCheckASTBinop>(EvalBinop, std::move(LeftOp),
+  return std::make_unique<FileCheckASTBinop>(EvalBinop, std::move(LeftOp),
                                               std::move(*RightOpResult));
 }
 
@@ -334,8 +306,7 @@ FileCheckPattern::parseNumericSubstitutionBlock(
   if (DefEnd != StringRef::npos) {
     DefExpr = DefExpr.ltrim(SpaceChars);
     Expected<FileCheckNumericVariable *> ParseResult =
-        parseNumericVariableDefinition(DefExpr, Context, LineNumber,
-                                       ExpressionAST.get(), SM);
+        parseNumericVariableDefinition(DefExpr, Context, LineNumber, SM);
 
     if (!ParseResult)
       return ParseResult.takeError();
@@ -349,6 +320,7 @@ bool FileCheckPattern::parsePattern(StringRef PatternStr, StringRef Prefix,
                                     SourceMgr &SM,
                                     const FileCheckRequest &Req) {
   bool MatchFullLinesHere = Req.MatchFullLines && CheckTy != Check::CheckNot;
+  IgnoreCase = Req.IgnoreCase;
 
   PatternLoc = SMLoc::getFromPointer(PatternStr.data());
 
@@ -648,7 +620,8 @@ Expected<size_t> FileCheckPattern::match(StringRef Buffer, size_t &MatchLen,
   // If this is a fixed string pattern, just match it now.
   if (!FixedStr.empty()) {
     MatchLen = FixedStr.size();
-    size_t Pos = Buffer.find(FixedStr);
+    size_t Pos = IgnoreCase ? Buffer.find_lower(FixedStr)
+                            : Buffer.find(FixedStr);
     if (Pos == StringRef::npos)
       return make_error<FileCheckNotFoundError>();
     return Pos;
@@ -686,7 +659,10 @@ Expected<size_t> FileCheckPattern::match(StringRef Buffer, size_t &MatchLen,
   }
 
   SmallVector<StringRef, 4> MatchInfo;
-  if (!Regex(RegExToMatch, Regex::Newline).match(Buffer, &MatchInfo))
+  unsigned int Flags = Regex::Newline;
+  if (IgnoreCase)
+    Flags |= Regex::IgnoreCase;
+  if (!Regex(RegExToMatch, Flags).match(Buffer, &MatchInfo))
     return make_error<FileCheckNotFoundError>();
 
   // Successful regex match.
@@ -862,7 +838,7 @@ template <class... Types>
 FileCheckNumericVariable *
 FileCheckPatternContext::makeNumericVariable(Types... args) {
   NumericVariables.push_back(
-      llvm::make_unique<FileCheckNumericVariable>(args...));
+      std::make_unique<FileCheckNumericVariable>(args...));
   return NumericVariables.back().get();
 }
 
@@ -870,14 +846,14 @@ FileCheckSubstitution *
 FileCheckPatternContext::makeStringSubstitution(StringRef VarName,
                                                 size_t InsertIdx) {
   Substitutions.push_back(
-      llvm::make_unique<FileCheckStringSubstitution>(this, VarName, InsertIdx));
+      std::make_unique<FileCheckStringSubstitution>(this, VarName, InsertIdx));
   return Substitutions.back().get();
 }
 
 FileCheckSubstitution *FileCheckPatternContext::makeNumericSubstitution(
     StringRef ExpressionStr,
     std::unique_ptr<FileCheckExpressionAST> ExpressionAST, size_t InsertIdx) {
-  Substitutions.push_back(llvm::make_unique<FileCheckNumericSubstitution>(
+  Substitutions.push_back(std::make_unique<FileCheckNumericSubstitution>(
       this, ExpressionStr, std::move(ExpressionAST), InsertIdx));
   return Substitutions.back().get();
 }
@@ -1146,16 +1122,22 @@ void FileCheckPatternContext::createLineVariable() {
   GlobalNumericVariableTable[LineName] = LineVariable;
 }
 
-bool FileCheck::ReadCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
-                              std::vector<FileCheckString> &CheckStrings) {
+FileCheck::FileCheck(FileCheckRequest Req)
+    : Req(Req), PatternContext(std::make_unique<FileCheckPatternContext>()),
+      CheckStrings(std::make_unique<std::vector<FileCheckString>>()) {}
+
+FileCheck::~FileCheck() = default;
+
+bool FileCheck::readCheckFile(SourceMgr &SM, StringRef Buffer,
+                              Regex &PrefixRE) {
   Error DefineError =
-      PatternContext.defineCmdlineVariables(Req.GlobalDefines, SM);
+      PatternContext->defineCmdlineVariables(Req.GlobalDefines, SM);
   if (DefineError) {
     logAllUnhandledErrors(std::move(DefineError), errs());
     return true;
   }
 
-  PatternContext.createLineVariable();
+  PatternContext->createLineVariable();
 
   std::vector<FileCheckPattern> ImplicitNegativeChecks;
   for (const auto &PatternString : Req.ImplicitCheckNot) {
@@ -1171,7 +1153,7 @@ bool FileCheck::ReadCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
     SM.AddNewSourceBuffer(std::move(CmdLine), SMLoc());
 
     ImplicitNegativeChecks.push_back(
-        FileCheckPattern(Check::CheckNot, &PatternContext));
+        FileCheckPattern(Check::CheckNot, PatternContext.get()));
     ImplicitNegativeChecks.back().parsePattern(PatternInBuffer,
                                                "IMPLICIT-CHECK", SM, Req);
   }
@@ -1234,7 +1216,7 @@ bool FileCheck::ReadCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
     SMLoc PatternLoc = SMLoc::getFromPointer(Buffer.data());
 
     // Parse the pattern.
-    FileCheckPattern P(CheckTy, &PatternContext, LineNumber);
+    FileCheckPattern P(CheckTy, PatternContext.get(), LineNumber);
     if (P.parsePattern(Buffer.substr(0, EOL), UsedPrefix, SM, Req))
       return true;
 
@@ -1252,7 +1234,7 @@ bool FileCheck::ReadCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
     // Verify that CHECK-NEXT/SAME/EMPTY lines have at least one CHECK line before them.
     if ((CheckTy == Check::CheckNext || CheckTy == Check::CheckSame ||
          CheckTy == Check::CheckEmpty) &&
-        CheckStrings.empty()) {
+        CheckStrings->empty()) {
       StringRef Type = CheckTy == Check::CheckNext
                            ? "NEXT"
                            : CheckTy == Check::CheckEmpty ? "EMPTY" : "SAME";
@@ -1270,21 +1252,21 @@ bool FileCheck::ReadCheckFile(SourceMgr &SM, StringRef Buffer, Regex &PrefixRE,
     }
 
     // Okay, add the string we captured to the output vector and move on.
-    CheckStrings.emplace_back(P, UsedPrefix, PatternLoc);
-    std::swap(DagNotMatches, CheckStrings.back().DagNotStrings);
+    CheckStrings->emplace_back(P, UsedPrefix, PatternLoc);
+    std::swap(DagNotMatches, CheckStrings->back().DagNotStrings);
     DagNotMatches = ImplicitNegativeChecks;
   }
 
   // Add an EOF pattern for any trailing CHECK-DAG/-NOTs, and use the first
   // prefix as a filler for the error message.
   if (!DagNotMatches.empty()) {
-    CheckStrings.emplace_back(
-        FileCheckPattern(Check::CheckEOF, &PatternContext, LineNumber + 1),
+    CheckStrings->emplace_back(
+        FileCheckPattern(Check::CheckEOF, PatternContext.get(), LineNumber + 1),
         *Req.CheckPrefixes.begin(), SMLoc::getFromPointer(Buffer.data()));
-    std::swap(DagNotMatches, CheckStrings.back().DagNotStrings);
+    std::swap(DagNotMatches, CheckStrings->back().DagNotStrings);
   }
 
-  if (CheckStrings.empty()) {
+  if (CheckStrings->empty()) {
     errs() << "error: no check strings found with prefix"
            << (Req.CheckPrefixes.size() > 1 ? "es " : " ");
     auto I = Req.CheckPrefixes.begin();
@@ -1742,7 +1724,7 @@ FileCheckString::CheckDag(const SourceMgr &SM, StringRef Buffer,
 
 // A check prefix must contain only alphanumeric, hyphens and underscores.
 static bool ValidateCheckPrefix(StringRef CheckPrefix) {
-  Regex Validator("^[a-zA-Z0-9_-]*$");
+  static const Regex Validator("^[a-zA-Z0-9_-]*$");
   return Validator.match(CheckPrefix);
 }
 
@@ -1946,18 +1928,17 @@ void FileCheckPatternContext::clearLocalVars() {
     GlobalNumericVariableTable.erase(Var);
 }
 
-bool FileCheck::CheckInput(SourceMgr &SM, StringRef Buffer,
-                           ArrayRef<FileCheckString> CheckStrings,
+bool FileCheck::checkInput(SourceMgr &SM, StringRef Buffer,
                            std::vector<FileCheckDiag> *Diags) {
   bool ChecksFailed = false;
 
-  unsigned i = 0, j = 0, e = CheckStrings.size();
+  unsigned i = 0, j = 0, e = CheckStrings->size();
   while (true) {
     StringRef CheckRegion;
     if (j == e) {
       CheckRegion = Buffer;
     } else {
-      const FileCheckString &CheckLabelStr = CheckStrings[j];
+      const FileCheckString &CheckLabelStr = (*CheckStrings)[j];
       if (CheckLabelStr.Pat.getCheckTy() != Check::CheckLabel) {
         ++j;
         continue;
@@ -1980,10 +1961,10 @@ bool FileCheck::CheckInput(SourceMgr &SM, StringRef Buffer,
     // CHECK-LABEL and it would clear variables defined on the command-line
     // before they get used.
     if (i != 0 && Req.EnableVarScope)
-      PatternContext.clearLocalVars();
+      PatternContext->clearLocalVars();
 
     for (; i != j; ++i) {
-      const FileCheckString &CheckStr = CheckStrings[i];
+      const FileCheckString &CheckStr = (*CheckStrings)[i];
 
       // Check each string within the scanned region, including a second check
       // of any final CHECK-LABEL (to verify CHECK-NOT and CHECK-DAG)

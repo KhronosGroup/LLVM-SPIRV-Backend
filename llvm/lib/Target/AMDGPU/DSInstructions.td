@@ -81,6 +81,17 @@ class DS_Real <DS_Pseudo ds> :
 
 // DS Pseudo instructions
 
+class DS_0A1D_NORET<string opName, RegisterClass rc = VGPR_32>
+: DS_Pseudo<opName,
+  (outs),
+  (ins rc:$data0, offset:$offset, gds:$gds),
+  "$data0$offset$gds"> {
+
+  let has_addr = 0;
+  let has_data1 = 0;
+  let has_vdst = 0;
+}
+
 class DS_1A1D_NORET<string opName, RegisterClass rc = VGPR_32>
 : DS_Pseudo<opName,
   (outs),
@@ -394,11 +405,12 @@ def DS_WRITE_B8_D16_HI  : DS_1A1D_NORET<"ds_write_b8_d16_hi">;
 def DS_WRITE_B16_D16_HI : DS_1A1D_NORET<"ds_write_b16_d16_hi">;
 }
 
+} // End has_m0_read = 0
+
 let SubtargetPredicate = HasDSAddTid in {
-def DS_WRITE_ADDTID_B32 : DS_1A1D_NORET<"ds_write_addtid_b32">;
+def DS_WRITE_ADDTID_B32 : DS_0A1D_NORET<"ds_write_addtid_b32">;
 }
 
-} // End has_m0_read = 0
 } // End mayLoad = 0
 
 defm DS_MSKOR_B32     : DS_1A2D_NORET_mc<"ds_mskor_b32">;
@@ -543,12 +555,13 @@ def DS_READ_I8_D16_HI  : DS_1A_RET_Tied<"ds_read_i8_d16_hi">;
 def DS_READ_U16_D16    : DS_1A_RET_Tied<"ds_read_u16_d16">;
 def DS_READ_U16_D16_HI : DS_1A_RET_Tied<"ds_read_u16_d16_hi">;
 }
+} // End has_m0_read = 0
 
 let SubtargetPredicate = HasDSAddTid in {
-def DS_READ_ADDTID_B32 : DS_1A_RET<"ds_read_addtid_b32">;
+def DS_READ_ADDTID_B32 : DS_0A_RET<"ds_read_addtid_b32">;
 }
-} // End has_m0_read = 0
-}
+
+} // End mayStore = 0
 
 def DS_CONSUME       : DS_0A_RET<"ds_consume">;
 def DS_APPEND        : DS_0A_RET<"ds_append">;
@@ -603,7 +616,7 @@ def DS_ADD_SRC2_F32 : DS_1A<"ds_add_src2_f32">;
 //===----------------------------------------------------------------------===//
 
 def : GCNPat <
-  (int_amdgcn_ds_swizzle i32:$src, imm:$offset16),
+  (int_amdgcn_ds_swizzle i32:$src, timm:$offset16),
   (DS_SWIZZLE_B32 $src, (as_i16imm $offset16), (i1 0))
 >;
 
@@ -639,13 +652,20 @@ defm : DSReadPat_mc <DS_READ_I16, i32, "sextloadi16_local">;
 defm : DSReadPat_mc <DS_READ_U16, i32, "extloadi16_local">;
 defm : DSReadPat_mc <DS_READ_U16, i32, "zextloadi16_local">;
 defm : DSReadPat_mc <DS_READ_U16, i16, "load_local">;
-defm : DSReadPat_mc <DS_READ_B32, i32, "load_local">;
+
+foreach vt = Reg32Types.types in {
+defm : DSReadPat_mc <DS_READ_B32, vt, "load_local">;
+}
+
 defm : DSReadPat_mc <DS_READ_B32, i32, "atomic_load_32_local">;
 defm : DSReadPat_mc <DS_READ_B64, i64, "atomic_load_64_local">;
 
 let AddedComplexity = 100 in {
 
-defm : DSReadPat_mc <DS_READ_B64, v2i32, "load_align8_local">;
+foreach vt = VReg_64.RegTypes in {
+defm : DSReadPat_mc <DS_READ_B64, vt, "load_align8_local">;
+}
+
 defm : DSReadPat_mc <DS_READ_B128, v4i32, "load_align16_local">;
 
 } // End AddedComplexity = 100
@@ -702,9 +722,13 @@ defm : DSWritePat_mc <DS_WRITE_B8, i32, "truncstorei8_local">;
 defm : DSWritePat_mc <DS_WRITE_B16, i32, "truncstorei16_local">;
 defm : DSWritePat_mc <DS_WRITE_B8, i16, "truncstorei8_local">;
 defm : DSWritePat_mc <DS_WRITE_B16, i16, "store_local">;
-defm : DSWritePat_mc <DS_WRITE_B32, i32, "store_local">;
-defm : DSAtomicWritePat_mc <DS_WRITE_B32, i32, "atomic_store_local">;
-defm : DSAtomicWritePat_mc <DS_WRITE_B64, i64, "atomic_store_local">;
+
+foreach vt = VGPR_32.RegTypes in {
+defm : DSWritePat_mc <DS_WRITE_B32, vt, "store_local">;
+}
+
+defm : DSAtomicWritePat_mc <DS_WRITE_B32, i32, "atomic_store_local_32">;
+defm : DSAtomicWritePat_mc <DS_WRITE_B64, i64, "atomic_store_local_64">;
 
 let OtherPredicates = [D16PreservesUnusedBits] in {
 def : DSWritePat <DS_WRITE_B16_D16_HI, i32, store_local_hi16>;
@@ -739,7 +763,10 @@ def : DS64Bit4ByteAlignedWritePat<DS_WRITE2_B32_gfx9, store_local>;
 
 let AddedComplexity = 100 in {
 
-defm : DSWritePat_mc <DS_WRITE_B64, v2i32, "store_align8_local">;
+foreach vt = VReg_64.RegTypes in {
+defm : DSWritePat_mc <DS_WRITE_B64, vt, "store_align8_local">;
+}
+
 defm : DSWritePat_mc <DS_WRITE_B128, v4i32, "store_align16_local">;
 
 } // End AddedComplexity = 100

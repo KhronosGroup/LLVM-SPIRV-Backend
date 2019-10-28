@@ -18,7 +18,7 @@
 ;/*  This test case provides various ways of building vectors to ensure we
 ;    produce optimal code for all cases. The cases are (for each type):
 ;    - All zeros
-;    - All ones
+;    - All ones - split to build-vector-allones.ll
 ;    - Splat of a constant
 ;    - From different values already in registers
 ;    - From different constants
@@ -47,11 +47,6 @@
 ;}                                                                            //
 ;// P8: vspltisb -1                                                           //
 ;// P9: xxspltisb 255                                                         //
-;vector int allOnei() {                                                       //
-;  return (vector int)-1;                                                     //
-;}                                                                            //
-;// P8: vspltisw 1                                                            //
-;// P9: vspltisw 1                                                            //
 ;vector int spltConst1i() {                                                   //
 ;  return (vector int)1;                                                      //
 ;}                                                                            //
@@ -218,11 +213,6 @@
 ;}                                                                            //
 ;// P8: vspltisb -1                                                           //
 ;// P9: xxspltisb 255                                                         //
-;vector unsigned int allOneui() {                                             //
-;  return (vector unsigned int)-1;                                            //
-;}                                                                            //
-;// P8: vspltisw 1                                                            //
-;// P9: vspltisw 1                                                            //
 ;vector unsigned int spltConst1ui() {                                         //
 ;  return (vector unsigned int)1;                                             //
 ;}                                                                            //
@@ -398,11 +388,6 @@
 ;}                                                                            //
 ;// P8: vspltisb -1                                                           //
 ;// P9: xxspltisb 255                                                         //
-;vector long long allOnell() {                                                //
-;  return (vector long long)-1;                                               //
-;}                                                                            //
-;// P8: constant pool load (possible: vmrgew (xxlxor), (vspltisw))            //
-;// P9: constant pool load (possible: vmrgew (xxlxor), (vspltisw))            //
 ;vector long long spltConst1ll() {                                            //
 ;  return (vector long long)1;                                                //
 ;}                                                                            //
@@ -565,11 +550,6 @@
 ;}                                                                            //
 ;// P8: vspltisb -1                                                           //
 ;// P9: xxspltisb 255                                                         //
-;vector unsigned long long allOneull() {                                      //
-;  return (vector unsigned long long)-1;                                      //
-;}                                                                            //
-;// P8: constant pool load (possible: vmrgew (xxlxor), (vspltisw))            //
-;// P9: constant pool load (possible: vmrgew (xxlxor), (vspltisw))            //
 ;vector unsigned long long spltConst1ull() {                                  //
 ;  return (vector unsigned long long)1;                                       //
 ;}                                                                            //
@@ -729,7 +709,6 @@
 ;}                                                                            //
 ;/*========================== unsigned long long ==============================*/
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @allZeroi() {
 ; P9BE-LABEL: allZeroi:
 ; P9BE:       # %bb.0: # %entry
@@ -754,32 +733,6 @@ entry:
   ret <4 x i32> zeroinitializer
 }
 
-; Function Attrs: norecurse nounwind readnone
-define <4 x i32> @allOnei() {
-; P9BE-LABEL: allOnei:
-; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    xxspltib v2, 255
-; P9BE-NEXT:    blr
-;
-; P9LE-LABEL: allOnei:
-; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    xxspltib v2, 255
-; P9LE-NEXT:    blr
-;
-; P8BE-LABEL: allOnei:
-; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    vspltisb v2, -1
-; P8BE-NEXT:    blr
-;
-; P8LE-LABEL: allOnei:
-; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    vspltisb v2, -1
-; P8LE-NEXT:    blr
-entry:
-  ret <4 x i32> <i32 -1, i32 -1, i32 -1, i32 -1>
-}
-
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst1i() {
 ; P9BE-LABEL: spltConst1i:
 ; P9BE:       # %bb.0: # %entry
@@ -804,7 +757,6 @@ entry:
   ret <4 x i32> <i32 1, i32 1, i32 1, i32 1>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst16ki() {
 ; P9BE-LABEL: spltConst16ki:
 ; P9BE:       # %bb.0: # %entry
@@ -833,7 +785,6 @@ entry:
   ret <4 x i32> <i32 32767, i32 32767, i32 32767, i32 32767>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst32ki() {
 ; P9BE-LABEL: spltConst32ki:
 ; P9BE:       # %bb.0: # %entry
@@ -862,7 +813,6 @@ entry:
   ret <4 x i32> <i32 65535, i32 65535, i32 65535, i32 65535>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsi(i32 signext %a, i32 signext %b, i32 signext %c, i32 signext %d) {
 ; P9BE-LABEL: fromRegsi:
 ; P9BE:       # %bb.0: # %entry
@@ -903,40 +853,38 @@ entry:
   ret <4 x i32> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsi() {
 ; P9BE-LABEL: fromDiffConstsi:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI6_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI6_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI5_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI5_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsi:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI6_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI6_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI5_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI5_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsi:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI6_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI6_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI5_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI5_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsi:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI6_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI6_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI5_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI5_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 242, i32 -113, i32 889, i32 19>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAi(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsAi:
 ; P9BE:       # %bb.0: # %entry
@@ -973,13 +921,12 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDi(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsDi:
 ; P9BE:       # %bb.0: # %entry
 ; P9BE-NEXT:    lxv v2, 0(r3)
-; P9BE-NEXT:    addis r3, r2, .LCPI8_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI8_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI7_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI7_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    blr
@@ -991,9 +938,9 @@ define <4 x i32> @fromDiffMemConsDi(i32* nocapture readonly %arr) {
 ;
 ; P8BE-LABEL: fromDiffMemConsDi:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r4, r2, .LCPI8_0@toc@ha
+; P8BE-NEXT:    addis r4, r2, .LCPI7_0@toc@ha
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
-; P8BE-NEXT:    addi r4, r4, .LCPI8_0@toc@l
+; P8BE-NEXT:    addi r4, r4, .LCPI7_0@toc@l
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    vperm v2, v2, v2, v3
 ; P8BE-NEXT:    blr
@@ -1001,8 +948,8 @@ define <4 x i32> @fromDiffMemConsDi(i32* nocapture readonly %arr) {
 ; P8LE-LABEL: fromDiffMemConsDi:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addis r4, r2, .LCPI8_0@toc@ha
-; P8LE-NEXT:    addi r3, r4, .LCPI8_0@toc@l
+; P8LE-NEXT:    addis r4, r2, .LCPI7_0@toc@ha
+; P8LE-NEXT:    addi r3, r4, .LCPI7_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    xxswapd v3, vs0
 ; P8LE-NEXT:    vperm v2, v3, v3, v2
@@ -1022,7 +969,6 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAi(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAi:
 ; P9BE:       # %bb.0: # %entry
@@ -1071,7 +1017,6 @@ entry:
   ret <4 x i32> %vecinit11
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDi(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDi:
 ; P9BE:       # %bb.0: # %entry
@@ -1079,8 +1024,8 @@ define <4 x i32> @fromDiffMemVarDi(i32* nocapture readonly %arr, i32 signext %el
 ; P9BE-NEXT:    add r3, r3, r4
 ; P9BE-NEXT:    addi r3, r3, -12
 ; P9BE-NEXT:    lxvx v2, 0, r3
-; P9BE-NEXT:    addis r3, r2, .LCPI10_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI10_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI9_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI9_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    blr
@@ -1091,8 +1036,8 @@ define <4 x i32> @fromDiffMemVarDi(i32* nocapture readonly %arr, i32 signext %el
 ; P9LE-NEXT:    add r3, r3, r4
 ; P9LE-NEXT:    addi r3, r3, -12
 ; P9LE-NEXT:    lxvx v2, 0, r3
-; P9LE-NEXT:    addis r3, r2, .LCPI10_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI10_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI9_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI9_0@toc@l
 ; P9LE-NEXT:    lxvx v3, 0, r3
 ; P9LE-NEXT:    vperm v2, v2, v2, v3
 ; P9LE-NEXT:    blr
@@ -1100,9 +1045,9 @@ define <4 x i32> @fromDiffMemVarDi(i32* nocapture readonly %arr, i32 signext %el
 ; P8BE-LABEL: fromDiffMemVarDi:
 ; P8BE:       # %bb.0: # %entry
 ; P8BE-NEXT:    sldi r4, r4, 2
-; P8BE-NEXT:    addis r5, r2, .LCPI10_0@toc@ha
+; P8BE-NEXT:    addis r5, r2, .LCPI9_0@toc@ha
 ; P8BE-NEXT:    add r3, r3, r4
-; P8BE-NEXT:    addi r4, r5, .LCPI10_0@toc@l
+; P8BE-NEXT:    addi r4, r5, .LCPI9_0@toc@l
 ; P8BE-NEXT:    addi r3, r3, -12
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
@@ -1112,11 +1057,11 @@ define <4 x i32> @fromDiffMemVarDi(i32* nocapture readonly %arr, i32 signext %el
 ; P8LE-LABEL: fromDiffMemVarDi:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    sldi r4, r4, 2
-; P8LE-NEXT:    addis r5, r2, .LCPI10_0@toc@ha
+; P8LE-NEXT:    addis r5, r2, .LCPI9_0@toc@ha
 ; P8LE-NEXT:    add r3, r3, r4
 ; P8LE-NEXT:    addi r3, r3, -12
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addi r3, r5, .LCPI10_0@toc@l
+; P8LE-NEXT:    addi r3, r5, .LCPI9_0@toc@l
 ; P8LE-NEXT:    lvx v3, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    vperm v2, v2, v2, v3
@@ -1144,7 +1089,6 @@ entry:
   ret <4 x i32> %vecinit11
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromRandMemConsi(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromRandMemConsi:
 ; P9BE:       # %bb.0: # %entry
@@ -1209,7 +1153,6 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromRandMemVari(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromRandMemVari:
 ; P9BE:       # %bb.0: # %entry
@@ -1290,7 +1233,6 @@ entry:
   ret <4 x i32> %vecinit12
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegVali(i32 signext %val) {
 ; P9BE-LABEL: spltRegVali:
 ; P9BE:       # %bb.0: # %entry
@@ -1319,20 +1261,15 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemVali(i32* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemVali:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    lfiwzx f0, 0, r3
-; P9BE-NEXT:    xxsldwi vs0, f0, f0, 1
-; P9BE-NEXT:    xxspltw v2, vs0, 0
+; P9BE-NEXT:    lxvwsx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltMemVali:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    lfiwzx f0, 0, r3
-; P9LE-NEXT:    xxpermdi vs0, f0, f0, 2
-; P9LE-NEXT:    xxspltw v2, vs0, 3
+; P9LE-NEXT:    lxvwsx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltMemVali:
@@ -1355,7 +1292,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltCnstConvftoi() {
 ; P9BE-LABEL: spltCnstConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1380,7 +1316,6 @@ entry:
   ret <4 x i32> <i32 4, i32 4, i32 4, i32 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsConvftoi(float %a, float %b, float %c, float %d) {
 ; P9BE-LABEL: fromRegsConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1445,40 +1380,38 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsConvftoi() {
 ; P9BE-LABEL: fromDiffConstsConvftoi:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI17_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI17_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI16_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI16_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvftoi:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI17_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI17_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI16_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI16_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvftoi:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI17_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI17_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI16_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI16_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvftoi:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI17_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI17_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI16_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI16_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 24, i32 234, i32 988, i32 422>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAConvftoi(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1511,13 +1444,12 @@ entry:
   ret <4 x i32> %2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDConvftoi(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvftoi:
 ; P9BE:       # %bb.0: # %entry
 ; P9BE-NEXT:    lxv v2, 0(r3)
-; P9BE-NEXT:    addis r3, r2, .LCPI19_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI19_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI18_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI18_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    xvcvspsxws v2, v2
@@ -1526,8 +1458,8 @@ define <4 x i32> @fromDiffMemConsDConvftoi(float* nocapture readonly %ptr) {
 ; P9LE-LABEL: fromDiffMemConsDConvftoi:
 ; P9LE:       # %bb.0: # %entry
 ; P9LE-NEXT:    lxv v2, 0(r3)
-; P9LE-NEXT:    addis r3, r2, .LCPI19_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI19_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI18_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI18_0@toc@l
 ; P9LE-NEXT:    lxvx v3, 0, r3
 ; P9LE-NEXT:    vperm v2, v2, v2, v3
 ; P9LE-NEXT:    xvcvspsxws v2, v2
@@ -1535,9 +1467,9 @@ define <4 x i32> @fromDiffMemConsDConvftoi(float* nocapture readonly %ptr) {
 ;
 ; P8BE-LABEL: fromDiffMemConsDConvftoi:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r4, r2, .LCPI19_0@toc@ha
+; P8BE-NEXT:    addis r4, r2, .LCPI18_0@toc@ha
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
-; P8BE-NEXT:    addi r4, r4, .LCPI19_0@toc@l
+; P8BE-NEXT:    addi r4, r4, .LCPI18_0@toc@l
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    vperm v2, v2, v2, v3
 ; P8BE-NEXT:    xvcvspsxws v2, v2
@@ -1546,8 +1478,8 @@ define <4 x i32> @fromDiffMemConsDConvftoi(float* nocapture readonly %ptr) {
 ; P8LE-LABEL: fromDiffMemConsDConvftoi:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addis r4, r2, .LCPI19_0@toc@ha
-; P8LE-NEXT:    addi r3, r4, .LCPI19_0@toc@l
+; P8LE-NEXT:    addis r4, r2, .LCPI18_0@toc@ha
+; P8LE-NEXT:    addi r3, r4, .LCPI18_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    xxswapd v3, vs0
 ; P8LE-NEXT:    vperm v2, v3, v3, v2
@@ -1572,7 +1504,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAConvftoi(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1658,10 +1589,8 @@ entry:
   %conv13 = fptosi float %3 to i32
   %vecinit14 = insertelement <4 x i32> %vecinit9, i32 %conv13, i32 3
   ret <4 x i32> %vecinit14
-; FIXME: implement finding consecutive loads with pre-inc
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDConvftoi(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1750,7 +1679,6 @@ entry:
 ; FIXME: implement finding consecutive loads with pre-inc
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegValConvftoi(float %val) {
 ; P9BE-LABEL: spltRegValConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1782,7 +1710,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemValConvftoi(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvftoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1817,7 +1744,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltCnstConvdtoi() {
 ; P9BE-LABEL: spltCnstConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1842,7 +1768,6 @@ entry:
   ret <4 x i32> <i32 4, i32 4, i32 4, i32 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsConvdtoi(double %a, double %b, double %c, double %d) {
 ; P9BE-LABEL: fromRegsConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -1907,40 +1832,38 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsConvdtoi() {
 ; P9BE-LABEL: fromDiffConstsConvdtoi:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI26_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI26_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI25_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI25_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvdtoi:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI26_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI26_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI25_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI25_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvdtoi:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI26_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI26_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI25_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI25_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvdtoi:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI26_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI26_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI25_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI25_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 24, i32 234, i32 988, i32 422>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAConvdtoi(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2001,7 +1924,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDConvdtoi(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2073,7 +1995,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAConvdtoi(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2157,7 +2078,6 @@ entry:
   ret <4 x i32> %vecinit14
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDConvdtoi(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2241,7 +2161,6 @@ entry:
   ret <4 x i32> %vecinit14
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegValConvdtoi(double %val) {
 ; P9BE-LABEL: spltRegValConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2273,7 +2192,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemValConvdtoi(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvdtoi:
 ; P9BE:       # %bb.0: # %entry
@@ -2309,7 +2227,7 @@ entry:
   %splat.splat = shufflevector <4 x i32> %splat.splatinsert, <4 x i32> undef, <4 x i32> zeroinitializer
   ret <4 x i32> %splat.splat
 }
-; Function Attrs: norecurse nounwind readnone
+
 define <4 x i32> @allZeroui() {
 ; P9BE-LABEL: allZeroui:
 ; P9BE:       # %bb.0: # %entry
@@ -2334,32 +2252,6 @@ entry:
   ret <4 x i32> zeroinitializer
 }
 
-; Function Attrs: norecurse nounwind readnone
-define <4 x i32> @allOneui() {
-; P9BE-LABEL: allOneui:
-; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    xxspltib v2, 255
-; P9BE-NEXT:    blr
-;
-; P9LE-LABEL: allOneui:
-; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    xxspltib v2, 255
-; P9LE-NEXT:    blr
-;
-; P8BE-LABEL: allOneui:
-; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    vspltisb v2, -1
-; P8BE-NEXT:    blr
-;
-; P8LE-LABEL: allOneui:
-; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    vspltisb v2, -1
-; P8LE-NEXT:    blr
-entry:
-  ret <4 x i32> <i32 -1, i32 -1, i32 -1, i32 -1>
-}
-
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst1ui() {
 ; P9BE-LABEL: spltConst1ui:
 ; P9BE:       # %bb.0: # %entry
@@ -2384,7 +2276,6 @@ entry:
   ret <4 x i32> <i32 1, i32 1, i32 1, i32 1>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst16kui() {
 ; P9BE-LABEL: spltConst16kui:
 ; P9BE:       # %bb.0: # %entry
@@ -2413,7 +2304,6 @@ entry:
   ret <4 x i32> <i32 32767, i32 32767, i32 32767, i32 32767>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltConst32kui() {
 ; P9BE-LABEL: spltConst32kui:
 ; P9BE:       # %bb.0: # %entry
@@ -2442,7 +2332,6 @@ entry:
   ret <4 x i32> <i32 65535, i32 65535, i32 65535, i32 65535>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsui(i32 zeroext %a, i32 zeroext %b, i32 zeroext %c, i32 zeroext %d) {
 ; P9BE-LABEL: fromRegsui:
 ; P9BE:       # %bb.0: # %entry
@@ -2483,40 +2372,38 @@ entry:
   ret <4 x i32> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsui() {
 ; P9BE-LABEL: fromDiffConstsui:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI39_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI39_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI37_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI37_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsui:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI39_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI39_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI37_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI37_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsui:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI39_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI39_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI37_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI37_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsui:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI39_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI39_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI37_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI37_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 242, i32 -113, i32 889, i32 19>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAui(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsAui:
 ; P9BE:       # %bb.0: # %entry
@@ -2553,13 +2440,12 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDui(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsDui:
 ; P9BE:       # %bb.0: # %entry
 ; P9BE-NEXT:    lxv v2, 0(r3)
-; P9BE-NEXT:    addis r3, r2, .LCPI41_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI41_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI39_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI39_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    blr
@@ -2571,9 +2457,9 @@ define <4 x i32> @fromDiffMemConsDui(i32* nocapture readonly %arr) {
 ;
 ; P8BE-LABEL: fromDiffMemConsDui:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r4, r2, .LCPI41_0@toc@ha
+; P8BE-NEXT:    addis r4, r2, .LCPI39_0@toc@ha
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
-; P8BE-NEXT:    addi r4, r4, .LCPI41_0@toc@l
+; P8BE-NEXT:    addi r4, r4, .LCPI39_0@toc@l
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    vperm v2, v2, v2, v3
 ; P8BE-NEXT:    blr
@@ -2581,8 +2467,8 @@ define <4 x i32> @fromDiffMemConsDui(i32* nocapture readonly %arr) {
 ; P8LE-LABEL: fromDiffMemConsDui:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addis r4, r2, .LCPI41_0@toc@ha
-; P8LE-NEXT:    addi r3, r4, .LCPI41_0@toc@l
+; P8LE-NEXT:    addis r4, r2, .LCPI39_0@toc@ha
+; P8LE-NEXT:    addi r3, r4, .LCPI39_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    xxswapd v3, vs0
 ; P8LE-NEXT:    vperm v2, v3, v3, v2
@@ -2602,7 +2488,6 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAui(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAui:
 ; P9BE:       # %bb.0: # %entry
@@ -2651,7 +2536,6 @@ entry:
   ret <4 x i32> %vecinit11
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDui(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDui:
 ; P9BE:       # %bb.0: # %entry
@@ -2659,8 +2543,8 @@ define <4 x i32> @fromDiffMemVarDui(i32* nocapture readonly %arr, i32 signext %e
 ; P9BE-NEXT:    add r3, r3, r4
 ; P9BE-NEXT:    addi r3, r3, -12
 ; P9BE-NEXT:    lxvx v2, 0, r3
-; P9BE-NEXT:    addis r3, r2, .LCPI43_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI43_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI41_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI41_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    blr
@@ -2671,8 +2555,8 @@ define <4 x i32> @fromDiffMemVarDui(i32* nocapture readonly %arr, i32 signext %e
 ; P9LE-NEXT:    add r3, r3, r4
 ; P9LE-NEXT:    addi r3, r3, -12
 ; P9LE-NEXT:    lxvx v2, 0, r3
-; P9LE-NEXT:    addis r3, r2, .LCPI43_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI43_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI41_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI41_0@toc@l
 ; P9LE-NEXT:    lxvx v3, 0, r3
 ; P9LE-NEXT:    vperm v2, v2, v2, v3
 ; P9LE-NEXT:    blr
@@ -2680,9 +2564,9 @@ define <4 x i32> @fromDiffMemVarDui(i32* nocapture readonly %arr, i32 signext %e
 ; P8BE-LABEL: fromDiffMemVarDui:
 ; P8BE:       # %bb.0: # %entry
 ; P8BE-NEXT:    sldi r4, r4, 2
-; P8BE-NEXT:    addis r5, r2, .LCPI43_0@toc@ha
+; P8BE-NEXT:    addis r5, r2, .LCPI41_0@toc@ha
 ; P8BE-NEXT:    add r3, r3, r4
-; P8BE-NEXT:    addi r4, r5, .LCPI43_0@toc@l
+; P8BE-NEXT:    addi r4, r5, .LCPI41_0@toc@l
 ; P8BE-NEXT:    addi r3, r3, -12
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
@@ -2692,11 +2576,11 @@ define <4 x i32> @fromDiffMemVarDui(i32* nocapture readonly %arr, i32 signext %e
 ; P8LE-LABEL: fromDiffMemVarDui:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    sldi r4, r4, 2
-; P8LE-NEXT:    addis r5, r2, .LCPI43_0@toc@ha
+; P8LE-NEXT:    addis r5, r2, .LCPI41_0@toc@ha
 ; P8LE-NEXT:    add r3, r3, r4
 ; P8LE-NEXT:    addi r3, r3, -12
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addi r3, r5, .LCPI43_0@toc@l
+; P8LE-NEXT:    addi r3, r5, .LCPI41_0@toc@l
 ; P8LE-NEXT:    lvx v3, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    vperm v2, v2, v2, v3
@@ -2724,7 +2608,6 @@ entry:
   ret <4 x i32> %vecinit11
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromRandMemConsui(i32* nocapture readonly %arr) {
 ; P9BE-LABEL: fromRandMemConsui:
 ; P9BE:       # %bb.0: # %entry
@@ -2789,7 +2672,6 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromRandMemVarui(i32* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromRandMemVarui:
 ; P9BE:       # %bb.0: # %entry
@@ -2870,7 +2752,6 @@ entry:
   ret <4 x i32> %vecinit12
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegValui(i32 zeroext %val) {
 ; P9BE-LABEL: spltRegValui:
 ; P9BE:       # %bb.0: # %entry
@@ -2899,20 +2780,15 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemValui(i32* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValui:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    lfiwzx f0, 0, r3
-; P9BE-NEXT:    xxsldwi vs0, f0, f0, 1
-; P9BE-NEXT:    xxspltw v2, vs0, 0
+; P9BE-NEXT:    lxvwsx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltMemValui:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    lfiwzx f0, 0, r3
-; P9LE-NEXT:    xxpermdi vs0, f0, f0, 2
-; P9LE-NEXT:    xxspltw v2, vs0, 3
+; P9LE-NEXT:    lxvwsx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltMemValui:
@@ -2935,7 +2811,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltCnstConvftoui() {
 ; P9BE-LABEL: spltCnstConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -2960,7 +2835,6 @@ entry:
   ret <4 x i32> <i32 4, i32 4, i32 4, i32 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsConvftoui(float %a, float %b, float %c, float %d) {
 ; P9BE-LABEL: fromRegsConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3025,40 +2899,38 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsConvftoui() {
 ; P9BE-LABEL: fromDiffConstsConvftoui:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI48_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI48_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvftoui:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI48_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI48_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvftoui:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI48_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI48_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvftoui:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI48_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI48_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 24, i32 234, i32 988, i32 422>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAConvftoui(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3091,13 +2963,12 @@ entry:
   ret <4 x i32> %2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDConvftoui(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvftoui:
 ; P9BE:       # %bb.0: # %entry
 ; P9BE-NEXT:    lxv v2, 0(r3)
-; P9BE-NEXT:    addis r3, r2, .LCPI52_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI52_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
 ; P9BE-NEXT:    lxvx v3, 0, r3
 ; P9BE-NEXT:    vperm v2, v2, v2, v3
 ; P9BE-NEXT:    xvcvspuxws v2, v2
@@ -3106,8 +2977,8 @@ define <4 x i32> @fromDiffMemConsDConvftoui(float* nocapture readonly %ptr) {
 ; P9LE-LABEL: fromDiffMemConsDConvftoui:
 ; P9LE:       # %bb.0: # %entry
 ; P9LE-NEXT:    lxv v2, 0(r3)
-; P9LE-NEXT:    addis r3, r2, .LCPI52_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI52_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI50_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI50_0@toc@l
 ; P9LE-NEXT:    lxvx v3, 0, r3
 ; P9LE-NEXT:    vperm v2, v2, v2, v3
 ; P9LE-NEXT:    xvcvspuxws v2, v2
@@ -3115,9 +2986,9 @@ define <4 x i32> @fromDiffMemConsDConvftoui(float* nocapture readonly %ptr) {
 ;
 ; P8BE-LABEL: fromDiffMemConsDConvftoui:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r4, r2, .LCPI52_0@toc@ha
+; P8BE-NEXT:    addis r4, r2, .LCPI50_0@toc@ha
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
-; P8BE-NEXT:    addi r4, r4, .LCPI52_0@toc@l
+; P8BE-NEXT:    addi r4, r4, .LCPI50_0@toc@l
 ; P8BE-NEXT:    lxvw4x v3, 0, r4
 ; P8BE-NEXT:    vperm v2, v2, v2, v3
 ; P8BE-NEXT:    xvcvspuxws v2, v2
@@ -3126,8 +2997,8 @@ define <4 x i32> @fromDiffMemConsDConvftoui(float* nocapture readonly %ptr) {
 ; P8LE-LABEL: fromDiffMemConsDConvftoui:
 ; P8LE:       # %bb.0: # %entry
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
-; P8LE-NEXT:    addis r4, r2, .LCPI52_0@toc@ha
-; P8LE-NEXT:    addi r3, r4, .LCPI52_0@toc@l
+; P8LE-NEXT:    addis r4, r2, .LCPI50_0@toc@ha
+; P8LE-NEXT:    addi r3, r4, .LCPI50_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    xxswapd v3, vs0
 ; P8LE-NEXT:    vperm v2, v3, v3, v2
@@ -3152,7 +3023,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAConvftoui(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3241,7 +3111,6 @@ entry:
 ; FIXME: implement finding consecutive loads with pre-inc
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDConvftoui(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3330,7 +3199,6 @@ entry:
 ; FIXME: implement finding consecutive loads with pre-inc
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegValConvftoui(float %val) {
 ; P9BE-LABEL: spltRegValConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3362,7 +3230,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemValConvftoui(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvftoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3397,7 +3264,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltCnstConvdtoui() {
 ; P9BE-LABEL: spltCnstConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3422,7 +3288,6 @@ entry:
   ret <4 x i32> <i32 4, i32 4, i32 4, i32 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromRegsConvdtoui(double %a, double %b, double %c, double %d) {
 ; P9BE-LABEL: fromRegsConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3487,40 +3352,38 @@ entry:
   ret <4 x i32> %vecinit6
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @fromDiffConstsConvdtoui() {
 ; P9BE-LABEL: fromDiffConstsConvdtoui:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI59_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI59_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI57_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI57_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvdtoui:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI59_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI59_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI57_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI57_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvdtoui:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI59_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI59_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI57_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI57_0@toc@l
 ; P8BE-NEXT:    lxvw4x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvdtoui:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI59_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI59_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI57_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI57_0@toc@l
 ; P8LE-NEXT:    lvx v2, 0, r3
 ; P8LE-NEXT:    blr
 entry:
   ret <4 x i32> <i32 24, i32 234, i32 988, i32 422>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsAConvdtoui(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3581,7 +3444,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemConsDConvdtoui(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3653,7 +3515,6 @@ entry:
   ret <4 x i32> %vecinit9
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarAConvdtoui(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3737,7 +3598,6 @@ entry:
   ret <4 x i32> %vecinit14
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @fromDiffMemVarDConvdtoui(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3821,7 +3681,6 @@ entry:
   ret <4 x i32> %vecinit14
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <4 x i32> @spltRegValConvdtoui(double %val) {
 ; P9BE-LABEL: spltRegValConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3853,7 +3712,6 @@ entry:
   ret <4 x i32> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <4 x i32> @spltMemValConvdtoui(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvdtoui:
 ; P9BE:       # %bb.0: # %entry
@@ -3889,7 +3747,7 @@ entry:
   %splat.splat = shufflevector <4 x i32> %splat.splatinsert, <4 x i32> undef, <4 x i32> zeroinitializer
   ret <4 x i32> %splat.splat
 }
-; Function Attrs: norecurse nounwind readnone
+
 define <2 x i64> @allZeroll() {
 ; P9BE-LABEL: allZeroll:
 ; P9BE:       # %bb.0: # %entry
@@ -3914,58 +3772,32 @@ entry:
   ret <2 x i64> zeroinitializer
 }
 
-; Function Attrs: norecurse nounwind readnone
-define <2 x i64> @allOnell() {
-; P9BE-LABEL: allOnell:
-; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    xxspltib v2, 255
-; P9BE-NEXT:    blr
-;
-; P9LE-LABEL: allOnell:
-; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    xxspltib v2, 255
-; P9LE-NEXT:    blr
-;
-; P8BE-LABEL: allOnell:
-; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    vspltisb v2, -1
-; P8BE-NEXT:    blr
-;
-; P8LE-LABEL: allOnell:
-; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    vspltisb v2, -1
-; P8LE-NEXT:    blr
-entry:
-  ret <2 x i64> <i64 -1, i64 -1>
-}
-
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst1ll() {
 ; P9BE-LABEL: spltConst1ll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI68_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI68_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI65_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI65_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst1ll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI68_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI68_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI65_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI65_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst1ll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI68_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI68_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI65_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI65_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst1ll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI68_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI68_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI65_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI65_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -3973,33 +3805,32 @@ entry:
   ret <2 x i64> <i64 1, i64 1>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst16kll() {
 ; P9BE-LABEL: spltConst16kll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI66_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI66_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst16kll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI66_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI66_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst16kll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI66_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI66_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst16kll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI66_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI66_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4007,33 +3838,32 @@ entry:
   ret <2 x i64> <i64 32767, i64 32767>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst32kll() {
 ; P9BE-LABEL: spltConst32kll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI70_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI70_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI67_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI67_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst32kll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI70_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI70_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI67_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI67_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst32kll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI70_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI70_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI67_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI67_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst32kll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI70_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI70_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI67_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI67_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4041,7 +3871,6 @@ entry:
   ret <2 x i64> <i64 65535, i64 65535>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsll(i64 %a, i64 %b) {
 ; P9BE-LABEL: fromRegsll:
 ; P9BE:       # %bb.0: # %entry
@@ -4072,33 +3901,32 @@ entry:
   ret <2 x i64> %vecinit1
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsll() {
 ; P9BE-LABEL: fromDiffConstsll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI72_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI72_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI72_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI72_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI72_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI72_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI72_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI72_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI69_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI69_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4106,7 +3934,6 @@ entry:
   ret <2 x i64> <i64 242, i64 -113>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAll(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsAll:
 ; P9BE:       # %bb.0: # %entry
@@ -4137,7 +3964,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDll(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsDll:
 ; P9BE:       # %bb.0: # %entry
@@ -4173,7 +3999,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAll(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAll:
 ; P9BE:       # %bb.0: # %entry
@@ -4212,7 +4037,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDll(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDll:
 ; P9BE:       # %bb.0: # %entry
@@ -4260,7 +4084,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromRandMemConsll(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromRandMemConsll:
 ; P9BE:       # %bb.0: # %entry
@@ -4303,7 +4126,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromRandMemVarll(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromRandMemVarll:
 ; P9BE:       # %bb.0: # %entry
@@ -4358,7 +4180,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValll(i64 %val) {
 ; P9BE-LABEL: spltRegValll:
 ; P9BE:       # %bb.0: # %entry
@@ -4387,7 +4208,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValll(i64* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValll:
 ; P9BE:       # %bb.0: # %entry
@@ -4415,33 +4235,32 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltCnstConvftoll() {
 ; P9BE-LABEL: spltCnstConvftoll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI81_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI81_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI78_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI78_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltCnstConvftoll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI81_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI81_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI78_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI78_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltCnstConvftoll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI81_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI81_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI78_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI78_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltCnstConvftoll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI81_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI81_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI78_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI78_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4449,7 +4268,6 @@ entry:
   ret <2 x i64> <i64 4, i64 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsConvftoll(float %a, float %b) {
 ; P9BE-LABEL: fromRegsConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4490,33 +4308,32 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsConvftoll() {
 ; P9BE-LABEL: fromDiffConstsConvftoll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI83_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI83_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI80_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI80_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvftoll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI83_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI83_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI80_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI80_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvftoll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI83_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI83_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI80_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI80_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvftoll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI83_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI83_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI80_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI80_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4524,7 +4341,6 @@ entry:
   ret <2 x i64> <i64 24, i64 234>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAConvftoll(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4568,7 +4384,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDConvftoll(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4613,7 +4428,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAConvftoll(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4665,7 +4479,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDConvftoll(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4717,7 +4530,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValConvftoll(float %val) {
 ; P9BE-LABEL: spltRegValConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4749,7 +4561,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValConvftoll(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvftoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4786,33 +4597,32 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltCnstConvdtoll() {
 ; P9BE-LABEL: spltCnstConvdtoll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI90_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI90_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI87_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI87_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltCnstConvdtoll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI90_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI90_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI87_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI87_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltCnstConvdtoll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI90_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI90_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI87_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI87_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltCnstConvdtoll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI90_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI90_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI87_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI87_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4820,7 +4630,6 @@ entry:
   ret <2 x i64> <i64 4, i64 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsConvdtoll(double %a, double %b) {
 ; P9BE-LABEL: fromRegsConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4861,33 +4670,32 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsConvdtoll() {
 ; P9BE-LABEL: fromDiffConstsConvdtoll:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI92_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI92_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI89_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI89_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvdtoll:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI92_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI92_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI89_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI89_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvdtoll:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI92_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI92_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI89_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI89_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvdtoll:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI92_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI92_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI89_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI89_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -4895,7 +4703,6 @@ entry:
   ret <2 x i64> <i64 24, i64 234>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAConvdtoll(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4928,7 +4735,6 @@ entry:
   ret <2 x i64> %2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDConvdtoll(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -4970,7 +4776,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAConvdtoll(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -5015,7 +4820,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDConvdtoll(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -5069,7 +4873,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValConvdtoll(double %val) {
 ; P9BE-LABEL: spltRegValConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -5101,7 +4904,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValConvdtoll(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvdtoll:
 ; P9BE:       # %bb.0: # %entry
@@ -5134,7 +4936,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @allZeroull() {
 ; P9BE-LABEL: allZeroull:
 ; P9BE:       # %bb.0: # %entry
@@ -5159,58 +4960,32 @@ entry:
   ret <2 x i64> zeroinitializer
 }
 
-; Function Attrs: norecurse nounwind readnone
-define <2 x i64> @allOneull() {
-; P9BE-LABEL: allOneull:
-; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    xxspltib v2, 255
-; P9BE-NEXT:    blr
-;
-; P9LE-LABEL: allOneull:
-; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    xxspltib v2, 255
-; P9LE-NEXT:    blr
-;
-; P8BE-LABEL: allOneull:
-; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    vspltisb v2, -1
-; P8BE-NEXT:    blr
-;
-; P8LE-LABEL: allOneull:
-; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    vspltisb v2, -1
-; P8LE-NEXT:    blr
-entry:
-  ret <2 x i64> <i64 -1, i64 -1>
-}
-
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst1ull() {
 ; P9BE-LABEL: spltConst1ull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI97_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI97_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst1ull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI97_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI97_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst1ull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI97_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI97_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst1ull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI97_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI97_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5218,33 +4993,32 @@ entry:
   ret <2 x i64> <i64 1, i64 1>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst16kull() {
 ; P9BE-LABEL: spltConst16kull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI102_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI102_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI98_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI98_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst16kull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI102_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI102_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI98_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI98_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst16kull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI102_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI102_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI98_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI98_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst16kull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI102_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI102_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI98_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI98_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5252,33 +5026,32 @@ entry:
   ret <2 x i64> <i64 32767, i64 32767>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltConst32kull() {
 ; P9BE-LABEL: spltConst32kull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI103_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI103_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI99_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI99_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltConst32kull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI103_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI103_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI99_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI99_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltConst32kull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI103_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI103_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI99_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI99_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltConst32kull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI103_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI103_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI99_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI99_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5286,7 +5059,6 @@ entry:
   ret <2 x i64> <i64 65535, i64 65535>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsull(i64 %a, i64 %b) {
 ; P9BE-LABEL: fromRegsull:
 ; P9BE:       # %bb.0: # %entry
@@ -5317,33 +5089,32 @@ entry:
   ret <2 x i64> %vecinit1
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsull() {
 ; P9BE-LABEL: fromDiffConstsull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI105_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI105_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI105_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI105_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI105_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI105_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI105_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI105_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI101_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI101_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5351,7 +5122,6 @@ entry:
   ret <2 x i64> <i64 242, i64 -113>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAull(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsAull:
 ; P9BE:       # %bb.0: # %entry
@@ -5382,7 +5152,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDull(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromDiffMemConsDull:
 ; P9BE:       # %bb.0: # %entry
@@ -5418,7 +5187,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAull(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAull:
 ; P9BE:       # %bb.0: # %entry
@@ -5457,7 +5225,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDull(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDull:
 ; P9BE:       # %bb.0: # %entry
@@ -5505,7 +5272,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromRandMemConsull(i64* nocapture readonly %arr) {
 ; P9BE-LABEL: fromRandMemConsull:
 ; P9BE:       # %bb.0: # %entry
@@ -5548,7 +5314,6 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromRandMemVarull(i64* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromRandMemVarull:
 ; P9BE:       # %bb.0: # %entry
@@ -5603,7 +5368,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValull(i64 %val) {
 ; P9BE-LABEL: spltRegValull:
 ; P9BE:       # %bb.0: # %entry
@@ -5632,7 +5396,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValull(i64* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValull:
 ; P9BE:       # %bb.0: # %entry
@@ -5660,33 +5423,32 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltCnstConvftoull() {
 ; P9BE-LABEL: spltCnstConvftoull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI114_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI114_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI110_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI110_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltCnstConvftoull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI114_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI114_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI110_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI110_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltCnstConvftoull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI114_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI114_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI110_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI110_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltCnstConvftoull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI114_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI114_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI110_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI110_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5694,7 +5456,6 @@ entry:
   ret <2 x i64> <i64 4, i64 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsConvftoull(float %a, float %b) {
 ; P9BE-LABEL: fromRegsConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5735,33 +5496,32 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsConvftoull() {
 ; P9BE-LABEL: fromDiffConstsConvftoull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI116_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI116_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI112_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI112_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvftoull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI116_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI116_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI112_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI112_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvftoull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI116_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI116_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI112_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI112_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvftoull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI116_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI116_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI112_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI112_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -5769,7 +5529,6 @@ entry:
   ret <2 x i64> <i64 24, i64 234>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAConvftoull(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5813,7 +5572,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDConvftoull(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5858,7 +5616,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAConvftoull(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5910,7 +5667,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDConvftoull(float* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5962,7 +5718,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValConvftoull(float %val) {
 ; P9BE-LABEL: spltRegValConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -5994,7 +5749,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValConvftoull(float* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvftoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6031,33 +5785,32 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltCnstConvdtoull() {
 ; P9BE-LABEL: spltCnstConvdtoull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI123_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI123_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI119_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI119_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: spltCnstConvdtoull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI123_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI123_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI119_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI119_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: spltCnstConvdtoull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI123_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI123_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI119_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI119_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: spltCnstConvdtoull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI123_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI123_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI119_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI119_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -6065,7 +5818,6 @@ entry:
   ret <2 x i64> <i64 4, i64 4>
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromRegsConvdtoull(double %a, double %b) {
 ; P9BE-LABEL: fromRegsConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6106,33 +5858,32 @@ entry:
   ret <2 x i64> %vecinit2
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @fromDiffConstsConvdtoull() {
 ; P9BE-LABEL: fromDiffConstsConvdtoull:
 ; P9BE:       # %bb.0: # %entry
-; P9BE-NEXT:    addis r3, r2, .LCPI125_0@toc@ha
-; P9BE-NEXT:    addi r3, r3, .LCPI125_0@toc@l
+; P9BE-NEXT:    addis r3, r2, .LCPI121_0@toc@ha
+; P9BE-NEXT:    addi r3, r3, .LCPI121_0@toc@l
 ; P9BE-NEXT:    lxvx v2, 0, r3
 ; P9BE-NEXT:    blr
 ;
 ; P9LE-LABEL: fromDiffConstsConvdtoull:
 ; P9LE:       # %bb.0: # %entry
-; P9LE-NEXT:    addis r3, r2, .LCPI125_0@toc@ha
-; P9LE-NEXT:    addi r3, r3, .LCPI125_0@toc@l
+; P9LE-NEXT:    addis r3, r2, .LCPI121_0@toc@ha
+; P9LE-NEXT:    addi r3, r3, .LCPI121_0@toc@l
 ; P9LE-NEXT:    lxvx v2, 0, r3
 ; P9LE-NEXT:    blr
 ;
 ; P8BE-LABEL: fromDiffConstsConvdtoull:
 ; P8BE:       # %bb.0: # %entry
-; P8BE-NEXT:    addis r3, r2, .LCPI125_0@toc@ha
-; P8BE-NEXT:    addi r3, r3, .LCPI125_0@toc@l
+; P8BE-NEXT:    addis r3, r2, .LCPI121_0@toc@ha
+; P8BE-NEXT:    addi r3, r3, .LCPI121_0@toc@l
 ; P8BE-NEXT:    lxvd2x v2, 0, r3
 ; P8BE-NEXT:    blr
 ;
 ; P8LE-LABEL: fromDiffConstsConvdtoull:
 ; P8LE:       # %bb.0: # %entry
-; P8LE-NEXT:    addis r3, r2, .LCPI125_0@toc@ha
-; P8LE-NEXT:    addi r3, r3, .LCPI125_0@toc@l
+; P8LE-NEXT:    addis r3, r2, .LCPI121_0@toc@ha
+; P8LE-NEXT:    addi r3, r3, .LCPI121_0@toc@l
 ; P8LE-NEXT:    lxvd2x vs0, 0, r3
 ; P8LE-NEXT:    xxswapd v2, vs0
 ; P8LE-NEXT:    blr
@@ -6140,7 +5891,6 @@ entry:
   ret <2 x i64> <i64 24, i64 234>
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsAConvdtoull(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsAConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6173,7 +5923,6 @@ entry:
   ret <2 x i64> %2
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemConsDConvdtoull(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: fromDiffMemConsDConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6215,7 +5964,6 @@ entry:
   ret <2 x i64> %vecinit3
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarAConvdtoull(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarAConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6260,7 +6008,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @fromDiffMemVarDConvdtoull(double* nocapture readonly %arr, i32 signext %elem) {
 ; P9BE-LABEL: fromDiffMemVarDConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6314,7 +6061,6 @@ entry:
   ret <2 x i64> %vecinit4
 }
 
-; Function Attrs: norecurse nounwind readnone
 define <2 x i64> @spltRegValConvdtoull(double %val) {
 ; P9BE-LABEL: spltRegValConvdtoull:
 ; P9BE:       # %bb.0: # %entry
@@ -6346,7 +6092,6 @@ entry:
   ret <2 x i64> %splat.splat
 }
 
-; Function Attrs: norecurse nounwind readonly
 define <2 x i64> @spltMemValConvdtoull(double* nocapture readonly %ptr) {
 ; P9BE-LABEL: spltMemValConvdtoull:
 ; P9BE:       # %bb.0: # %entry

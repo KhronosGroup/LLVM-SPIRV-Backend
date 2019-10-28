@@ -1,4 +1,4 @@
-; RUN: llc -mattr=+bulk-memory -filetype=obj %s -o %t.o
+; RUN: llc -mattr=+bulk-memory,+atomics -filetype=obj %s -o %t.o
 
 target triple = "wasm32-unknown-unknown"
 
@@ -24,7 +24,7 @@ define i32* @tls2_addr() {
 ; CHECK-NEXT:       Mutable:         true
 ; CHECK-NEXT:       InitExpr:
 ; CHECK-NEXT:         Opcode:          I32_CONST
-; CHECK-NEXT:         Value:           66608
+; CHECK-NEXT:         Value:           66592
 
 ; __tls_base
 ; CHECK-NEXT:     - Index:           1

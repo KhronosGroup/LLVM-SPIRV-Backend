@@ -86,8 +86,8 @@ ConnectionFileDescriptor::ConnectionFileDescriptor(bool child_processes_inherit)
 ConnectionFileDescriptor::ConnectionFileDescriptor(int fd, bool owns_fd)
     : Connection(), m_pipe(), m_mutex(), m_shutting_down(false),
       m_waiting_for_accept(false), m_child_processes_inherit(false) {
-  m_write_sp = std::make_shared<File>(fd, owns_fd);
-  m_read_sp = std::make_shared<File>(fd, false);
+  m_write_sp = std::make_shared<NativeFile>(fd, File::eOpenOptionWrite, owns_fd);
+  m_read_sp = std::make_shared<NativeFile>(fd, File::eOpenOptionRead, false);
 
   Log *log(lldb_private::GetLogIfAnyCategoriesSet(LIBLLDB_LOG_CONNECTION |
                                                   LIBLLDB_LOG_OBJECT));
@@ -218,8 +218,10 @@ ConnectionStatus ConnectionFileDescriptor::Connect(llvm::StringRef path,
             m_read_sp = std::move(tcp_socket);
             m_write_sp = m_read_sp;
           } else {
-            m_read_sp = std::make_shared<File>(fd, false);
-            m_write_sp = std::make_shared<File>(fd, false);
+            m_read_sp =
+                std::make_shared<NativeFile>(fd, File::eOpenOptionRead, false);
+            m_write_sp =
+                std::make_shared<NativeFile>(fd, File::eOpenOptionWrite, false);
           }
           m_uri = *addr;
           return eConnectionStatusSuccess;
@@ -268,8 +270,8 @@ ConnectionStatus ConnectionFileDescriptor::Connect(llvm::StringRef path,
           ::fcntl(fd, F_SETFL, flags);
         }
       }
-      m_read_sp = std::make_shared<File>(fd, true);
-      m_write_sp = std::make_shared<File>(fd, false);
+      m_read_sp = std::make_shared<NativeFile>(fd, File::eOpenOptionRead, true);
+      m_write_sp = std::make_shared<NativeFile>(fd, File::eOpenOptionWrite, false);
       return eConnectionStatusSuccess;
     }
 #endif
@@ -312,9 +314,6 @@ ConnectionStatus ConnectionFileDescriptor::Disconnect(Status *error_ptr) {
   // descriptor.  If that's the case, then send the "q" char to the command
   // file channel so the read will wake up and the connection will then know to
   // shut down.
-
-  m_shutting_down = true;
-
   std::unique_lock<std::recursive_mutex> locker(m_mutex, std::defer_lock);
   if (!locker.try_lock()) {
     if (m_pipe.CanWrite()) {
@@ -333,6 +332,9 @@ ConnectionStatus ConnectionFileDescriptor::Disconnect(Status *error_ptr) {
     }
     locker.lock();
   }
+
+  // Prevents reads and writes during shutdown.
+  m_shutting_down = true;
 
   Status error = m_read_sp->Close();
   Status error2 = m_write_sp->Close();
@@ -369,6 +371,8 @@ size_t ConnectionFileDescriptor::Read(void *dst, size_t dst_len,
   }
 
   if (m_shutting_down) {
+    if (error_ptr)
+      error_ptr->SetErrorString("shutting down");
     status = eConnectionStatusError;
     return 0;
   }
@@ -473,6 +477,13 @@ size_t ConnectionFileDescriptor::Write(const void *src, size_t src_len,
     return 0;
   }
 
+  if (m_shutting_down) {
+    if (error_ptr)
+      error_ptr->SetErrorString("shutting down");
+    status = eConnectionStatusError;
+    return 0;
+  }
+
   Status error;
 
   size_t bytes_sent = src_len;
@@ -555,7 +566,7 @@ ConnectionFileDescriptor::BytesAvailable(const Timeout<std::micro> &timeout,
       select_helper.SetTimeout(*timeout);
 
     select_helper.FDSetRead(handle);
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     // select() won't accept pipes on Windows.  The entire Windows codepath
     // needs to be converted over to using WaitForMultipleObjects and event
     // HANDLEs, but for now at least this will allow ::select() to not return

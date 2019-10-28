@@ -43,6 +43,10 @@ multiple file formats.
  starts with ".note". Otherwise, it will have type `SHT_PROGBITS`. Can be
  specified multiple times to add multiple sections.
 
+.. option:: --binary-architecture <arch>, -B
+
+ Ignored for compatibility.
+
 .. option:: --disable-deterministic-archives, -U
 
  Use real values for UIDs, GIDs and timestamps when updating archive member
@@ -77,6 +81,11 @@ multiple file formats.
 
  Remove the specified section from the output. Can be specified multiple times
  to remove multiple sections simultaneously.
+
+.. option:: --set-section-alignment <section>=<align>
+
+ Set the alignment of section ``<section>`` to `<align>``. Can be specified
+ multiple times to update multiple sections.
 
 .. option:: --strip-all-gnu
 
@@ -123,11 +132,39 @@ multiple file formats.
 .. option:: --strip-unneeded
 
  Remove from the output all local or undefined symbols that are not required by
- relocations.
+ relocations. Also remove all debug sections.
 
 .. option:: --version, -V
 
-  Display the version of this program.
+ Display the version of the :program:`llvm-objcopy` executable.
+
+.. option:: @<FILE>
+
+ Read command-line options and commands from response file `<FILE>`.
+
+.. option:: --wildcard, -w
+
+  Allow wildcard syntax for symbol-related flags. On by default for
+  section-related flags. Incompatible with --regex.
+
+  Wildcard syntax allows the following special symbols:
+
+  ====================== ========================= ==================
+   Character              Meaning                   Equivalent
+  ====================== ========================= ==================
+  ``*``                  Any number of characters  ``.*``
+  ``?``                  Any single character      ``.``
+  ``\``                  Escape the next character ``\``
+  ``[a-z]``              Character class           ``[a-z]``
+  ``[!a-z]``, ``[^a-z]`` Negated character class   ``[^a-z]``
+  ====================== ========================= ==================
+
+  Additionally, starting a wildcard with '!' will prevent a match, even if
+  another flag matches. For example ``-w -N '*' -N '!x'`` will strip all symbols
+  except for ``x``.
+
+  The order of wildcards does not matter. For example, ``-w -N '*' -N '!x'`` is
+  the same as ``-w -N '!x' -N '*'``.
 
 COFF-SPECIFIC OPTIONS
 ---------------------
@@ -160,6 +197,7 @@ them.
  - `weak` = the symbol will have weak binding.
  - `default` = the symbol will have default visibility.
  - `hidden` = the symbol will have hidden visibility.
+ - `protected` = the symbol will have protected visibility.
  - `file` = the symbol will be an `STT_FILE` symbol.
  - `section` = the symbol will be an `STT_SECTION` symbol.
  - `object` = the symbol will be an `STT_OBJECT` symbol.
@@ -173,25 +211,8 @@ them.
 
 .. option:: --allow-broken-links
 
- Allow llvm-objcopy to remove sections even if it would leave invalid section
- references. Any invalid sh_link fields will be set to zero.
-
-.. option:: --binary-architecture <arch>, -B
-
- Specify the architecture to use, when transforming an architecture-less format
- (e.g. binary) to another format. Valid options are:
-
- - `aarch64`
- - `arm`
- - `i386`
- - `i386:x86-64`
- - `mips`
- - `powerpc:common64`
- - `riscv:rv32`
- - `riscv:rv64`
- - `sparc`
- - `sparcel`
- - `x86-64`
+ Allow :program:`llvm-objcopy` to remove sections even if it would leave invalid
+ section references. Any invalid sh_link fields will be set to zero.
 
 .. option:: --build-id-link-dir <dir>
 
@@ -317,6 +338,18 @@ them.
  represents a single symbol, with leading and trailing whitespace ignored, as is
  anything following a '#'. Can be specified multiple times to read names from
  multiple files.
+ 
+.. option:: --new-symbol-visibility <visibility>
+
+ Specify the visibility of the symbols automatically created when using binary
+ input or :option:`--add-symbol`. Valid options are:
+
+ - `default`
+ - `hidden`
+ - `internal`
+ - `protected`
+
+ The default is `default`.
 
 .. option:: --output-target <format>, -O
 

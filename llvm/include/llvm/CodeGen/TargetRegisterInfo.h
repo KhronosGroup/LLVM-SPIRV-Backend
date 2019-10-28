@@ -377,9 +377,9 @@ public:
 
   /// Returns true if the two registers are equal or alias each other.
   /// The registers may be virtual registers.
-  bool regsOverlap(unsigned regA, unsigned regB) const {
+  bool regsOverlap(Register regA, Register regB) const {
     if (regA == regB) return true;
-    if (Register::isVirtualRegister(regA) || Register::isVirtualRegister(regB))
+    if (regA.isVirtual() || regB.isVirtual())
       return false;
 
     // Regunits are numerically ordered. Find a common unit.
@@ -680,13 +680,9 @@ public:
 
   /// Find the largest common subclass of A and B.
   /// Return NULL if there is no common subclass.
-  /// The common subclass should contain
-  /// simple value type SVT if it is not the Any type.
   const TargetRegisterClass *
   getCommonSubClass(const TargetRegisterClass *A,
-                    const TargetRegisterClass *B,
-                    const MVT::SimpleValueType SVT =
-                    MVT::SimpleValueType::Any) const;
+                    const TargetRegisterClass *B) const;
 
   /// Returns a TargetRegisterClass used for pointer values.
   /// If a target supports multiple different pointer register classes,
@@ -1148,7 +1144,7 @@ struct VirtReg2IndexFunctor {
 ///   %physreg17      - a physical register when no TRI instance given.
 ///
 /// Usage: OS << printReg(Reg, TRI, SubRegIdx) << '\n';
-Printable printReg(unsigned Reg, const TargetRegisterInfo *TRI = nullptr,
+Printable printReg(Register Reg, const TargetRegisterInfo *TRI = nullptr,
                    unsigned SubIdx = 0,
                    const MachineRegisterInfo *MRI = nullptr);
 

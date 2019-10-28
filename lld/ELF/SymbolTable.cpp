@@ -27,10 +27,9 @@ using namespace llvm;
 using namespace llvm::object;
 using namespace llvm::ELF;
 
-using namespace lld;
-using namespace lld::elf;
-
-SymbolTable *elf::symtab;
+namespace lld {
+namespace elf {
+SymbolTable *symtab;
 
 void SymbolTable::wrap(Symbol *sym, Symbol *real, Symbol *wrap) {
   // Swap symbols as instructed by -wrap.
@@ -71,21 +70,26 @@ Symbol *SymbolTable::insert(StringRef name) {
   Symbol *sym = reinterpret_cast<Symbol *>(make<SymbolUnion>());
   symVector.push_back(sym);
 
+  // *sym was not initialized by a constructor. Fields that may get referenced
+  // when it is a placeholder must be initialized here.
   sym->setName(name);
   sym->symbolKind = Symbol::PlaceholderKind;
   sym->versionId = VER_NDX_GLOBAL;
   sym->visibility = STV_DEFAULT;
   sym->isUsedInRegularObj = false;
   sym->exportDynamic = false;
+  sym->inDynamicList = false;
   sym->canInline = true;
+  sym->referenced = false;
+  sym->traced = false;
   sym->scriptDefined = false;
   sym->partition = 1;
   return sym;
 }
 
-Symbol *SymbolTable::addSymbol(const Symbol &New) {
-  Symbol *sym = symtab->insert(New.getName());
-  sym->resolve(New);
+Symbol *SymbolTable::addSymbol(const Symbol &newSym) {
+  Symbol *sym = symtab->insert(newSym.getName());
+  sym->resolve(newSym);
   return sym;
 }
 
@@ -118,10 +122,7 @@ StringMap<std::vector<Symbol *>> &SymbolTable::getDemangledSyms() {
     for (Symbol *sym : symVector) {
       if (!sym->isDefined() && !sym->isCommon())
         continue;
-      if (Optional<std::string> s = demangleItanium(sym->getName()))
-        (*demangledSyms)[*s].push_back(sym);
-      else
-        (*demangledSyms)[sym->getName()].push_back(sym);
+      (*demangledSyms)[demangleItanium(sym->getName())].push_back(sym);
     }
   }
   return *demangledSyms;
@@ -162,12 +163,8 @@ void SymbolTable::handleDynamicList() {
     else
       syms = findByVersion(ver);
 
-    for (Symbol *b : syms) {
-      if (!config->shared)
-        b->exportDynamic = true;
-      else if (b->includeInDynsym())
-        b->isPreemptible = true;
-    }
+    for (Symbol *sym : syms)
+      sym->inDynamicList = true;
   }
 }
 
@@ -267,3 +264,6 @@ void SymbolTable::scanVersionScript() {
   // --dynamic-list.
   handleDynamicList();
 }
+
+} // namespace elf
+} // namespace lld

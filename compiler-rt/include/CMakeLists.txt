@@ -13,9 +13,10 @@ if (COMPILER_RT_BUILD_SANITIZERS)
     sanitizer/scudo_interface.h
     sanitizer/tsan_interface.h
     sanitizer/tsan_interface_atomic.h
+    sanitizer/ubsan_interface.h
     )
   set(FUZZER_HEADERS
-    fuzzer/FuzzedDataProvider.hpp
+    fuzzer/FuzzedDataProvider.h
     )
 endif(COMPILER_RT_BUILD_SANITIZERS)
 

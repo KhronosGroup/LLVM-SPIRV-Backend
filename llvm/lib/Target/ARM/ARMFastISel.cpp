@@ -191,8 +191,8 @@ class ARMFastISel final : public FastISel {
     bool isTypeLegal(Type *Ty, MVT &VT);
     bool isLoadTypeLegal(Type *Ty, MVT &VT);
     bool ARMEmitCmp(const Value *Src1Value, const Value *Src2Value,
-                    bool isZExt, bool isEquality);
-    bool ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
+                    bool isZExt);
+    bool ARMEmitLoad(MVT VT, Register &ResultReg, Address &Addr,
                      unsigned Alignment = 0, bool isZExt = true,
                      bool allocReg = true);
     bool ARMEmitStore(MVT VT, unsigned SrcReg, Address &Addr,
@@ -913,7 +913,7 @@ void ARMFastISel::AddLoadStoreOperands(MVT VT, Address &Addr,
   AddOptionalDefs(MIB);
 }
 
-bool ARMFastISel::ARMEmitLoad(MVT VT, unsigned &ResultReg, Address &Addr,
+bool ARMFastISel::ARMEmitLoad(MVT VT, Register &ResultReg, Address &Addr,
                               unsigned Alignment, bool isZExt, bool allocReg) {
   unsigned Opc;
   bool useAM3 = false;
@@ -1045,7 +1045,7 @@ bool ARMFastISel::SelectLoad(const Instruction *I) {
   Address Addr;
   if (!ARMComputeAddress(I->getOperand(0), Addr)) return false;
 
-  unsigned ResultReg;
+  Register ResultReg;
   if (!ARMEmitLoad(VT, ResultReg, Addr, cast<LoadInst>(I)->getAlignment()))
     return false;
   updateValueMap(I, ResultReg);
@@ -1259,8 +1259,7 @@ bool ARMFastISel::SelectBranch(const Instruction *I) {
       if (ARMPred == ARMCC::AL) return false;
 
       // Emit the compare.
-      if (!ARMEmitCmp(CI->getOperand(0), CI->getOperand(1), CI->isUnsigned(),
-                      CI->isEquality()))
+      if (!ARMEmitCmp(CI->getOperand(0), CI->getOperand(1), CI->isUnsigned()))
         return false;
 
       unsigned BrOpc = isThumb2 ? ARM::t2Bcc : ARM::Bcc;
@@ -1349,7 +1348,7 @@ bool ARMFastISel::SelectIndirectBr(const Instruction *I) {
 }
 
 bool ARMFastISel::ARMEmitCmp(const Value *Src1Value, const Value *Src2Value,
-                             bool isZExt, bool isEquality) {
+                             bool isZExt) {
   Type *Ty = Src1Value->getType();
   EVT SrcEVT = TLI.getValueType(DL, Ty, true);
   if (!SrcEVT.isSimple()) return false;
@@ -1397,19 +1396,11 @@ bool ARMFastISel::ARMEmitCmp(const Value *Src1Value, const Value *Src2Value,
     // TODO: Verify compares.
     case MVT::f32:
       isICmp = false;
-      // Equality comparisons shouldn't raise Invalid on uordered inputs.
-      if (isEquality)
-        CmpOpc = UseImm ? ARM::VCMPZS : ARM::VCMPS;
-      else
-        CmpOpc = UseImm ? ARM::VCMPEZS : ARM::VCMPES;
+      CmpOpc = UseImm ? ARM::VCMPZS : ARM::VCMPS;
       break;
     case MVT::f64:
       isICmp = false;
-      // Equality comparisons shouldn't raise Invalid on uordered inputs.
-      if (isEquality)
-        CmpOpc = UseImm ? ARM::VCMPZD : ARM::VCMPD;
-      else
-      CmpOpc = UseImm ? ARM::VCMPEZD : ARM::VCMPED;
+      CmpOpc = UseImm ? ARM::VCMPZD : ARM::VCMPD;
       break;
     case MVT::i1:
     case MVT::i8:
@@ -1485,8 +1476,7 @@ bool ARMFastISel::SelectCmp(const Instruction *I) {
   if (ARMPred == ARMCC::AL) return false;
 
   // Emit the compare.
-  if (!ARMEmitCmp(CI->getOperand(0), CI->getOperand(1), CI->isUnsigned(),
-                  CI->isEquality()))
+  if (!ARMEmitCmp(CI->getOperand(0), CI->getOperand(1), CI->isUnsigned()))
     return false;
 
   // Now set a register based on the comparison. Explicitly set the predicates
@@ -2162,7 +2152,7 @@ bool ARMFastISel::SelectRet(const Instruction *I) {
     }
 
     // Make the copy.
-    unsigned DstReg = VA.getLocReg();
+    Register DstReg = VA.getLocReg();
     const TargetRegisterClass* SrcRC = MRI.getRegClass(SrcReg);
     // Avoid a cross-class copy. This is very unlikely.
     if (!SrcRC->contains(DstReg))
@@ -2247,8 +2237,7 @@ bool ARMFastISel::ARMEmitLibcall(const Instruction *I, RTLIB::Libcall Call) {
     if (!isTypeLegal(ArgTy, ArgVT)) return false;
 
     ISD::ArgFlagsTy Flags;
-    unsigned OriginalAlignment = DL.getABITypeAlignment(ArgTy);
-    Flags.setOrigAlign(OriginalAlignment);
+    Flags.setOrigAlign(Align(DL.getABITypeAlignment(ArgTy)));
 
     Args.push_back(Op);
     ArgRegs.push_back(Arg);
@@ -2381,8 +2370,7 @@ bool ARMFastISel::SelectCall(const Instruction *I,
     if (!Arg.isValid())
       return false;
 
-    unsigned OriginalAlignment = DL.getABITypeAlignment(ArgTy);
-    Flags.setOrigAlign(OriginalAlignment);
+    Flags.setOrigAlign(Align(DL.getABITypeAlignment(ArgTy)));
 
     Args.push_back(*i);
     ArgRegs.push_back(Arg);
@@ -2476,7 +2464,7 @@ bool ARMFastISel::ARMTryEmitSmallMemCpy(Address Dest, Address Src,
     }
 
     bool RV;
-    unsigned ResultReg;
+    Register ResultReg;
     RV = ARMEmitLoad(VT, ResultReg, Src);
     assert(RV && "Should be able to handle this load.");
     RV = ARMEmitStore(VT, ResultReg, Dest);
@@ -2506,7 +2494,7 @@ bool ARMFastISel::SelectIntrinsicCall(const IntrinsicInst &I) {
 
     const ARMBaseRegisterInfo *RegInfo =
         static_cast<const ARMBaseRegisterInfo *>(Subtarget->getRegisterInfo());
-    unsigned FramePtr = RegInfo->getFrameRegister(*(FuncInfo.MF));
+    Register FramePtr = RegInfo->getFrameRegister(*(FuncInfo.MF));
     unsigned SrcReg = FramePtr;
 
     // Recursively load frame address
@@ -2947,7 +2935,7 @@ bool ARMFastISel::tryToFoldLoadIntoMI(MachineInstr *MI, unsigned OpNo,
   Address Addr;
   if (!ARMComputeAddress(LI->getOperand(0), Addr)) return false;
 
-  unsigned ResultReg = MI->getOperand(0).getReg();
+  Register ResultReg = MI->getOperand(0).getReg();
   if (!ARMEmitLoad(VT, ResultReg, Addr, LI->getAlignment(), isZExt, false))
     return false;
   MachineBasicBlock::iterator I(MI);
@@ -2974,7 +2962,7 @@ unsigned ARMFastISel::ARMLowerPICELF(const GlobalValue *GV,
       MF->getMachineMemOperand(MachinePointerInfo::getConstantPool(*MF),
                                MachineMemOperand::MOLoad, 4, 4);
 
-  unsigned TempReg = MF->getRegInfo().createVirtualRegister(&ARM::rGPRRegClass);
+  Register TempReg = MF->getRegInfo().createVirtualRegister(&ARM::rGPRRegClass);
   unsigned Opc = isThumb2 ? ARM::t2LDRpci : ARM::LDRcp;
   MachineInstrBuilder MIB =
       BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), TempReg)

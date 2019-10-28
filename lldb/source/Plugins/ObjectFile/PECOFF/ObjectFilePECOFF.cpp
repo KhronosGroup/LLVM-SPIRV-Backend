@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ObjectFilePECOFF.h"
+#include "PECallFrameInfo.h"
 #include "WindowsMiniDump.h"
 
 #include "lldb/Core/FileSpecList.h"
@@ -133,7 +134,7 @@ ObjectFile *ObjectFilePECOFF::CreateInstance(const lldb::ModuleSP &module_sp,
       return nullptr;
   }
 
-  auto objfile_up = llvm::make_unique<ObjectFilePECOFF>(
+  auto objfile_up = std::make_unique<ObjectFilePECOFF>(
       module_sp, data_sp, data_offset, file, file_offset, length);
   if (!objfile_up || !objfile_up->ParseHeader())
     return nullptr;
@@ -150,7 +151,7 @@ ObjectFile *ObjectFilePECOFF::CreateMemoryInstance(
     const lldb::ProcessSP &process_sp, lldb::addr_t header_addr) {
   if (!data_sp || !ObjectFilePECOFF::MagicBytesMatch(data_sp))
     return nullptr;
-  auto objfile_up = llvm::make_unique<ObjectFilePECOFF>(
+  auto objfile_up = std::make_unique<ObjectFilePECOFF>(
       module_sp, data_sp, process_sp, header_addr);
   if (objfile_up.get() && objfile_up->ParseHeader()) {
     return objfile_up.release();
@@ -195,7 +196,11 @@ size_t ObjectFilePECOFF::GetModuleSpecifications(
     specs.Append(module_spec);
     break;
   case MachineArmNt:
-    spec.SetTriple("arm-pc-windows");
+    spec.SetTriple("armv7-pc-windows");
+    specs.Append(module_spec);
+    break;
+  case MachineArm64:
+    spec.SetTriple("aarch64-pc-windows");
     specs.Append(module_spec);
     break;
   default:
@@ -514,7 +519,26 @@ bool ObjectFilePECOFF::ParseCOFFOptionalHeader(lldb::offset_t *offset_ptr) {
   return success;
 }
 
+uint32_t ObjectFilePECOFF::GetRVA(const Address &addr) const {
+  return addr.GetFileAddress() - m_image_base;
+}
+
+Address ObjectFilePECOFF::GetAddress(uint32_t rva) {
+  SectionList *sect_list = GetSectionList();
+  if (!sect_list)
+    return Address(GetFileAddress(rva));
+
+  return Address(GetFileAddress(rva), sect_list);
+}
+
+lldb::addr_t ObjectFilePECOFF::GetFileAddress(uint32_t rva) const {
+  return m_image_base + rva;
+}
+
 DataExtractor ObjectFilePECOFF::ReadImageData(uint32_t offset, size_t size) {
+  if (!size)
+    return {};
+
   if (m_file) {
     // A bit of a hack, but we intend to write to this buffer, so we can't
     // mmap it.
@@ -524,7 +548,7 @@ DataExtractor ObjectFilePECOFF::ReadImageData(uint32_t offset, size_t size) {
   ProcessSP process_sp(m_process_wp.lock());
   DataExtractor data;
   if (process_sp) {
-    auto data_up = llvm::make_unique<DataBufferHeap>(size, 0);
+    auto data_up = std::make_unique<DataBufferHeap>(size, 0);
     Status readmem_error;
     size_t bytes_read =
         process_sp->ReadMemory(m_image_base + offset, data_up->GetBytes(),
@@ -535,6 +559,15 @@ DataExtractor ObjectFilePECOFF::ReadImageData(uint32_t offset, size_t size) {
     }
   }
   return data;
+}
+
+DataExtractor ObjectFilePECOFF::ReadImageDataByRVA(uint32_t rva, size_t size) {
+  if (m_file) {
+    Address addr = GetAddress(rva);
+    rva = addr.GetSection()->GetFileOffset() + addr.GetOffset();
+  }
+
+  return ReadImageData(rva, size);
 }
 
 // ParseSectionHeaders
@@ -674,14 +707,8 @@ Symtab *ObjectFilePECOFF::GetSymtab() {
         uint32_t data_start =
             m_coff_header_opt.data_dirs[coff_data_dir_export_table].vmaddr;
 
-        uint32_t address_rva = data_start;
-        if (m_file) {
-          Address address(m_coff_header_opt.image_base + data_start, sect_list);
-          address_rva =
-              address.GetSection()->GetFileOffset() + address.GetOffset();
-        }
-        DataExtractor symtab_data =
-            ReadImageData(address_rva, m_coff_header_opt.data_dirs[0].vmsize);
+        DataExtractor symtab_data = ReadImageDataByRVA(
+            data_start, m_coff_header_opt.data_dirs[0].vmsize);
         lldb::offset_t offset = 0;
 
         // Read export_table header
@@ -734,6 +761,19 @@ Symtab *ObjectFilePECOFF::GetSymtab() {
     }
   }
   return m_symtab_up.get();
+}
+
+std::unique_ptr<CallFrameInfo> ObjectFilePECOFF::CreateCallFrameInfo() {
+  if (coff_data_dir_exception_table >= m_coff_header_opt.data_dirs.size())
+    return {};
+
+  data_directory data_dir_exception =
+      m_coff_header_opt.data_dirs[coff_data_dir_exception_table];
+  if (!data_dir_exception.vmaddr)
+    return {};
+
+  return std::make_unique<PECallFrameInfo>(*this, data_dir_exception.vmaddr,
+                                           data_dir_exception.vmsize);
 }
 
 bool ObjectFilePECOFF::IsStripped() {
@@ -1200,6 +1240,7 @@ ArchSpec ObjectFilePECOFF::GetArchitecture() {
   case llvm::COFF::IMAGE_FILE_MACHINE_ARM:
   case llvm::COFF::IMAGE_FILE_MACHINE_ARMNT:
   case llvm::COFF::IMAGE_FILE_MACHINE_THUMB:
+  case llvm::COFF::IMAGE_FILE_MACHINE_ARM64:
     ArchSpec arch;
     arch.SetArchitecture(eArchTypeCOFF, machine, LLDB_INVALID_CPUTYPE,
                          IsWindowsSubsystem() ? llvm::Triple::Win32

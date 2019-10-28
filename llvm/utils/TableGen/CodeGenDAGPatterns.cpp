@@ -769,7 +769,10 @@ void TypeInfer::expandOverloads(TypeSetByHwMode::SetType &Out,
         for (MVT T : MVT::integer_valuetypes())
           if (Legal.count(T))
             Out.insert(T);
-        for (MVT T : MVT::integer_vector_valuetypes())
+        for (MVT T : MVT::integer_fixedlen_vector_valuetypes())
+          if (Legal.count(T))
+            Out.insert(T);
+        for (MVT T : MVT::integer_scalable_vector_valuetypes())
           if (Legal.count(T))
             Out.insert(T);
         return;
@@ -777,7 +780,10 @@ void TypeInfer::expandOverloads(TypeSetByHwMode::SetType &Out,
         for (MVT T : MVT::fp_valuetypes())
           if (Legal.count(T))
             Out.insert(T);
-        for (MVT T : MVT::fp_vector_valuetypes())
+        for (MVT T : MVT::fp_fixedlen_vector_valuetypes())
+          if (Legal.count(T))
+            Out.insert(T);
+        for (MVT T : MVT::fp_scalable_vector_valuetypes())
           if (Legal.count(T))
             Out.insert(T);
         return;
@@ -919,6 +925,7 @@ std::string TreePredicateFn::getPredCode() const {
 
   if (isAtomic()) {
     if (getMemoryVT() == nullptr && !isAtomicOrderingMonotonic() &&
+        getAddressSpaces() == nullptr &&
         !isAtomicOrderingAcquire() && !isAtomicOrderingRelease() &&
         !isAtomicOrderingAcquireRelease() &&
         !isAtomicOrderingSequentiallyConsistent() &&
@@ -1393,7 +1400,7 @@ std::string PatternToMatch::getPredicateCheck() const {
     if (!P.getCondString().empty())
       PredList.push_back(&P);
   }
-  llvm::sort(PredList, deref<llvm::less>());
+  llvm::sort(PredList, deref<std::less<>>());
 
   std::string Check;
   for (unsigned i = 0, e = PredList.size(); i != e; ++i) {
@@ -2790,6 +2797,7 @@ TreePatternNodePtr TreePattern::ParseTreePattern(Init *TheInit,
 
     if (Operator->isSubClassOf("SDNode") &&
         Operator->getName() != "imm" &&
+        Operator->getName() != "timm" &&
         Operator->getName() != "fpimm" &&
         Operator->getName() != "tglobaltlsaddr" &&
         Operator->getName() != "tconstpool" &&
@@ -3101,7 +3109,7 @@ void CodeGenDAGPatterns::ParsePatternFragments(bool OutFrags) {
 
     ListInit *LI = Frag->getValueAsListInit("Fragments");
     TreePattern *P =
-        (PatternFragments[Frag] = llvm::make_unique<TreePattern>(
+        (PatternFragments[Frag] = std::make_unique<TreePattern>(
              Frag, LI, !Frag->isSubClassOf("OutPatFrag"),
              *this)).get();
 

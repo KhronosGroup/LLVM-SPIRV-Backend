@@ -44,12 +44,14 @@ Clang-Tidy Checks
    bugprone-branch-clone
    bugprone-copy-constructor-init
    bugprone-dangling-handle
+   bugprone-dynamic-static-initializers
    bugprone-exception-escape
    bugprone-fold-init-type
    bugprone-forward-declaration-namespace
    bugprone-forwarding-reference-overload
    bugprone-inaccurate-erase
    bugprone-incorrect-roundings
+   bugprone-infinite-loop
    bugprone-integer-division
    bugprone-lambda-function-name
    bugprone-macro-parentheses
@@ -58,6 +60,7 @@ Clang-Tidy Checks
    bugprone-misplaced-widening-cast
    bugprone-move-forwarding-reference
    bugprone-multiple-statement-macro
+   bugprone-not-null-terminated-result
    bugprone-parent-virtual-call
    bugprone-posix-return
    bugprone-sizeof-container
@@ -192,6 +195,7 @@ Clang-Tidy Checks
    cppcoreguidelines-avoid-magic-numbers (redirects to readability-magic-numbers) <cppcoreguidelines-avoid-magic-numbers>
    cppcoreguidelines-c-copy-assignment-signature (redirects to misc-unconventional-assign-operator) <cppcoreguidelines-c-copy-assignment-signature>
    cppcoreguidelines-explicit-virtual-functions (redirects to modernize-use-override) <cppcoreguidelines-explicit-virtual-functions>
+   cppcoreguidelines-init-variables
    cppcoreguidelines-interfaces-global-init
    cppcoreguidelines-macro-usage
    cppcoreguidelines-narrowing-conversions
@@ -210,6 +214,8 @@ Clang-Tidy Checks
    cppcoreguidelines-pro-type-vararg
    cppcoreguidelines-slicing
    cppcoreguidelines-special-member-functions
+   darwin-avoid-spinlock
+   darwin-dispatch-once-nonstatic
    fuchsia-default-arguments-calls
    fuchsia-default-arguments-declarations
    fuchsia-header-anon-namespaces (redirects to google-build-namespaces) <fuchsia-header-anon-namespaces>
@@ -274,6 +280,7 @@ Clang-Tidy Checks
    llvm-include-order
    llvm-namespace-comment
    llvm-prefer-isa-or-dyn-cast-in-conditionals
+   llvm-prefer-register-over-unsigned
    llvm-twine-local
    misc-definitions-in-headers
    misc-misplaced-const
@@ -321,8 +328,8 @@ Clang-Tidy Checks
    mpi-buffer-deref
    mpi-type-mismatch
    objc-avoid-nserror-init
-   objc-avoid-spinlock
    objc-forbidden-subclassing
+   objc-missing-hash
    objc-property-declaration
    objc-super-self
    openmp-exception-escape

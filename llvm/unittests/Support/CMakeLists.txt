@@ -33,6 +33,7 @@ add_llvm_unittest(SupportTests
   FileCheckTest.cpp
   FileCollectorTest.cpp
   FileOutputBufferTest.cpp
+  FileUtilitiesTest.cpp
   FormatVariadicTest.cpp
   GlobPatternTest.cpp
   Host.cpp
@@ -57,6 +58,7 @@ add_llvm_unittest(SupportTests
   ReverseIterationTest.cpp
   ReplaceFileTest.cpp
   ScaledNumberTest.cpp
+  SignalsTest.cpp
   SourceMgrTest.cpp
   SpecialCaseListTest.cpp
   StringPool.cpp

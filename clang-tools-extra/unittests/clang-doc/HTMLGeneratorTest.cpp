@@ -9,10 +9,15 @@
 #include "ClangDocTest.h"
 #include "Generators.h"
 #include "Representation.h"
+#include "Serialize.h"
+#include "clang/Basic/Version.h"
 #include "gtest/gtest.h"
 
 namespace clang {
 namespace doc {
+
+static const std::string ClangDocVersion =
+    clang::getClangToolFullVersion("clang-doc");
 
 std::unique_ptr<Generator> getHTMLGenerator() {
   auto G = doc::findGeneratorByName("html");
@@ -22,9 +27,10 @@ std::unique_ptr<Generator> getHTMLGenerator() {
 }
 
 ClangDocContext
-getClangDocContext(std::vector<std::string> UserStylesheets = {}) {
-  ClangDocContext CDCtx;
-  CDCtx.UserStylesheets = {UserStylesheets.begin(), UserStylesheets.end()};
+getClangDocContext(std::vector<std::string> UserStylesheets = {},
+                   StringRef RepositoryUrl = "") {
+  ClangDocContext CDCtx{
+      {}, "test-project", {}, {}, {}, RepositoryUrl, UserStylesheets, {}};
   CDCtx.UserStylesheets.insert(
       CDCtx.UserStylesheets.begin(),
       "../share/clang/clang-doc-default-stylesheet.css");
@@ -38,9 +44,11 @@ TEST(HTMLGeneratorTest, emitNamespaceHTML) {
   I.Namespace.emplace_back(EmptySID, "A", InfoType::IT_namespace);
 
   I.ChildNamespaces.emplace_back(EmptySID, "ChildNamespace",
-                                 InfoType::IT_namespace);
-  I.ChildRecords.emplace_back(EmptySID, "ChildStruct", InfoType::IT_record);
+                                 InfoType::IT_namespace, "Namespace");
+  I.ChildRecords.emplace_back(EmptySID, "ChildStruct", InfoType::IT_record,
+                              "Namespace");
   I.ChildFunctions.emplace_back();
+  I.ChildFunctions.back().Access = AccessSpecifier::AS_none;
   I.ChildFunctions.back().Name = "OneFunction";
   I.ChildEnums.emplace_back();
   I.ChildEnums.back().Name = "OneEnum";
@@ -58,27 +66,76 @@ TEST(HTMLGeneratorTest, emitNamespaceHTML) {
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
 <link rel="stylesheet" href="user-provided-stylesheet.css"/>
 <script src="index.js"></script>
-<div id="index" path=""></div>
-<div>
-  <h1>namespace Namespace</h1>
-  <h2>Namespaces</h2>
-  <ul>
-    <li>ChildNamespace</li>
-  </ul>
-  <h2>Records</h2>
-  <ul>
-    <li>ChildStruct</li>
-  </ul>
-  <h2>Functions</h2>
-  <div>
-    <h3>OneFunction</h3>
-    <p>OneFunction()</p>
+<header id="project-title">test-project</header>
+<main>
+  <div id="sidebar-left" path="" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left"></div>
+  <div id="main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+    <h1>namespace Namespace</h1>
+    <h2 id="Namespaces">Namespaces</h2>
+    <ul>
+      <li>
+        <a href="Namespace/ChildNamespace.html">ChildNamespace</a>
+      </li>
+    </ul>
+    <h2 id="Records">Records</h2>
+    <ul>
+      <li>
+        <a href="Namespace/ChildStruct.html">ChildStruct</a>
+      </li>
+    </ul>
+    <h2 id="Functions">Functions</h2>
+    <div>
+      <h3 id="0000000000000000000000000000000000000000">OneFunction</h3>
+      <p>OneFunction()</p>
+    </div>
+    <h2 id="Enums">Enums</h2>
+    <div>
+      <h3 id="0000000000000000000000000000000000000000">enum OneEnum</h3>
+    </div>
   </div>
-  <h2>Enums</h2>
-  <div>
-    <h3>enum OneEnum</h3>
+  <div id="sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right">
+    <ol>
+      <li>
+        <span>
+          <a href="#Namespaces">Namespaces</a>
+        </span>
+      </li>
+      <li>
+        <span>
+          <a href="#Records">Records</a>
+        </span>
+      </li>
+      <li>
+        <span>
+          <a href="#Functions">Functions</a>
+        </span>
+        <ul>
+          <li>
+            <span>
+              <a href="#0000000000000000000000000000000000000000">OneFunction</a>
+            </span>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <span>
+          <a href="#Enums">Enums</a>
+        </span>
+        <ul>
+          <li>
+            <span>
+              <a href="#0000000000000000000000000000000000000000">OneEnum</a>
+            </span>
+          </li>
+        </ul>
+      </li>
+    </ol>
   </div>
-</div>
+</main>
+<footer>
+  <span class="no-break">)raw" +
+                         ClangDocVersion + R"raw(</span>
+</footer>
 )raw";
 
   EXPECT_EQ(Expected, Actual.str());
@@ -90,7 +147,7 @@ TEST(HTMLGeneratorTest, emitRecordHTML) {
   I.Path = "X/Y/Z";
   I.Namespace.emplace_back(EmptySID, "A", InfoType::IT_namespace);
 
-  I.DefLoc = Location(10, llvm::SmallString<16>{"test.cpp"});
+  I.DefLoc = Location(10, llvm::SmallString<16>{"dir/test.cpp"}, true);
   I.Loc.emplace_back(12, llvm::SmallString<16>{"test.cpp"});
 
   SmallString<16> PathTo;
@@ -100,7 +157,8 @@ TEST(HTMLGeneratorTest, emitRecordHTML) {
   I.Parents.emplace_back(EmptySID, "F", InfoType::IT_record, PathTo);
   I.VirtualParents.emplace_back(EmptySID, "G", InfoType::IT_record);
 
-  I.ChildRecords.emplace_back(EmptySID, "ChildStruct", InfoType::IT_record);
+  I.ChildRecords.emplace_back(EmptySID, "ChildStruct", InfoType::IT_record,
+                              "X/Y/Z/r");
   I.ChildFunctions.emplace_back();
   I.ChildFunctions.back().Name = "OneFunction";
   I.ChildEnums.emplace_back();
@@ -110,7 +168,7 @@ TEST(HTMLGeneratorTest, emitRecordHTML) {
   assert(G);
   std::string Buffer;
   llvm::raw_string_ostream Actual(Buffer);
-  ClangDocContext CDCtx = getClangDocContext();
+  ClangDocContext CDCtx = getClangDocContext({}, "http://www.repository.com");
   auto Err = G->generateDocForInfo(&I, Actual, CDCtx);
   assert(!Err);
   std::string Expected = R"raw(<!DOCTYPE html>
@@ -118,37 +176,89 @@ TEST(HTMLGeneratorTest, emitRecordHTML) {
 <title>class r</title>
 <link rel="stylesheet" href="../../../clang-doc-default-stylesheet.css"/>
 <script src="../../../index.js"></script>
-<div id="index" path="X/Y/Z"></div>
-<div>
-  <h1>class r</h1>
-  <p>Defined at line 10 of test.cpp</p>
-  <p>
-    Inherits from 
-    <a href="../../../path/to/F.html">F</a>
-    , G
-  </p>
-  <h2>Members</h2>
-  <ul>
-    <li>
-      private 
-      <a href="../int.html">int</a>
-       X
-    </li>
-  </ul>
-  <h2>Records</h2>
-  <ul>
-    <li>ChildStruct</li>
-  </ul>
-  <h2>Functions</h2>
-  <div>
-    <h3>OneFunction</h3>
-    <p>OneFunction()</p>
+<header id="project-title">test-project</header>
+<main>
+  <div id="sidebar-left" path="X/Y/Z" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left"></div>
+  <div id="main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+    <h1>class r</h1>
+    <p>
+      Defined at line 
+      <a href="http://www.repository.com/dir/test.cpp#10">10</a>
+       of file 
+      <a href="http://www.repository.com/dir/test.cpp">test.cpp</a>
+    </p>
+    <p>
+      Inherits from 
+      <a href="../../../path/to/F.html">F</a>
+      , G
+    </p>
+    <h2 id="Members">Members</h2>
+    <ul>
+      <li>
+        private 
+        <a href="../int.html">int</a>
+         X
+      </li>
+    </ul>
+    <h2 id="Records">Records</h2>
+    <ul>
+      <li>
+        <a href="r/ChildStruct.html">ChildStruct</a>
+      </li>
+    </ul>
+    <h2 id="Functions">Functions</h2>
+    <div>
+      <h3 id="0000000000000000000000000000000000000000">OneFunction</h3>
+      <p>public OneFunction()</p>
+    </div>
+    <h2 id="Enums">Enums</h2>
+    <div>
+      <h3 id="0000000000000000000000000000000000000000">enum OneEnum</h3>
+    </div>
   </div>
-  <h2>Enums</h2>
-  <div>
-    <h3>enum OneEnum</h3>
+  <div id="sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right">
+    <ol>
+      <li>
+        <span>
+          <a href="#Members">Members</a>
+        </span>
+      </li>
+      <li>
+        <span>
+          <a href="#Records">Records</a>
+        </span>
+      </li>
+      <li>
+        <span>
+          <a href="#Functions">Functions</a>
+        </span>
+        <ul>
+          <li>
+            <span>
+              <a href="#0000000000000000000000000000000000000000">OneFunction</a>
+            </span>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <span>
+          <a href="#Enums">Enums</a>
+        </span>
+        <ul>
+          <li>
+            <span>
+              <a href="#0000000000000000000000000000000000000000">OneEnum</a>
+            </span>
+          </li>
+        </ul>
+      </li>
+    </ol>
   </div>
-</div>
+</main>
+<footer>
+  <span class="no-break">)raw" +
+                         ClangDocVersion + R"raw(</span>
+</footer>
 )raw";
 
   EXPECT_EQ(Expected, Actual.str());
@@ -159,8 +269,10 @@ TEST(HTMLGeneratorTest, emitFunctionHTML) {
   I.Name = "f";
   I.Namespace.emplace_back(EmptySID, "A", InfoType::IT_namespace);
 
-  I.DefLoc = Location(10, llvm::SmallString<16>{"test.cpp"});
+  I.DefLoc = Location(10, llvm::SmallString<16>{"dir/test.cpp"}, false);
   I.Loc.emplace_back(12, llvm::SmallString<16>{"test.cpp"});
+
+  I.Access = AccessSpecifier::AS_none;
 
   SmallString<16> PathTo;
   llvm::sys::path::native("path/to", PathTo);
@@ -173,7 +285,7 @@ TEST(HTMLGeneratorTest, emitFunctionHTML) {
   assert(G);
   std::string Buffer;
   llvm::raw_string_ostream Actual(Buffer);
-  ClangDocContext CDCtx = getClangDocContext();
+  ClangDocContext CDCtx = getClangDocContext({}, "https://www.repository.com");
   auto Err = G->generateDocForInfo(&I, Actual, CDCtx);
   assert(!Err);
   std::string Expected = R"raw(<!DOCTYPE html>
@@ -181,17 +293,25 @@ TEST(HTMLGeneratorTest, emitFunctionHTML) {
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
 <script src="index.js"></script>
-<div id="index" path=""></div>
-<div>
-  <h3>f</h3>
-  <p>
-    <a href="path/to/float.html">float</a>
-     f(
-    <a href="path/to/int.html">int</a>
-     P)
-  </p>
-  <p>Defined at line 10 of test.cpp</p>
-</div>
+<header id="project-title">test-project</header>
+<main>
+  <div id="sidebar-left" path="" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left"></div>
+  <div id="main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+    <h3 id="0000000000000000000000000000000000000000">f</h3>
+    <p>
+      <a href="path/to/float.html">float</a>
+       f(
+      <a href="path/to/int.html">int</a>
+       P)
+    </p>
+    <p>Defined at line 10 of file dir/test.cpp</p>
+  </div>
+  <div id="sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right"></div>
+</main>
+<footer>
+  <span class="no-break">)raw" +
+                         ClangDocVersion + R"raw(</span>
+</footer>
 )raw";
 
   EXPECT_EQ(Expected, Actual.str());
@@ -202,7 +322,7 @@ TEST(HTMLGeneratorTest, emitEnumHTML) {
   I.Name = "e";
   I.Namespace.emplace_back(EmptySID, "A", InfoType::IT_namespace);
 
-  I.DefLoc = Location(10, llvm::SmallString<16>{"test.cpp"});
+  I.DefLoc = Location(10, llvm::SmallString<16>{"test.cpp"}, true);
   I.Loc.emplace_back(12, llvm::SmallString<16>{"test.cpp"});
 
   I.Members.emplace_back("X");
@@ -212,7 +332,7 @@ TEST(HTMLGeneratorTest, emitEnumHTML) {
   assert(G);
   std::string Buffer;
   llvm::raw_string_ostream Actual(Buffer);
-  ClangDocContext CDCtx = getClangDocContext();
+  ClangDocContext CDCtx = getClangDocContext({}, "www.repository.com");
   auto Err = G->generateDocForInfo(&I, Actual, CDCtx);
   assert(!Err);
   std::string Expected = R"raw(<!DOCTYPE html>
@@ -220,14 +340,27 @@ TEST(HTMLGeneratorTest, emitEnumHTML) {
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
 <script src="index.js"></script>
-<div id="index" path=""></div>
-<div>
-  <h3>enum class e</h3>
-  <ul>
-    <li>X</li>
-  </ul>
-  <p>Defined at line 10 of test.cpp</p>
-</div>
+<header id="project-title">test-project</header>
+<main>
+  <div id="sidebar-left" path="" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left"></div>
+  <div id="main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+    <h3 id="0000000000000000000000000000000000000000">enum class e</h3>
+    <ul>
+      <li>X</li>
+    </ul>
+    <p>
+      Defined at line 
+      <a href="https://www.repository.com/test.cpp#10">10</a>
+       of file 
+      <a href="https://www.repository.com/test.cpp">test.cpp</a>
+    </p>
+  </div>
+  <div id="sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right"></div>
+</main>
+<footer>
+  <span class="no-break">)raw" +
+                         ClangDocVersion + R"raw(</span>
+</footer>
 )raw";
 
   EXPECT_EQ(Expected, Actual.str());
@@ -240,38 +373,39 @@ TEST(HTMLGeneratorTest, emitCommentHTML) {
   I.ReturnType = TypeInfo(EmptySID, "void", InfoType::IT_default);
   I.Params.emplace_back("int", "I");
   I.Params.emplace_back("int", "J");
+  I.Access = AccessSpecifier::AS_none;
 
   CommentInfo Top;
   Top.Kind = "FullComment";
 
-  Top.Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Top.Children.emplace_back(std::make_unique<CommentInfo>());
   CommentInfo *BlankLine = Top.Children.back().get();
   BlankLine->Kind = "ParagraphComment";
-  BlankLine->Children.emplace_back(llvm::make_unique<CommentInfo>());
+  BlankLine->Children.emplace_back(std::make_unique<CommentInfo>());
   BlankLine->Children.back()->Kind = "TextComment";
 
-  Top.Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Top.Children.emplace_back(std::make_unique<CommentInfo>());
   CommentInfo *Brief = Top.Children.back().get();
   Brief->Kind = "ParagraphComment";
-  Brief->Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Brief->Children.emplace_back(std::make_unique<CommentInfo>());
   Brief->Children.back()->Kind = "TextComment";
   Brief->Children.back()->Name = "ParagraphComment";
   Brief->Children.back()->Text = " Brief description.";
 
-  Top.Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Top.Children.emplace_back(std::make_unique<CommentInfo>());
   CommentInfo *Extended = Top.Children.back().get();
   Extended->Kind = "ParagraphComment";
-  Extended->Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Extended->Children.emplace_back(std::make_unique<CommentInfo>());
   Extended->Children.back()->Kind = "TextComment";
   Extended->Children.back()->Text = " Extended description that";
-  Extended->Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Extended->Children.emplace_back(std::make_unique<CommentInfo>());
   Extended->Children.back()->Kind = "TextComment";
   Extended->Children.back()->Text = " continues onto the next line.";
 
-  Top.Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Top.Children.emplace_back(std::make_unique<CommentInfo>());
   CommentInfo *Entities = Top.Children.back().get();
   Entities->Kind = "ParagraphComment";
-  Entities->Children.emplace_back(llvm::make_unique<CommentInfo>());
+  Entities->Children.emplace_back(std::make_unique<CommentInfo>());
   Entities->Children.back()->Kind = "TextComment";
   Entities->Children.back()->Name = "ParagraphComment";
   Entities->Children.back()->Text =
@@ -291,19 +425,27 @@ TEST(HTMLGeneratorTest, emitCommentHTML) {
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
 <script src="index.js"></script>
-<div id="index" path=""></div>
-<div>
-  <h3>f</h3>
-  <p>void f(int I, int J)</p>
-  <p>Defined at line 10 of test.cpp</p>
-  <div>
+<header id="project-title">test-project</header>
+<main>
+  <div id="sidebar-left" path="" class="col-xs-6 col-sm-3 col-md-2 sidebar sidebar-offcanvas-left"></div>
+  <div id="main-content" class="col-xs-12 col-sm-9 col-md-8 main-content">
+    <h3 id="0000000000000000000000000000000000000000">f</h3>
+    <p>void f(int I, int J)</p>
+    <p>Defined at line 10 of file test.cpp</p>
     <div>
-      <p> Brief description.</p>
-      <p> Extended description that continues onto the next line.</p>
-      <p> Comment with html entities: &amp;, &lt;, &gt;, &quot;, &apos;.</p>
+      <div>
+        <p> Brief description.</p>
+        <p> Extended description that continues onto the next line.</p>
+        <p> Comment with html entities: &amp;, &lt;, &gt;, &quot;, &apos;.</p>
+      </div>
     </div>
   </div>
-</div>
+  <div id="sidebar-right" class="col-xs-6 col-sm-6 col-md-2 sidebar sidebar-offcanvas-right"></div>
+</main>
+<footer>
+  <span class="no-break">)raw" +
+                         ClangDocVersion + R"raw(</span>
+</footer>
 )raw";
 
   EXPECT_EQ(Expected, Actual.str());

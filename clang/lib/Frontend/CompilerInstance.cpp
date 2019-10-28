@@ -50,8 +50,6 @@
 #include "llvm/Support/TimeProfiler.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
-#include <sys/stat.h>
-#include <system_error>
 #include <time.h>
 #include <utility>
 
@@ -84,6 +82,16 @@ bool CompilerInstance::shouldBuildGlobalModuleIndex() const {
 
 void CompilerInstance::setDiagnostics(DiagnosticsEngine *Value) {
   Diagnostics = Value;
+}
+
+void CompilerInstance::setVerboseOutputStream(raw_ostream &Value) {
+  OwnedVerboseOutputStream.release();
+  VerboseOutputStream = &Value;
+}
+
+void CompilerInstance::setVerboseOutputStream(std::unique_ptr<raw_ostream> Value) {
+  OwnedVerboseOutputStream.swap(Value);
+  VerboseOutputStream = OwnedVerboseOutputStream.get();
 }
 
 void CompilerInstance::setTarget(TargetInfo *Value) { Target = Value; }
@@ -215,7 +223,7 @@ static void SetUpDiagnosticLog(DiagnosticOptions *DiagOpts,
   raw_ostream *OS = &llvm::errs();
   if (DiagOpts->DiagnosticLogFile != "-") {
     // Create the output stream.
-    auto FileOS = llvm::make_unique<llvm::raw_fd_ostream>(
+    auto FileOS = std::make_unique<llvm::raw_fd_ostream>(
         DiagOpts->DiagnosticLogFile, EC,
         llvm::sys::fs::OF_Append | llvm::sys::fs::OF_Text);
     if (EC) {
@@ -229,7 +237,7 @@ static void SetUpDiagnosticLog(DiagnosticOptions *DiagOpts,
   }
 
   // Chain in the diagnostic client which will log the diagnostics.
-  auto Logger = llvm::make_unique<LogDiagnosticPrinter>(*OS, DiagOpts,
+  auto Logger = std::make_unique<LogDiagnosticPrinter>(*OS, DiagOpts,
                                                         std::move(StreamOwner));
   if (CodeGenOpts)
     Logger->setDwarfDebugFlags(CodeGenOpts->DwarfDebugFlags);
@@ -510,7 +518,8 @@ IntrusiveRefCntPtr<ASTReader> CompilerInstance::createPCHExternalASTSource(
       PP, ModuleCache, &Context, PCHContainerRdr, Extensions,
       Sysroot.empty() ? "" : Sysroot.data(), DisablePCHValidation,
       AllowPCHWithCompilerErrors, /*AllowConfigurationMismatch*/ false,
-      HSOpts.ModulesValidateSystemHeaders, UseGlobalModuleIndex));
+      HSOpts.ModulesValidateSystemHeaders, HSOpts.ValidateASTInputFilesContent,
+      UseGlobalModuleIndex));
 
   // We need the external source to be set up before we read the AST, because
   // eagerly-deserialized declarations may use it.
@@ -667,7 +676,7 @@ CompilerInstance::createDefaultOutputFile(bool Binary, StringRef InFile,
 }
 
 std::unique_ptr<raw_pwrite_stream> CompilerInstance::createNullOutputFile() {
-  return llvm::make_unique<llvm::raw_null_ostream>();
+  return std::make_unique<llvm::raw_null_ostream>();
 }
 
 std::unique_ptr<raw_pwrite_stream>
@@ -793,7 +802,7 @@ std::unique_ptr<llvm::raw_pwrite_stream> CompilerInstance::createOutputFile(
   if (!Binary || OS->supportsSeeking())
     return std::move(OS);
 
-  auto B = llvm::make_unique<llvm::buffer_ostream>(*OS);
+  auto B = std::make_unique<llvm::buffer_ostream>(*OS);
   assert(!NonSeekStream);
   NonSeekStream = std::move(OS);
   return std::move(B);
@@ -831,33 +840,39 @@ bool CompilerInstance::InitializeSourceManager(
 
   // Figure out where to get and map in the main file.
   if (InputFile != "-") {
-    auto FileOrErr = FileMgr.getFile(InputFile, /*OpenFile=*/true);
+    auto FileOrErr = FileMgr.getFileRef(InputFile, /*OpenFile=*/true);
     if (!FileOrErr) {
+      // FIXME: include the error in the diagnostic.
+      consumeError(FileOrErr.takeError());
       Diags.Report(diag::err_fe_error_reading) << InputFile;
       return false;
     }
-    auto File = *FileOrErr;
+    FileEntryRef File = *FileOrErr;
 
     // The natural SourceManager infrastructure can't currently handle named
     // pipes, but we would at least like to accept them for the main
     // file. Detect them here, read them with the volatile flag so FileMgr will
     // pick up the correct size, and simply override their contents as we do for
     // STDIN.
-    if (File->isNamedPipe()) {
-      auto MB = FileMgr.getBufferForFile(File, /*isVolatile=*/true);
+    if (File.getFileEntry().isNamedPipe()) {
+      auto MB =
+          FileMgr.getBufferForFile(&File.getFileEntry(), /*isVolatile=*/true);
       if (MB) {
         // Create a new virtual file that will have the correct size.
-        File = FileMgr.getVirtualFile(InputFile, (*MB)->getBufferSize(), 0);
-        SourceMgr.overrideFileContents(File, std::move(*MB));
+        const FileEntry *FE =
+            FileMgr.getVirtualFile(InputFile, (*MB)->getBufferSize(), 0);
+        SourceMgr.overrideFileContents(FE, std::move(*MB));
+        SourceMgr.setMainFileID(
+            SourceMgr.createFileID(FE, SourceLocation(), Kind));
       } else {
         Diags.Report(diag::err_cannot_open_file) << InputFile
                                                  << MB.getError().message();
         return false;
       }
+    } else {
+      SourceMgr.setMainFileID(
+          SourceMgr.createFileID(File, SourceLocation(), Kind));
     }
-
-    SourceMgr.setMainFileID(
-        SourceMgr.createFileID(File, SourceLocation(), Kind));
   } else {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> SBOrErr =
         llvm::MemoryBuffer::getSTDIN();
@@ -886,9 +901,12 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
   assert(!getFrontendOpts().ShowHelp && "Client must handle '-help'!");
   assert(!getFrontendOpts().ShowVersion && "Client must handle '-version'!");
 
-  // FIXME: Take this as an argument, once all the APIs we used have moved to
-  // taking it as an input instead of hard-coding llvm::errs.
-  raw_ostream &OS = llvm::errs();
+  // Mark this point as the bottom of the stack if we don't have somewhere
+  // better. We generally expect frontend actions to be invoked with (nearly)
+  // DesiredStackSpace available.
+  noteBottomOfStack();
+
+  raw_ostream &OS = getVerboseOutputStream();
 
   if (!Act.PrepareToExecute(*this))
     return false;
@@ -988,7 +1006,7 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
   StringRef StatsFile = getFrontendOpts().StatsFile;
   if (!StatsFile.empty()) {
     std::error_code EC;
-    auto StatS = llvm::make_unique<llvm::raw_fd_ostream>(
+    auto StatS = std::make_unique<llvm::raw_fd_ostream>(
         StatsFile, EC, llvm::sys::fs::OF_Text);
     if (EC) {
       getDiagnostics().Report(diag::warn_fe_unable_to_open_stats_file)
@@ -1377,16 +1395,16 @@ static void writeTimestampFile(StringRef TimestampFile) {
 /// Prune the module cache of modules that haven't been accessed in
 /// a long time.
 static void pruneModuleCache(const HeaderSearchOptions &HSOpts) {
-  struct stat StatBuf;
+  llvm::sys::fs::file_status StatBuf;
   llvm::SmallString<128> TimestampFile;
   TimestampFile = HSOpts.ModuleCachePath;
   assert(!TimestampFile.empty());
   llvm::sys::path::append(TimestampFile, "modules.timestamp");
 
   // Try to stat() the timestamp file.
-  if (::stat(TimestampFile.c_str(), &StatBuf)) {
+  if (std::error_code EC = llvm::sys::fs::status(TimestampFile, StatBuf)) {
     // If the timestamp file wasn't there, create one now.
-    if (errno == ENOENT) {
+    if (EC == std::errc::no_such_file_or_directory) {
       writeTimestampFile(TimestampFile);
     }
     return;
@@ -1394,7 +1412,8 @@ static void pruneModuleCache(const HeaderSearchOptions &HSOpts) {
 
   // Check whether the time stamp is older than our pruning interval.
   // If not, do nothing.
-  time_t TimeStampModTime = StatBuf.st_mtime;
+  time_t TimeStampModTime =
+      llvm::sys::toTimeT(StatBuf.getLastModificationTime());
   time_t CurrentTime = time(nullptr);
   if (CurrentTime - TimeStampModTime <= time_t(HSOpts.ModuleCachePruneInterval))
     return;
@@ -1426,11 +1445,11 @@ static void pruneModuleCache(const HeaderSearchOptions &HSOpts) {
 
       // Look at this file. If we can't stat it, there's nothing interesting
       // there.
-      if (::stat(File->path().c_str(), &StatBuf))
+      if (llvm::sys::fs::status(File->path(), StatBuf))
         continue;
 
       // If the file has been used recently enough, leave it there.
-      time_t FileAccessTime = StatBuf.st_atime;
+      time_t FileAccessTime = llvm::sys::toTimeT(StatBuf.getLastAccessedTime());
       if (CurrentTime - FileAccessTime <=
               time_t(HSOpts.ModuleCachePruneAfter)) {
         continue;
@@ -1471,7 +1490,7 @@ void CompilerInstance::createModuleManager() {
     const PreprocessorOptions &PPOpts = getPreprocessorOpts();
     std::unique_ptr<llvm::Timer> ReadTimer;
     if (FrontendTimerGroup)
-      ReadTimer = llvm::make_unique<llvm::Timer>("reading_modules",
+      ReadTimer = std::make_unique<llvm::Timer>("reading_modules",
                                                  "Reading modules",
                                                  *FrontendTimerGroup);
     ModuleManager = new ASTReader(
@@ -1481,6 +1500,7 @@ void CompilerInstance::createModuleManager() {
         /*AllowASTWithCompilerErrors=*/false,
         /*AllowConfigurationMismatch=*/false,
         HSOpts.ModulesValidateSystemHeaders,
+        HSOpts.ValidateASTInputFilesContent,
         getFrontendOpts().UseGlobalModuleIndex, std::move(ReadTimer));
     if (hasASTConsumer()) {
       ModuleManager->setDeserializationListener(
@@ -1566,7 +1586,7 @@ bool CompilerInstance::loadModuleFile(StringRef FileName) {
                                           SourceLocation())
         <= DiagnosticsEngine::Warning;
 
-  auto Listener = llvm::make_unique<ReadModuleNames>(*this);
+  auto Listener = std::make_unique<ReadModuleNames>(*this);
   auto &ListenerRef = *Listener;
   ASTReader::ListenerScope ReadModuleNamesListener(*ModuleManager,
                                                    std::move(Listener));

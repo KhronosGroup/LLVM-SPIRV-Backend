@@ -409,7 +409,8 @@ llvm::Error dwarfgen::Generator::init(Triple TheTriple, uint16_t V) {
                                        TripleName,
                                    inconvertibleErrorCode());
 
-  MAI.reset(TheTarget->createMCAsmInfo(*MRI, TripleName));
+  MCTargetOptions MCOptions = InitMCTargetOptionsFromFlags();
+  MAI.reset(TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
   if (!MAI)
     return make_error<StringError>("no asm info for target " + TripleName,
                                    inconvertibleErrorCode());
@@ -419,7 +420,6 @@ llvm::Error dwarfgen::Generator::init(Triple TheTriple, uint16_t V) {
     return make_error<StringError>("no subtarget info for target " + TripleName,
                                    inconvertibleErrorCode());
 
-  MCTargetOptions MCOptions = InitMCTargetOptionsFromFlags();
   MAB = TheTarget->createMCAsmBackend(*MSTI, *MRI, MCOptions);
   if (!MAB)
     return make_error<StringError>("no asm backend for target " + TripleName,
@@ -446,7 +446,7 @@ llvm::Error dwarfgen::Generator::init(Triple TheTriple, uint16_t V) {
     return make_error<StringError>("no code emitter for target " + TripleName,
                                    inconvertibleErrorCode());
 
-  Stream = make_unique<raw_svector_ostream>(FileBytes);
+  Stream = std::make_unique<raw_svector_ostream>(FileBytes);
 
   MS = TheTarget->createMCObjectStreamer(
       TheTriple, *MC, std::unique_ptr<MCAsmBackend>(MAB),
@@ -469,7 +469,7 @@ llvm::Error dwarfgen::Generator::init(Triple TheTriple, uint16_t V) {
   MC->setDwarfVersion(Version);
   Asm->setDwarfVersion(Version);
 
-  StringPool = llvm::make_unique<DwarfStringPool>(Allocator, *Asm, StringRef());
+  StringPool = std::make_unique<DwarfStringPool>(Allocator, *Asm, StringRef());
   StringOffsetsStartSym = Asm->createTempSymbol("str_offsets_base");
 
   return Error::success();
@@ -541,12 +541,12 @@ bool dwarfgen::Generator::saveFile(StringRef Path) {
 
 dwarfgen::CompileUnit &dwarfgen::Generator::addCompileUnit() {
   CompileUnits.push_back(
-      make_unique<CompileUnit>(*this, Version, Asm->getPointerSize()));
+      std::make_unique<CompileUnit>(*this, Version, Asm->getPointerSize()));
   return *CompileUnits.back();
 }
 
 dwarfgen::LineTable &dwarfgen::Generator::addLineTable(DwarfFormat Format) {
   LineTables.push_back(
-      make_unique<LineTable>(Version, Format, Asm->getPointerSize()));
+      std::make_unique<LineTable>(Version, Format, Asm->getPointerSize()));
   return *LineTables.back();
 }

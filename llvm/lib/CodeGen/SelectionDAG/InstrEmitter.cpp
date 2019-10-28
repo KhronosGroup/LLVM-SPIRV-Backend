@@ -139,7 +139,7 @@ EmitCopyFromReg(SDNode *Node, unsigned ResNo, bool IsClone, bool IsCloned,
               UseRC = RC;
             else if (RC) {
               const TargetRegisterClass *ComRC =
-                TRI->getCommonSubClass(UseRC, RC, VT.SimpleTy);
+                TRI->getCommonSubClass(UseRC, RC);
               // If multiple uses expect disjoint register classes, we emit
               // copies in AddRegisterOperand.
               if (ComRC)
@@ -272,7 +272,7 @@ unsigned InstrEmitter::getVR(SDValue Op,
     // does not include operand register class info.
     const TargetRegisterClass *RC = TLI->getRegClassFor(
         Op.getSimpleValueType(), Op.getNode()->isDivergent());
-    unsigned VReg = MRI->createVirtualRegister(RC);
+    Register VReg = MRI->createVirtualRegister(RC);
     BuildMI(*MBB, InsertPos, Op.getDebugLoc(),
             TII->get(TargetOpcode::IMPLICIT_DEF), VReg);
     return VReg;
@@ -319,7 +319,7 @@ InstrEmitter::AddRegisterOperand(MachineInstrBuilder &MIB,
       if (!ConstrainedRC) {
         OpRC = TRI->getAllocatableClass(OpRC);
         assert(OpRC && "Constraints cannot be fulfilled for allocation");
-        unsigned NewVReg = MRI->createVirtualRegister(OpRC);
+        Register NewVReg = MRI->createVirtualRegister(OpRC);
         BuildMI(*MBB, InsertPos, Op.getNode()->getDebugLoc(),
                 TII->get(TargetOpcode::COPY), NewVReg).addReg(VReg);
         VReg = NewVReg;
@@ -386,7 +386,7 @@ void InstrEmitter::AddOperand(MachineInstrBuilder &MIB,
             : nullptr;
 
     if (OpRC && IIRC && OpRC != IIRC && Register::isVirtualRegister(VReg)) {
-      unsigned NewVReg = MRI->createVirtualRegister(IIRC);
+      Register NewVReg = MRI->createVirtualRegister(IIRC);
       BuildMI(*MBB, InsertPos, Op.getNode()->getDebugLoc(),
                TII->get(TargetOpcode::COPY), NewVReg).addReg(VReg);
       VReg = NewVReg;
@@ -464,7 +464,7 @@ unsigned InstrEmitter::ConstrainForSubReg(unsigned VReg, unsigned SubIdx,
   // register instead.
   RC = TRI->getSubClassWithSubReg(TLI->getRegClassFor(VT, isDivergent), SubIdx);
   assert(RC && "No legal register class for VT supports that SubIdx");
-  unsigned NewReg = MRI->createVirtualRegister(RC);
+  Register NewReg = MRI->createVirtualRegister(RC);
   BuildMI(*MBB, InsertPos, DL, TII->get(TargetOpcode::COPY), NewReg)
     .addReg(VReg);
   return NewReg;
@@ -613,7 +613,7 @@ InstrEmitter::EmitCopyToRegClassNode(SDNode *Node,
   unsigned DstRCIdx = cast<ConstantSDNode>(Node->getOperand(1))->getZExtValue();
   const TargetRegisterClass *DstRC =
     TRI->getAllocatableClass(TRI->getRegClass(DstRCIdx));
-  unsigned NewVReg = MRI->createVirtualRegister(DstRC);
+  Register NewVReg = MRI->createVirtualRegister(DstRC);
   BuildMI(*MBB, InsertPos, Node->getDebugLoc(), TII->get(TargetOpcode::COPY),
     NewVReg).addReg(VReg);
 
@@ -630,7 +630,7 @@ void InstrEmitter::EmitRegSequence(SDNode *Node,
                                   bool IsClone, bool IsCloned) {
   unsigned DstRCIdx = cast<ConstantSDNode>(Node->getOperand(0))->getZExtValue();
   const TargetRegisterClass *RC = TRI->getRegClass(DstRCIdx);
-  unsigned NewVReg = MRI->createVirtualRegister(TRI->getAllocatableClass(RC));
+  Register NewVReg = MRI->createVirtualRegister(TRI->getAllocatableClass(RC));
   const MCInstrDesc &II = TII->get(TargetOpcode::REG_SEQUENCE);
   MachineInstrBuilder MIB = BuildMI(*MF, Node->getDebugLoc(), II, NewVReg);
   unsigned NumOps = Node->getNumOperands();
@@ -677,7 +677,7 @@ MachineInstr *
 InstrEmitter::EmitDbgValue(SDDbgValue *SD,
                            DenseMap<SDValue, unsigned> &VRBaseMap) {
   MDNode *Var = SD->getVariable();
-  MDNode *Expr = SD->getExpression();
+  const DIExpression *Expr = SD->getExpression();
   DebugLoc DL = SD->getDebugLoc();
   assert(cast<DILocalVariable>(Var)->isValidLocationForIntrinsic(DL) &&
          "Expected inlined-at fields to agree");
@@ -701,12 +701,11 @@ InstrEmitter::EmitDbgValue(SDDbgValue *SD,
     // EmitTargetCodeForFrameDebugValue is responsible for allocation.
     auto FrameMI = BuildMI(*MF, DL, TII->get(TargetOpcode::DBG_VALUE))
                        .addFrameIndex(SD->getFrameIx());
+
     if (SD->isIndirect())
-      // Push [fi + 0] onto the DIExpression stack.
-      FrameMI.addImm(0);
-    else
-      // Push fi onto the DIExpression stack.
-      FrameMI.addReg(0);
+      Expr = DIExpression::append(Expr, {dwarf::DW_OP_deref});
+
+    FrameMI.addReg(0);
     return FrameMI.addMetadata(Var).addMetadata(Expr);
   }
   // Otherwise, we're going to create an instruction here.
@@ -752,9 +751,9 @@ InstrEmitter::EmitDbgValue(SDDbgValue *SD,
 
   // Indirect addressing is indicated by an Imm as the second parameter.
   if (SD->isIndirect())
-    MIB.addImm(0U);
-  else
-    MIB.addReg(0U, RegState::Debug);
+    Expr = DIExpression::append(Expr, {dwarf::DW_OP_deref});
+
+  MIB.addReg(0U, RegState::Debug);
 
   MIB.addMetadata(Var);
   MIB.addMetadata(Expr);

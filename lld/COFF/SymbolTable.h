@@ -29,7 +29,7 @@ class Defined;
 class DefinedAbsolute;
 class DefinedRegular;
 class DefinedRelative;
-class Lazy;
+class LazyArchive;
 class SectionChunk;
 class Symbol;
 
@@ -86,11 +86,12 @@ public:
   Symbol *addAbsolute(StringRef n, uint64_t va);
 
   Symbol *addUndefined(StringRef name, InputFile *f, bool isWeakAlias);
-  void addLazy(ArchiveFile *f, const Archive::Symbol &sym);
+  void addLazyArchive(ArchiveFile *f, const Archive::Symbol &sym);
+  void addLazyObject(LazyObjFile *f, StringRef n);
   Symbol *addAbsolute(StringRef n, COFFSymbolRef s);
   Symbol *addRegular(InputFile *f, StringRef n,
                      const llvm::object::coff_symbol_generic *s = nullptr,
-                     SectionChunk *c = nullptr);
+                     SectionChunk *c = nullptr, uint32_t sectionOffset = 0);
   std::pair<DefinedRegular *, bool>
   addComdat(InputFile *f, StringRef n,
             const llvm::object::coff_symbol_generic *s = nullptr);
@@ -100,8 +101,11 @@ public:
   Symbol *addImportData(StringRef n, ImportFile *f);
   Symbol *addImportThunk(StringRef name, DefinedImportData *s,
                          uint16_t machine);
+  void addLibcall(StringRef name);
 
-  void reportDuplicate(Symbol *existing, InputFile *newFile);
+  void reportDuplicate(Symbol *existing, InputFile *newFile,
+                       SectionChunk *newSc = nullptr,
+                       uint32_t newSectionOffset = 0);
 
   // A list of chunks which to be added to .rdata.
   std::vector<Chunk *> localImportChunks;

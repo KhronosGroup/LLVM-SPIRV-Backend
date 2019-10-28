@@ -333,6 +333,8 @@ bool MachineOperand::isIdenticalTo(const MachineOperand &Other) const {
     return getIntrinsicID() == Other.getIntrinsicID();
   case MachineOperand::MO_Predicate:
     return getPredicate() == Other.getPredicate();
+  case MachineOperand::MO_ShuffleMask:
+    return getShuffleMask() == Other.getShuffleMask();
   }
   llvm_unreachable("Invalid machine operand type");
 }
@@ -381,6 +383,8 @@ hash_code llvm::hash_value(const MachineOperand &MO) {
     return hash_combine(MO.getType(), MO.getTargetFlags(), MO.getIntrinsicID());
   case MachineOperand::MO_Predicate:
     return hash_combine(MO.getType(), MO.getTargetFlags(), MO.getPredicate());
+  case MachineOperand::MO_ShuffleMask:
+    return hash_combine(MO.getType(), MO.getTargetFlags(), MO.getShuffleMask());
   }
   llvm_unreachable("Invalid machine operand type");
 }
@@ -425,12 +429,10 @@ static void printCFIRegister(unsigned DwarfReg, raw_ostream &OS,
     return;
   }
 
-  int Reg = TRI->getLLVMRegNum(DwarfReg, true);
-  if (Reg == -1) {
+  if (Optional<unsigned> Reg = TRI->getLLVMRegNum(DwarfReg, true))
+    OS << printReg(*Reg, TRI);
+  else
     OS << "<badreg>";
-    return;
-  }
-  OS << printReg(Reg, TRI);
 }
 
 static void printIRBlockReference(raw_ostream &OS, const BasicBlock &BB,
@@ -746,7 +748,7 @@ void MachineOperand::print(raw_ostream &OS, ModuleSlotTracker &MST,
   printTargetFlags(OS, *this);
   switch (getType()) {
   case MachineOperand::MO_Register: {
-    unsigned Reg = getReg();
+    Register Reg = getReg();
     if (isImplicit())
       OS << (isDef() ? "implicit-def " : "implicit ");
     else if (PrintDef && isDef())
@@ -936,6 +938,20 @@ void MachineOperand::print(raw_ostream &OS, ModuleSlotTracker &MST,
        << CmpInst::getPredicateName(Pred) << ')';
     break;
   }
+  case MachineOperand::MO_ShuffleMask:
+    OS << "shufflemask(";
+    const Constant* C = getShuffleMask();
+    const int NumElts = C->getType()->getVectorNumElements();
+
+    StringRef Separator;
+    for (int I = 0; I != NumElts; ++I) {
+      OS << Separator;
+      C->getAggregateElement(I)->printAsOperand(OS, false, MST);
+      Separator = ", ";
+    }
+
+    OS << ')';
+    break;
   }
 }
 
@@ -963,7 +979,8 @@ bool MachinePointerInfo::isDereferenceable(unsigned Size, LLVMContext &C,
     return false;
 
   return isDereferenceableAndAlignedPointer(
-      BasePtr, 1, APInt(DL.getPointerSizeInBits(), Offset + Size), DL);
+      BasePtr, Align::None(), APInt(DL.getPointerSizeInBits(), Offset + Size),
+      DL);
 }
 
 /// getConstantPool - Return a MachinePointerInfo record that refers to the
@@ -1047,17 +1064,6 @@ void MachineMemOperand::refineAlignment(const MachineMemOperand *MMO) {
 /// actual memory reference.
 uint64_t MachineMemOperand::getAlignment() const {
   return MinAlign(getBaseAlignment(), getOffset());
-}
-
-void MachineMemOperand::print(raw_ostream &OS) const {
-  ModuleSlotTracker DummyMST(nullptr);
-  print(OS, DummyMST);
-}
-
-void MachineMemOperand::print(raw_ostream &OS, ModuleSlotTracker &MST) const {
-  SmallVector<StringRef, 0> SSNs;
-  LLVMContext Ctx;
-  print(OS, MST, SSNs, Ctx, nullptr, nullptr);
 }
 
 void MachineMemOperand::print(raw_ostream &OS, ModuleSlotTracker &MST,

@@ -69,6 +69,25 @@ CachedFileSystemEntry CachedFileSystemEntry::createFileEntry(
   // Now make the null terminator implicit again, so that Clang's lexer can find
   // it right where the buffer ends.
   Result.Contents.pop_back();
+
+  // Compute the skipped PP ranges that speedup skipping over inactive
+  // preprocessor blocks.
+  llvm::SmallVector<minimize_source_to_dependency_directives::SkippedRange, 32>
+      SkippedRanges;
+  minimize_source_to_dependency_directives::computeSkippedRanges(Tokens,
+                                                                 SkippedRanges);
+  PreprocessorSkippedRangeMapping Mapping;
+  for (const auto &Range : SkippedRanges) {
+    if (Range.Length < 16) {
+      // Ignore small ranges as non-profitable.
+      // FIXME: This is a heuristic, its worth investigating the tradeoffs
+      // when it should be applied.
+      continue;
+    }
+    Mapping[Range.Offset] = Range.Length;
+  }
+  Result.PPSkippedRangeMapping = std::move(Mapping);
+
   return Result;
 }
 
@@ -88,7 +107,7 @@ DependencyScanningFilesystemSharedCache::
   // FIXME: A better heuristic might also consider the OS to account for
   // the different cost of lock contention on different OSes.
   NumShards = std::max(2u, llvm::hardware_concurrency() / 4);
-  CacheShards = llvm::make_unique<CacheShard[]>(NumShards);
+  CacheShards = std::make_unique<CacheShard[]>(NumShards);
 }
 
 /// Returns a cache entry for the corresponding key.
@@ -103,14 +122,12 @@ DependencyScanningFilesystemSharedCache::get(StringRef Key) {
   return It.first->getValue();
 }
 
-llvm::ErrorOr<llvm::vfs::Status>
-DependencyScanningWorkerFilesystem::status(const Twine &Path) {
-  SmallString<256> OwnedFilename;
-  StringRef Filename = Path.toStringRef(OwnedFilename);
-
-  // Check the local cache first.
-  if (const CachedFileSystemEntry *Entry = getCachedEntry(Filename))
-    return Entry->getStatus();
+llvm::ErrorOr<const CachedFileSystemEntry *>
+DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
+    const StringRef Filename) {
+  if (const CachedFileSystemEntry *Entry = getCachedEntry(Filename)) {
+    return Entry;
+  }
 
   // FIXME: Handle PCM/PCH files.
   // FIXME: Handle module map files.
@@ -141,7 +158,18 @@ DependencyScanningWorkerFilesystem::status(const Twine &Path) {
 
   // Store the result in the local cache.
   setCachedEntry(Filename, Result);
-  return Result->getStatus();
+  return Result;
+}
+
+llvm::ErrorOr<llvm::vfs::Status>
+DependencyScanningWorkerFilesystem::status(const Twine &Path) {
+  SmallString<256> OwnedFilename;
+  StringRef Filename = Path.toStringRef(OwnedFilename);
+  const llvm::ErrorOr<const CachedFileSystemEntry *> Result =
+      getOrCreateFileSystemEntry(Filename);
+  if (!Result)
+    return Result.getError();
+  return (*Result)->getStatus();
 }
 
 namespace {
@@ -172,14 +200,23 @@ private:
 };
 
 llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
-createFile(const CachedFileSystemEntry *Entry) {
+createFile(const CachedFileSystemEntry *Entry,
+           ExcludedPreprocessorDirectiveSkipMapping *PPSkipMappings) {
+  if (Entry->isDirectory())
+    return llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>(
+        std::make_error_code(std::errc::is_a_directory));
   llvm::ErrorOr<StringRef> Contents = Entry->getContents();
   if (!Contents)
     return Contents.getError();
-  return llvm::make_unique<MinimizedVFSFile>(
+  auto Result = std::make_unique<MinimizedVFSFile>(
       llvm::MemoryBuffer::getMemBuffer(*Contents, Entry->getName(),
                                        /*RequiresNullTerminator=*/false),
       *Entry->getStatus());
+  if (!Entry->getPPSkippedRangeMapping().empty() && PPSkipMappings)
+    (*PPSkipMappings)[Result->getBufferPtr()] =
+        &Entry->getPPSkippedRangeMapping();
+  return llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>(
+      std::unique_ptr<llvm::vfs::File>(std::move(Result)));
 }
 
 } // end anonymous namespace
@@ -189,30 +226,9 @@ DependencyScanningWorkerFilesystem::openFileForRead(const Twine &Path) {
   SmallString<256> OwnedFilename;
   StringRef Filename = Path.toStringRef(OwnedFilename);
 
-  // Check the local cache first.
-  if (const CachedFileSystemEntry *Entry = getCachedEntry(Filename))
-    return createFile(Entry);
-
-  // FIXME: Handle PCM/PCH files.
-  // FIXME: Handle module map files.
-
-  bool KeepOriginalSource = IgnoredFiles.count(Filename);
-  DependencyScanningFilesystemSharedCache::SharedFileSystemEntry
-      &SharedCacheEntry = SharedCache.get(Filename);
-  const CachedFileSystemEntry *Result;
-  {
-    std::unique_lock<std::mutex> LockGuard(SharedCacheEntry.ValueLock);
-    CachedFileSystemEntry &CacheEntry = SharedCacheEntry.Value;
-
-    if (!CacheEntry.isValid()) {
-      CacheEntry = CachedFileSystemEntry::createFileEntry(
-          Filename, getUnderlyingFS(), !KeepOriginalSource);
-    }
-
-    Result = &CacheEntry;
-  }
-
-  // Store the result in the local cache.
-  setCachedEntry(Filename, Result);
-  return createFile(Result);
+  const llvm::ErrorOr<const CachedFileSystemEntry *> Result =
+      getOrCreateFileSystemEntry(Filename);
+  if (!Result)
+    return Result.getError();
+  return createFile(Result.get(), PPSkipMappings);
 }

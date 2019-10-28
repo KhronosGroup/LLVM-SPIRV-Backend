@@ -629,7 +629,7 @@ public:
   }
 
   std::unique_ptr<CorrectionCandidateCallback> clone() override {
-    return llvm::make_unique<RecordMemberExprValidatorCCC>(*this);
+    return std::make_unique<RecordMemberExprValidatorCCC>(*this);
   }
 
 private:
@@ -1006,7 +1006,7 @@ Sema::BuildMemberReferenceExpr(Expr *BaseExpr, QualType BaseExprType,
     // Rederive where we looked up.
     DeclContext *DC = (SS.isSet()
                        ? computeDeclContext(SS, false)
-                       : BaseType->getAs<RecordType>()->getDecl());
+                       : BaseType->castAs<RecordType>()->getDecl());
 
     if (ExtraArgs) {
       ExprResult RetryExpr;

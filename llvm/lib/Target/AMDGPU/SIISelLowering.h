@@ -186,6 +186,7 @@ private:
 
   unsigned isCFIntrinsic(const SDNode *Intr) const;
 
+public:
   /// \returns True if fixup needs to be emitted for given global value \p GV,
   /// false otherwise.
   bool shouldEmitFixup(const GlobalValue *GV) const;
@@ -198,11 +199,14 @@ private:
   /// global value \p GV, false otherwise.
   bool shouldEmitPCReloc(const GlobalValue *GV) const;
 
+private:
   // Analyze a combined offset from an amdgcn_buffer_ intrinsic and store the
   // three offsets (voffset, soffset and instoffset) into the SDValue[3] array
   // pointed to by Offsets.
-  void setBufferOffsets(SDValue CombinedOffset, SelectionDAG &DAG,
-                        SDValue *Offsets, unsigned Align = 4) const;
+  /// \returns 0 If there is a non-constant offset or if the offset is 0.
+  /// Otherwise returns the constant offset.
+  unsigned setBufferOffsets(SDValue CombinedOffset, SelectionDAG &DAG,
+                           SDValue *Offsets, unsigned Align = 4) const;
 
   // Handle 8 bit and 16 bit buffer loads
   SDValue handleByteShortBufferLoads(SelectionDAG &DAG, EVT LoadVT, SDLoc DL,
@@ -237,6 +241,11 @@ public:
 
   bool canMergeStoresTo(unsigned AS, EVT MemVT,
                         const SelectionDAG &DAG) const override;
+
+  bool allowsMisalignedMemoryAccessesImpl(
+      unsigned Size, unsigned AS, unsigned Align,
+      MachineMemOperand::Flags Flags = MachineMemOperand::MONone,
+      bool *IsFast = nullptr) const;
 
   bool allowsMisalignedMemoryAccesses(
       EVT VT, unsigned AS, unsigned Align,
@@ -312,8 +321,8 @@ public:
   SDValue LowerCall(CallLoweringInfo &CLI,
                     SmallVectorImpl<SDValue> &InVals) const override;
 
-  unsigned getRegisterByName(const char* RegName, EVT VT,
-                             SelectionDAG &DAG) const override;
+  Register getRegisterByName(const char* RegName, EVT VT,
+                             const MachineFunction &MF) const override;
 
   MachineBasicBlock *splitKillBlock(MachineInstr &MI,
                                     MachineBasicBlock *BB) const;
@@ -379,8 +388,11 @@ public:
                                     unsigned Depth = 0) const override;
   AtomicExpansionKind shouldExpandAtomicRMWInIR(AtomicRMWInst *) const override;
 
-  unsigned getPrefLoopAlignment(MachineLoop *ML) const override;
-
+  virtual const TargetRegisterClass *
+  getRegClassFor(MVT VT, bool isDivergent) const override;
+  virtual bool requiresUniformRegister(MachineFunction &MF,
+                                       const Value *V) const override;
+  Align getPrefLoopAlignment(MachineLoop *ML) const override;
 
   void allocateHSAUserSGPRs(CCState &CCInfo,
                             MachineFunction &MF,

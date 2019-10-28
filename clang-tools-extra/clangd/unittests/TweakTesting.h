@@ -25,8 +25,8 @@ namespace clangd {
 //   Header = R"cpp(
 //     namespace foo { template<typename> class X{}; }
 //     using namespace foo;
-//   cpp)";
-//   Context = Block;
+//   )cpp";
+//   Context = Function;
 //   EXPECT_THAT(apply("[[auto]] X = foo<int>();"),
 //               "foo<int> X = foo<int();");
 //   EXPECT_AVAILABLE("^a^u^t^o^ X = foo<int>();");
@@ -54,6 +54,9 @@ protected:
   // This typically contains declarations that will be used for a set of related
   // testcases.
   std::string Header;
+
+  // Extra flags passed to the compilation in apply().
+  std::vector<const char *> ExtraArgs;
 
   // Context in which snippets of code should be placed to run tweaks.
   CodeContext Context = File;

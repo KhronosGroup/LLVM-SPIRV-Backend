@@ -340,14 +340,14 @@ void *ArgvArray::reset(LLVMContext &C, ExecutionEngine *EE,
   Values.clear();  // Free the old contents.
   Values.reserve(InputArgv.size());
   unsigned PtrSize = EE->getDataLayout().getPointerSize();
-  Array = make_unique<char[]>((InputArgv.size()+1)*PtrSize);
+  Array = std::make_unique<char[]>((InputArgv.size()+1)*PtrSize);
 
   LLVM_DEBUG(dbgs() << "JIT: ARGV = " << (void *)Array.get() << "\n");
   Type *SBytePtr = Type::getInt8PtrTy(C);
 
   for (unsigned i = 0; i != InputArgv.size(); ++i) {
     unsigned Size = InputArgv[i].size()+1;
-    auto Dest = make_unique<char[]>(Size);
+    auto Dest = std::make_unique<char[]>(Size);
     LLVM_DEBUG(dbgs() << "JIT: ARGV[" << i << "] = " << (void *)Dest.get()
                       << "\n");
 
@@ -626,7 +626,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
       break;
     case Type::VectorTyID:
       // if the whole vector is 'undef' just reserve memory for the value.
-      auto* VTy = dyn_cast<VectorType>(C->getType());
+      auto* VTy = cast<VectorType>(C->getType());
       Type *ElemTy = VTy->getElementType();
       unsigned int elemNum = VTy->getNumElements();
       Result.AggregateVal.resize(elemNum);
@@ -925,7 +925,7 @@ GenericValue ExecutionEngine::getConstantValue(const Constant *C) {
         elemNum = CDV->getNumElements();
         ElemTy = CDV->getElementType();
     } else if (CV || CAZ) {
-        VectorType* VTy = dyn_cast<VectorType>(C->getType());
+        auto* VTy = cast<VectorType>(C->getType());
         elemNum = VTy->getNumElements();
         ElemTy = VTy->getElementType();
     } else {

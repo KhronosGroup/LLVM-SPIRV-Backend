@@ -91,7 +91,7 @@ namespace {
 
         LLVM_DEBUG(dbgs() << "Scanning after load immediate: "; BBI->dump(););
 
-        unsigned Reg = BBI->getOperand(0).getReg();
+        Register Reg = BBI->getOperand(0).getReg();
         int64_t Imm = BBI->getOperand(1).getImm();
         MachineOperand *DeadOrKillToUnset = nullptr;
         if (BBI->getOperand(0).isDead()) {
@@ -117,8 +117,6 @@ namespace {
 
           if (!AfterBBI->modifiesRegister(Reg, TRI))
             continue;
-          assert(DeadOrKillToUnset &&
-                 "Shouldn't overwrite a register before it is killed");
           // Finish scanning because Reg is overwritten by a non-load
           // instruction.
           if (AfterBBI->getOpcode() != Opc)
@@ -134,12 +132,15 @@ namespace {
           // It loads same immediate value to the same Reg, which is redundant.
           // We would unset kill flag in previous Reg usage to extend live range
           // of Reg first, then remove the redundancy.
-          LLVM_DEBUG(dbgs() << " Unset dead/kill flag of " << *DeadOrKillToUnset
-                            << " from " << *DeadOrKillToUnset->getParent());
-          if (DeadOrKillToUnset->isDef())
-            DeadOrKillToUnset->setIsDead(false);
-          else
-            DeadOrKillToUnset->setIsKill(false);
+          if (DeadOrKillToUnset) {
+            LLVM_DEBUG(dbgs()
+                       << " Unset dead/kill flag of " << *DeadOrKillToUnset
+                       << " from " << *DeadOrKillToUnset->getParent());
+            if (DeadOrKillToUnset->isDef())
+              DeadOrKillToUnset->setIsDead(false);
+            else
+              DeadOrKillToUnset->setIsKill(false);
+          }
           DeadOrKillToUnset =
               AfterBBI->findRegisterDefOperand(Reg, true, true, TRI);
           if (DeadOrKillToUnset)
@@ -214,7 +215,7 @@ namespace {
         if (Br->getOpcode() != PPC::BC && Br->getOpcode() != PPC::BCn)
           continue;
         MachineInstr *CRSetMI = nullptr;
-        unsigned CRBit = Br->getOperand(0).getReg();
+        Register CRBit = Br->getOperand(0).getReg();
         unsigned CRReg = getCRFromCRBit(CRBit);
         bool SeenUse = false;
         MachineBasicBlock::reverse_iterator It = Br, Er = MBB.rend();

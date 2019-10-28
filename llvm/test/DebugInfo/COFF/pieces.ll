@@ -43,7 +43,6 @@
 ; ASM: [[oy_ox_start:\.Ltmp[0-9]+]]:
 ; ASM:         .p2align        4, 0x90
 ; ASM: .LBB0_3:                                # %for.body
-; ASM:        #DEBUG_VALUE: loop_csr:o <- [DW_OP_LLVM_fragment 0 32] 0
 ; ASM:        #DEBUG_VALUE: loop_csr:o <- [DW_OP_LLVM_fragment 0 32] $edi
 ; ASM:        #DEBUG_VALUE: loop_csr:o <- [DW_OP_LLVM_fragment 32 32] $esi
 ; ASM:        .cv_loc 0 1 13 11               # t.c:13:11
@@ -88,7 +87,7 @@
 
 
 ; ASM-LABEL: nested: # @nested
-; ASM:         #DEBUG_VALUE: nested:o <- [DW_OP_deref] [$rcx+0]
+; ASM:         #DEBUG_VALUE: nested:o <- [DW_OP_deref] $rcx
 ; ASM:         movl    12(%rcx), %eax
 ; ASM: [[p_start:\.Ltmp[0-9]+]]:
 ; ASM:         #DEBUG_VALUE: nested:p <- [DW_OP_LLVM_fragment 32 32] $eax
@@ -203,7 +202,7 @@
 ; OBJ:         DisplayName: nested
 ; OBJ:       }
 ; OBJ:       LocalSym {
-; OBJ:         Type: Nested&
+; OBJ:         Type: Nested
 ; OBJ:         VarName: o
 ; OBJ:       }
 ; OBJ:       DefRangeRegisterRelSym {
@@ -436,7 +435,7 @@ attributes #5 = { nounwind }
 !70 = !{!71, !72}
 !71 = !DILocalVariable(name: "o", arg: 1, scope: !61, file: !1, line: 27, type: !64)
 !72 = !DILocalVariable(name: "p", scope: !61, file: !1, line: 28, type: !53)
-!73 = !DIExpression(DW_OP_deref)
+!73 = !DIExpression()
 !74 = !DILocation(line: 27, column: 26, scope: !61)
 !75 = !DILocation(line: 28, column: 18, scope: !61)
 !76 = !DILocation(line: 28, column: 22, scope: !61)

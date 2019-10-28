@@ -71,6 +71,11 @@ and from the command line.
  The :option:`--strict-whitespace` argument disables this behavior. End-of-line
  sequences are canonicalized to UNIX-style ``\n`` in all modes.
 
+.. option:: --ignore-case
+
+  By default, FileCheck uses case-sensitive matching. This option causes
+  FileCheck to use case-insensitive matching.
+
 .. option:: --implicit-check-not check-pattern
 
   Adds implicit negative checks for the specified patterns between positive
@@ -648,7 +653,7 @@ The ``--enable-var-scope`` option has the same effect on numeric variables as
 on string variables.
 
 Important note: In its current implementation, an expression cannot use a
-numeric variable with a non-empty expression defined on the same line.
+numeric variable defined earlier in the same CHECK directive.
 
 FileCheck Pseudo Numeric Variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

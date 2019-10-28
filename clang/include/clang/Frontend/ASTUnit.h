@@ -315,7 +315,7 @@ public:
 
   CodeCompletionTUInfo &getCodeCompletionTUInfo() {
     if (!CCTUInfo)
-      CCTUInfo = llvm::make_unique<CodeCompletionTUInfo>(
+      CCTUInfo = std::make_unique<CodeCompletionTUInfo>(
           std::make_shared<GlobalCodeCompletionAllocator>());
     return *CCTUInfo;
   }
@@ -832,6 +832,7 @@ public:
           SkipFunctionBodiesScope::None,
       bool SingleFileParse = false, bool UserFilesAreVolatile = false,
       bool ForSerialization = false,
+      bool RetainExcludedConditionalBlocks = false,
       llvm::Optional<StringRef> ModuleFormat = llvm::None,
       std::unique_ptr<ASTUnit> *ErrAST = nullptr,
       IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS = nullptr);

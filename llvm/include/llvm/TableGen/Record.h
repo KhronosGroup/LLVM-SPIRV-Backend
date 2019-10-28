@@ -1330,6 +1330,7 @@ public:
   void Profile(FoldingSetNodeID &ID) const;
 
   Init *getOperator() const { return Val; }
+  Record *getOperatorAsDef(ArrayRef<SMLoc> Loc) const;
 
   StringInit *getName() const { return ValName; }
 
@@ -1687,10 +1688,10 @@ raw_ostream &operator<<(raw_ostream &OS, const Record &R);
 
 class RecordKeeper {
   friend class RecordRecTy;
-  using RecordMap = std::map<std::string, std::unique_ptr<Record>>;
+  using RecordMap = std::map<std::string, std::unique_ptr<Record>, std::less<>>;
   RecordMap Classes, Defs;
   FoldingSet<RecordRecTy> RecordTypePool;
-  std::map<std::string, Init *> ExtraGlobals;
+  std::map<std::string, Init *, std::less<>> ExtraGlobals;
   unsigned AnonCounter = 0;
 
 public:

@@ -34,6 +34,11 @@ static bool runImpl(Function &F, const SimplifyQuery &SQ,
 
   do {
     for (BasicBlock &BB : F) {
+      // Unreachable code can take on strange forms that we are not prepared to
+      // handle. For example, an instruction may have itself as an operand.
+      if (!SQ.DT->isReachableFromEntry(&BB))
+        continue;
+
       SmallVector<Instruction *, 8> DeadInstsInBB;
       for (Instruction &I : BB) {
         // The first time through the loop, ToSimplify is empty and we try to
@@ -45,6 +50,7 @@ static bool runImpl(Function &F, const SimplifyQuery &SQ,
         // Don't waste time simplifying dead/unused instructions.
         if (isInstructionTriviallyDead(&I)) {
           DeadInstsInBB.push_back(&I);
+          Changed = true;
         } else if (!I.use_empty()) {
           if (Value *V = SimplifyInstruction(&I, SQ, ORE)) {
             // Mark all uses for resimplification next time round the loop.
@@ -86,7 +92,7 @@ struct InstSimplifyLegacyPass : public FunctionPass {
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
   }
 
-  /// runOnFunction - Remove instructions that simplify.
+  /// Remove instructions that simplify.
   bool runOnFunction(Function &F) override {
     if (skipFunction(F))
       return false;
@@ -94,7 +100,7 @@ struct InstSimplifyLegacyPass : public FunctionPass {
     const DominatorTree *DT =
         &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     const TargetLibraryInfo *TLI =
-        &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+        &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
     AssumptionCache *AC =
         &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F);
     OptimizationRemarkEmitter *ORE =

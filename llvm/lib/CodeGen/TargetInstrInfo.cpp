@@ -143,7 +143,7 @@ TargetInstrInfo::ReplaceTailWithBranchTo(MachineBasicBlock::iterator Tail,
   while (Tail != MBB->end()) {
     auto MI = Tail++;
     if (MI->isCall())
-      MBB->getParent()->updateCallSiteInfo(&*MI);
+      MBB->getParent()->eraseCallSiteInfo(&*MI);
     MBB->erase(MI);
   }
 
@@ -282,7 +282,7 @@ bool TargetInstrInfo::fixCommutedOpIndices(unsigned &ResultIdx1,
   return true;
 }
 
-bool TargetInstrInfo::findCommutedOpIndices(MachineInstr &MI,
+bool TargetInstrInfo::findCommutedOpIndices(const MachineInstr &MI,
                                             unsigned &SrcOpIdx1,
                                             unsigned &SrcOpIdx2) const {
   assert(!MI.isBundle() &&
@@ -394,7 +394,7 @@ bool TargetInstrInfo::getStackSlotRange(const TargetRegisterClass *RC,
   if (BitOffset < 0 || BitOffset % 8)
     return false;
 
-  Size = BitSize /= 8;
+  Size = BitSize / 8;
   Offset = (unsigned)BitOffset / 8;
 
   assert(TRI->getSpillSize(*RC) >= (Offset + Size) && "bad subregister range");
@@ -443,8 +443,8 @@ static const TargetRegisterClass *canFoldCopy(const MachineInstr &MI,
   if (FoldOp.getSubReg() || LiveOp.getSubReg())
     return nullptr;
 
-  unsigned FoldReg = FoldOp.getReg();
-  unsigned LiveReg = LiveOp.getReg();
+  Register FoldReg = FoldOp.getReg();
+  Register LiveReg = LiveOp.getReg();
 
   assert(Register::isVirtualRegister(FoldReg) && "Cannot fold physregs");
 
@@ -805,11 +805,11 @@ void TargetInstrInfo::reassociateOps(
   MachineOperand &OpY = Root.getOperand(OpIdx[Row][3]);
   MachineOperand &OpC = Root.getOperand(0);
 
-  unsigned RegA = OpA.getReg();
-  unsigned RegB = OpB.getReg();
-  unsigned RegX = OpX.getReg();
-  unsigned RegY = OpY.getReg();
-  unsigned RegC = OpC.getReg();
+  Register RegA = OpA.getReg();
+  Register RegB = OpB.getReg();
+  Register RegX = OpX.getReg();
+  Register RegY = OpY.getReg();
+  Register RegC = OpC.getReg();
 
   if (Register::isVirtualRegister(RegA))
     MRI.constrainRegClass(RegA, RC);
@@ -825,7 +825,7 @@ void TargetInstrInfo::reassociateOps(
   // Create a new virtual register for the result of (X op Y) instead of
   // recycling RegB because the MachineCombiner's computation of the critical
   // path requires a new register definition rather than an existing one.
-  unsigned NewVR = MRI.createVirtualRegister(RC);
+  Register NewVR = MRI.createVirtualRegister(RC);
   InstrIdxForVirtReg.insert(std::make_pair(NewVR, 0));
 
   unsigned Opcode = Root.getOpcode();
@@ -880,14 +880,14 @@ void TargetInstrInfo::genAlternativeCodeSequence(
 }
 
 bool TargetInstrInfo::isReallyTriviallyReMaterializableGeneric(
-    const MachineInstr &MI, AliasAnalysis *AA) const {
+    const MachineInstr &MI, AAResults *AA) const {
   const MachineFunction &MF = *MI.getMF();
   const MachineRegisterInfo &MRI = MF.getRegInfo();
 
   // Remat clients assume operand 0 is the defined register.
   if (!MI.getNumOperands() || !MI.getOperand(0).isReg())
     return false;
-  unsigned DefReg = MI.getOperand(0).getReg();
+  Register DefReg = MI.getOperand(0).getReg();
 
   // A sub-register definition can only be rematerialized if the instruction
   // doesn't read the other parts of the register.  Otherwise it is really a
@@ -924,7 +924,7 @@ bool TargetInstrInfo::isReallyTriviallyReMaterializableGeneric(
   for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI.getOperand(i);
     if (!MO.isReg()) continue;
-    unsigned Reg = MO.getReg();
+    Register Reg = MO.getReg();
     if (Reg == 0)
       continue;
 
@@ -1129,22 +1129,7 @@ TargetInstrInfo::describeLoadedValue(const MachineInstr &MI) const {
 
   if (isCopyInstr(MI, SrcRegOp, DestRegOp)) {
     Op = SrcRegOp;
-    return ParamLoadedValue(Op, Expr);
-  } else if (MI.isMoveImmediate()) {
-    Op = &MI.getOperand(1);
-    return ParamLoadedValue(Op, Expr);
-  } else if (MI.hasOneMemOperand()) {
-    int64_t Offset;
-    const auto &TRI = MF->getSubtarget().getRegisterInfo();
-    const auto &TII = MF->getSubtarget().getInstrInfo();
-    const MachineOperand *BaseOp;
-
-    if (!TII->getMemOperandWithOffset(MI, BaseOp, Offset, TRI))
-      return None;
-
-    Expr = DIExpression::prepend(Expr, DIExpression::DerefAfter, Offset);
-    Op = BaseOp;
-    return ParamLoadedValue(Op, Expr);
+    return ParamLoadedValue(*Op, Expr);
   }
 
   return None;
@@ -1257,3 +1242,5 @@ bool TargetInstrInfo::getInsertSubregInputs(
   InsertedReg.SubIdx = (unsigned)MOSubIdx.getImm();
   return true;
 }
+
+TargetInstrInfo::PipelinerLoopInfo::~PipelinerLoopInfo() {}

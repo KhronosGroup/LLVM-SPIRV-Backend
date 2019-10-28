@@ -107,9 +107,13 @@ MachineIRBuilder::buildIndirectDbgValue(Register Reg, const MDNode *Variable,
   assert(
       cast<DILocalVariable>(Variable)->isValidLocationForIntrinsic(getDL()) &&
       "Expected inlined-at fields to agree");
+  // DBG_VALUE insts now carry IR-level indirection in their DIExpression
+  // rather than encoding it in the instruction itself.
+  const DIExpression *DIExpr = cast<DIExpression>(Expr);
+  DIExpr = DIExpression::append(DIExpr, {dwarf::DW_OP_deref});
   return insertInstr(BuildMI(getMF(), getDL(),
                              getTII().get(TargetOpcode::DBG_VALUE),
-                             /*IsIndirect*/ true, Reg, Variable, Expr));
+                             /*IsIndirect*/ false, Reg, Variable, DIExpr));
 }
 
 MachineInstrBuilder MachineIRBuilder::buildFIDbgValue(int FI,
@@ -120,11 +124,15 @@ MachineInstrBuilder MachineIRBuilder::buildFIDbgValue(int FI,
   assert(
       cast<DILocalVariable>(Variable)->isValidLocationForIntrinsic(getDL()) &&
       "Expected inlined-at fields to agree");
+  // DBG_VALUE insts now carry IR-level indirection in their DIExpression
+  // rather than encoding it in the instruction itself.
+  const DIExpression *DIExpr = cast<DIExpression>(Expr);
+  DIExpr = DIExpression::append(DIExpr, {dwarf::DW_OP_deref});
   return buildInstr(TargetOpcode::DBG_VALUE)
       .addFrameIndex(FI)
-      .addImm(0)
+      .addReg(0)
       .addMetadata(Variable)
-      .addMetadata(Expr);
+      .addMetadata(DIExpr);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildConstDbgValue(const Constant &C,
@@ -148,7 +156,7 @@ MachineInstrBuilder MachineIRBuilder::buildConstDbgValue(const Constant &C,
     MIB.addReg(0U);
   }
 
-  return MIB.addImm(0).addMetadata(Variable).addMetadata(Expr);
+  return MIB.addReg(0).addMetadata(Variable).addMetadata(Expr);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildDbgLabel(const MDNode *Label) {
@@ -158,6 +166,17 @@ MachineInstrBuilder MachineIRBuilder::buildDbgLabel(const MDNode *Label) {
   auto MIB = buildInstr(TargetOpcode::DBG_LABEL);
 
   return MIB.addMetadata(Label);
+}
+
+MachineInstrBuilder MachineIRBuilder::buildDynStackAlloc(const DstOp &Res,
+                                                         const SrcOp &Size,
+                                                         unsigned Align) {
+  assert(Res.getLLTTy(*getMRI()).isPointer() && "expected ptr dst type");
+  auto MIB = buildInstr(TargetOpcode::G_DYN_STACKALLOC);
+  Res.addDefToMIB(*getMRI(), MIB);
+  Size.addSrcToMIB(MIB);
+  MIB.addImm(Align);
+  return MIB;
 }
 
 MachineInstrBuilder MachineIRBuilder::buildFrameIndex(const DstOp &Res,
@@ -207,11 +226,7 @@ MachineInstrBuilder MachineIRBuilder::buildGEP(const DstOp &Res,
          Res.getLLTTy(*getMRI()) == Op0.getLLTTy(*getMRI()) && "type mismatch");
   assert(Op1.getLLTTy(*getMRI()).isScalar() && "invalid offset type");
 
-  auto MIB = buildInstr(TargetOpcode::G_GEP);
-  Res.addDefToMIB(*getMRI(), MIB);
-  Op0.addSrcToMIB(MIB);
-  Op1.addSrcToMIB(MIB);
-  return MIB;
+  return buildInstr(TargetOpcode::G_GEP, {Res}, {Op0, Op1});
 }
 
 Optional<MachineInstrBuilder>
@@ -1056,8 +1071,11 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
            "input operands do not cover output register");
     if (SrcOps.size() == 1)
       return buildCast(DstOps[0], SrcOps[0]);
-    if (DstOps[0].getLLTTy(*getMRI()).isVector())
-      return buildInstr(TargetOpcode::G_CONCAT_VECTORS, DstOps, SrcOps);
+    if (DstOps[0].getLLTTy(*getMRI()).isVector()) {
+      if (SrcOps[0].getLLTTy(*getMRI()).isVector())
+        return buildInstr(TargetOpcode::G_CONCAT_VECTORS, DstOps, SrcOps);
+      return buildInstr(TargetOpcode::G_BUILD_VECTOR, DstOps, SrcOps);
+    }
     break;
   }
   case TargetOpcode::G_EXTRACT_VECTOR_ELT: {

@@ -340,12 +340,14 @@ Status NativeProcessNetBSD::Resume(const ResumeActionList &resume_actions) {
   }
 
   Status error;
+  int signal =
+      action->signal != LLDB_INVALID_SIGNAL_NUMBER ? action->signal : 0;
 
   switch (action->state) {
   case eStateRunning: {
     // Run the thread, possibly feeding it the signal.
     error = NativeProcessNetBSD::PtraceWrapper(PT_CONTINUE, GetID(), (void *)1,
-                                               action->signal);
+                                               signal);
     if (!error.Success())
       return error;
     for (const auto &thread : m_threads)
@@ -356,7 +358,7 @@ Status NativeProcessNetBSD::Resume(const ResumeActionList &resume_actions) {
   case eStateStepping:
     // Run the thread, possibly feeding it the signal.
     error = NativeProcessNetBSD::PtraceWrapper(PT_STEP, GetID(), (void *)1,
-                                               action->signal);
+                                               signal);
     if (!error.Success())
       return error;
     for (const auto &thread : m_threads)
@@ -659,7 +661,7 @@ NativeThreadNetBSD &NativeProcessNetBSD::AddThread(lldb::tid_t thread_id) {
   if (m_threads.empty())
     SetCurrentThreadID(thread_id);
 
-  m_threads.push_back(llvm::make_unique<NativeThreadNetBSD>(*this, thread_id));
+  m_threads.push_back(std::make_unique<NativeThreadNetBSD>(*this, thread_id));
   return static_cast<NativeThreadNetBSD &>(*m_threads.back());
 }
 

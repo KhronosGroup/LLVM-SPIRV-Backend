@@ -24,7 +24,11 @@ Non-comprehensive list of changes in this release
 ELF Improvements
 ----------------
 
-* ...
+* Glob pattern, which you can use in linker scripts or version scripts,
+  now supports `\` and `[!...]`. Except character classes
+  (e.g. `[[:digit:]]`), lld's glob pattern should be fully compatible
+  with GNU now. (`r375051
+  <https://github.com/llvm/llvm-project/commit/48993d5ab9413f0e5b94dfa292a233ce55b09e3e>`_)
 
 COFF Improvements
 -----------------
@@ -44,4 +48,7 @@ MachO Improvements
 WebAssembly Improvements
 ------------------------
 
-* ...
+* `__data_end` and `__heap_base` are no longer exported by default,
+  as it's best to keep them internal when possible. They can be
+  explicitly exported with `--export=__data_end` and
+  `--export=__heap_base`, respectively.

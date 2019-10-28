@@ -107,9 +107,11 @@ public:
   WasmSymbolType getWasmType() const;
   bool isExported() const;
 
-  const WasmSignature* getSignature() const;
+  // Indicates that the symbol is used in an __attribute__((used)) directive
+  // or similar.
+  bool isNoStrip() const;
 
-  bool isInGOT() const { return gotIndex != INVALID_INDEX; }
+  const WasmSignature* getSignature() const;
 
   uint32_t getGOTIndex() const {
     assert(gotIndex != INVALID_INDEX);
@@ -122,8 +124,9 @@ public:
 protected:
   Symbol(StringRef name, Kind k, uint32_t flags, InputFile *f)
       : name(name), file(f), flags(flags), symbolKind(k),
-        referenced(!config->gcSections), isUsedInRegularObj(false),
-        forceExport(false), canInline(false), traced(false) {}
+        referenced(!config->gcSections), requiresGOT(false),
+        isUsedInRegularObj(false), forceExport(false), canInline(false),
+        traced(false) {}
 
   StringRef name;
   InputFile *file;
@@ -134,6 +137,10 @@ protected:
 
 public:
   bool referenced : 1;
+
+  // True for data symbols that needs a dummy GOT entry.  Used for static
+  // linking of GOT accesses.
+  bool requiresGOT : 1;
 
   // True if the symbol was used for linking and thus need to be added to the
   // output file's symbol table. This is true for all symbols except for
@@ -449,13 +456,17 @@ struct WasmSym {
   // therefore be used as a backing store for brk()/malloc() implementations.
   static DefinedData *heapBase;
 
+  // __wasm_init_memory_flag
+  // Symbol whose contents are nonzero iff memory has already been initialized.
+  static DefinedData *initMemoryFlag;
+
+  // __wasm_init_memory
+  // Function that initializes passive data segments during instantiation.
+  static DefinedFunction *initMemory;
+
   // __wasm_call_ctors
   // Function that directly calls all ctors in priority order.
   static DefinedFunction *callCtors;
-
-  // __wasm_init_memory
-  // Function that initializes passive data segments post-instantiation.
-  static DefinedFunction *initMemory;
 
   // __wasm_apply_relocs
   // Function that applies relocations to data segment post-instantiation.
@@ -472,10 +483,12 @@ struct WasmSym {
   // __table_base
   // Used in PIC code for offset of indirect function table
   static UndefinedGlobal *tableBase;
+  static DefinedData *definedTableBase;
 
   // __memory_base
   // Used in PIC code for offset of global data
   static UndefinedGlobal *memoryBase;
+  static DefinedData *definedMemoryBase;
 };
 
 // A buffer class that is large enough to hold any Symbol-derived

@@ -2,7 +2,6 @@
 # RUN: llc -march=amdgcn -mcpu=hawaii -run-pass=regbankselect -regbankselect-fast -verify-machineinstrs -o - %s | FileCheck %s
 # RUN: llc -march=amdgcn -mcpu=hawaii -run-pass=regbankselect -regbankselect-greedy -verify-machineinstrs -o - %s | FileCheck %s
 
-# FIXME: The constant bank should have been chosen as VGPR
 ---
 name: test_constant_s32_vgpr_use
 legalized:       true

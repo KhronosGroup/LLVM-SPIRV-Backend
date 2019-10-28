@@ -16,6 +16,7 @@
 
 #include "../ClangTidy.h"
 #include "../ClangTidyForceLinker.h"
+#include "../GlobList.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
@@ -289,7 +290,7 @@ static std::unique_ptr<ClangTidyOptionsProvider> createOptionsProvider(
   if (!Config.empty()) {
     if (llvm::ErrorOr<ClangTidyOptions> ParsedConfig =
             parseConfiguration(Config)) {
-      return llvm::make_unique<ConfigOptionsProvider>(
+      return std::make_unique<ConfigOptionsProvider>(
           GlobalOptions,
           ClangTidyOptions::getDefaults().mergeWith(DefaultOptions),
           *ParsedConfig, OverrideOptions);
@@ -299,7 +300,7 @@ static std::unique_ptr<ClangTidyOptionsProvider> createOptionsProvider(
       return nullptr;
     }
   }
-  return llvm::make_unique<FileOptionsProvider>(GlobalOptions, DefaultOptions,
+  return std::make_unique<FileOptionsProvider>(GlobalOptions, DefaultOptions,
                                                 OverrideOptions, std::move(FS));
 }
 

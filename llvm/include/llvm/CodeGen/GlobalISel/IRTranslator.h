@@ -523,6 +523,10 @@ protected:
   // function has the optnone attribute.
   bool EnableOpts = false;
 
+  /// True when the block contains a tail call. This allows the IRTranslator to
+  /// stop translating such blocks early.
+  bool HasTailCall = false;
+
   /// Switch analysis and optimization.
   class GISelSwitchLowering : public SwitchCG::SwitchLowering {
   public:

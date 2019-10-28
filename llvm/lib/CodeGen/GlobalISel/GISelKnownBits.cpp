@@ -33,19 +33,19 @@ GISelKnownBits::GISelKnownBits(MachineFunction &MF)
     : MF(MF), MRI(MF.getRegInfo()), TL(*MF.getSubtarget().getTargetLowering()),
       DL(MF.getFunction().getParent()->getDataLayout()) {}
 
-unsigned GISelKnownBits::inferAlignmentForFrameIdx(int FrameIdx, int Offset,
-                                                   const MachineFunction &MF) {
+Align GISelKnownBits::inferAlignmentForFrameIdx(int FrameIdx, int Offset,
+                                                const MachineFunction &MF) {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
-  return MinAlign(Offset, MFI.getObjectAlignment(FrameIdx));
+  return commonAlignment(Align(MFI.getObjectAlignment(FrameIdx)), Offset);
   // TODO: How to handle cases with Base + Offset?
 }
 
-unsigned GISelKnownBits::inferPtrAlignment(const MachineInstr &MI) {
+MaybeAlign GISelKnownBits::inferPtrAlignment(const MachineInstr &MI) {
   if (MI.getOpcode() == TargetOpcode::G_FRAME_INDEX) {
     int FrameIdx = MI.getOperand(1).getIndex();
     return inferAlignmentForFrameIdx(FrameIdx, 0, *MI.getMF());
   }
-  return 0;
+  return None;
 }
 
 void GISelKnownBits::computeKnownBitsForFrameIndex(Register R, KnownBits &Known,
@@ -56,10 +56,10 @@ void GISelKnownBits::computeKnownBitsForFrameIndex(Register R, KnownBits &Known,
 }
 
 void GISelKnownBits::computeKnownBitsForAlignment(KnownBits &Known,
-                                                  unsigned Align) {
-  if (Align)
+                                                  MaybeAlign Alignment) {
+  if (Alignment)
     // The low bits are known zero if the pointer is aligned.
-    Known.Zero.setLowBits(Log2_32(Align));
+    Known.Zero.setLowBits(Log2(Alignment));
 }
 
 KnownBits GISelKnownBits::getKnownBits(MachineInstr &MI) {
@@ -75,6 +75,12 @@ KnownBits GISelKnownBits::getKnownBits(Register R) {
   return Known;
 }
 
+bool GISelKnownBits::signBitIsZero(Register R) {
+  LLT Ty = MRI.getType(R);
+  unsigned BitWidth = Ty.getScalarSizeInBits();
+  return maskedValueIsZero(R, APInt::getSignMask(BitWidth));
+}
+
 APInt GISelKnownBits::getKnownZeroes(Register R) {
   return getKnownBits(R).Zero;
 }
@@ -87,6 +93,15 @@ void GISelKnownBits::computeKnownBitsImpl(Register R, KnownBits &Known,
   MachineInstr &MI = *MRI.getVRegDef(R);
   unsigned Opcode = MI.getOpcode();
   LLT DstTy = MRI.getType(R);
+
+  // Handle the case where this is called on a register that does not have a
+  // type constraint (i.e. it has a register class constraint instead). This is
+  // unlikely to occur except by looking through copies but it is possible for
+  // the initial register being queried to be in this state.
+  if (!DstTy.isValid()) {
+    Known = KnownBits();
+    return;
+  }
 
   unsigned BitWidth = DstTy.getSizeInBits();
   Known = KnownBits(BitWidth); // Don't know anything
@@ -104,10 +119,30 @@ void GISelKnownBits::computeKnownBitsImpl(Register R, KnownBits &Known,
 
   switch (Opcode) {
   default:
-    TL.computeKnownBitsForTargetInstr(R, Known, DemandedElts, MRI, Depth);
+    TL.computeKnownBitsForTargetInstr(*this, R, Known, DemandedElts, MRI,
+                                      Depth);
     break;
+  case TargetOpcode::COPY: {
+    MachineOperand Dst = MI.getOperand(0);
+    MachineOperand Src = MI.getOperand(1);
+    // Look through trivial copies but don't look through trivial copies of the
+    // form `%1:(s32) = OP %0:gpr32` known-bits analysis is currently unable to
+    // determine the bit width of a register class.
+    //
+    // We can't use NoSubRegister by name as it's defined by each target but
+    // it's always defined to be 0 by tablegen.
+    if (Dst.getSubReg() == 0 /*NoSubRegister*/ && Src.getReg().isVirtual() &&
+        Src.getSubReg() == 0 /*NoSubRegister*/ &&
+        MRI.getType(Src.getReg()).isValid()) {
+      // Don't increment Depth for this one since we didn't do any work.
+      computeKnownBitsImpl(Src.getReg(), Known, DemandedElts, Depth);
+    }
+    break;
+  }
   case TargetOpcode::G_CONSTANT: {
     auto CstVal = getConstantVRegVal(R, MRI);
+    if (!CstVal)
+      break;
     Known.One = *CstVal;
     Known.Zero = ~Known.One;
     break;
@@ -131,8 +166,26 @@ void GISelKnownBits::computeKnownBitsImpl(Register R, KnownBits &Known,
     Known.Zero.setLowBits(KnownZeroLow);
     break;
   }
-  // G_GEP is like G_ADD. FIXME: Is this true for all targets?
-  case TargetOpcode::G_GEP:
+  case TargetOpcode::G_XOR: {
+    computeKnownBitsImpl(MI.getOperand(2).getReg(), Known, DemandedElts,
+                         Depth + 1);
+    computeKnownBitsImpl(MI.getOperand(1).getReg(), Known2, DemandedElts,
+                         Depth + 1);
+
+    // Output known-0 bits are known if clear or set in both the LHS & RHS.
+    APInt KnownZeroOut = (Known.Zero & Known2.Zero) | (Known.One & Known2.One);
+    // Output known-1 are known to be set if set in only one of the LHS, RHS.
+    Known.One = (Known.Zero & Known2.One) | (Known.One & Known2.Zero);
+    Known.Zero = KnownZeroOut;
+    break;
+  }
+  case TargetOpcode::G_GEP: {
+    // G_GEP is like G_ADD. FIXME: Is this true for all targets?
+    LLT Ty = MRI.getType(MI.getOperand(1).getReg());
+    if (DL.isNonIntegralAddressSpace(Ty.getAddressSpace()))
+      break;
+    LLVM_FALLTHROUGH;
+  }
   case TargetOpcode::G_ADD: {
     // Output known-0 bits are known if clear or set in both the low clear bits
     // common to both LHS & RHS.  For example, 8+(X<<3) is known to have the
@@ -297,7 +350,7 @@ void GISelKnownBits::computeKnownBitsImpl(Register R, KnownBits &Known,
     Register SrcReg = MI.getOperand(1).getReg();
     LLT SrcTy = MRI.getType(SrcReg);
     unsigned SrcBitWidth = SrcTy.isPointer()
-                               ? DL.getIndexSize(SrcTy.getAddressSpace())
+                               ? DL.getIndexSizeInBits(SrcTy.getAddressSpace())
                                : SrcTy.getSizeInBits();
     assert(SrcBitWidth && "SrcBitWidth can't be zero");
     Known = Known.zextOrTrunc(SrcBitWidth, true);

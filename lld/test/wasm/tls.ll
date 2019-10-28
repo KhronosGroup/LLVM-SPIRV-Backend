@@ -1,4 +1,4 @@
-; RUN: llc -mattr=+bulk-memory -filetype=obj %s -o %t.o
+; RUN: llc -mattr=+bulk-memory,+atomics -filetype=obj %s -o %t.o
 
 target triple = "wasm32-unknown-unknown"
 
@@ -66,7 +66,7 @@ declare i32 @llvm.wasm.tls.align.i32()
 ; Skip __wasm_call_ctors and __wasm_init_memory
 ; CHECK:          - Index:           2
 ; CHECK-NEXT:       Locals:          []
-; CHECK-NEXT:       Body:            20002401200041004108FC0801000B
+; CHECK-NEXT:       Body:            20002401200041004108FC0800000B
 
 ; Expected body of __wasm_init_tls:
 ;   local.get 0

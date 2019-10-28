@@ -19,6 +19,7 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopPass.h"
+#include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -45,6 +46,7 @@ using namespace llvm::PatternMatch;
 #define DEBUG_TYPE "loop-utils"
 
 static const char *LLVMLoopDisableNonforced = "llvm.loop.disable_nonforced";
+static const char *LLVMLoopDisableLICM = "llvm.licm.disable";
 
 bool llvm::formDedicatedExitBlocks(Loop *L, DominatorTree *DT, LoopInfo *LI,
                                    MemorySSAUpdater *MSSAU,
@@ -169,6 +171,8 @@ void llvm::getLoopAnalysisUsage(AnalysisUsage &AU) {
   AU.addPreserved<SCEVAAWrapperPass>();
   AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addPreserved<ScalarEvolutionWrapperPass>();
+  // FIXME: When all loop passes preserve MemorySSA, it can be required and
+  // preserved here instead of the individual handling in each pass.
 }
 
 /// Manually defined generic "LoopPass" dependency initialization. This is used
@@ -189,6 +193,7 @@ void llvm::initializeLoopPassPass(PassRegistry &Registry) {
   INITIALIZE_PASS_DEPENDENCY(GlobalsAAWrapperPass)
   INITIALIZE_PASS_DEPENDENCY(SCEVAAWrapperPass)
   INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
+  INITIALIZE_PASS_DEPENDENCY(MemorySSAWrapperPass)
 }
 
 /// Create MDNode for input string.
@@ -377,6 +382,10 @@ Optional<MDNode *> llvm::makeFollowupLoopID(
 
 bool llvm::hasDisableAllTransformsHint(const Loop *L) {
   return getBooleanLoopAttribute(L, LLVMLoopDisableNonforced);
+}
+
+bool llvm::hasDisableLICMTransformsHint(const Loop *L) {
+  return getBooleanLoopAttribute(L, LLVMLoopDisableLICM);
 }
 
 TransformationMode llvm::hasUnrollTransformation(Loop *L) {

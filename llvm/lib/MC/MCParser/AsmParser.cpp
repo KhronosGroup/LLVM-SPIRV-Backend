@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/DebugInfo/CodeView/SymbolRecord.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCCodeView.h"
 #include "llvm/MC/MCContext.h"
@@ -1162,7 +1163,9 @@ bool AsmParser::parsePrimaryExpr(const MCExpr *&Res, SMLoc &EndLoc) {
       }
     }
 
-    MCSymbol *Sym = getContext().getOrCreateSymbol(SymbolName);
+    MCSymbol *Sym = getContext().getInlineAsmLabel(SymbolName);
+    if (!Sym)
+      Sym = getContext().getOrCreateSymbol(SymbolName);
 
     // If this is an absolute variable reference, substitute it now to preserve
     // semantics in the face of reassignment.
@@ -2916,10 +2919,26 @@ bool AsmParser::parseEscapedString(std::string &Data) {
     }
 
     // Recognize escaped characters. Note that this escape semantics currently
-    // loosely follows Darwin 'as'. Notably, it doesn't support hex escapes.
+    // loosely follows Darwin 'as'.
     ++i;
     if (i == e)
       return TokError("unexpected backslash at end of string");
+
+    // Recognize hex sequences similarly to GNU 'as'.
+    if (Str[i] == 'x' || Str[i] == 'X') {
+      size_t length = Str.size();
+      if (i + 1 >= length || !isHexDigit(Str[i + 1]))
+        return TokError("invalid hexadecimal escape sequence");
+
+      // Consume hex characters. GNU 'as' reads all hexadecimal characters and
+      // then truncates to the lower 16 bits. Seems reasonable.
+      unsigned Value = 0;
+      while (i + 1 < length && isHexDigit(Str[i + 1]))
+        Value = Value * 16 + hexDigitValue(Str[++i]);
+
+      Data += (unsigned char)(Value & 0xFF);
+      continue;
+    }
 
     // Recognize octal sequences.
     if ((unsigned)(Str[i] - '0') <= 7) {
@@ -3894,7 +3913,7 @@ bool AsmParser::parseDirectiveCVDefRange() {
         parseAbsoluteExpression(DRRegister))
       return Error(Loc, "expected register number");
 
-    codeview::DefRangeRegisterSym::Header DRHdr;
+    codeview::DefRangeRegisterHeader DRHdr;
     DRHdr.Register = DRRegister;
     DRHdr.MayHaveNoName = 0;
     getStreamer().EmitCVDefRangeDirective(Ranges, DRHdr);
@@ -3907,7 +3926,7 @@ bool AsmParser::parseDirectiveCVDefRange() {
         parseAbsoluteExpression(DROffset))
       return Error(Loc, "expected offset value");
 
-    codeview::DefRangeFramePointerRelSym::Header DRHdr;
+    codeview::DefRangeFramePointerRelHeader DRHdr;
     DRHdr.Offset = DROffset;
     getStreamer().EmitCVDefRangeDirective(Ranges, DRHdr);
     break;
@@ -3924,7 +3943,7 @@ bool AsmParser::parseDirectiveCVDefRange() {
         parseAbsoluteExpression(DROffsetInParent))
       return Error(Loc, "expected offset value");
 
-    codeview::DefRangeSubfieldRegisterSym::Header DRHdr;
+    codeview::DefRangeSubfieldRegisterHeader DRHdr;
     DRHdr.Register = DRRegister;
     DRHdr.MayHaveNoName = 0;
     DRHdr.OffsetInParent = DROffsetInParent;
@@ -3949,7 +3968,7 @@ bool AsmParser::parseDirectiveCVDefRange() {
         parseAbsoluteExpression(DRBasePointerOffset))
       return Error(Loc, "expected base pointer offset value");
 
-    codeview::DefRangeRegisterRelSym::Header DRHdr;
+    codeview::DefRangeRegisterRelHeader DRHdr;
     DRHdr.Register = DRRegister;
     DRHdr.Flags = DRFlags;
     DRHdr.BasePointerOffset = DRBasePointerOffset;

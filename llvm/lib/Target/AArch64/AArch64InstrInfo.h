@@ -56,8 +56,7 @@ public:
 
   bool
   areMemAccessesTriviallyDisjoint(const MachineInstr &MIa,
-                                  const MachineInstr &MIb,
-                                  AliasAnalysis *AA = nullptr) const override;
+                                  const MachineInstr &MIb) const override;
 
   unsigned isLoadFromStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
@@ -336,7 +335,7 @@ enum AArch64FrameOffsetStatus {
 int isAArch64FrameOffsetLegal(const MachineInstr &MI, StackOffset &Offset,
                               bool *OutUseUnscaledOp = nullptr,
                               unsigned *OutUnscaledOp = nullptr,
-                              int *EmittableOffset = nullptr);
+                              int64_t *EmittableOffset = nullptr);
 
 static inline bool isUncondBranchOpcode(int Opc) { return Opc == AArch64::B; }
 

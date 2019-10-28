@@ -32,7 +32,7 @@ bool WebAssembly::isChild(const MachineInstr &MI,
   const MachineOperand &MO = MI.getOperand(0);
   if (!MO.isReg() || MO.isImplicit() || !MO.isDef())
     return false;
-  unsigned Reg = MO.getReg();
+  Register Reg = MO.getReg();
   return Register::isVirtualRegister(Reg) && MFI.isVRegStackified(Reg);
 }
 
@@ -50,7 +50,21 @@ bool WebAssembly::mayThrow(const MachineInstr &MI) {
     return false;
 
   const MachineOperand &MO = MI.getOperand(getCalleeOpNo(MI.getOpcode()));
-  assert(MO.isGlobal());
+  assert(MO.isGlobal() || MO.isSymbol());
+
+  if (MO.isSymbol()) {
+    // Some intrinsics are lowered to calls to external symbols, which are then
+    // lowered to calls to library functions. Most of libcalls don't throw, but
+    // we only list some of them here now.
+    // TODO Consider adding 'nounwind' info in TargetLowering::CallLoweringInfo
+    // instead for more accurate info.
+    const char *Name = MO.getSymbolName();
+    if (strcmp(Name, "memcpy") == 0 || strcmp(Name, "memmove") == 0 ||
+        strcmp(Name, "memset") == 0)
+      return false;
+    return true;
+  }
+
   const auto *F = dyn_cast<Function>(MO.getGlobal());
   if (!F)
     return true;

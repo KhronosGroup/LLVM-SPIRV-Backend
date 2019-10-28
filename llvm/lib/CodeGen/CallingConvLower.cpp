@@ -43,17 +43,18 @@ CCState::CCState(CallingConv::ID CC, bool isVarArg, MachineFunction &mf,
 void CCState::HandleByVal(unsigned ValNo, MVT ValVT, MVT LocVT,
                           CCValAssign::LocInfo LocInfo, int MinSize,
                           int MinAlignment, ISD::ArgFlagsTy ArgFlags) {
-  llvm::Align MinAlign(MinAlignment);
-  llvm::Align Align(ArgFlags.getByValAlign());
+  Align MinAlign(MinAlignment);
+  Align Alignment(ArgFlags.getByValAlign());
   unsigned Size  = ArgFlags.getByValSize();
   if (MinSize > (int)Size)
     Size = MinSize;
-  if (MinAlign > Align)
-    Align = MinAlign;
-  ensureMaxAlignment(Align);
-  MF.getSubtarget().getTargetLowering()->HandleByVal(this, Size, Align.value());
+  if (MinAlign > Alignment)
+    Alignment = MinAlign;
+  ensureMaxAlignment(Alignment);
+  MF.getSubtarget().getTargetLowering()->HandleByVal(this, Size,
+                                                     Alignment.value());
   Size = unsigned(alignTo(Size, MinAlign));
-  unsigned Offset = AllocateStack(Size, Align.value());
+  unsigned Offset = AllocateStack(Size, Alignment.value());
   addLoc(CCValAssign::getMem(ValNo, ValVT, Offset, LocVT, LocInfo));
 }
 
@@ -89,13 +90,8 @@ CCState::AnalyzeFormalArguments(const SmallVectorImpl<ISD::InputArg> &Ins,
   for (unsigned i = 0; i != NumArgs; ++i) {
     MVT ArgVT = Ins[i].VT;
     ISD::ArgFlagsTy ArgFlags = Ins[i].Flags;
-    if (Fn(i, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, *this)) {
-#ifndef NDEBUG
-      dbgs() << "Formal argument #" << i << " has unhandled type "
-             << EVT(ArgVT).getEVTString() << '\n';
-#endif
-      llvm_unreachable(nullptr);
-    }
+    if (Fn(i, ArgVT, ArgVT, CCValAssign::Full, ArgFlags, *this))
+      report_fatal_error("unable to allocate function argument #" + Twine(i));
   }
 }
 
@@ -121,13 +117,8 @@ void CCState::AnalyzeReturn(const SmallVectorImpl<ISD::OutputArg> &Outs,
   for (unsigned i = 0, e = Outs.size(); i != e; ++i) {
     MVT VT = Outs[i].VT;
     ISD::ArgFlagsTy ArgFlags = Outs[i].Flags;
-    if (Fn(i, VT, VT, CCValAssign::Full, ArgFlags, *this)) {
-#ifndef NDEBUG
-      dbgs() << "Return operand #" << i << " has unhandled type "
-             << EVT(VT).getEVTString() << '\n';
-#endif
-      llvm_unreachable(nullptr);
-    }
+    if (Fn(i, VT, VT, CCValAssign::Full, ArgFlags, *this))
+      report_fatal_error("unable to allocate function return #" + Twine(i));
   }
 }
 
@@ -208,7 +199,7 @@ static bool isValueTypeInRegForCC(CallingConv::ID CC, MVT VT) {
 void CCState::getRemainingRegParmsForType(SmallVectorImpl<MCPhysReg> &Regs,
                                           MVT VT, CCAssignFn Fn) {
   unsigned SavedStackOffset = StackOffset;
-  llvm::Align SavedMaxStackArgAlign = MaxStackArgAlign;
+  Align SavedMaxStackArgAlign = MaxStackArgAlign;
   unsigned NumLocs = Locs.size();
 
   // Set the 'inreg' flag if it is used for this calling convention.

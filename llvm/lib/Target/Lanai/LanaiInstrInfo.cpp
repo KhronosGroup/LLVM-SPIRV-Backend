@@ -86,8 +86,7 @@ void LanaiInstrInfo::loadRegFromStackSlot(
 }
 
 bool LanaiInstrInfo::areMemAccessesTriviallyDisjoint(
-    const MachineInstr &MIa, const MachineInstr &MIb,
-    AliasAnalysis * /*AA*/) const {
+    const MachineInstr &MIa, const MachineInstr &MIb) const {
   assert(MIa.mayLoadOrStore() && "MIa must be a load or store.");
   assert(MIb.mayLoadOrStore() && "MIb must be a load or store.");
 
@@ -505,7 +504,7 @@ LanaiInstrInfo::optimizeSelect(MachineInstr &MI,
 
   // Find new register class to use.
   MachineOperand FalseReg = MI.getOperand(Invert ? 1 : 2);
-  unsigned DestReg = MI.getOperand(0).getReg();
+  Register DestReg = MI.getOperand(0).getReg();
   const TargetRegisterClass *PreviousClass = MRI.getRegClass(FalseReg.getReg());
   if (!MRI.constrainRegClass(DestReg, PreviousClass))
     return nullptr;

@@ -369,11 +369,13 @@ LLVM-specific variables
 
 **LLVM_ENABLE_PROJECTS**:STRING
   Semicolon-separated list of projects to build, or *all* for building all
-  (clang, libcxx, libcxxabi, lldb, compiler-rt, lld, polly) projects.
+  (clang, libcxx, libcxxabi, lldb, compiler-rt, lld, polly, etc) projects.
   This flag assumes that projects are checked out side-by-side and not nested,
   i.e. clang needs to be in parallel of llvm instead of nested in `llvm/tools`.
   This feature allows to have one build for only LLVM and another for clang+llvm
   using the same source checkout.
+  The full list is:
+  ``clang;clang-tools-extra;compiler-rt;debuginfo-tests;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;openmp;parallel-libs;polly;pstl``
 
 **LLVM_EXTERNAL_PROJECTS**:STRING
   Semicolon-separated list of additional external projects to build as part of
@@ -430,6 +432,11 @@ LLVM-specific variables
   If the host compiler and linker supports the stdlib flag, -stdlib=libc++ is
   passed to invocations of both so that the project is built using libc++
   instead of stdlibc++. Defaults to OFF.
+
+**LLVM_STATIC_LINK_CXX_STDLIB**:BOOL
+  Statically link to the C++ standard library if possible. This uses the flag
+  "-static-libstdc++", but a Clang host compiler will statically link to libc++
+  if used in conjuction with the **LLVM_ENABLE_LIBCXX** flag. Defaults to OFF.
 
 **LLVM_ENABLE_LLD**:BOOL
   This option is equivalent to `-DLLVM_USE_LINKER=lld`, except during a 2-stage
@@ -512,7 +519,7 @@ LLVM-specific variables
 **SPHINX_EXECUTABLE**:STRING
   The path to the ``sphinx-build`` executable detected by CMake.
   For installation instructions, see
-  http://www.sphinx-doc.org/en/latest/install.html
+  http://www.sphinx-doc.org/en/latest/usage/installation.html
 
 **SPHINX_OUTPUT_HTML**:BOOL
   If enabled (and ``LLVM_ENABLE_SPHINX`` is enabled) then the targets for
@@ -609,6 +616,10 @@ LLVM-specific variables
 
 **LLVM_ENABLE_BINDINGS**:BOOL
   If disabled, do not try to build the OCaml and go bindings.
+
+**LLVM_ENABLE_Z3_SOLVER**:BOOL
+  If enabled, the Z3 constraint solver is activated for the Clang static analyzer.
+  A recent version of the z3 library needs to be available on the system.
 
 CMake Caches
 ============

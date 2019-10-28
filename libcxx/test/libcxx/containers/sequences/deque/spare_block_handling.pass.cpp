@@ -21,7 +21,7 @@
 #include <queue>
 
 #include "min_allocator.h"
-#include "rapid-cxx-test.hpp"
+#include "rapid-cxx-test.h"
 
 template <class Adaptor>
 struct ContainerAdaptor : public Adaptor {
@@ -280,5 +280,3 @@ TEST_CASE(pop_front_push_back) {
 }
 
 TEST_SUITE_END()
-
-

@@ -46,18 +46,17 @@ public:
 
   void RemovePersistentVariable(lldb::ExpressionVariableSP variable) override;
 
-  ConstString GetNextPersistentVariableName(Target &target,
-                                            llvm::StringRef prefix) override {
-    llvm::SmallString<64> name;
-    {
-      llvm::raw_svector_ostream os(name);
-      os << prefix << m_next_persistent_variable_id++;
-    }
-    return ConstString(name);
-  }
-
   llvm::StringRef GetPersistentVariablePrefix(bool is_error) const override {
     return "$";
+  }
+
+  /// Returns the next file name that should be used for user expressions.
+  std::string GetNextExprFileName() {
+    std::string name;
+    name.append("<user expression ");
+    name.append(std::to_string(m_next_user_file_id++));
+    name.append(">");
+    return name;
   }
 
   llvm::Optional<CompilerType>
@@ -76,6 +75,8 @@ public:
   }
 
 private:
+  /// The counter used by GetNextExprFileName.
+  uint32_t m_next_user_file_id = 0;
   // The counter used by GetNextPersistentVariableName
   uint32_t m_next_persistent_variable_id = 0;
 
