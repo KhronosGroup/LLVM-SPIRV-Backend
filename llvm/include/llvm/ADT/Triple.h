@@ -90,6 +90,9 @@ public:
     hsail64,        // AMD HSAIL with 64-bit pointers
     spir,           // SPIR: standard portable IR for OpenCL 32-bit version
     spir64,         // SPIR: standard portable IR for OpenCL 64-bit version
+    spirv32,        // SPIR-V with 32-bit pointers
+    spirv64,        // SPIR-V with 64-bit pointers
+    spirvlogical,   // SPIR-V with logical addressing
     kalimba,        // Kalimba: generic kalimba
     shave,          // SHAVE: Movidius vector VLIW processors
     lanai,          // Lanai: Lanai 32-bit
@@ -217,7 +220,9 @@ public:
     CoreCLR,
     Simulator, // Simulator variants of other systems, e.g., Apple's iOS
     MacABI, // Mac Catalyst variant of Apple's iOS deployment target.
-    LastEnvironmentType = MacABI
+    OpenCL,
+    Vulkan,
+    LastEnvironmentType = Vulkan
   };
   enum ObjectFormatType {
     UnknownObjectFormat,
@@ -226,6 +231,7 @@ public:
     ELF,
     MachO,
     Wasm,
+    SPIRV,
     XCOFF,
   };
 
@@ -481,6 +487,14 @@ public:
     return getEnvironment() == Triple::MacABI;
   }
 
+  bool isOpenCLEnvironment() const {
+    return getEnvironment() == Triple::OpenCL;
+  }
+
+  bool isVulkanEnvironment() const {
+    return getEnvironment() == Triple::Vulkan;
+  }
+
   bool isOSNetBSD() const {
     return getOS() == Triple::NetBSD;
   }
@@ -675,6 +689,17 @@ public:
   bool isSPIR() const {
     return getArch() == Triple::spir || getArch() == Triple::spir64;
   }
+
+  /// Tests whether the target is SPIR-V (32- or 64-bit).
+  bool isSPIRVPhysical() const {
+    return getArch() == Triple::spirv32 || getArch() == Triple::spirv64;
+  }
+
+  /// Tests whether the target is SPIR-V with logical addressing
+  bool isSPIRVLogical() const { return getArch() == spirvlogical; }
+
+  /// Tests whether the target is SPIR-V (32/64-bit or logical).
+  bool isSPIRV() const { return isSPIRVPhysical() || isSPIRVLogical(); }
 
   /// Tests whether the target is NVPTX (32- or 64-bit).
   bool isNVPTX() const {

@@ -307,6 +307,7 @@ set(LLVM_ALL_TARGETS
   PowerPC
   RISCV
   Sparc
+  SPIRV
   SystemZ
   WebAssembly
   X86
