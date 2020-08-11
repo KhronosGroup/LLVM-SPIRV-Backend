@@ -32,17 +32,17 @@ public:
       : MCObjectStreamer(Context, std::move(TAB), std::move(OW),
                          std::move(Emitter)) {}
 
-  bool EmitSymbolAttribute(MCSymbol *Symbol, MCSymbolAttr Attribute) override {
+  bool emitSymbolAttribute(MCSymbol *Symbol, MCSymbolAttr Attribute) override {
     return false;
   }
-  void EmitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
+  void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
                         unsigned ByteAlignment) override {}
-  void EmitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
+  void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
                     uint64_t Size = 0, unsigned ByteAlignment = 0,
                     SMLoc Loc = SMLoc()) override {}
 
 private:
-  void EmitInstToData(const MCInst &Inst, const MCSubtargetInfo &) override;
+  void emitInstToData(const MCInst &Inst, const MCSubtargetInfo &) override;
 };
 
 } // end namespace llvm

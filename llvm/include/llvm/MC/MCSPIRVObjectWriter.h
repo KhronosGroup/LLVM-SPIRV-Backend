@@ -10,6 +10,7 @@
 #define LLVM_MC_MCSPIRVOBJECTWRITER_H
 
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/Support/raw_ostream.h"
 #include <memory>
 
 namespace llvm {
@@ -35,7 +36,7 @@ public:
 /// \returns The constructed object writer.
 std::unique_ptr<MCObjectWriter>
 createSPIRVObjectWriter(std::unique_ptr<MCSPIRVObjectTargetWriter> MOTW,
-                        raw_pwrite_stream &OS);
+                        llvm::raw_pwrite_stream &OS);
 
 } // namespace llvm
 

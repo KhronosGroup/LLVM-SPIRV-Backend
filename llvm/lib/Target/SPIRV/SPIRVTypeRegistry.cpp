@@ -29,6 +29,7 @@
 #include "SPIRVTargetMachine.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
+#include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #include "SPIRVEnums.h"
@@ -347,8 +348,10 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
   } else if (Ty->isVoidTy()) {
     return getOpTypeVoid(MIRBuilder);
   } else if (Ty->isVectorTy()) {
-    auto el = getOrCreateSPIRVType(Ty->getVectorElementType(), MIRBuilder);
-    return getOpTypeVector(Ty->getVectorNumElements(), el, MIRBuilder);
+    auto el = getOrCreateSPIRVType(cast<VectorType>(Ty)->getElementType(),
+                                   MIRBuilder);
+    return getOpTypeVector(cast<VectorType>(Ty)->getNumElements(), el,
+                           MIRBuilder);
   } else if (Ty->isArrayTy()) {
     auto *el = getOrCreateSPIRVType(Ty->getArrayElementType(), MIRBuilder);
     return getOpTypeArray(Ty->getArrayNumElements(), el, MIRBuilder);

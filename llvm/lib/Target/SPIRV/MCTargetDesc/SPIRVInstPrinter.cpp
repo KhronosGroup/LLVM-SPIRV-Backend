@@ -68,11 +68,11 @@ void SPIRVInstPrinter::recordOpExtInstImport(const MCInst *MI) {
   extInstSetIDs.insert({reg, set});
 }
 
-void SPIRVInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
-                                 StringRef Annot, const MCSubtargetInfo &STI) {
-
+void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
+                                 StringRef Annot, const MCSubtargetInfo &STI,
+                                 raw_ostream &O) {
   const unsigned int OpCode = MI->getOpcode();
-  printInstruction(MI, O);
+  printInstruction(MI, Address, O);
 
   if (OpCode == SPIRV::OpDecorate) {
     printOpDecorate(MI, O);

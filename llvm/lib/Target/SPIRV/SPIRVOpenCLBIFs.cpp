@@ -932,7 +932,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   auto firstBraceIdx = demangledName.find_first_of('(');
   auto nameNoArgs = demangledName.substr(0, firstBraceIdx);
 
-  auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs);
+  auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs.str());
   if (extInstIDOpt.hasValue()) {
     auto extInstID = extInstIDOpt.getValue();
     return genOpenCLExtInst(extInstID, MIRBuilder, ret, retTy, args, TR);
@@ -956,7 +956,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
           {"sub_sat", {CL::u_sub_sat, CL::s_sub_sat}},
           {"upsample", {CL::u_upsample, CL::s_upsample}}};
 
-  auto extInstMatch = typeDependantExtInstMap.find(nameNoArgs);
+  auto extInstMatch = typeDependantExtInstMap.find(nameNoArgs.str());
   if (extInstMatch != typeDependantExtInstMap.end()) {
     char typeChar = demangledName[firstBraceIdx + 1];
     int idx = -1;

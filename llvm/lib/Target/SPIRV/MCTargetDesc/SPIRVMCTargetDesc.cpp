@@ -15,7 +15,7 @@
 #include "MCTargetDesc/SPIRVMCAsmInfo.h"
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
 
-#include "InstPrinter/SPIRVInstPrinter.h"
+#include "SPIRVInstPrinter.h"
 
 #include "llvm/MC/MCInstrAnalysis.h"
 #include "llvm/MC/MCInstrInfo.h"

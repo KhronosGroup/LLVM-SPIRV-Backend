@@ -27,6 +27,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/InitializePasses.h"
 
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
@@ -34,7 +35,7 @@
 #include <string>
 
 #include "llvm/CodeGen/MachineModuleInfo.h"
-#include "llvm/PassSupport.h"
+#include "llvm/Pass.h"
 
 using namespace llvm;
 InstructionSelector *
@@ -86,8 +87,8 @@ SPIRVTargetMachine::SPIRVTargetMachine(const Target &T, const Triple &TT,
     : LLVMTargetMachine(T, computeDataLayout(TT), TT, CPU, FS, Options,
                         getEffectiveRelocModel(RM),
                         getEffectiveCodeModel(CM, CodeModel::Small), OL),
-      TLOF(make_unique<TargetLoweringObjectFileELF>()),
-      Subtarget(TT, CPU, FS, *this) {
+      TLOF(std::make_unique<TargetLoweringObjectFileELF>()),
+      Subtarget(TT, CPU.str(), FS.str(), *this) {
   initAsmInfo();
   setGlobalISel(true);
   setGlobalISelAbort(GlobalISelAbortMode::Enable);

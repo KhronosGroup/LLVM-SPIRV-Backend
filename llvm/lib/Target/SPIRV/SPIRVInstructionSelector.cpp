@@ -55,7 +55,7 @@ public:
                            SPIRVTypeRegistry &TR);
 
   // Common selection code. Instruction-specific selection occurs in spvSelect()
-  bool select(MachineInstr &I, CodeGenCoverage &CoverageInfo) const override;
+  bool select(MachineInstr &I) override;
   static const char *getName() { return DEBUG_TYPE; }
 
 private:
@@ -178,8 +178,7 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(
     : InstructionSelector(), TM(TM), ST(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), TR(TR) {}
 
-bool SPIRVInstructionSelector::select(MachineInstr &I,
-                                      CodeGenCoverage &CoverageInfo) const {
+bool SPIRVInstructionSelector::select(MachineInstr &I) {
   assert(I.getParent() && "Instruction should be in a basic block!");
   assert(I.getParent()->getParent() && "Instruction should be in a function!");
 

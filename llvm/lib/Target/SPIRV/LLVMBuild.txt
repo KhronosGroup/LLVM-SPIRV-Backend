@@ -15,7 +15,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = InstPrinter MCTargetDesc TargetInfo
+subdirectories = MCTargetDesc TargetInfo
 
 [component_0]
 type = TargetGroup
@@ -34,7 +34,6 @@ required_libraries =
  CodeGen
  Core
  MC
- SPIRVAsmPrinter
  SPIRVDesc
  SPIRVInfo
  SelectionDAG

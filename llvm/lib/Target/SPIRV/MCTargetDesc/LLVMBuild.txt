@@ -18,5 +18,5 @@
 type = Library
 name = SPIRVDesc
 parent = SPIRV
-required_libraries = MC SPIRVAsmPrinter SPIRVInfo Support
+required_libraries = MC SPIRVInfo Support
 add_to_library_groups = SPIRV

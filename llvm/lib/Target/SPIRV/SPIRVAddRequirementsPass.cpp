@@ -24,7 +24,7 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/PassSupport.h"
+#include "llvm/Pass.h"
 
 #include "SPIRV.h"
 #include "SPIRVCapabilityUtils.h"
@@ -74,10 +74,10 @@ bool SPIRVAddRequirements::runOnMachineFunction(MachineFunction &MF) {
   MIRBuilder.setMBB(*MBB);
   MIRBuilder.setInstr(*MBB->begin());
 
-  for (const auto &cap : reqHandler.getMinimalCapabilities()) {
+  for (const auto &cap : *reqHandler.getMinimalCapabilities()) {
     MIRBuilder.buildInstr(SPIRV::OpCapability).addImm(cap);
   }
-  for (const auto &ext : reqHandler.getExtensions()) {
+  for (const auto &ext : *reqHandler.getExtensions()) {
     MIRBuilder.buildInstr(SPIRV::OpExtension).addImm(ext);
   }
 

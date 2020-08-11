@@ -3,4 +3,7 @@ add_llvm_library(LLVMSPIRVDesc
   SPIRVAsmBackend.cpp
   SPIRVMCCodeEmitter.cpp
   SPIRVObjectTargetWriter.cpp
+  SPIRVInstPrinter.cpp
+  ../SPIRVEnums.cpp
+  ../SPIRVExtInsts.cpp
   )

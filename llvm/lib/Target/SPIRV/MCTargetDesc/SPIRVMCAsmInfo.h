@@ -20,7 +20,8 @@ namespace llvm {
 
 class SPIRVMCAsmInfo : public MCAsmInfo {
 public:
-  explicit SPIRVMCAsmInfo(const Triple &TT) {
+    // TODO: Fix prototype
+  explicit SPIRVMCAsmInfo(const Triple &TT, const MCTargetOptions &Options) {
     IsLittleEndian = true;
 
     HasSingleParameterDotFile = false;
