@@ -194,7 +194,7 @@ protected:
   /// 3. Create the generic instruction.
   ///
   /// \return true if the translation succeeded.
-  bool translate(const Instruction &Inst);
+  virtual bool translate(const Instruction &Inst);
 
   /// Materialize \p C into virtual-register \p Reg. The generic instructions
   /// performing this materialization will be inserted into the entry block of
@@ -209,13 +209,13 @@ protected:
 
   /// Translate an LLVM bitcast into generic IR. Either a COPY or a G_BITCAST is
   /// emitted.
-  virtual bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
+  bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM load instruction into generic IR.
-  virtual bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
+  bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM store instruction into generic IR.
-  virtual bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
+  bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
 
   /// Translate an LLVM string intrinsic (memcpy, memset, ...).
   bool translateMemFunc(const CallInst &CI, MachineIRBuilder &MIRBuilder,
@@ -250,8 +250,8 @@ protected:
   /// Returns true if the value should be split into multiple LLTs.
   /// If \p Offsets is given then the split type's offsets will be stored in it.
   /// If \p Offsets is not empty it will be cleared first.
-  virtual bool valueIsSplit(const Value &V,
-                            SmallVectorImpl<uint64_t> *Offsets = nullptr);
+  bool valueIsSplit(const Value &V,
+                    SmallVectorImpl<uint64_t> *Offsets = nullptr);
 
   /// Common code for translating normal calls or invokes.
   bool translateCallBase(const CallBase &CB, MachineIRBuilder &MIRBuilder);
@@ -390,16 +390,13 @@ protected:
 
   bool translateIndirectBr(const User &U, MachineIRBuilder &MIRBuilder);
 
-  virtual bool translateExtractValue(const User &U,
-                                     MachineIRBuilder &MIRBuilder);
+  bool translateExtractValue(const User &U, MachineIRBuilder &MIRBuilder);
 
-  virtual bool translateInsertValue(const User &U,
-                                    MachineIRBuilder &MIRBuilder);
+  bool translateInsertValue(const User &U, MachineIRBuilder &MIRBuilder);
 
   bool translateSelect(const User &U, MachineIRBuilder &MIRBuilder);
 
-  virtual bool translateGetElementPtr(const User &U,
-                                      MachineIRBuilder &MIRBuilder);
+  bool translateGetElementPtr(const User &U, MachineIRBuilder &MIRBuilder);
 
   bool translateAlloca(const User &U, MachineIRBuilder &MIRBuilder);
 
@@ -512,11 +509,9 @@ protected:
 
   bool translateExtractElement(const User &U, MachineIRBuilder &MIRBuilder);
 
-  virtual bool translateShuffleVector(const User &U,
-                                      MachineIRBuilder &MIRBuilder);
+  bool translateShuffleVector(const User &U, MachineIRBuilder &MIRBuilder);
 
-  virtual bool translateAtomicCmpXchg(const User &U,
-                                      MachineIRBuilder &MIRBuilder);
+  bool translateAtomicCmpXchg(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateAtomicRMW(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateFence(const User &U, MachineIRBuilder &MIRBuilder);
   bool translateFreeze(const User &U, MachineIRBuilder &MIRBuilder);
