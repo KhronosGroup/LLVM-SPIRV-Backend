@@ -34,47 +34,40 @@ protected:
   // emitted before the LLVM IR value gets discarded
   ArrayRef<Register> getOrCreateVRegs(const Value &Val) override;
 
-  // All values use a single ID register even aggregates, so no types are split.
-  bool valueIsSplit(const Value &V,
-                    SmallVectorImpl<uint64_t> *Offsets) override {
-    return false;
-  }
+  bool translate(const Instruction &Inst) override;
 
   // Override to translate aggregate constants and null types
   bool translate(const Constant &C, Register Reg) override;
 
+  bool translateInst(const User &U, unsigned OpCode);
+
   // Translate to OpAccessChain etc. instead of flattening indices
-  bool translateGetElementPtr(const User &U,
-                              MachineIRBuilder &MIRBuilder) override;
+  bool translateGetElementPtr(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Translate to OpVectorShuffle instead of turning indices into const vector.
-  bool translateShuffleVector(const User &U,
-                              MachineIRBuilder &MIRBuilder) override;
+  bool translateShuffleVector(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Translate to OpCompositeExtract instead of flattening indices
-  bool translateExtractValue(const User &U,
-                             MachineIRBuilder &MIRBuilder) override;
+  bool translateExtractValue(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Translate to OpCompositeInsert instead of flattening indices
-  bool translateInsertValue(const User &U,
-                            MachineIRBuilder &MIRBuilder) override;
+  bool translateInsertValue(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Translate to OpLoad (the default won't work with unaligned loads)
-  bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder) override;
+  bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Translate to OpStore (the default won't work with unaligned stores)
-  bool translateStore(const User &U, MachineIRBuilder &MIRBuilder) override;
+  bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Override to ensure an explicit Bitcast is always emitted
-  bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder) override;
+  bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
 
   // Override to define a single struct reg rather than 2 separate regs
   bool translateOverflowIntrinsic(const CallInst &CI, unsigned Op,
-                                  MachineIRBuilder &MIRBuilder) override;
+                                  MachineIRBuilder &MIRBuilder);
 
   // Override to define a single struct reg rather than 2 separate regs
-  bool translateAtomicCmpXchg(const User &U,
-                              MachineIRBuilder &MIRBuilder) override;
+  bool translateAtomicCmpXchg(const User &U, MachineIRBuilder &MIRBuilder);
 
 public:
   // Initialize the type registry before calling parent function

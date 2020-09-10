@@ -110,6 +110,22 @@ bool SPIRVIRTranslator::buildGlobalValue(Register Reg, const GlobalValue *GV,
   return TR->constrainRegOperands(MIB);
 }
 
+bool SPIRVIRTranslator::translate(const Instruction &Inst) {
+  CurBuilder->setDebugLoc(Inst.getDebugLoc());
+  // We only emit constants into the entry block from here. To prevent jumpy
+  // debug behaviour set the line to 0.
+  if (const DebugLoc &DL = Inst.getDebugLoc())
+    EntryBuilder->setDebugLoc(
+        DebugLoc::get(0, 0, DL.getScope(), DL.getInlinedAtScope()));
+  else
+    EntryBuilder->setDebugLoc(DebugLoc());
+
+  if (translateInst(Inst, Inst.getOpcode()))
+    return true;
+
+  return IRTranslator::translate(Inst);
+}
+
 bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
   if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
     // Null (needs handled here to not loose the type info)
@@ -135,9 +151,76 @@ bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
       Ops.push_back(getOrCreateVReg(*C.getOperand(i)));
     }
     return buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
-  } else {
-    // Default behavior is fine as Ints, Floats etc, won't get flattened
-    return IRTranslator::translate(C, Reg);
+  } else if (auto CE = dyn_cast<ConstantExpr>(&C)) {
+
+    if (translateInst(*CE, CE->getOpcode()))
+      return true;
+  }
+
+  return IRTranslator::translate(C, Reg);
+}
+
+bool SPIRVIRTranslator::translateInst(const User &Inst, unsigned OpCode) {
+  switch (OpCode) {
+  case Instruction::GetElementPtr:
+    return translateGetElementPtr(Inst, *CurBuilder.get());
+  case Instruction::ShuffleVector:
+    return translateShuffleVector(Inst, *CurBuilder.get());
+  case Instruction::ExtractValue:
+    return translateExtractValue(Inst, *CurBuilder.get());
+  case Instruction::InsertValue:
+    return translateInsertValue(Inst, *CurBuilder.get());
+  case Instruction::Load:
+    return translateLoad(Inst, *CurBuilder.get());
+  case Instruction::Store:
+    return translateStore(Inst, *CurBuilder.get());
+  case Instruction::BitCast:
+    return translateBitCast(Inst, *CurBuilder.get());
+  case Instruction::Call: {
+    const CallInst &CI = cast<CallInst>(Inst);
+    auto TII = MF->getTarget().getIntrinsicInfo();
+    const Function *F = CI.getCalledFunction();
+
+    // FIXME: support Windows dllimport function calls.
+    if (F && F->hasDLLImportStorageClass())
+      return false;
+
+    if (CI.isInlineAsm())
+      return translateInlineAsm(CI, *CurBuilder);
+
+    Intrinsic::ID ID = Intrinsic::not_intrinsic;
+    if (F && F->isIntrinsic()) {
+      ID = F->getIntrinsicID();
+      if (TII && ID == Intrinsic::not_intrinsic)
+        ID = static_cast<Intrinsic::ID>(TII->getIntrinsicID(F));
+    }
+
+    if (!F || !F->isIntrinsic() || ID == Intrinsic::not_intrinsic)
+      return translateCall(CI, *CurBuilder);
+
+    assert(ID != Intrinsic::not_intrinsic && "unknown intrinsic");
+
+    switch (ID) {
+    case Intrinsic::uadd_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_UADDO, *CurBuilder);
+    case Intrinsic::sadd_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_SADDO, *CurBuilder);
+    case Intrinsic::usub_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_USUBO, *CurBuilder);
+    case Intrinsic::ssub_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_SSUBO, *CurBuilder);
+    case Intrinsic::umul_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_UMULO, *CurBuilder);
+    case Intrinsic::smul_with_overflow:
+      return translateOverflowIntrinsic(CI, TargetOpcode::G_SMULO, *CurBuilder);
+    default:
+      return false;
+    }
+  }
+  case Instruction::AtomicCmpXchg:
+    return translateAtomicCmpXchg(Inst, *CurBuilder.get());
+  default:
+    return false;
   }
 }
 
