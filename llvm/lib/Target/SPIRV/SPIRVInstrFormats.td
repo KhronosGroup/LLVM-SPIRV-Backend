@@ -10,7 +10,7 @@ def StringImm: Operand<i32>{
   let PrintMethod="printStringImm";
 }
 
-class Op<bits<16> Opcode, dag outs, dag ins, string asmstr>
+class Op<bits<16> Opcode, dag outs, dag ins, string asmstr, list<dag> pattern = []>
   : Instruction {
   field bits<16> Inst;
 
@@ -22,7 +22,7 @@ class Op<bits<16> Opcode, dag outs, dag ins, string asmstr>
   dag OutOperandList = outs;
   dag InOperandList = ins;
   let AsmString = asmstr;
-  let Pattern = [];
+  let Pattern = pattern;
 }
 
 // Pseudo instructions

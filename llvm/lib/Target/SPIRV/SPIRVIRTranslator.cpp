@@ -197,10 +197,9 @@ bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
   this->TR = ST->getSPIRVTypeRegistry();
-
   // Run the regular IRTranslator
   bool success = IRTranslator::runOnMachineFunction(MF);
-
+  TR->generateAssignInstrs(MF);
   // Clean up
   TR->reset();
   return success;

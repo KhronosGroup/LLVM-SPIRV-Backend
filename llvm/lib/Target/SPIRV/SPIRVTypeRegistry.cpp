@@ -43,17 +43,43 @@ using namespace llvm;
 SPIRVTypeRegistry::SPIRVTypeRegistry(unsigned int pointerSize)
     : pointerSize(pointerSize) {}
 
+void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
+  MachineIRBuilder MIB(MF);
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  for (auto P : VRegToTypeMap) {
+    auto Reg = P.first;
+    if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
+      continue;
+    auto *Ty = P.second;
+    auto *Def = MRI.getVRegDef(Reg);
+    MIB.setInsertPt(*Def->getParent(), Def->getNextNode()->getIterator());
+    auto &MRI = MF.getRegInfo();
+    auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+    if (auto *RC = MRI.getRegClassOrNull(Reg))
+      MRI.setRegClass(NewReg, RC);
+    auto MI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+                  .addDef(Reg)
+                  .addUse(NewReg)
+                  .addUse(getSPIRVTypeID(Ty));
+    Def->getOperand(0).setReg(NewReg);
+    constrainRegOperands(MI, &MF);
+  }
+}
+
 void SPIRVTypeRegistry::rebuildTypeTablesForFunction(MachineFunction &MF) {
   const auto TII = MF.getSubtarget().getInstrInfo();
   const auto spvTII = static_cast<const SPIRVInstrInfo *>(TII);
   for (const auto &MBB : MF) {
     for (const auto &MI : MBB) {
       if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
-        Register typeVReg = MI.getOperand(0).getReg();
-        Register idVReg = MI.getOperand(1).getReg();
+        Register typeVReg = MI.getOperand(2).getReg();
+        Register SrcVReg = MI.getOperand(1).getReg();
+        Register ResVReg = MI.getOperand(0).getReg();
 
         SPIRVType *type = VRegToTypeMap[typeVReg];
-        VRegToTypeMap[idVReg] = type;
+        assert(type);
+        VRegToTypeMap[SrcVReg] = type;
+        VRegToTypeMap[ResVReg] = type;
       } else if (spvTII->isTypeDeclInstr(MI)) {
         VRegToTypeMap.insert({getSPIRVTypeID(&MI), &MI});
         getExistingTypesForOpcode(MI.getOpcode())->push_back(&MI);
@@ -96,15 +122,13 @@ void SPIRVTypeRegistry::assignSPIRVTypeToVReg(SPIRVType *spirvType,
                                               Register VReg,
                                               MachineIRBuilder &MIRBuilder) {
   VRegToTypeMap[VReg] = spirvType;
-  auto MIB = MIRBuilder.buildInstr(SPIRV::ASSIGN_TYPE)
-                 .addUse(getSPIRVTypeID(spirvType))
-                 .addUse(VReg);
-  constrainRegOperands(MIB);
 }
 
 static Register createTypeVReg(MachineIRBuilder &MIRBuilder) {
   auto &MRI = MIRBuilder.getMF().getRegInfo();
-  return MRI.createVirtualRegister(&SPIRV::TYPERegClass);
+  auto Res = MRI.createGenericVirtualRegister(LLT::scalar(32));
+  MRI.setRegClass(Res, &SPIRV::TYPERegClass);
+  return Res;
 }
 
 SPIRVType *SPIRVTypeRegistry::getOpTypeBool(MachineIRBuilder &MIRBuilder) {
@@ -603,9 +627,11 @@ SPIRVTypeRegistry::addressSpaceToStorageClass(unsigned int addressSpace) {
   }
 }
 
-bool SPIRVTypeRegistry::constrainRegOperands(MachineInstrBuilder &MIB) const {
+bool SPIRVTypeRegistry::constrainRegOperands(MachineInstrBuilder &MIB, MachineFunction *MF) const {
   // A utility method to avoid having these TII, TRI, RBI lines everywhere
-  const auto &subtarget = MIB->getMF()->getSubtarget();
+  if (!MF)
+    MF = MIB->getMF();
+  const auto &subtarget = MF->getSubtarget();
   const TargetInstrInfo *TII = subtarget.getInstrInfo();
   const TargetRegisterInfo *TRI = subtarget.getRegisterInfo();
   const RegisterBankInfo *RBI = subtarget.getRegBankInfo();
