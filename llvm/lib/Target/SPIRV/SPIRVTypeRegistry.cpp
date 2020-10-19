@@ -52,7 +52,10 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
       continue;
     auto *Ty = P.second;
     auto *Def = MRI.getVRegDef(Reg);
-    MIB.setInsertPt(*Def->getParent(), Def->getNextNode()->getIterator());
+
+    MIB.setInsertPt(*Def->getParent(),
+                    (Def->getNextNode() ? Def->getNextNode()->getIterator()
+                                        : Def->getParent()->end()));
     auto &MRI = MF.getRegInfo();
     auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
     if (auto *RC = MRI.getRegClassOrNull(Reg))
