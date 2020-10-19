@@ -42,11 +42,14 @@ private:
 void SPIRVObjectWriter::writeHeader(const MCAssembler &Asm) {
   uint32_t MagicNumber = 0x07230203;
 
+  // TODO: set the version on a min-necessary basis (just like the translator does)
+  //       requires some refactoring of MCAssembler::VersionInfoType
   uint32_t Major = 1;
-  uint32_t Minor = 4;
+  uint32_t Minor = 0;
   uint32_t VersionNumber = 0 | (Major << 16) | (Minor << 8);
-
+  // TODO: check if we could use anything other than 0 (spec allows)
   uint32_t GeneratorMagicNumber = 0;
+  // TODO: do not hardcode this as well
   uint32_t Bound = 900;
   uint32_t Schema = 0;
 
@@ -59,7 +62,6 @@ void SPIRVObjectWriter::writeHeader(const MCAssembler &Asm) {
 
 uint64_t SPIRVObjectWriter::writeObject(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) {
-
   uint64_t StartOffset = W.OS.tell();
 
   writeHeader(Asm);
