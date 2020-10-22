@@ -38,6 +38,7 @@ private:
   void pruneCapabilities(const CapabilityList &toPrune);
 
 public:
+  SPIRVRequirementHandler() : minVersion(0), maxVersion(0) {}
   uint32_t getMinVersion() const { return minVersion; }
   uint32_t getMaxVersion() const { return maxVersion; }
   const CapabilityList *getMinimalCapabilities() const { return &minimalCaps; };
