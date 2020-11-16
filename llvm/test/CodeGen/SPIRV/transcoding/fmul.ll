@@ -1,27 +1,27 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV: 3 Name [[#r1:]] "r1"
-; CHECK-SPIRV: 3 Name [[#r2:]] "r2"
-; CHECK-SPIRV: 3 Name [[#r3:]] "r3"
-; CHECK-SPIRV: 3 Name [[#r4:]] "r4"
-; CHECK-SPIRV: 3 Name [[#r5:]] "r5"
-; CHECK-SPIRV: 3 Name [[#r6:]] "r6"
-; CHECK-SPIRV: 3 Name [[#r7:]] "r7"
-; CHECK-SPIRV-NOT: 4 Decorate [[#r1]] FPFastMathMode
-; CHECK-SPIRV-DAG: 4 Decorate [[#r2]] FPFastMathMode 1
-; CHECK-SPIRV-DAG: 4 Decorate [[#r3]] FPFastMathMode 2
-; CHECK-SPIRV-DAG: 4 Decorate [[#r4]] FPFastMathMode 4
-; CHECK-SPIRV-DAG: 4 Decorate [[#r5]] FPFastMathMode 8
-; CHECK-SPIRV-DAG: 4 Decorate [[#r6]] FPFastMathMode 16
-; CHECK-SPIRV-DAG: 4 Decorate [[#r7]] FPFastMathMode 3
-; CHECK-SPIRV: 3 TypeFloat [[float:[0-9]+]] 32
-; CHECK-SPIRV: 5 FMul [[float]] [[#r1]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r2]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r3]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r4]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r5]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r6]]
-; CHECK-SPIRV: 5 FMul [[float]] [[#r7]]
+; CHECK-SPIRV: OpName %[[#r1:]] "r1"
+; CHECK-SPIRV: OpName %[[#r2:]] "r2"
+; CHECK-SPIRV: OpName %[[#r3:]] "r3"
+; CHECK-SPIRV: OpName %[[#r4:]] "r4"
+; CHECK-SPIRV: OpName %[[#r5:]] "r5"
+; CHECK-SPIRV: OpName %[[#r6:]] "r6"
+; CHECK-SPIRV: OpName %[[#r7:]] "r7"
+; CHECK-SPIRV-NOT: OpDecorate %[[#r1]] FPFastMathMode
+; CHECK-SPIRV-DAG: OpDecorate %[[#r2]] FPFastMathMode NotNaN
+; CHECK-SPIRV-DAG: OpDecorate %[[#r3]] FPFastMathMode NotInf
+; CHECK-SPIRV-DAG: OpDecorate %[[#r4]] FPFastMathMode NSZ
+; CHECK-SPIRV-DAG: OpDecorate %[[#r5]] FPFastMathMode AllowRecip
+; CHECK-SPIRV-DAG: OpDecorate %[[#r6]] FPFastMathMode NotNaN|NotInf|NSZ|AllowRecip|Fast
+; CHECK-SPIRV-DAG: OpDecorate %[[#r7]] FPFastMathMode NotNaN|NotInf
+; CHECK-SPIRV: %[[float:[0-9]+]] = OpTypeFloat 32
+; CHECK-SPIRV: %[[#r1]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r2]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r3]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r4]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r5]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r6]] = OpFMul %[[float]]
+; CHECK-SPIRV: %[[#r7]] = OpFMul %[[float]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"

@@ -2,10 +2,10 @@
 
 ; The OpDot operands must be vectors; check that translating dot with
 ; scalar arguments does not result in OpDot.
-; CHECK-SPIRV-LABEL: 5 Function
-; CHECK-SPIRV: 5 FMul
-; CHECK-SPIRV-NOT: Dot
-; CHECK-SPIRV: FunctionEnd
+; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFMul
+; CHECK-SPIRV-NOT: OpDot
+; CHECK-SPIRV: OpFunctionEnd
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"

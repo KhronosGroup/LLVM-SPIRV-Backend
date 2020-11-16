@@ -71,7 +71,7 @@ attributes #0 = { convergent noinline norecurse nounwind optnone "correctly-roun
 
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 2, i32 0}
-!2 = !{!"clang version 12.0.0 (https://gerrit-gfx-fm.intel.com/a/gfx/spirv/LLVM-SPIRV-Backend 6b10242b744a2ff28490f1393c6d1e31748ba5ae)"}
+!2 = !{!"clang version 12.0.0"}
 !3 = !{i32 1, i32 1}
 !4 = !{!"none", !"none"}
 !5 = !{!"int*", !"int*"}
