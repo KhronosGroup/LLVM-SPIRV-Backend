@@ -5,7 +5,7 @@
 ; CHECK-SPIRV: %[[short2]] = OpBitReverse
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spirv64-unknown-unknown"
+target triple = "spirv32-unknown-unknown"
 
 ; Function Attrs: convergent nounwind writeonly
 define spir_kernel void @testBitRev(<2 x i16> %a, <2 x i16> %b, <2 x i16> %c, <2 x i16> addrspace(1)* nocapture %res) local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
