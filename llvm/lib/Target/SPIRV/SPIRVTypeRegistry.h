@@ -30,12 +30,12 @@
 
 namespace AQ = AccessQualifier;
 
+bool isTypeFoldingSupported(unsigned Opcode);
+
 namespace llvm {
 using SPIRVType = const MachineInstr;
 
 class SPIRVTypeRegistry {
-
-private:
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
   // Reconstituted from ASSIGN_TYPE machineInstrs in subsequent passes.

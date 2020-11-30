@@ -19,24 +19,29 @@ include "SPIRVEnums.td"
 
 //Codegen only metadata instructions
 let isCodeGenOnly=1 in {
-  def ASSIGN_TYPE: Pseudo<(outs ID:$dst_id), (ins ID:$src_id, TYPE:$src_ty)>;
+  def ASSIGN_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
 }
 
-def SPVType   : SDTypeProfile<1, 2, []>;
-def AssType: SDNode<"SPIRVISD::AssType", SPVType>;
-def : GINodeEquiv<ASSIGN_TYPE, AssType>;
+def SPVTypeBin   : SDTypeProfile<1, 2, []>;
+
+def assigntype: SDNode<"SPIRVISD::AssignType", SPVTypeBin>;
+
+def : GINodeEquiv<ASSIGN_TYPE, assigntype>;
 
 class BinOp<string name, bits<16> opCode, list<dag> pattern=[]>
-                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, ID:$src, ID:$src2),
+                : Op<opCode, (outs ANYID:$dst), (ins TYPE:$src_ty, ANYID:$src, ANYID:$src2),
                   "$dst = "#name#" $src_ty $src $src2", pattern>;
 
-class BinOpTyFolded<string name, bits<16> opCode, dag node>
-                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, ID:$src, ID:$src2),
-                  "$dst = "#name#" $src_ty $src $src2", [(set ID:$dst, (AssType node, TYPE:$src_ty))]>;
+class BinOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
+                : Op<opCode, (outs CID:$dst), (ins TYPE:$src_ty, CID:$src, CID:$src2),
+                  "$dst = "#name#" $src_ty $src $src2", [(set CID:$dst, (assigntype (node CID:$src, CID:$src2), TYPE:$src_ty))]>;
 
-class UnOp<string name, bits<16> opCode>
-                : Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
-                  "$dst = "#name#" $type $src">;
+class UnOp<string name, bits<16> opCode, list<dag> pattern=[]>
+                : Op<opCode, (outs ANYID:$dst), (ins TYPE:$type, ANYID:$src),
+                  "$dst = "#name#" $type $src", pattern>;
+class UnOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
+                : Op<opCode, (outs CID:$dst), (ins TYPE:$src_ty, CID:$src),
+                  "$dst = "#name#" $src_ty $src", [(set CID:$dst, (assigntype (node CID:$src), TYPE:$src_ty))]>;
 
 class SimpleOp<string name, bits<16> opCode>: Op<opCode, (outs), (ins), name>;
 
@@ -149,9 +154,41 @@ def OpTypeCooperativeMatrixNV: Op<5358, (outs TYPE:$res),
 
 //3.32.7 Constant-Creation Instructions
 
-def OpConstantTrue: Op<41, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantTrue $ty">;
-def OpConstantFalse: Op<42, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantFalse $ty">;
-def OpConstant: Op<43, (outs ID:$res), (ins TYPE:$ty, variable_ops), "$res = OpConstant $ty">;
+def imm_to_i32 : SDNodeXForm<imm, [{
+return CurDAG->getTargetConstant(
+  N->getValueAP().bitcastToAPInt().getZExtValue(), SDLoc(N), MVT::i32);
+}]>;
+
+def fimm_to_i32 : SDNodeXForm<imm, [{
+return CurDAG->getTargetConstant(
+  N->getValueAPF().bitcastToAPInt().getZExtValue(), SDLoc(N), MVT::i32);
+}]>;
+
+def gi_bitcast_fimm_to_i32 : GICustomOperandRenderer<"renderFImm32">,
+  GISDNodeXFormEquiv<fimm_to_i32>;
+
+def gi_bitcast_imm_to_i32 : GICustomOperandRenderer<"renderImm32">,
+  GISDNodeXFormEquiv<imm_to_i32>;
+
+def PseudoConstI: IntImmLeaf<i32, [{ return true; }], imm_to_i32>;
+def PseudoConstF: FPImmLeaf<f32, [{ return true; }], fimm_to_i32>;
+def ConstPseudoTrue: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 1; }]>;
+def ConstPseudoFalse: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 0; }]>;
+
+multiclass IntFPImm<bits<16> opCode, string name> {
+  def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
+                  "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstI:$src, TYPE:$type))]>;
+  def F: Op<opCode, (outs FID:$dst), (ins TYPE:$type, FID:$src),
+                  "$dst = "#name#" $type $src", [(set FID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
+}
+
+def OpConstantTrue: Op<41, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantTrue $src_ty",
+                      [(set ID:$dst, (assigntype ConstPseudoTrue, TYPE:$src_ty))]>;
+def OpConstantFalse: Op<42, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantFalse $src_ty",
+                      [(set ID:$dst, (assigntype ConstPseudoFalse, TYPE:$src_ty))]>;
+
+defm OpConstant: IntFPImm<43, "OpConstant">;
+
 def OpConstantComposite: Op<44, (outs ID:$res), (ins TYPE:$type, variable_ops),
                   "$res = OpConstantComposite $type">;
 def OpConstantSampler: Op<45, (outs ID:$res),
@@ -336,6 +373,7 @@ def OpSConvert : UnOp<"OpSConvert", 114>;
 def OpFConvert : UnOp<"OpFConvert", 115>;
 
 def OpQuantizeToF16 : UnOp<"OpQuantizeToF16", 116>;
+
 def OpConvertPtrToU : UnOp<"OpConvertPtrToU", 117>;
 
 def OpSatConvertSToU : UnOp<"OpSatConvertSToU", 118>;
@@ -370,26 +408,26 @@ def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 //3.32.13 Arithmetic Instructions
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
-def OpFNegate: UnOp<"OpFNegate", 127>;
-def OpIAdd: BinOpTyFolded<"OpIAdd", 128, (add ID:$src, ID:$src2)>;
-def OpFAdd: BinOp<"OpFAdd", 129>;
+def OpFNegate: UnOpTyped<"OpFNegate", 127, FID, fneg>;
+def OpIAdd: BinOpTyped<"OpIAdd", 128, ID, add>;
+def OpFAdd: BinOpTyped<"OpFAdd", 129, FID, fadd>;
 
-def OpISub: BinOp<"OpISub", 130>;
-def OpFSub: BinOp<"OpFSub", 131>;
+def OpISub: BinOpTyped<"OpISub", 130, ID, sub>;
+def OpFSub: BinOpTyped<"OpFSub", 131, FID, fsub>;
 
-def OpIMul: BinOp<"OpIMul", 132>;
-def OpFMul: BinOp<"OpFMul", 133>;
+def OpIMul: BinOpTyped<"OpIMul", 132, ID, mul>;
+def OpFMul: BinOpTyped<"OpFMul", 133, FID, fmul>;
 
-def OpUDiv: BinOp<"OpUDiv", 134>;
-def OpSDiv: BinOp<"OpSDiv", 135>;
-def OpFDiv: BinOp<"OpFDiv", 136>;
+def OpUDiv: BinOpTyped<"OpUDiv", 134, ID, udiv>;
+def OpSDiv: BinOpTyped<"OpSDiv", 135, ID, sdiv>;
+def OpFDiv: BinOpTyped<"OpFDiv", 136, FID, fdiv>;
 
-def OpUMod: BinOp<"OpUMod", 137>;
+def OpUMod: BinOpTyped<"OpUMod", 137, ID, urem>;
 
-def OpSRem : BinOp<"OpSRem", 138>;
+def OpSRem : BinOpTyped<"OpSRem", 138, ID, srem>;
 def OpSMod: BinOp<"OpSMod", 139>;
 
-def OpFRem: BinOp<"OpFRem", 140>;
+def OpFRem: BinOpTyped<"OpFRem", 140, FID, frem>;
 def OpFMod: BinOp<"OpFMod", 141>;
 
 def OpVectorTimesScalar: BinOp<"OpVectorTimesScalar", 142>;
@@ -401,20 +439,20 @@ def OpMatrixTimesMatrix: BinOp<"OpMatrixTimesMatrix", 146>;
 def OpOuterProduct: BinOp<"OpOuterProduct", 147>;
 def OpDot: BinOp<"OpDot", 148>;
 
-def OpIAddCarry: BinOp<"OpIAddCarry", 149>;
-def OpISubBorrow: BinOp<"OpISubBorrow", 150>;
+def OpIAddCarry: BinOpTyped<"OpIAddCarry", 149, ID, addc>;
+def OpISubBorrow: BinOpTyped<"OpISubBorrow", 150, ID, subc>;
 def OpUMulExtended: BinOp<"OpUMulExtended", 151>;
 def OpSMulExtended: BinOp<"OpSMulExtended", 152>;
 
 //3.32.14 Bit Instructions
 
-def OpShiftRightLogical: BinOp<"OpShiftRightLogical", 194>;
-def OpShiftRightArithmetic: BinOp<"OpShiftRightArithmetic", 195>;
-def OpShiftLeftLogical: BinOp<"OpShiftLeftLogical", 196>;
+def OpShiftRightLogical: BinOpTyped<"OpShiftRightLogical", 194, ID, srl>;
+def OpShiftRightArithmetic: BinOpTyped<"OpShiftRightArithmetic", 195, ID, sra>;
+def OpShiftLeftLogical: BinOpTyped<"OpShiftLeftLogical", 196, ID, shl>;
 
-def OpBitwiseOr: BinOp<"OpBitwiseOr", 197>;
-def OpBitwiseXor: BinOp<"OpBitwiseXor", 198>;
-def OpBitwiseAnd: BinOp<"OpBitwiseAnd", 199>;
+def OpBitwiseOr: BinOpTyped<"OpBitwiseOr", 197, ID, or>;
+def OpBitwiseXor: BinOpTyped<"OpBitwiseXor", 198, ID, xor>;
+def OpBitwiseAnd: BinOpTyped<"OpBitwiseAnd", 199, ID, and>;
 def OpNot: UnOp<"OpNot", 200>;
 
 def OpBitFieldInsert: Op<201, (outs ID:$res),
@@ -513,7 +551,7 @@ def OpSwitch: Op<251, (outs), (ins ID:$sel, ID:$dflt, variable_ops), "OpSwitch $
 let isReturn = 1, hasDelaySlot=0, isBarrier = 0, isTerminator=1, isNotDuplicable = 1 in {
   def OpKill: SimpleOp<"OpKill", 252>;
   def OpReturn: SimpleOp<"OpReturn", 253>;
-  def OpReturnValue: Op<254, (outs), (ins ID:$ret), "OpReturnValue $ret">;
+  def OpReturnValue: Op<254, (outs), (ins ANYID:$ret), "OpReturnValue $ret">;
   def OpUnreachable: SimpleOp<"OpUnreachable", 255>;
 }
 def OpLifetimeStart: Op<256, (outs), (ins ID:$ptr, i32imm:$sz), "OpLifetimeStart $ptr, $sz">;
