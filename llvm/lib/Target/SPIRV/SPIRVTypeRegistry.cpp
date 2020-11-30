@@ -40,6 +40,32 @@
 
 using namespace llvm;
 
+bool isTypeFoldingSupported(unsigned Opcode) {
+  switch(Opcode) {
+    case TargetOpcode::G_ADD:
+    case TargetOpcode::G_FADD:
+    case TargetOpcode::G_SUB:
+    case TargetOpcode::G_FSUB:
+    case TargetOpcode::G_MUL:
+    case TargetOpcode::G_FMUL:
+    case TargetOpcode::G_SDIV:
+    case TargetOpcode::G_UDIV:
+    case TargetOpcode::G_FDIV:
+    case TargetOpcode::G_SREM:
+    case TargetOpcode::G_UREM:
+    case TargetOpcode::G_FREM:
+    case TargetOpcode::G_FNEG:
+    case TargetOpcode::G_CONSTANT:
+    case TargetOpcode::G_FCONSTANT:
+    case TargetOpcode::G_AND:
+    case TargetOpcode::G_OR:
+    case TargetOpcode::G_XOR:
+      return true;
+    default:
+      return false;
+  }
+}
+
 SPIRVTypeRegistry::SPIRVTypeRegistry(unsigned int pointerSize)
     : pointerSize(pointerSize) {}
 

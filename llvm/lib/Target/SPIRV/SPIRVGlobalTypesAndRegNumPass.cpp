@@ -196,6 +196,8 @@ static Register hoistMetaInstr(MachineInstr &toHoist,
     MachineOperand op = toHoist.getOperand(i);
     if (op.isImm()) {
       MIB.addImm(op.getImm());
+    } else if (op.isFPImm()) {
+      MIB.addFPImm(op.getFPImm());
     } else if (op.isReg()) {
       Register metaReg = localToMetaVRegAliasMap[op.getReg()];
       assert(metaReg.isValid() && "No reg alias found");

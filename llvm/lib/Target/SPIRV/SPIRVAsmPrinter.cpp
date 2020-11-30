@@ -68,6 +68,10 @@ void SPIRVAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
     O << MO.getImm();
     break;
 
+  case MachineOperand::MO_FPImmediate:
+    O << MO.getFPImm();
+    break;
+
   case MachineOperand::MO_MachineBasicBlock:
     O << *MO.getMBB()->getSymbol();
     break;

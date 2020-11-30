@@ -208,6 +208,25 @@ class SPIRVInstructionSelect : public InstructionSelect {
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     auto *TR = ST->getSPIRVTypeRegistry();
     TR->rebuildTypeTablesForFunction(MF);
+    auto &MRI = MF.getRegInfo();
+
+    // we need to rewrite types for tblgen'erated selection
+    // to be able to select anything
+    // we can't do this on legalizer because in general it breaks
+    // the overall semantics for the types PoV
+    for (auto &MBB : MF) {
+      for (auto &MI : MBB) {
+        if (MI.getNumOperands() > 0) {
+          auto &Op = MI.getOperand(0);
+          if (Op.isReg() && Op.isDef())
+            MRI.setType(Op.getReg(), LLT::scalar(32));
+        }
+      }
+    }
+    // type rewriting is what makes tblgen'erated selection work,
+    // but due to that the legality check before running the selection fails
+    // and we have to disable it here
+    DisableGISelLegalityCheck = true;
 
     bool success = InstructionSelect::runOnMachineFunction(MF);
 

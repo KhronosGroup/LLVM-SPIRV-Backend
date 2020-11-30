@@ -164,7 +164,8 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
           }
           break;
         }
-        case SPIRV::OpConstant:
+        case SPIRV::OpConstantI:
+        case SPIRV::OpConstantF:
           printOpConstantVarOps(MI, numFixedOps, O);
           break;
         default:
@@ -276,7 +277,9 @@ void SPIRVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
     if (Op.isReg()) {
       O << "%" << (Register::virtReg2Index(Op.getReg()) + 1);
     } else if (Op.isImm()) {
-      O << formatImm((int32_t)Op.getImm());
+      O << formatImm((int64_t)Op.getImm());
+    } else if (Op.isFPImm()) {
+      O << formatImm((float)Op.getFPImm());
     } else {
       assert(Op.isExpr() && "Expected an expression");
       printExpr(Op.getExpr(), O);

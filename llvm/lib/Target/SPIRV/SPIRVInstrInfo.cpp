@@ -33,7 +33,8 @@ bool SPIRVInstrInfo::isConstantInstr(const MachineInstr &MI) const {
   switch (MI.getOpcode()) {
   case OpConstantTrue:
   case OpConstantFalse:
-  case OpConstant:
+  case OpConstantI:
+  case OpConstantF:
   case OpConstantComposite:
   case OpConstantSampler:
   case OpConstantNull:
