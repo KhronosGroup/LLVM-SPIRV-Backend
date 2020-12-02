@@ -23,6 +23,7 @@ class SPIRVSubtarget;
 // This class provides the information for legalizing SPIR-V instructions.
 class SPIRVLegalizerInfo : public LegalizerInfo {
 public:
+  bool legalizeCustom(LegalizerHelper &Helper, MachineInstr &MI) const override;
   SPIRVLegalizerInfo(const SPIRVSubtarget &ST);
 };
 } // namespace llvm

@@ -535,6 +535,7 @@ static void decorate(Register target, Decoration::Decoration dec,
                      MachineIRBuilder &MIRBuilder) {
   MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(target).addImm(dec);
 }
+
 static void decorate(Register target, Decoration::Decoration dec, uint32_t imm,
                      MachineIRBuilder &MIRBuilder) {
   MIRBuilder.buildInstr(SPIRV::OpDecorate)
@@ -543,27 +544,7 @@ static void decorate(Register target, Decoration::Decoration dec, uint32_t imm,
       .addImm(imm);
 }
 
-static uint32_t getFastMathFlags(const MachineInstr &I) {
-  uint32_t flags = FPFastMathMode::None;
-  if (I.getFlag(MachineInstr::MIFlag::FmNoNans)) {
-    flags |= FPFastMathMode::NotNaN;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs)) {
-    flags |= FPFastMathMode::NotInf;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmNsz)) {
-    flags |= FPFastMathMode::NSZ;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmArcp)) {
-    flags |= FPFastMathMode::AllowRecip;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmReassoc)) {
-    flags |= FPFastMathMode::Fast;
-  }
-  return flags;
-}
-
-// can remove for a while??
+// TODO: move to Legalizer just like fastmath flags were
 static void handleIntegerWrapFlags(const MachineInstr &I, Register target,
                                    unsigned newOpcode, const SPIRVSubtarget &ST,
                                    MachineIRBuilder &MIRBuilder) {
@@ -596,12 +577,6 @@ bool SPIRVInstructionSelector::selectShiftOp(Register resVReg,
   if (!success)
     return false;
 
-  if (canUseFastMathFlags(newOpcode)) {
-    auto fmFlags = getFastMathFlags(I);
-    if (fmFlags != FPFastMathMode::None) {
-      decorate(resVReg, Decoration::FPFastMathMode, fmFlags, MIRBuilder);
-    }
-  }
   handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder);
   return true;
 }
