@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SPIRV.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVSubtarget.h"
-#include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
+#include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -125,9 +126,11 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
       .legalFor(allScalarsAndVectors);
 
-  getActionDefinitionsBuilder(
-      {G_FADD, G_FSUB, G_FMA, G_FMUL, G_FDIV, G_FREM, G_FNEG})
+  getActionDefinitionsBuilder({G_FMA, G_FNEG})
       .legalFor(allFloatScalarsAndVectors);
+
+  getActionDefinitionsBuilder({G_FADD, G_FSUB, G_FMUL, G_FDIV, G_FREM})
+      .customFor(allFloatScalarsAndVectors);
 
   getActionDefinitionsBuilder({G_FPTOSI, G_FPTOUI})
       .legalForCartesianProduct(allIntScalarsAndVectors,
@@ -258,4 +261,40 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 
   computeTables();
   verify(*ST.getInstrInfo());
+}
+
+static uint32_t getFastMathFlags(const MachineInstr &I) {
+  uint32_t flags = FPFastMathMode::None;
+  if (I.getFlag(MachineInstr::MIFlag::FmNoNans)) {
+    flags |= FPFastMathMode::NotNaN;
+  }
+  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs)) {
+    flags |= FPFastMathMode::NotInf;
+  }
+  if (I.getFlag(MachineInstr::MIFlag::FmNsz)) {
+    flags |= FPFastMathMode::NSZ;
+  }
+  if (I.getFlag(MachineInstr::MIFlag::FmArcp)) {
+    flags |= FPFastMathMode::AllowRecip;
+  }
+  if (I.getFlag(MachineInstr::MIFlag::FmReassoc)) {
+    flags |= FPFastMathMode::Fast;
+  }
+  return flags;
+}
+
+bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
+                                        MachineInstr &MI) const {
+  auto fmFlags = getFastMathFlags(MI);
+  if (fmFlags != FPFastMathMode::None) {
+    // can be only a source of an ASSIGN_TYPE instr
+    assert(MI.getMF()->getRegInfo().hasOneUse(MI.getOperand(0).getReg()));
+    auto DstReg = MI.getMF()->getRegInfo().use_instr_begin(MI.getOperand(0).getReg())->getOperand(0).getReg();
+    Helper.MIRBuilder.buildInstr(SPIRV::OpDecorate)
+      .addUse(DstReg)
+    //   .addUse(MI.getNumDefs() > 0 ? MI.getOperand(0).getReg() : Register(0))
+      .addImm(Decoration::FPFastMathMode)
+      .addImm(fmFlags);
+  }
+  return true;
 }
