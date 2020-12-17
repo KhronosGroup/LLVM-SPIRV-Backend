@@ -640,7 +640,7 @@ def scalar_to_vector : SDNode<"ISD::SCALAR_TO_VECTOR", SDTypeProfile<1, 1, []>,
 // vector_extract/vector_insert are deprecated. extractelt/insertelt
 // are preferred.
 def vector_extract : SDNode<"ISD::EXTRACT_VECTOR_ELT",
-    SDTypeProfile<1, 2, [SDTCisPtrTy<2>]>, []>;
+    SDTypeProfile<1, 2, [SDTCisEltOfVec<0, 1>, SDTCisPtrTy<2>]>, []>;
 def vector_insert : SDNode<"ISD::INSERT_VECTOR_ELT",
     SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>, SDTCisPtrTy<3>]>, []>;
 def concat_vectors : SDNode<"ISD::CONCAT_VECTORS",

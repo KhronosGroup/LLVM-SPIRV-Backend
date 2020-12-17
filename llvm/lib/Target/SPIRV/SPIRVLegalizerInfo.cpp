@@ -158,19 +158,19 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
         return Query.Types[0].getSizeInBits() == Query.Types[1].getSizeInBits();
       }))));
 
-  getActionDefinitionsBuilder(G_INSERT_VECTOR_ELT)
-      .legalIf(all(typeInSet(0, allVectors), typeInSet(1, allScalars),
-                   typeInSet(2, allIntScalars),
-                   LegalityPredicate([=](const LegalityQuery &Query) {
-                     return Query.Types[0].getElementType() == Query.Types[1];
-                   })));
+  // getActionDefinitionsBuilder(G_INSERT_VECTOR_ELT)
+  //     .legalIf(all(typeInSet(0, allVectors), typeInSet(1, allScalars),
+  //                  typeInSet(2, allIntScalars),
+  //                  LegalityPredicate([=](const LegalityQuery &Query) {
+  //                    return Query.Types[0].getElementType() == Query.Types[1];
+  //                  })));
 
-  getActionDefinitionsBuilder(G_EXTRACT_VECTOR_ELT)
-      .legalIf(all(typeInSet(0, allScalars), typeInSet(1, allVectors),
-                   typeInSet(2, allIntScalars),
-                   LegalityPredicate(([=](const LegalityQuery &Query) {
-                     return Query.Types[1].getElementType() == Query.Types[0];
-                   }))));
+  // getActionDefinitionsBuilder(G_EXTRACT_VECTOR_ELT)
+  //     .legalIf(all(typeInSet(0, allScalars), typeInSet(1, allVectors),
+  //                  typeInSet(2, allIntScalars),
+  //                  LegalityPredicate(([=](const LegalityQuery &Query) {
+  //                    return Query.Types[1].getElementType() == Query.Types[0];
+  //                  }))));
 
   getActionDefinitionsBuilder(G_IMPLICIT_DEF).alwaysLegal();
 

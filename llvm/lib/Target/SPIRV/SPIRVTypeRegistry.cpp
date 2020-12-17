@@ -58,7 +58,9 @@ static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_FCONSTANT,
     TargetOpcode::G_AND,
     TargetOpcode::G_OR,
-    TargetOpcode::G_XOR};
+    TargetOpcode::G_XOR,
+    TargetOpcode::G_EXTRACT_VECTOR_ELT,
+    TargetOpcode::G_INSERT_VECTOR_ELT};
 
 const std::unordered_set<unsigned>& getTypeFoldingSupportingOpcs() {
   return TypeFoldingSupportingOpcs;
