@@ -28,8 +28,11 @@
 #include "SPIRVEnums.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
+#include <unordered_set>
+
 namespace AQ = AccessQualifier;
 
+const std::unordered_set<unsigned>& getTypeFoldingSupportingOpcs();
 bool isTypeFoldingSupported(unsigned Opcode);
 
 namespace llvm {

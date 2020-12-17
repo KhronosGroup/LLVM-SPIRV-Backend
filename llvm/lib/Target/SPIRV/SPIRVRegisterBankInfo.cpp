@@ -31,7 +31,10 @@ const RegisterBank &SPIRVRegisterBankInfo::getRegBankFromRegClass(
   case SPIRV::TYPERegClassID:
     return SPIRV::TYPERegBank;
   case SPIRV::IDRegClassID:
-  case SPIRV::FIDRegClassID:
+  case SPIRV::fIDRegClassID:
+  case SPIRV::pIDRegClassID:
+  case SPIRV::vIDRegClassID:
+  case SPIRV::vfIDRegClassID:
   case SPIRV::ANYIDRegClassID:
   case SPIRV::ANYRegClassID:
     return SPIRV::IDRegBank;

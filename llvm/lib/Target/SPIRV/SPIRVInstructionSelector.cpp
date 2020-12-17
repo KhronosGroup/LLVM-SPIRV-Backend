@@ -493,11 +493,16 @@ bool SPIRVInstructionSelector::selectExtInst(Register resVReg,
 static bool canUseFastMathFlags(unsigned opCode) {
   using namespace SPIRV;
   switch (opCode) {
-  case OpFAdd:
-  case OpFSub:
-  case OpFMul:
-  case OpFDiv:
-  case OpFRem:
+  case OpFAddS:
+  case OpFAddV:
+  case OpFSubS:
+  case OpFSubV:
+  case OpFMulS:
+  case OpFMulV:
+  case OpFDivS:
+  case OpFDivV:
+  case OpFRemS:
+  case OpFRemV:
   case OpFMod:
     return true;
   default:
