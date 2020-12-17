@@ -11,6 +11,7 @@
 
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 
 namespace llvm {
 class SPIRVTargetMachine;
@@ -22,6 +23,7 @@ FunctionPass *createSPIRVBasicBlockDominancePass();
 FunctionPass *createSPIRVBlockLabelerPass();
 FunctionPass *createSPIRVAddRequirementsPass();
 ModulePass *createSPIRVGlobalTypesAndRegNumPass();
+MachineFunctionPass *createSPIRVGenerateDecorationsPass();
 
 InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
@@ -32,6 +34,7 @@ void initializeSPIRVBasicBlockDominancePass(PassRegistry &);
 void initializeSPIRVBlockLabelerPass(PassRegistry &);
 void initializeSPIRVAddRequirementsPass(PassRegistry &);
 void initializeSPIRVGlobalTypesAndRegNumPass(PassRegistry &);
+void initializeSPIRVGenerateDecorationsPass(PassRegistry &);
 } // namespace llvm
 
 #endif

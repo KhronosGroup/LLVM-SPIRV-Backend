@@ -20,6 +20,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVEnums.cpp
   SPIRVEnumRequirements.cpp
   SPIRVExtInsts.cpp
+  SPIRVGenerateDecorations.cpp
   SPIRVGlobalTypesAndRegNumPass.cpp
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp

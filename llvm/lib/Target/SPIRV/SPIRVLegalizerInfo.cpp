@@ -266,20 +266,6 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   verify(*ST.getInstrInfo());
 }
 
-static uint32_t getFastMathFlags(const MachineInstr &I) {
-  uint32_t flags = FPFastMathMode::None;
-  if (I.getFlag(MachineInstr::MIFlag::FmNoNans))
-    flags |= FPFastMathMode::NotNaN;
-  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs))
-    flags |= FPFastMathMode::NotInf;
-  if (I.getFlag(MachineInstr::MIFlag::FmNsz))
-    flags |= FPFastMathMode::NSZ;
-  if (I.getFlag(MachineInstr::MIFlag::FmArcp))
-    flags |= FPFastMathMode::AllowRecip;
-  if (I.getFlag(MachineInstr::MIFlag::FmReassoc))
-    flags |= FPFastMathMode::Fast;
-}
-
 static unsigned isFPOpcode(unsigned Opc)
 {
   switch (Opc) {
@@ -316,17 +302,6 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI) {
 
 bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
                                         MachineInstr &MI) const {
-  auto fmFlags = getFastMathFlags(MI);
-  if (fmFlags != FPFastMathMode::None) {
-    // can be only a source of an ASSIGN_TYPE instr
-    assert(MI.getMF()->getRegInfo().hasOneUse(MI.getOperand(0).getReg()));
-    auto DstReg = MI.getMF()->getRegInfo().use_instr_begin(MI.getOperand(0).getReg())->getOperand(0).getReg();
-    Helper.MIRBuilder.buildInstr(SPIRV::OpDecorate)
-      .addUse(DstReg)
-    //   .addUse(MI.getNumDefs() > 0 ? MI.getOperand(0).getReg() : Register(0))
-      .addImm(Decoration::FPFastMathMode)
-      .addImm(fmFlags);
-  }
   auto &MRI = MI.getMF()->getRegInfo();
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
   if (MI.getOpcode() == TargetOpcode::G_CONSTANT &&

@@ -112,6 +112,7 @@ public:
   bool addIRTranslator() override;
   bool addLegalizeMachineIR() override;
   bool addRegBankSelect() override;
+  void addPreGlobalInstructionSelect() override;
   bool addGlobalInstructionSelect() override;
 
   FunctionPass *createTargetRegisterAllocator(bool) override;
@@ -246,6 +247,10 @@ class SPIRVInstructionSelect : public InstructionSelect {
   }
 };
 } // namespace
+
+void SPIRVPassConfig::addPreGlobalInstructionSelect() {
+  addPass(createSPIRVGenerateDecorationsPass());
+}
 
 // Add the custom SPIRVInstructionSelect from above
 bool SPIRVPassConfig::addGlobalInstructionSelect() {

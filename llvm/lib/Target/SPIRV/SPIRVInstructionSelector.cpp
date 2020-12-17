@@ -490,26 +490,6 @@ bool SPIRVInstructionSelector::selectExtInst(Register resVReg,
   return false;
 }
 
-static bool canUseFastMathFlags(unsigned opCode) {
-  using namespace SPIRV;
-  switch (opCode) {
-  case OpFAddS:
-  case OpFAddV:
-  case OpFSubS:
-  case OpFSubV:
-  case OpFMulS:
-  case OpFMulV:
-  case OpFDivS:
-  case OpFDivV:
-  case OpFRemS:
-  case OpFRemV:
-  case OpFMod:
-    return true;
-  default:
-    return false;
-  }
-}
-
 static bool canUseNSW(unsigned opCode) {
   using namespace SPIRV;
   switch (opCode) {
@@ -549,7 +529,7 @@ static void decorate(Register target, Decoration::Decoration dec, uint32_t imm,
       .addImm(imm);
 }
 
-// TODO: move to Legalizer just like fastmath flags were
+// TODO: move to GenerateDecorations pass
 static void handleIntegerWrapFlags(const MachineInstr &I, Register target,
                                    unsigned newOpcode, const SPIRVSubtarget &ST,
                                    MachineIRBuilder &MIRBuilder) {
