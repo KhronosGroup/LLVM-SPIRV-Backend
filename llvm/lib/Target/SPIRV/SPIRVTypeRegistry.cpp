@@ -40,30 +40,32 @@
 
 using namespace llvm;
 
+static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
+    TargetOpcode::G_ADD,
+    TargetOpcode::G_FADD,
+    TargetOpcode::G_SUB,
+    TargetOpcode::G_FSUB,
+    TargetOpcode::G_MUL,
+    TargetOpcode::G_FMUL,
+    TargetOpcode::G_SDIV,
+    TargetOpcode::G_UDIV,
+    TargetOpcode::G_FDIV,
+    TargetOpcode::G_SREM,
+    TargetOpcode::G_UREM,
+    TargetOpcode::G_FREM,
+    TargetOpcode::G_FNEG,
+    TargetOpcode::G_CONSTANT,
+    TargetOpcode::G_FCONSTANT,
+    TargetOpcode::G_AND,
+    TargetOpcode::G_OR,
+    TargetOpcode::G_XOR};
+
+const std::unordered_set<unsigned>& getTypeFoldingSupportingOpcs() {
+  return TypeFoldingSupportingOpcs;
+}
+
 bool isTypeFoldingSupported(unsigned Opcode) {
-  switch(Opcode) {
-    case TargetOpcode::G_ADD:
-    case TargetOpcode::G_FADD:
-    case TargetOpcode::G_SUB:
-    case TargetOpcode::G_FSUB:
-    case TargetOpcode::G_MUL:
-    case TargetOpcode::G_FMUL:
-    case TargetOpcode::G_SDIV:
-    case TargetOpcode::G_UDIV:
-    case TargetOpcode::G_FDIV:
-    case TargetOpcode::G_SREM:
-    case TargetOpcode::G_UREM:
-    case TargetOpcode::G_FREM:
-    case TargetOpcode::G_FNEG:
-    case TargetOpcode::G_CONSTANT:
-    case TargetOpcode::G_FCONSTANT:
-    case TargetOpcode::G_AND:
-    case TargetOpcode::G_OR:
-    case TargetOpcode::G_XOR:
-      return true;
-    default:
-      return false;
-  }
+  return TypeFoldingSupportingOpcs.count(Opcode) > 0;
 }
 
 SPIRVTypeRegistry::SPIRVTypeRegistry(unsigned int pointerSize)
@@ -76,6 +78,7 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
     auto Reg = P.first;
     if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
       continue;
+    // MRI.setType(Reg, LLT::scalar(32));
     auto *Ty = P.second;
     auto *Def = MRI.getVRegDef(Reg);
 

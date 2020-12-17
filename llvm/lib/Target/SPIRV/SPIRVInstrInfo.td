@@ -20,6 +20,11 @@ include "SPIRVEnums.td"
 //Codegen only metadata instructions
 let isCodeGenOnly=1 in {
   def ASSIGN_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
+  def GET_ID: Pseudo<(outs ID:$dst_id), (ins ANYID:$src)>;
+  def GET_fID: Pseudo<(outs fID:$dst_id), (ins ANYID:$src)>;
+  def GET_pID: Pseudo<(outs pID:$dst_id), (ins ANYID:$src)>;
+  def GET_vID: Pseudo<(outs vID:$dst_id), (ins ANYID:$src)>;
+  def GET_vfID: Pseudo<(outs vfID:$dst_id), (ins ANYID:$src)>;
 }
 
 def SPVTypeBin   : SDTypeProfile<1, 2, []>;
@@ -33,15 +38,33 @@ class BinOp<string name, bits<16> opCode, list<dag> pattern=[]>
                   "$dst = "#name#" $src_ty $src $src2", pattern>;
 
 class BinOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
-                : Op<opCode, (outs CID:$dst), (ins TYPE:$src_ty, CID:$src, CID:$src2),
-                  "$dst = "#name#" $src_ty $src $src2", [(set CID:$dst, (assigntype (node CID:$src, CID:$src2), TYPE:$src_ty))]>;
+                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, CID:$src, CID:$src2),
+                  "$dst = "#name#" $src_ty $src $src2", [(set ID:$dst, (assigntype (node CID:$src, CID:$src2), TYPE:$src_ty))]>;
+
+// integer & float
+multiclass BinOpTypedIF<string name, bits<16> opCode, SDNode node> {
+  def I: BinOpTyped<name, opCode, ID, node>;
+  def F: BinOpTyped<name, opCode, fID, node>;
+}
+
+// scalar & vector integer
+multiclass BinOpTypedSVI<string name, bits<16> opCode, SDNode node> {
+  def S: BinOpTyped<name, opCode, ID, node>;
+  def V: BinOpTyped<name, opCode, vID, node>;
+}
+
+// scalar & vector float
+multiclass BinOpTypedSVF<string name, bits<16> opCode, SDNode node> {
+  def S: BinOpTyped<name, opCode, fID, node>;
+  def V: BinOpTyped<name, opCode, vfID, node>;
+}
 
 class UnOp<string name, bits<16> opCode, list<dag> pattern=[]>
                 : Op<opCode, (outs ANYID:$dst), (ins TYPE:$type, ANYID:$src),
                   "$dst = "#name#" $type $src", pattern>;
 class UnOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
-                : Op<opCode, (outs CID:$dst), (ins TYPE:$src_ty, CID:$src),
-                  "$dst = "#name#" $src_ty $src", [(set CID:$dst, (assigntype (node CID:$src), TYPE:$src_ty))]>;
+                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, CID:$src),
+                  "$dst = "#name#" $src_ty $src", [(set ID:$dst, (assigntype (node CID:$src), TYPE:$src_ty))]>;
 
 class SimpleOp<string name, bits<16> opCode>: Op<opCode, (outs), (ins), name>;
 
@@ -178,8 +201,8 @@ def ConstPseudoFalse: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.ge
 multiclass IntFPImm<bits<16> opCode, string name> {
   def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstI:$src, TYPE:$type))]>;
-  def F: Op<opCode, (outs FID:$dst), (ins TYPE:$type, FID:$src),
-                  "$dst = "#name#" $type $src", [(set FID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
+  def F: Op<opCode, (outs fID:$dst), (ins TYPE:$type, fID:$src),
+                  "$dst = "#name#" $type $src", [(set fID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
 }
 
 def OpConstantTrue: Op<41, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantTrue $src_ty",
@@ -408,26 +431,27 @@ def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 //3.32.13 Arithmetic Instructions
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
-def OpFNegate: UnOpTyped<"OpFNegate", 127, FID, fneg>;
+def OpFNegate: UnOpTyped<"OpFNegate", 127, fID, fneg>;
 def OpIAdd: BinOpTyped<"OpIAdd", 128, ID, add>;
-def OpFAdd: BinOpTyped<"OpFAdd", 129, FID, fadd>;
+defm OpFAdd: BinOpTypedSVF<"OpFAdd", 129, fadd>;
 
 def OpISub: BinOpTyped<"OpISub", 130, ID, sub>;
-def OpFSub: BinOpTyped<"OpFSub", 131, FID, fsub>;
+def OpFSub: BinOpTyped<"OpFSub", 131, fID, fsub>;
+defm OpFSub: BinOpTypedSVF<"OpFSub", 131, fsub>;
 
 def OpIMul: BinOpTyped<"OpIMul", 132, ID, mul>;
-def OpFMul: BinOpTyped<"OpFMul", 133, FID, fmul>;
+defm OpFMul: BinOpTypedSVF<"OpFMul", 133, fmul>;
 
 def OpUDiv: BinOpTyped<"OpUDiv", 134, ID, udiv>;
 def OpSDiv: BinOpTyped<"OpSDiv", 135, ID, sdiv>;
-def OpFDiv: BinOpTyped<"OpFDiv", 136, FID, fdiv>;
+defm OpFDiv: BinOpTypedSVF<"OpFDiv", 136, fdiv>;
 
 def OpUMod: BinOpTyped<"OpUMod", 137, ID, urem>;
 
 def OpSRem : BinOpTyped<"OpSRem", 138, ID, srem>;
 def OpSMod: BinOp<"OpSMod", 139>;
 
-def OpFRem: BinOpTyped<"OpFRem", 140, FID, frem>;
+defm OpFRem: BinOpTypedSVF<"OpFRem", 140, frem>;
 def OpFMod: BinOp<"OpFMod", 141>;
 
 def OpVectorTimesScalar: BinOp<"OpVectorTimesScalar", 142>;
@@ -446,13 +470,17 @@ def OpSMulExtended: BinOp<"OpSMulExtended", 152>;
 
 //3.32.14 Bit Instructions
 
-def OpShiftRightLogical: BinOpTyped<"OpShiftRightLogical", 194, ID, srl>;
-def OpShiftRightArithmetic: BinOpTyped<"OpShiftRightArithmetic", 195, ID, sra>;
-def OpShiftLeftLogical: BinOpTyped<"OpShiftLeftLogical", 196, ID, shl>;
+def OpShiftRightLogical: BinOp<"OpShiftRightLogical", 194>;
+def OpShiftRightArithmetic: BinOp<"OpShiftRightArithmetic", 195>;
+def OpShiftLeftLogical: BinOp<"OpShiftLeftLogical", 196>;
 
-def OpBitwiseOr: BinOpTyped<"OpBitwiseOr", 197, ID, or>;
-def OpBitwiseXor: BinOpTyped<"OpBitwiseXor", 198, ID, xor>;
-def OpBitwiseAnd: BinOpTyped<"OpBitwiseAnd", 199, ID, and>;
+//def OpShiftRightLogical: BinOpTyped<"OpShiftRightLogical", 194, ID, srl>;
+//def OpShiftRightArithmetic: BinOpTyped<"OpShiftRightArithmetic", 195, ID, sra>;
+//def OpShiftLeftLogical: BinOpTyped<"OpShiftLeftLogical", 196, ID, shl>;
+
+defm OpBitwiseOr: BinOpTypedSVI<"OpBitwiseOr", 197, or>;
+defm OpBitwiseXor: BinOpTypedSVI<"OpBitwiseXor", 198, xor>;
+defm OpBitwiseAnd: BinOpTypedSVI<"OpBitwiseAnd", 199, and>;
 def OpNot: UnOp<"OpNot", 200>;
 
 def OpBitFieldInsert: Op<201, (outs ID:$res),

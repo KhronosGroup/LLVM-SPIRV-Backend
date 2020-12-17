@@ -62,13 +62,13 @@ static std::string computeDataLayout(const Triple &TT) {
   std::string dataLayout = "e-m:e";
 
   const auto arch = TT.getArch();
-  if (arch == Triple::spirv32) {
+  // TODO: unify this with pointers legalization
+  if (arch == Triple::spirv32)
     dataLayout += "-p:32:32";
-  } else if (arch == Triple::spirv64) {
+  else if (arch == Triple::spirv64)
     dataLayout += "-p:64:64";
-  } else if (arch == Triple::spirvlogical) {
+  else if (arch == Triple::spirvlogical)
     dataLayout += "-p:8:8";
-  }
   return dataLayout;
 }
 
@@ -210,26 +210,37 @@ class SPIRVInstructionSelect : public InstructionSelect {
     TR->rebuildTypeTablesForFunction(MF);
     auto &MRI = MF.getRegInfo();
 
-    // we need to rewrite types for tblgen'erated selection
-    // to be able to select anything
-    // we can't do this on legalizer because in general it breaks
-    // the overall semantics for the types PoV
+    // we need to rewrite dst types for ASSIGN_TYPE instrs
+    // to be able to perform tblgen'erated selection
+    // and we can't do that on Legalizer as it operates on gMIR only
+    // TODO: consider redesigning this approach
     for (auto &MBB : MF) {
       for (auto &MI : MBB) {
-        if (MI.getNumOperands() > 0) {
-          auto &Op = MI.getOperand(0);
-          if (Op.isReg() && Op.isDef())
-            MRI.setType(Op.getReg(), LLT::scalar(32));
+        if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
+          auto &SrcOp = MI.getOperand(1);
+          if (isTypeFoldingSupported(MRI.getVRegDef(SrcOp.getReg())->getOpcode()))
+            MRI.setType(MI.getOperand(0).getReg(), LLT::scalar(32));
         }
       }
     }
-    // type rewriting is what makes tblgen'erated selection work,
-    // but due to that the legality check before running the selection fails
-    // and we have to disable it here
-    DisableGISelLegalityCheck = true;
 
     bool success = InstructionSelect::runOnMachineFunction(MF);
-
+    std::vector<MachineInstr*> ToRemove;
+    for (auto &MBB : MF) {
+      for (auto &MI : MBB) {
+        if (MI.getOpcode() == SPIRV::GET_ID ||
+            MI.getOpcode() == SPIRV::GET_fID ||
+            MI.getOpcode() == SPIRV::GET_pID ||
+            MI.getOpcode() == SPIRV::GET_vfID ||
+            MI.getOpcode() == SPIRV::GET_vID) {
+          auto &Op = MI.getOperand(0);
+          MRI.replaceRegWith(MI.getOperand(0).getReg(), MI.getOperand(1).getReg());
+          ToRemove.push_back(&MI);
+        }
+      }
+    }
+    for (auto *MI: ToRemove)
+      MI->eraseFromParent();
     TR->reset();
     return success;
   }

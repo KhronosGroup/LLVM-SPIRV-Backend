@@ -13,6 +13,7 @@
 #include "SPIRV.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVSubtarget.h"
+#include "SPIRVTypeRegistry.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -27,7 +28,6 @@ using namespace LegalizeActions;
 using namespace LegalityPredicates;
 
 SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
-
   using namespace TargetOpcode;
 
   const LLT s1 = LLT::scalar(1);
@@ -112,25 +112,28 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   auto allPtrs = {p0, p1, p2, p3, p4, p5};
   auto allWritablePtrs = {p0, p1, p3, p4};
 
+  for (auto Opc: getTypeFoldingSupportingOpcs())
+    getActionDefinitionsBuilder(Opc).custom();
+
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 
-  getActionDefinitionsBuilder(
-      {G_ADD, G_SUB, G_MUL, G_SDIV, G_UDIV, G_SREM, G_UREM})
-      .legalFor(allIntScalarsAndVectors);
+  // getActionDefinitionsBuilder(
+  //     {G_ADD, G_SUB, G_MUL, G_SDIV, G_UDIV, G_SREM, G_UREM})
+  //     .legalFor(allIntScalarsAndVectors);
 
   getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
       .legalForCartesianProduct(allIntScalarsAndVectors,
                                 allIntScalarsAndVectors);
 
-  getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
-      .legalFor(allScalarsAndVectors);
+  // getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
+  //     .legalFor(allScalarsAndVectors);
 
-  getActionDefinitionsBuilder({G_FMA, G_FNEG})
+  getActionDefinitionsBuilder(G_FMA)
       .legalFor(allFloatScalarsAndVectors);
 
-  getActionDefinitionsBuilder({G_FADD, G_FSUB, G_FMUL, G_FDIV, G_FREM})
-      .customFor(allFloatScalarsAndVectors);
+  // getActionDefinitionsBuilder({G_FADD, G_FSUB, G_FMUL, G_FDIV, G_FREM})
+  //     .customFor(allFloatScalarsAndVectors);
 
   getActionDefinitionsBuilder({G_FPTOSI, G_FPTOUI})
       .legalForCartesianProduct(allIntScalarsAndVectors,
@@ -177,8 +180,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
       .legalForCartesianProduct({PInt}, allPtrs);
 
   // Constants
-  getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
-  getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
+  // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
+  // getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
 
   getActionDefinitionsBuilder(G_ICMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
@@ -265,22 +268,50 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 
 static uint32_t getFastMathFlags(const MachineInstr &I) {
   uint32_t flags = FPFastMathMode::None;
-  if (I.getFlag(MachineInstr::MIFlag::FmNoNans)) {
+  if (I.getFlag(MachineInstr::MIFlag::FmNoNans))
     flags |= FPFastMathMode::NotNaN;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs)) {
+  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs))
     flags |= FPFastMathMode::NotInf;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmNsz)) {
+  if (I.getFlag(MachineInstr::MIFlag::FmNsz))
     flags |= FPFastMathMode::NSZ;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmArcp)) {
+  if (I.getFlag(MachineInstr::MIFlag::FmArcp))
     flags |= FPFastMathMode::AllowRecip;
-  }
-  if (I.getFlag(MachineInstr::MIFlag::FmReassoc)) {
+  if (I.getFlag(MachineInstr::MIFlag::FmReassoc))
     flags |= FPFastMathMode::Fast;
+}
+
+static unsigned isFPOpcode(unsigned Opc)
+{
+  switch (Opc) {
+    case TargetOpcode::G_FADD:
+    case TargetOpcode::G_FSUB:
+    case TargetOpcode::G_FMUL:
+    case TargetOpcode::G_FDIV:
+    case TargetOpcode::G_FREM:
+    case TargetOpcode::G_FNEG:
+      return true;
+    default:
+      return false;
   }
-  return flags;
+}
+
+static std::pair<Register, unsigned>
+createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI) {
+  auto NewT = LLT::scalar(32);
+  auto GetIdOp = isFPOpcode(Opcode) ? SPIRV::GET_fID : SPIRV::GET_ID;
+  auto DstClass = isFPOpcode(Opcode) ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
+  if (MRI.getType(ValReg).isPointer()) {
+    NewT = LLT::pointer(0, 32);
+    GetIdOp = SPIRV::GET_pID;
+    DstClass = &SPIRV::pIDRegClass;
+  } else if (MRI.getType(ValReg).isVector()) {
+    NewT = LLT::vector(2, NewT);
+    GetIdOp = isFPOpcode(Opcode) ? SPIRV::GET_vfID : SPIRV::GET_vID;
+    DstClass = isFPOpcode(Opcode) ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
+  }
+  auto IdReg = MRI.createGenericVirtualRegister(NewT);
+  MRI.setRegClass(IdReg, DstClass);
+  return {IdReg, GetIdOp};
 }
 
 bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
@@ -295,6 +326,46 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     //   .addUse(MI.getNumDefs() > 0 ? MI.getOperand(0).getReg() : Register(0))
       .addImm(Decoration::FPFastMathMode)
       .addImm(fmFlags);
+  }
+  auto &MRI = MI.getMF()->getRegInfo();
+  assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
+  if (MI.getOpcode() == TargetOpcode::G_CONSTANT &&
+      MI.getOpcode() == TargetOpcode::G_FCONSTANT) {
+    auto NewT = LLT::scalar(32);
+    // TODO: use getOperand(1).getCImm
+    auto ValReg = MI.getOperand(0).getReg();
+    if (MRI.getType(ValReg).isPointer()) {
+      NewT = LLT::pointer(0, 32);
+      // DstClass = &SPIRV::pIDRegClass;
+    } else if (MRI.getType(ValReg).isVector()) {
+      NewT = LLT::vector(2, NewT);
+      // DstClass = &SPIRV::vIDRegClass;
+    } else if (isFPOpcode(MI.getOpcode())) {
+      // DstClass = &SPIRV::fIDRegClass;
+    }
+    MRI.setType(MI.getOperand(0).getReg(), NewT);
+  } else {
+    auto NewReg =
+        createNewIdReg(MI.getOperand(0).getReg(), MI.getOpcode(), MRI).first;
+    MRI.use_instr_begin(MI.getOperand(0).getReg())
+        ->getOperand(1)
+        .setReg(NewReg);
+    MI.getOperand(0).setReg(NewReg);
+    for (auto &Op : MI.operands()) {
+      if (!Op.isReg() || Op.isDef())
+        continue;
+      // if (Ids.count(&Op) > 0) {
+      //   Op.setReg(Ids.at(&Op));
+      //   // NewI.addUse(Ids.at(&Op));
+      // } else {
+      auto IdOpInfo = createNewIdReg(Op.getReg(), MI.getOpcode(), MRI);
+      Helper.MIRBuilder.buildInstr(IdOpInfo.second)
+          .addDef(IdOpInfo.first)
+          .addUse(Op.getReg());
+      // Ids[&Op] = IdOpInfo.first;
+      Op.setReg(IdOpInfo.first);
+      // }
+    }
   }
   return true;
 }

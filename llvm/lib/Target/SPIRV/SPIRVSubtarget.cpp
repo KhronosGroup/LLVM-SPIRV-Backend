@@ -39,6 +39,7 @@ static bool isAtLeastVer(uint32_t target, uint32_t verToCompareTo) {
 
 static unsigned computePointerSize(const Triple &TT) {
   const auto arch = TT.getArch();
+  // TODO: unify this with pointers legalization
   return arch == Triple::spirv32 ? 32 : arch == Triple::spirv64 ? 64 : 8;
 }
 
