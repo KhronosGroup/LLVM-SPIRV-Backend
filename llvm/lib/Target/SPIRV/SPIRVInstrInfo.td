@@ -598,7 +598,7 @@ class AtomicOpVal<string name, bits<16> opCode>: Op<opCode, (outs ID:$res),
 def OpAtomicLoad: AtomicOp<"OpAtomicLoad", 227>;
 
 def OpAtomicStore: Op<228, (outs), (ins ID:$ptr, ID:$sc, ID:$sem, ID:$val),
-                  "OpStore $ptr $sc $sem $val">;
+                  "OpAtomicStore $ptr $sc $sem $val">;
 def OpAtomicExchange: Op<229, (outs ID:$res),
                   (ins TYPE:$ty, ID:$ptr, ID:$sc, ID:$sem, ID:$val),
                   "$res = OpAtomicExchange $ty $ptr $sc $sem $val">;

@@ -26,7 +26,7 @@ entry:
 ; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV-NEXT:   OpFunctionParameter
 ; CHECK-SPIRV-NEXT:   %[[desired:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
-; CHECK-SPIRV:        %{{[0-9]+}} = OpAtomicStore %[[object]] %{{[0-9]+}} %[[desired]]
+; CHECK-SPIRV:        OpAtomicStore %[[object]] %{{[0-9]+}} %{{[0-9]+}} %[[desired]]
 ; CHECK-SPIRV-LABEL:  OpFunctionEnd
 
 ; Function Attrs: nounwind

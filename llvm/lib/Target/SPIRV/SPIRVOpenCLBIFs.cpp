@@ -577,6 +577,62 @@ static bool genImageQuery(MachineIRBuilder &MIRBuilder,
   report_fatal_error("Cannot handle OpenCL img query: get_image_" + queryStr);
 }
 
+static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
+                          MachineIRBuilder& MIRBuilder, Register ptr,
+                          SPIRVTypeRegistry* TR) {
+  using namespace SPIRV;
+
+  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+
+  Register scopeReg;
+  auto scope = Scope::Device;
+  if (!scopeReg.isValid())
+    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+
+  auto scSem = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
+  Register memSemReg;
+  auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
+  if (!memSemReg.isValid())
+    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+
+  auto MIB = MIRBuilder.buildInstr(OpAtomicLoad)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(resType))
+                 .addUse(ptr)
+                 .addUse(scopeReg)
+                 .addUse(memSemReg);
+
+  return TR->constrainRegOperands(MIB);
+}
+
+static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
+                         const SmallVectorImpl<Register> &OrigArgs,
+                         SPIRVTypeRegistry *TR) {
+  assert(OrigArgs.size() >= 2 && "Need 2 args for atomic store instr");
+  using namespace SPIRV;
+  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+
+  Register scopeReg;
+  auto scope = Scope::Device;
+  if (!scopeReg.isValid())
+    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+
+  auto ptr = OrigArgs[0];
+  auto scSem = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
+
+  Register memSemReg;
+  auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
+  if (!memSemReg.isValid())
+    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+
+  auto MIB = MIRBuilder.buildInstr(OpAtomicStore)
+                 .addUse(ptr)
+                 .addUse(scopeReg)
+                 .addUse(memSemReg)
+                 .addUse(OrigArgs[1]);
+  return TR->constrainRegOperands(MIB);
+}
+
 static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
                              SPIRVType *retType, bool isWeak,
                              const SmallVectorImpl<Register> &OrigArgs,
@@ -701,7 +757,13 @@ static bool genAtomicInstr(MachineIRBuilder &MIRBuilder,
                            const SmallVectorImpl<Register> &args,
                            SPIRVTypeRegistry *TR) {
   using namespace SPIRV;
-  if (atomicStr.startswith("compare_exchange_")) {
+
+  if (atomicStr.startswith("load")) {
+      assert(args.size() == 1 && "Need ptr arg for atomic load");
+      return genAtomicLoad(ret, retTy, MIRBuilder, args[0], TR);
+  } else if (atomicStr.startswith("store")) {
+      return genAtomicStore(MIRBuilder, args, TR);
+  } else if (atomicStr.startswith("compare_exchange_")) {
     const auto cmp_xchg = atomicStr.substr(strlen("compare_exchange_"));
     if (cmp_xchg.startswith("weak")) {
       return genAtomicCmpXchg(MIRBuilder, ret, retTy, true, args, TR);
