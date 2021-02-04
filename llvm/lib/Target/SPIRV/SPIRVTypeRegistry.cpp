@@ -58,6 +58,10 @@ static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_AND,
     TargetOpcode::G_OR,
     TargetOpcode::G_XOR,
+    TargetOpcode::G_SHL,
+    TargetOpcode::G_ASHR,
+    TargetOpcode::G_LSHR,
+    TargetOpcode::G_SELECT,
     TargetOpcode::G_EXTRACT_VECTOR_ELT,
     TargetOpcode::G_INSERT_VECTOR_ELT};
 

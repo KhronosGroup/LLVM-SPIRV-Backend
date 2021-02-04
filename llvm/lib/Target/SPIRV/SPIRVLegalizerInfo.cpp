@@ -122,9 +122,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   //     {G_ADD, G_SUB, G_MUL, G_SDIV, G_UDIV, G_SREM, G_UREM})
   //     .legalFor(allIntScalarsAndVectors);
 
-  getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
-      .legalForCartesianProduct(allIntScalarsAndVectors,
-                                allIntScalarsAndVectors);
+  // getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
+  //     .legalForCartesianProduct(allIntScalarsAndVectors,
+  //                               allIntScalarsAndVectors);
 
   // getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
   //     .legalFor(allScalarsAndVectors);
@@ -235,8 +235,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
       .legalForCartesianProduct(allFloatScalarsAndVectors);
 
   // Select
-  getActionDefinitionsBuilder(G_SELECT).legalIf(
-      typeInSet(1, allBoolScalarsAndVectors));
+  // getActionDefinitionsBuilder(G_SELECT).legalIf(
+  //     typeInSet(1, allBoolScalarsAndVectors));
 
   // Pointer-handling
   getActionDefinitionsBuilder(G_FRAME_INDEX).legalFor({p0});

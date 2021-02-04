@@ -273,7 +273,17 @@ static void addInstrRequirements(const MachineInstr &MI,
       reqs.addCapability(PhysicalStorageBufferAddressesEXT);
     }
     break;
-  case SPIRV::OpSelect:
+  // TODO: reconsider .td patterns to get rid of such a long switches
+  // maybe just removing the pattern for OpSelect
+  // is enough, but binary ops may be quite various too
+  case SPIRV::OpSelectSISCond:
+  case SPIRV::OpSelectSFSCond:
+  case SPIRV::OpSelectVISCond:
+  case SPIRV::OpSelectVFSCond:
+  case SPIRV::OpSelectSIVCond:
+  case SPIRV::OpSelectSFVCond:
+  case SPIRV::OpSelectVIVCond:
+  case SPIRV::OpSelectVFVCond:
   case SPIRV::OpPhi:
   case SPIRV::OpFunctionCall:
   case SPIRV::OpPtrAccessChain:

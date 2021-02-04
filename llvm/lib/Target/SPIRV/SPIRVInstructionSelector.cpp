@@ -78,9 +78,6 @@ private:
   bool spvSelect(Register resVReg, const SPIRVType *resType,
                  const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
 
-  bool selectShiftOp(Register resVReg, const SPIRVType *resType,
-                   const MachineInstr &I, MachineIRBuilder &MIRBuilder,
-                   unsigned newOpcode) const;
   bool selectUnOp(Register resVReg, const SPIRVType *resType,
                   const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                   unsigned newOpcode) const;
@@ -148,9 +145,6 @@ private:
   bool selectBranch(const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
   bool selectBranchCond(const MachineInstr &I,
                         MachineIRBuilder &MIRBuilder) const;
-
-  bool selectSelect(Register resVReg, const SPIRVType *resType,
-                    const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
 
   bool selectPhi(Register resVReg, const SPIRVType *resType,
                  const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
@@ -286,9 +280,6 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_BRCOND:
     return selectBranchCond(I, MIRBuilder);
 
-  case TargetOpcode::G_SELECT:
-    return selectSelect(resVReg, resType, I, MIRBuilder);
-
   case TargetOpcode::G_PHI:
     return selectPhi(resVReg, resType, I, MIRBuilder);
 
@@ -404,13 +395,6 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_ADDRSPACE_CAST:
     return selectAddrSpaceCast(resVReg, resType, I, MIRBuilder);
 
-  case TargetOpcode::G_SHL:
-    return selectShiftOp(resVReg, resType, I, MIRBuilder, OpShiftLeftLogical);
-  case TargetOpcode::G_LSHR:
-    return selectShiftOp(resVReg, resType, I, MIRBuilder, OpShiftRightLogical);
-  case TargetOpcode::G_ASHR:
-    return selectShiftOp(resVReg, resType, I, MIRBuilder, OpShiftRightArithmetic);
-
   case TargetOpcode::G_ATOMICRMW_OR:
     return selectAtomicRMW(resVReg, resType, I, MIRBuilder, OpAtomicOr);
   case TargetOpcode::G_ATOMICRMW_ADD:
@@ -493,10 +477,14 @@ bool SPIRVInstructionSelector::selectExtInst(Register resVReg,
 static bool canUseNSW(unsigned opCode) {
   using namespace SPIRV;
   switch (opCode) {
-  case OpIAdd:
-  case OpISub:
-  case OpIMul:
-  case OpShiftLeftLogical:
+  case OpIAddS:
+  case OpIAddV:
+  case OpISubS:
+  case OpISubV:
+  case OpIMulS:
+  case OpIMulV:
+  case OpShiftLeftLogicalS:
+  case OpShiftLeftLogicalV:
   case OpSNegate:
     return true;
   default:
@@ -507,9 +495,12 @@ static bool canUseNSW(unsigned opCode) {
 static bool canUseNUW(unsigned opCode) {
   using namespace SPIRV;
   switch (opCode) {
-  case OpIAdd:
-  case OpISub:
-  case OpIMul:
+  case OpIAddS:
+  case OpIAddV:
+  case OpISubS:
+  case OpISubV:
+  case OpIMulS:
+  case OpIMulV:
     return true;
   default:
     return false;
@@ -545,25 +536,6 @@ static void handleIntegerWrapFlags(const MachineInstr &I, Register target,
       decorate(target, Decoration::NoUnsignedWrap, MIRBuilder);
     }
   }
-}
-
-bool SPIRVInstructionSelector::selectShiftOp(Register resVReg,
-                                           const SPIRVType *resType,
-                                           const MachineInstr &I,
-                                           MachineIRBuilder &MIRBuilder,
-                                           unsigned newOpcode) const {
-  bool success = MIRBuilder.buildInstr(newOpcode)
-      .addDef(resVReg)
-      .addUse(TR.getSPIRVTypeID(resType))
-      .addUse(I.getOperand(1).getReg())
-      .addUse(I.getOperand(2).getReg())
-      .constrainAllUses(TII, TRI, RBI);
-
-  if (!success)
-    return false;
-
-  handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder);
-  return true;
 }
 
 bool SPIRVInstructionSelector::selectUnOp(Register resVReg,
@@ -1089,7 +1061,10 @@ bool SPIRVInstructionSelector::selectExt(Register resVReg,
     // To extend a bool, we need to use OpSelect between constants
     Register zeroReg = buildZerosVal(resType, MIRBuilder);
     Register oneReg = buildOnesVal(isSigned, resType, MIRBuilder);
-    return MIRBuilder.buildInstr(OpSelect)
+    return MIRBuilder
+        .buildInstr(TR.isScalarOfType(I.getOperand(1).getReg(), OpTypeBool)
+                        ? OpSelectSISCond
+                        : OpSelectSIVCond)
         .addDef(resVReg)
         .addUse(TR.getSPIRVTypeID(resType))
         .addUse(oneReg)
@@ -1243,18 +1218,6 @@ bool SPIRVInstructionSelector::selectBranchCond(
         .addMBB(nextMBB)
         .constrainAllUses(TII, TRI, RBI);
   }
-}
-
-bool SPIRVInstructionSelector::selectSelect(
-    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
-    MachineIRBuilder &MIRBuilder) const {
-  return MIRBuilder.buildInstr(SPIRV::OpSelect)
-      .addDef(resVReg)
-      .addUse(TR.getSPIRVTypeID(resType))
-      .addUse(I.getOperand(1).getReg())
-      .addUse(I.getOperand(2).getReg())
-      .addUse(I.getOperand(3).getReg())
-      .constrainAllUses(TII, TRI, RBI);
 }
 
 bool SPIRVInstructionSelector::selectPhi(Register resVReg,
