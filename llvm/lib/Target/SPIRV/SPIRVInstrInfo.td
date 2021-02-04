@@ -41,22 +41,42 @@ class BinOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
                 : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, CID:$src, CID:$src2),
                   "$dst = "#name#" $src_ty $src $src2", [(set ID:$dst, (assigntype (node CID:$src, CID:$src2), TYPE:$src_ty))]>;
 
-// integer & float
-multiclass BinOpTypedIF<string name, bits<16> opCode, SDNode node> {
-  def I: BinOpTyped<name, opCode, ID, node>;
-  def F: BinOpTyped<name, opCode, fID, node>;
+class TernOpTyped<string name, bits<16> opCode, RegisterClass CCond, RegisterClass CID, SDNode node>
+                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, CCond:$cond, CID:$src1, CID:$src2),
+                  "$dst = "#name#" $src_ty $cond $src1 $src2", [(set ID:$dst, (assigntype (node CCond:$cond, CID:$src1, CID:$src2), TYPE:$src_ty))]>;
+
+multiclass BinOpTypedGen<string name, bits<16> opCode, SDNode node, bit genF = 0, bit genV = 0> {
+  if genF then
+    def S: BinOpTyped<name, opCode, fID, node>;
+  else
+    def S: BinOpTyped<name, opCode, ID, node>;
+  if genV then {
+    if genF then
+      def V: BinOpTyped<name, opCode, vfID, node>;
+    else
+      def V: BinOpTyped<name, opCode, vID, node>;
+  }
 }
 
-// scalar & vector integer
-multiclass BinOpTypedSVI<string name, bits<16> opCode, SDNode node> {
-  def S: BinOpTyped<name, opCode, ID, node>;
-  def V: BinOpTyped<name, opCode, vID, node>;
-}
-
-// scalar & vector float
-multiclass BinOpTypedSVF<string name, bits<16> opCode, SDNode node> {
-  def S: BinOpTyped<name, opCode, fID, node>;
-  def V: BinOpTyped<name, opCode, vfID, node>;
+multiclass TernOpTypedGen<string name, bits<16> opCode, SDNode node, bit genI = 1, bit genF = 0, bit genV = 0> {
+  if genF then {
+    def SFSCond: TernOpTyped<name, opCode, ID, fID, node>;
+    def SFVCond: TernOpTyped<name, opCode, vID, fID, node>;
+  }
+  if genI then {
+    def SISCond: TernOpTyped<name, opCode, ID, ID, node>;
+    def SIVCond: TernOpTyped<name, opCode, vID, ID, node>;
+  }
+  if genV then {
+    if genF then {
+      def VFSCond: TernOpTyped<name, opCode, ID, vfID, node>;
+      def VFVCond: TernOpTyped<name, opCode, vID, vfID, node>;
+    }
+    if genI then {
+      def VISCond: TernOpTyped<name, opCode, ID, vID, node>;
+      def VIVCond: TernOpTyped<name, opCode, vID, vID, node>;
+    }
+  }
 }
 
 class UnOp<string name, bits<16> opCode, list<dag> pattern=[]>
@@ -432,26 +452,25 @@ def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
 def OpFNegate: UnOpTyped<"OpFNegate", 127, fID, fneg>;
-def OpIAdd: BinOpTyped<"OpIAdd", 128, ID, add>;
-defm OpFAdd: BinOpTypedSVF<"OpFAdd", 129, fadd>;
+defm OpIAdd: BinOpTypedGen<"OpIAdd", 128, add, 0, 1>;
+defm OpFAdd: BinOpTypedGen<"OpFAdd", 129, fadd, 1, 1>;
 
-def OpISub: BinOpTyped<"OpISub", 130, ID, sub>;
-def OpFSub: BinOpTyped<"OpFSub", 131, fID, fsub>;
-defm OpFSub: BinOpTypedSVF<"OpFSub", 131, fsub>;
+defm OpISub: BinOpTypedGen<"OpISub", 130, sub, 0, 1>;
+defm OpFSub: BinOpTypedGen<"OpFSub", 131, fsub, 1, 1>;
 
-def OpIMul: BinOpTyped<"OpIMul", 132, ID, mul>;
-defm OpFMul: BinOpTypedSVF<"OpFMul", 133, fmul>;
+defm OpIMul: BinOpTypedGen<"OpIMul", 132, mul, 0, 1>;
+defm OpFMul: BinOpTypedGen<"OpFMul", 133, fmul, 1, 1>;
 
-def OpUDiv: BinOpTyped<"OpUDiv", 134, ID, udiv>;
-def OpSDiv: BinOpTyped<"OpSDiv", 135, ID, sdiv>;
-defm OpFDiv: BinOpTypedSVF<"OpFDiv", 136, fdiv>;
+defm OpUDiv: BinOpTypedGen<"OpUDiv", 134, udiv, 0, 1>;
+defm OpSDiv: BinOpTypedGen<"OpSDiv", 135, sdiv, 0, 1>;
+defm OpFDiv: BinOpTypedGen<"OpFDiv", 136, fdiv, 1, 1>;
 
-def OpUMod: BinOpTyped<"OpUMod", 137, ID, urem>;
+defm OpUMod: BinOpTypedGen<"OpUMod", 137, urem, 0, 1>;
+defm OpSRem: BinOpTypedGen<"OpSRem", 138, srem, 0, 1>;
 
-def OpSRem : BinOpTyped<"OpSRem", 138, ID, srem>;
 def OpSMod: BinOp<"OpSMod", 139>;
 
-defm OpFRem: BinOpTypedSVF<"OpFRem", 140, frem>;
+defm OpFRem: BinOpTypedGen<"OpFRem", 140, frem, 1, 1>;
 def OpFMod: BinOp<"OpFMod", 141>;
 
 def OpVectorTimesScalar: BinOp<"OpVectorTimesScalar", 142>;
@@ -470,17 +489,17 @@ def OpSMulExtended: BinOp<"OpSMulExtended", 152>;
 
 //3.32.14 Bit Instructions
 
-def OpShiftRightLogical: BinOp<"OpShiftRightLogical", 194>;
-def OpShiftRightArithmetic: BinOp<"OpShiftRightArithmetic", 195>;
-def OpShiftLeftLogical: BinOp<"OpShiftLeftLogical", 196>;
+//def OpShiftRightLogical: BinOp<"OpShiftRightLogical", 194>;
+//def OpShiftRightArithmetic: BinOp<"OpShiftRightArithmetic", 195>;
+//def OpShiftLeftLogical: BinOp<"OpShiftLeftLogical", 196>;
 
-//def OpShiftRightLogical: BinOpTyped<"OpShiftRightLogical", 194, ID, srl>;
-//def OpShiftRightArithmetic: BinOpTyped<"OpShiftRightArithmetic", 195, ID, sra>;
-//def OpShiftLeftLogical: BinOpTyped<"OpShiftLeftLogical", 196, ID, shl>;
+defm OpShiftRightLogical: BinOpTypedGen<"OpShiftRightLogical", 194, srl, 0, 1>;
+defm OpShiftRightArithmetic: BinOpTypedGen<"OpShiftRightArithmetic", 195, sra, 0, 1>;
+defm OpShiftLeftLogical: BinOpTypedGen<"OpShiftLeftLogical", 196, shl, 0, 1>;
 
-defm OpBitwiseOr: BinOpTypedSVI<"OpBitwiseOr", 197, or>;
-defm OpBitwiseXor: BinOpTypedSVI<"OpBitwiseXor", 198, xor>;
-defm OpBitwiseAnd: BinOpTypedSVI<"OpBitwiseAnd", 199, and>;
+defm OpBitwiseOr: BinOpTypedGen<"OpBitwiseOr", 197, or, 0, 1>;
+defm OpBitwiseXor: BinOpTypedGen<"OpBitwiseXor", 198, xor, 0, 1>;
+defm OpBitwiseAnd: BinOpTypedGen<"OpBitwiseAnd", 199, and, 0, 1>;
 def OpNot: UnOp<"OpNot", 200>;
 
 def OpBitFieldInsert: Op<201, (outs ID:$res),
@@ -516,8 +535,7 @@ def OpLogicalOr: BinOp<"OpLogicalOr", 166>;
 def OpLogicalAnd: BinOp<"OpLogicalAnd", 167>;
 def OpLogicalNot: UnOp<"OpLogicalNot", 168>;
 
-def OpSelect: Op<169, (outs ID:$res), (ins TYPE:$type, ID:$cond, ID:$true, ID:$false),
-                  "$res = OpSelect $type $cond $true $false">;
+defm OpSelect: TernOpTypedGen<"OpSelect", 169, select, 1, 1, 1>;
 
 def OpIEqual: BinOp<"OpIEqual", 170>;
 def OpINotEqual: BinOp<"OpINotEqual", 171>;
