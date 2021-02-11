@@ -3,8 +3,7 @@
 ; CHECK-SPIRV-DAG: OpCapability ImageBasic
 ; CHECK-SPIRV-DAG: OpCapability ImageReadWrite
 ; CHECK-SPIRV-DAG: OpCapability LiteralSampler
-; FIXME: "2 0 0 0 0 0 0 2"
-; CHECK-SPIRV-DAG: %[[TyImageID:[0-9]+]] = OpTypeImage 2 0 0 0 0 0 0 2 
+; CHECK-SPIRV-DAG: %[[TyImageID:[0-9]+]] = OpTypeImage %{{[0-9]+}} 1D 0 0 0 0 Unknown ReadWrite 
 ; CHECK-SPIRV-DAG: %[[TySampledImageID:[0-9]+]] = OpTypeSampledImage %[[TyImageID]]
 
 ; CHECK-SPIRV-DAG: %[[ResID:[0-9]+]] = OpSampledImage %[[TySampledImageID]]

@@ -25,13 +25,13 @@
 ; CHECK-SPIRV-DAG: %[[VOID:[0-9]+]] = OpTypeVoid
 ; CHECK-SPIRV-DAG: %[[PIPE_RD:[0-9]+]] = OpTypePipe 0
 ; CHECK-SPIRV-DAG: %[[PIPE_WR:[0-9]+]] = OpTypePipe 1
-; CHECK-SPIRV-DAG: %[[IMG1D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 0 0 0 0 0 0 0
-; CHECK-SPIRV-DAG: %[[IMG2D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 1 0 0 0 0 0 0
-; CHECK-SPIRV-DAG: %[[IMG3D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 2 0 0 0 0 0 0
-; CHECK-SPIRV-DAG: %[[IMG2DA_RD:[0-9]+]] = OpTypeImage %[[VOID]] 1 0 1 0 0 0 0
-; CHECK-SPIRV-DAG: %[[IMG1DB_RD:[0-9]+]] = OpTypeImage %[[VOID]] 5 0 0 0 0 0 0
-; CHECK-SPIRV-DAG: %[[IMG1D_WR:[0-9]+]] = OpTypeImage %[[VOID]] 0 0 0 0 0 0 1
-; CHECK-SPIRV-DAG: %[[IMG2D_RW:[0-9]+]] = OpTypeImage %[[VOID]] 1 0 0 0 0 0 2
+; CHECK-SPIRV-DAG: %[[IMG1D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 1D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[IMG2D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 2D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[IMG3D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 3D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[IMG2DA_RD:[0-9]+]] = OpTypeImage %[[VOID]] 2D 0 1 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[IMG1DB_RD:[0-9]+]] = OpTypeImage %[[VOID]] Buffer 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[IMG1D_WR:[0-9]+]] = OpTypeImage %[[VOID]] 1D 0 0 0 0 Unknown WriteOnly
+; CHECK-SPIRV-DAG: %[[IMG2D_RW:[0-9]+]] = OpTypeImage %[[VOID]] 2D 0 0 0 0 Unknown ReadWrite
 ; CHECK-SPIRV-DAG: %[[SAMP:[0-9]+]] = OpTypeSampler
 ; CHECK-SPIRV-DAG: %[[SAMPIMG:[0-9]+]] = OpTypeSampledImage %[[IMG2D_RD]]
 

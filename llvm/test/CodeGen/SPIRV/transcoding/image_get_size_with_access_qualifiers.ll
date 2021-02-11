@@ -3,9 +3,8 @@
 ; FIXME: CHECK-SPIRV-DAG for OpTypeInt, OpTypeVoid and OpTypeImage?
 ; CHECK-SPIRV: %[[IntTyID:[0-9]+]] = OpTypeInt
 ; CHECK-SPIRV: %[[VoidTyID:[0-9]+]] = OpTypeVoid
-; FIXME: fix "1 0 1 0 0 0 0" -> "2D 0 0 0 0 Unknown ReadOnly" ?
-; CHECK-SPIRV: %[[ImageTyID:[0-9]+]] = OpTypeImage %[[VoidTyID]] 1 0 1 0 0 0 0
-; CHECK-SPIRV: %[[VectorTyID:[0-9]+]] = OpTypeVector %[[IntTyID]] %{{[0-9]+}}
+; CHECK-SPIRV: %[[ImageTyID:[0-9]+]] = OpTypeImage %[[VoidTyID]] 2D 0 1 0 0 Unknown ReadOnly
+; CHECK-SPIRV: %[[VectorTyID:[0-9]+]] = OpTypeVector %[[IntTyID]] {{[0-9]+}}
 ; CHECK-SPIRV: %[[ImageArgID:[0-9]+]] = OpFunctionParameter %[[ImageTyID]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpImageQuerySizeLod %[[VectorTyID]] %[[ImageArgID]]
 
