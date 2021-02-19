@@ -202,7 +202,7 @@ GEN_EXT_INST_HEADER(GLSL_std_450)
   X(N, log2, 38)                                                               \
   X(N, log10, 39)                                                              \
   X(N, log1p, 40)                                                              \
-  X(N, log1b, 41)                                                              \
+  X(N, logb, 41)                                                               \
   X(N, mad, 42)                                                                \
   X(N, maxmag, 43)                                                             \
   X(N, minmag, 44)                                                             \
