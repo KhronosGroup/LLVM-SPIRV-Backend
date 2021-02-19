@@ -1025,7 +1025,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     int idx = -1;
     if (typeChar == 'u') {
       idx = 0;
-    } else if (typeChar == 'i') {
+    } else if (typeChar == 'c' || typeChar == 's' || typeChar == 'i' || typeChar == 'l') {
       idx = 1;
     } else if (typeChar == 'f' || typeChar == 'd') {
       idx = 2;
