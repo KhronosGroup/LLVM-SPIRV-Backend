@@ -1,14 +1,14 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; The OpDot operands must be vectors; check that translating dot with
-; scalar arguments does not result in OpDot.
-; CHECK-SPIRV-LABEL: OpFunction
-; CHECK-SPIRV: OpFMul
-; CHECK-SPIRV-NOT: OpDot
-; CHECK-SPIRV: OpFunctionEnd
-
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
+
+; The OpDot operands must be vectors; check that translating dot with
+; scalar arguments does not result in OpDot.
+; CHECK-SPIRV-LABEL:	%{{[0-9]+}} = OpFunction %{{[0-9]+}} None %{{[0-9]+}}
+; CHECK-SPIRV:	%{{[0-9]+}} = OpFMul %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpDot %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV:	OpFunctionEnd
 
 ; Function Attrs: nounwind
 define spir_kernel void @testScalar(float %f) #0 !kernel_arg_addr_space !1 !kernel_arg_access_qual !2 !kernel_arg_type !3 !kernel_arg_base_type !4 !kernel_arg_type_qual !5 {
@@ -17,9 +17,11 @@ entry:
   ret void
 }
 
-; CHECK-SPIRV-LABEL: 5 Function
-; CHECK-SPIRV: Dot
-; CHECK-SPIRV: FunctionEnd
+; The OpDot operands must be vectors; check that translating dot with
+; vector arguments results in OpDot.
+; CHECK-SPIRV-LABEL:	%{{[0-9]+}} = OpFunction %{{[0-9]+}} None %{{[0-9]+}}
+; CHECK-SPIRV: %{{[0-9]+}} = OpDot %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV: OpFunctionEnd
 
 ; Function Attrs: nounwind
 define spir_kernel void @testVector(<2 x float> %f) #0 !kernel_arg_addr_space !1 !kernel_arg_access_qual !2 !kernel_arg_type !3 !kernel_arg_base_type !4 !kernel_arg_type_qual !5 {

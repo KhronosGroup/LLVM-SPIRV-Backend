@@ -928,6 +928,35 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
   report_fatal_error("Convert instr not implemented yet: " + convertStr);
 }
 
+static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
+                   MachineIRBuilder &MIRBuilder,
+                   const SmallVectorImpl<Register> &OrigArgs,
+                   SPIRVTypeRegistry *TR) {
+  assert(OrigArgs.size() >= 2 && "Need 2 args for dot instr");
+  using namespace SPIRV;
+
+  unsigned OpCode;
+
+  if (TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() ==
+          SPIRV::OpTypeVector &&
+      TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() ==
+          SPIRV::OpTypeVector) {
+    // Use OpDot only in case of vector args.
+    OpCode = OpDot;
+
+  } else {
+    // Use OpFMul in case of scalar args.
+    OpCode = OpFMulS;
+  }
+
+ auto MIB = MIRBuilder.buildInstr(OpCode)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(resType))
+                 .addUse(OrigArgs[0])
+                 .addUse(OrigArgs[1]);
+  return TR->constrainRegOperands(MIB);
+}
+
 static SPIRVType *buildOpTypeImageCL(Dim::Dim dim, AQ::AccessQualifier access,
                                      MachineIRBuilder &MIRBuilder,
                                      SPIRVTypeRegistry *TR) {
@@ -1060,6 +1089,11 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     if (nameNoArgs.startswith("convert_")) {
       const auto convTy = demangledName.substr(strlen("convert_"));
       return genConvertInstr(MIRBuilder, convTy, ret, retTy, args, TR);
+    }
+    break;
+  case 'd':
+    if (nameNoArgs.startswith("dot")) {
+      return genDotOrFMul(ret, retTy, MIRBuilder, args, TR);
     }
     break;
   case 'g': {
