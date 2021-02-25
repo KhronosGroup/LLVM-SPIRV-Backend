@@ -581,7 +581,7 @@ static bool genImageQuery(MachineIRBuilder &MIRBuilder,
                           SPIRVType *retType,
                           const SmallVectorImpl<Register> &OrigArgs,
                           SPIRVTypeRegistry *TR) {
-  assert(OrigArgs.size() == 1 && "Image queries require 1 arguAment");
+  assert(OrigArgs.size() == 1 && "Image queries require 1 argument");
   Register img = OrigArgs[0];
   if (queryStr.startswith("width")) {
     return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 0, TR);
