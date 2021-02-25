@@ -540,6 +540,23 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   }
 }
 
+// Used for get_image_num_samples
+static bool genNumSamplesQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
+                               SPIRVType *retType, Register img,
+                               SPIRVTypeRegistry *TR) {
+  unsigned retOpcode = retType->getOpcode();
+  assert(retOpcode == SPIRV::OpTypeInt && "Samples query result must be int");
+  
+  unsigned imgDim = TR->getSPIRVTypeForVReg(img)->getOperand(2).getImm();
+  assert(imgDim == 1 && "Samples query image dim must be 2D");
+
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageQuerySamples)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(retType))
+                 .addUse(img);
+  return TR->constrainRegOperands(MIB);
+}
+
 static bool genGlobalLocalQuery(MachineIRBuilder &MIRBuilder,
                                 const StringRef globLocStr, bool global,
                                 Register ret, SPIRVType *retTy,
@@ -574,6 +591,8 @@ static bool genImageQuery(MachineIRBuilder &MIRBuilder,
     return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 2, TR);
   } else if (queryStr.startswith("dim")) {
     return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 0, TR);
+  } else if (queryStr.startswith("num_samples")) {
+    return genNumSamplesQuery(MIRBuilder, resVReg, retType, img, TR);
   }
   report_fatal_error("Cannot handle OpenCL img query: get_image_" + queryStr);
 }
