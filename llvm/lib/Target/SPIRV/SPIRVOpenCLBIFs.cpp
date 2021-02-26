@@ -1023,7 +1023,17 @@ SPIRVType *llvm::generateOpenCLOpaqueType(const StringRef name,
     }
   } else if (typeName.startswith("sampler_t")) {
     return TR->getSamplerType(MIRBuilder);
+  } else if (typeName.startswith("pipe")) {
+    if (typeName.endswith("_ro_t")) {
+      accessQual = AQ::ReadOnly;
+    } else if (typeName.endswith("_wo_t")) {
+      accessQual = AQ::WriteOnly;
+    } else if (typeName.endswith("_rw_t")) {
+      accessQual = AQ::ReadWrite;
+    }
+    return TR->getOpTypePipe(MIRBuilder, accessQual);
   }
+
   report_fatal_error("Cannot generate OpenCL type: " + name);
 }
 
