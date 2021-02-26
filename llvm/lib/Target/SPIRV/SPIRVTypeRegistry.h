@@ -178,6 +178,10 @@ public:
                             ImageFormat::ImageFormat imageFormat,
                             AQ::AccessQualifier accessQualifier);
 
+  // Get or create an OpTypePipe with the given accessQualifier.
+  SPIRVType *getOpTypePipe(MachineIRBuilder &MIRBuilder,
+                           AQ::AccessQualifier accessQualifier);
+
   std::vector<SPIRVType *> *getExistingTypesForOpcode(unsigned opcode);
 
   // Convert a SPIR-V storage class to the corresponding LLVM IR address space.

@@ -603,6 +603,25 @@ SPIRVType *SPIRVTypeRegistry::getSamplerType(MachineIRBuilder &MIRBuilder) {
 }
 
 SPIRVType *
+SPIRVTypeRegistry::getOpTypePipe(MachineIRBuilder &MIRBuilder,
+                                 AQ::AccessQualifier accessQualifier) {
+  auto tys = getExistingTypesForOpcode(SPIRV::OpTypePipe);
+  for (const auto &ty : *tys) {
+    if (ty->getOperand(1).getImm() == accessQualifier) {
+      return ty;
+    }
+  }
+
+  Register resVReg = createTypeVReg(MIRBuilder);
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypePipe)
+                 .addDef(resVReg)
+                 .addImm(accessQualifier);
+  constrainRegOperands(MIB);
+  tys->push_back(MIB);
+  return MIB;
+}
+
+SPIRVType *
 SPIRVTypeRegistry::getSampledImageType(SPIRVType *imageType,
                                        MachineIRBuilder &MIRBuilder) {
   auto tys = getExistingTypesForOpcode(SPIRV::OpTypeSampledImage);
