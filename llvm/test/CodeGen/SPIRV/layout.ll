@@ -55,8 +55,8 @@
 ; CHECK: %[[TypeBar1:[0-9]+]] = OpTypeFunction %[[Void]] %[[Int3Ptr]]
 ; CHECK: %[[Var:[0-9]+]] = OpVariable %[[TPointer]]
 ; CHECK: %[[SConstOp:[0-9]+]] = OpSpecConstantOp %[[SConstOpType]] 70 %[[Var]]
-; CHECK: %{{[0-9]+}} = OpVariable %{{[0-9]+}} 5 %[[SConstOp]]
-; FIXME: 70? 5? %?
+; CHECK: %{{[0-9]+}} = OpVariable %{{[0-9]+}} CrossWorkgroup %[[SConstOp]]
+; FIXME: 70? %?
 
 ; CHECK-NOT: OpCapability
 ; CHECK-NOT: OpExtInstImport

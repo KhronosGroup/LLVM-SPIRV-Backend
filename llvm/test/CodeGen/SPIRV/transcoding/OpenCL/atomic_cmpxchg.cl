@@ -15,7 +15,7 @@ __kernel void test_atomic_cmpxchg(__global int *p, int cmp, int val) {
 
 // CHECK-SPIRV: OpEntryPoint Kernel %[[TEST:[0-9]+]] "test_atomic_cmpxchg"
 // CHECK-SPIRV-DAG: %[[UINT:[0-9]+]] = OpTypeInt 32 0
-// CHECK-SPIRV-DAG: %[[UINT_PTR:[0-9]+]] = OpTypePointer 5 %[[UINT]]
+// CHECK-SPIRV-DAG: %[[UINT_PTR:[0-9]+]] = OpTypePointer CrossWorkgroup %[[UINT]]
 //
 // In SPIR-V, atomic_cmpxchg is represented as OpAtomicCompareExchange [2],
 // which also includes memory scope and two memory semantic arguments. The

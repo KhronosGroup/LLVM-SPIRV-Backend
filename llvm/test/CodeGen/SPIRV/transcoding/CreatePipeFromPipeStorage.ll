@@ -15,13 +15,11 @@
 
 ; CHECK-SPIRV: %[[READ_PIPE:[0-9]+]] = OpTypePipe 0
 ; CHECK-SPIRV: %[[READ_PIPE_WRAPPER:[0-9]+]] = OpTypeStruct %[[READ_PIPE]]
-; FIXME: Change "7" to appropriate class storage
-; CHECK-SPIRV: %[[READ_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer 7 %[[READ_PIPE_WRAPPER]]
+; CHECK-SPIRV: %[[READ_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer Function %[[READ_PIPE_WRAPPER]]
 ; CHECK-SPIRV: %[[WRITE_PIPE:[0-9]+]] = OpTypePipe 1
 ; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER:[0-9]+]] = OpTypeStruct %[[WRITE_PIPE]]
 
-; FIXME: Change "7" to appropriate class storage
-; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer 7 %[[WRITE_PIPE_WRAPPER]]
+; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer Function %[[WRITE_PIPE_WRAPPER]]
 
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
@@ -42,9 +40,8 @@ target triple = "spirv32-unknown-unknown"
 ; Function Attrs: nounwind
 define spir_kernel void @worker() {
 entry:
-  ; FIXME: fix storage class
-  ; CHECK-SPIRV: %[[READ_PIPE_WRAPPER_ID]] = OpVariable %[[READ_PIPE_WRAPPER_PTR]] 7
-  ; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER_ID]] = OpVariable %[[WRITE_PIPE_WRAPPER_PTR]] 7
+  ; CHECK-SPIRV: %[[READ_PIPE_WRAPPER_ID]] = OpVariable %[[READ_PIPE_WRAPPER_PTR]] Function
+  ; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER_ID]] = OpVariable %[[WRITE_PIPE_WRAPPER_PTR]] Function
 
   %myrpipe = alloca %"class.cl::pipe<int __attribute__((ext_vector_type(4))), cl::pipe_access::read>", align 4
   %mywpipe = alloca %"class.cl::pipe<int __attribute__((ext_vector_type(4))), cl::pipe_access::write>", align 4

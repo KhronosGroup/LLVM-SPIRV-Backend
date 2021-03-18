@@ -15,8 +15,7 @@
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
 ; CHECK: %[[Int8:[0-9]+]] = TypeInt 8 0
-; CHECK: %[[Int8Ptr:[0-9]+]] = OpTypePointer 8 %[[Int8]]
-; FIXME: 8?
+; CHECK: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8]]
 ; CHECK: %[[StructType:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
