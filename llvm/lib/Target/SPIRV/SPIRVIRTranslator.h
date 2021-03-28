@@ -53,12 +53,6 @@ protected:
   // Translate to OpCompositeInsert instead of flattening indices
   bool translateInsertValue(const User &U, MachineIRBuilder &MIRBuilder);
 
-  // Translate to OpLoad (the default won't work with unaligned loads)
-  bool translateLoad(const User &U, MachineIRBuilder &MIRBuilder);
-
-  // Translate to OpStore (the default won't work with unaligned stores)
-  bool translateStore(const User &U, MachineIRBuilder &MIRBuilder);
-
   // Override to ensure an explicit Bitcast is always emitted
   bool translateBitCast(const User &U, MachineIRBuilder &MIRBuilder);
 

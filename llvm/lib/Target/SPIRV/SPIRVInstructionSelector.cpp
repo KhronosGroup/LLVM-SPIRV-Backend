@@ -82,6 +82,11 @@ private:
                   const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                   unsigned newOpcode) const;
 
+  bool selectLoad(Register resVReg, const SPIRVType *resType,
+                  const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
+
+  bool selectStore(const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
+
   bool selectAtomicRMW(Register resVReg, const SPIRVType *resType,
                        const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                        unsigned newOpcode) const;
@@ -274,6 +279,11 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
 
   case TargetOpcode::G_FRAME_INDEX:
     return selectFrameIndex(resVReg, resType, MIRBuilder);
+
+  case TargetOpcode::G_LOAD:
+    return selectLoad(resVReg, resType, I, MIRBuilder);
+  case TargetOpcode::G_STORE:
+    return selectStore(I, MIRBuilder);
 
   case TargetOpcode::G_BR:
     return selectBranch(I, MIRBuilder);
@@ -578,6 +588,49 @@ static Scope::Scope getScope(SyncScope::ID ord) {
   default:
     llvm_unreachable("Unsupported synchronization scope ID.");
   }
+}
+
+static void addMemoryOperands(MachineMemOperand *MemOp, MachineInstrBuilder &MIB) {
+  uint32_t spvMemOp = MemoryOperand::None;
+  if (MemOp->isVolatile())
+    spvMemOp |= MemoryOperand::Volatile;
+  if (MemOp->isNonTemporal())
+    spvMemOp |= MemoryOperand::Nontemporal;
+  if (MemOp->getAlignment())
+    spvMemOp |= MemoryOperand::Aligned;
+
+  if (spvMemOp != MemoryOperand::None) {
+    MIB.addImm(spvMemOp);
+    if (spvMemOp & MemoryOperand::Aligned)
+      MIB.addImm(MemOp->getAlignment());
+  }
+}
+
+bool SPIRVInstructionSelector::selectLoad(Register resVReg,
+                                          const SPIRVType *resType,
+                                          const MachineInstr &I,
+                                          MachineIRBuilder &MIRBuilder) const {
+  auto Ptr = I.getOperand(1).getReg();
+  auto MemOp = *I.memoperands_begin();
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpLoad)
+                 .addDef(resVReg)
+                 .addUse(TR.getSPIRVTypeID(resType))
+                 .addUse(Ptr);
+  addMemoryOperands(MemOp, MIB);
+  return MIB.constrainAllUses(TII, TRI, RBI);
+}
+
+bool SPIRVInstructionSelector::selectStore(
+                                          const MachineInstr &I,
+                                          MachineIRBuilder &MIRBuilder) const {
+  auto StoreVal = I.getOperand(0).getReg();
+  auto Ptr = I.getOperand(1).getReg();
+  auto MemOp = *I.memoperands_begin();
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpStore)
+                 .addUse(Ptr)
+                 .addUse(StoreVal);
+  addMemoryOperands(MemOp, MIB);
+  return MIB.constrainAllUses(TII, TRI, RBI);
 }
 
 bool SPIRVInstructionSelector::selectAtomicRMW(Register resVReg,
