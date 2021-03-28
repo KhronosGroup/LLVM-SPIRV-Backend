@@ -171,10 +171,6 @@ bool SPIRVIRTranslator::translateInst(const User &Inst, unsigned OpCode) {
     return translateExtractValue(Inst, *CurBuilder.get());
   case Instruction::InsertValue:
     return translateInsertValue(Inst, *CurBuilder.get());
-  case Instruction::Load:
-    return translateLoad(Inst, *CurBuilder.get());
-  case Instruction::Store:
-    return translateStore(Inst, *CurBuilder.get());
   case Instruction::BitCast:
     return translateBitCast(Inst, *CurBuilder.get());
   case Instruction::Call: {
@@ -391,51 +387,6 @@ static unsigned int getMetadataUInt(const MDNode *mdNode, unsigned int opIndex,
   } else {
     return defaultVal;
   }
-}
-
-static void addMemoryOperands(const Instruction *val, unsigned int alignment,
-                              bool isVolatile, MachineInstrBuilder &MIB) {
-  uint32_t spvMemOp = MemoryOperand::None;
-  if (isVolatile) {
-    spvMemOp |= MemoryOperand::Volatile;
-  }
-  if (getMetadataUInt(val->getMetadata("nontemporal"), 0) == 1) {
-    spvMemOp |= MemoryOperand::Nontemporal;
-  }
-  if (alignment != 0) {
-    spvMemOp |= MemoryOperand::Aligned;
-  }
-
-  if (spvMemOp != MemoryOperand::None) {
-    MIB.addImm(spvMemOp);
-    if (spvMemOp & MemoryOperand::Aligned) {
-      MIB.addImm(alignment);
-    }
-  }
-}
-
-bool SPIRVIRTranslator::translateLoad(const User &U,
-                                      MachineIRBuilder &MIRBuilder) {
-  auto Load = dyn_cast<LoadInst>(&U);
-  auto ResVReg = getOrCreateVReg(*Load);
-  auto ResVRegType = TR->getSPIRVTypeForVReg(ResVReg);
-  auto Ptr = getOrCreateVReg(*Load->getPointerOperand());
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpLoad)
-                 .addDef(ResVReg)
-                 .addUse(TR->getSPIRVTypeID(ResVRegType))
-                 .addUse(Ptr);
-  addMemoryOperands(Load, Load->getAlignment(), Load->isVolatile(), MIB);
-  return TR->constrainRegOperands(MIB);
-}
-
-bool SPIRVIRTranslator::translateStore(const User &U,
-                                       MachineIRBuilder &MIRBuilder) {
-  auto Store = dyn_cast<StoreInst>(&U);
-  auto Ptr = getOrCreateVReg(*Store->getPointerOperand());
-  auto Obj = getOrCreateVReg(*Store->getValueOperand());
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpStore).addUse(Ptr).addUse(Obj);
-  addMemoryOperands(Store, Store->getAlignment(), Store->isVolatile(), MIB);
-  return TR->constrainRegOperands(MIB);
 }
 
 bool SPIRVIRTranslator::translateOverflowIntrinsic(
