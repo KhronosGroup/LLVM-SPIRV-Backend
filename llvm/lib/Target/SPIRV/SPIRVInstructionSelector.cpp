@@ -222,7 +222,7 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
       auto *Def = MRI->getVRegDef(I.getOperand(1).getReg());
       if (isTypeFoldingSupported(Def->getOpcode()))
         return selectImpl(I, *CoverageInfo);
-      MRI->replaceRegWith(I.getOperand(0).getReg(), I.getOperand(1).getReg());
+      MRI->replaceRegWith(I.getOperand(1).getReg(), I.getOperand(0).getReg());
       I.removeFromParent();
     } else if (I.getNumDefs() == 1) { // Make all vregs 32 bits (for SPIR-V IDs)
       MIRBuilder.getMRI()->setType(I.getOperand(0).getReg(), LLT::scalar(32));
