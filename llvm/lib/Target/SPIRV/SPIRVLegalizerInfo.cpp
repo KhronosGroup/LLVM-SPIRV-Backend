@@ -32,6 +32,9 @@ using namespace LegalityPredicates;
 SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   using namespace TargetOpcode;
 
+  this->ST = &ST;
+  TR = ST.getSPIRVTypeRegistry();
+
   const LLT s1 = LLT::scalar(1);
   const LLT s8 = LLT::scalar(8);
   const LLT s16 = LLT::scalar(16);
@@ -198,19 +201,24 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
   // getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
 
-  getActionDefinitionsBuilder(G_ICMP).legalIf(
-      all(typeInSet(0, allBoolScalarsAndVectors),
-          typeInSet(1, allPtrsScalarsAndVectors),
-          LegalityPredicate([=](const LegalityQuery &Query) {
-            LLT retTy = Query.Types[0];
-            LLT cmpTy = Query.Types[1];
-            if (retTy.isVector()) {
-              return cmpTy.isVector() &&
-                     retTy.getNumElements() == cmpTy.getNumElements();
-            } else {
-              return cmpTy.isScalar() || cmpTy.isPointer();
-            }
-          })));
+  getActionDefinitionsBuilder(G_ICMP)
+      .legalIf(all(typeInSet(0, allBoolScalarsAndVectors),
+                   typeInSet(1, allPtrsScalarsAndVectors),
+                   LegalityPredicate([&](const LegalityQuery &Query) {
+                     LLT retTy = Query.Types[0];
+                     LLT cmpTy = Query.Types[1];
+                     if (retTy.isVector())
+                       return cmpTy.isVector() &&
+                              retTy.getNumElements() == cmpTy.getNumElements();
+                     else
+                       return cmpTy.isScalar() ||
+                              (cmpTy.isPointer() &&
+                               ST.canDirectlyComparePointers());
+                   })))
+      .customIf(all(typeInSet(1, allPtrs),
+                    LegalityPredicate(([&](const LegalityQuery &Query) {
+                      return !ST.canDirectlyComparePointers();
+                    }))));
 
   getActionDefinitionsBuilder(G_FCMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
@@ -318,10 +326,35 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI) {
 
 bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
                                         MachineInstr &MI) const {
+  auto Opc = MI.getOpcode();
+  if (!isTypeFoldingSupported(Opc)) {
+    assert(Opc == TargetOpcode::G_ICMP);
+    auto ConvT = LLT::scalar(ST->getPointerSize());
+    auto &MRI = MI.getMF()->getRegInfo();
+    auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
+    auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
+    auto &Op0 = MI.getOperand(2);
+    auto &Op1 = MI.getOperand(3);
+    auto *SpirvType = TR->getOrCreateSPIRVType(
+            IntegerType::get(MI.getMF()->getFunction().getContext(),
+                             ST->getPointerSize()),
+        Helper.MIRBuilder);
+    TR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
+    TR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
+    Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
+        .addDef(ConvReg0)
+        .addUse(Op0.getReg());
+    Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
+        .addDef(ConvReg1)
+        .addUse(Op1.getReg());
+    Op0.setReg(ConvReg0);
+    Op1.setReg(ConvReg1);
+    return true;
+  }
   auto &MRI = MI.getMF()->getRegInfo();
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
-  if (MI.getOpcode() == TargetOpcode::G_CONSTANT &&
-      MI.getOpcode() == TargetOpcode::G_FCONSTANT) {
+  if (Opc == TargetOpcode::G_CONSTANT ||
+      Opc == TargetOpcode::G_FCONSTANT) {
     auto NewT = LLT::scalar(32);
     // TODO: use getOperand(1).getCImm
     auto ValReg = MI.getOperand(0).getReg();
@@ -331,13 +364,13 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     } else if (MRI.getType(ValReg).isVector()) {
       NewT = LLT::fixed_vector(2, NewT);
       // DstClass = &SPIRV::vIDRegClass;
-    } else if (isFPOpcode(MI.getOpcode())) {
+    } else if (isFPOpcode(Opc)) {
       // DstClass = &SPIRV::fIDRegClass;
     }
     MRI.setType(MI.getOperand(0).getReg(), NewT);
   } else {
     auto NewReg =
-        createNewIdReg(MI.getOperand(0).getReg(), MI.getOpcode(), MRI).first;
+        createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI).first;
     MRI.use_instr_begin(MI.getOperand(0).getReg())
         ->getOperand(1)
         .setReg(NewReg);
@@ -349,7 +382,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
       //   Op.setReg(Ids.at(&Op));
       //   // NewI.addUse(Ids.at(&Op));
       // } else {
-      auto IdOpInfo = createNewIdReg(Op.getReg(), MI.getOpcode(), MRI);
+      auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI);
       Helper.MIRBuilder.buildInstr(IdOpInfo.second)
           .addDef(IdOpInfo.first)
           .addUse(Op.getReg());

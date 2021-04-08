@@ -173,9 +173,6 @@ private:
   Register buildOnesVal(bool allOnes, const SPIRVType *resType,
                         MachineIRBuilder &MIRBuilder) const;
 
-  Register buildConvertPtrToUInt(Register targetReg,
-                                 MachineIRBuilder &MIRBuilder) const;
-
   const SPIRVTargetMachine &TM;
   const SPIRVSubtarget &STI;
   const SPIRVInstrInfo &TII;
@@ -925,18 +922,6 @@ static unsigned int getBoolCmpOpcode(unsigned predNum) {
   }
 }
 
-Register SPIRVInstructionSelector::buildConvertPtrToUInt(
-    Register targetReg, MachineIRBuilder &MIRBuilder) const {
-  auto MRI = MIRBuilder.getMRI();
-  SPIRVType *ptrUIntType = TR.getPtrUIntType(MIRBuilder);
-  Register resVReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-  MIRBuilder.buildInstr(SPIRV::OpConvertPtrToU)
-      .addDef(resVReg)
-      .addUse(TR.getSPIRVTypeID(ptrUIntType))
-      .addUse(targetReg);
-  return targetReg;
-}
-
 bool SPIRVInstructionSelector::selectCmp(Register resVReg,
                                          const SPIRVType *resType,
                                          unsigned scalarTyOpc, unsigned cmpOpc,
@@ -951,16 +936,10 @@ bool SPIRVInstructionSelector::selectCmp(Register resVReg,
   SPIRVType *cmp1Type = TR.getSPIRVTypeForVReg(cmp1);
   assert(cmp0Type->getOpcode() == cmp1Type->getOpcode());
 
-  if (cmp0Type->getOpcode() == OpTypePointer) {
-    if (convertToUInt) {
-      // legalize??
-      cmp0 = buildConvertPtrToUInt(cmp0, MIRBuilder);
-      cmp1 = buildConvertPtrToUInt(cmp1, MIRBuilder);
-    }
-  } else if (!TR.isScalarOrVectorOfType(cmp0, scalarTyOpc) ||
-             !TR.isScalarOrVectorOfType(cmp1, scalarTyOpc)) {
+  if (cmp0Type->getOpcode() != OpTypePointer &&
+      (!TR.isScalarOrVectorOfType(cmp0, scalarTyOpc) ||
+       !TR.isScalarOrVectorOfType(cmp1, scalarTyOpc)))
     llvm_unreachable("Incompatible type for comparison");
-  }
 
   return MIRBuilder.buildInstr(cmpOpc)
       .addDef(resVReg)
