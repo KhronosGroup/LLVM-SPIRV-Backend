@@ -653,7 +653,7 @@ SPIRVTypeRegistry::StorageClassToAddressSpace(StorageClass::StorageClass sc) {
   case StorageClass::Generic:
     return 4;
   case StorageClass::Input:
-    return 5;
+    return 7;
   default:
     errs() << getStorageClassName(sc) << "\n";
     llvm_unreachable("Unable to get address space id");
@@ -675,7 +675,7 @@ SPIRVTypeRegistry::addressSpaceToStorageClass(unsigned int addressSpace) {
     return StorageClass::Workgroup;
   case 4:
     return StorageClass::Generic;
-  case 5:
+  case 7:
     return StorageClass::Input;
   default:
     llvm_unreachable("Unknown address space");
