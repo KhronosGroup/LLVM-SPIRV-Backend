@@ -13,6 +13,8 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 
+#include "SPIRVTypeRegistry.h"
+
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
 
 namespace llvm {
@@ -22,6 +24,8 @@ class SPIRVSubtarget;
 
 // This class provides the information for legalizing SPIR-V instructions.
 class SPIRVLegalizerInfo : public LegalizerInfo {
+  const SPIRVSubtarget *ST;
+  SPIRVTypeRegistry *TR;
 public:
   bool legalizeCustom(LegalizerHelper &Helper, MachineInstr &MI) const override;
   SPIRVLegalizerInfo(const SPIRVSubtarget &ST);
