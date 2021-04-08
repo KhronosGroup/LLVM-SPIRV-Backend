@@ -30,6 +30,7 @@
 #include "SPIRVExtInsts.h"
 #include "SPIRVExtensions.h"
 #include "SPIRVRegisterBankInfo.h"
+#include "SPIRVDuplicatesTracker.h"
 
 #include <unordered_set>
 
@@ -64,6 +65,7 @@ private:
   // TODO Some of these fields might work without unique_ptr.
   //      But they are shared with other classes, so if the SPIRVSubtarget
   //      moves, not relying on unique_ptr breaks things.
+  std::unique_ptr<SPIRVGeneralDuplicatesTracker> DT;
   std::unique_ptr<SPIRVTypeRegistry> TR;
   std::unique_ptr<SPIRVCallLowering> CallLoweringInfo;
   std::unique_ptr<SPIRVRegisterBankInfo> RegBankInfo;
@@ -120,6 +122,8 @@ public:
   bool canUseExtInstSet(ExtInstSet e) const;
 
   SPIRVTypeRegistry *getSPIRVTypeRegistry() const { return TR.get(); }
+
+  SPIRVGeneralDuplicatesTracker *getSPIRVDuplicatesTracker() const { return DT.get(); }
 
   const CallLowering *getCallLowering() const override {
     return CallLoweringInfo.get();

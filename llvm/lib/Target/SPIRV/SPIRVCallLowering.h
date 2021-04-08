@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVCALLLOWERING_H
 
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
+#include "SPIRVDuplicatesTracker.h"
 
 namespace llvm {
 
@@ -24,9 +25,11 @@ class SPIRVCallLowering : public CallLowering {
 private:
   // Used to create and assign function, argument, and return type information
   SPIRVTypeRegistry *TR;
+  SPIRVGeneralDuplicatesTracker *DT;
 
 public:
-  SPIRVCallLowering(const SPIRVTargetLowering &TLI, SPIRVTypeRegistry *TR);
+  SPIRVCallLowering(const SPIRVTargetLowering &TLI, SPIRVTypeRegistry *TR,
+                    SPIRVGeneralDuplicatesTracker *DT);
 
   // Built OpReturn or OpReturnValue
   bool lowerReturn(MachineIRBuilder &MIRBuiler, const Value *Val,

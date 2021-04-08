@@ -91,8 +91,13 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
       targetVulkanVersion(computeTargetVulkanVersion(TT)),
       openCLFullProfile(computeOpenCLFullProfile(TT)),
       openCLImageSupport(computeOpenCLImageSupport(TT)),
-      TR(new SPIRVTypeRegistry(pointerSize)),
-      CallLoweringInfo(new SPIRVCallLowering(TLInfo, TR.get())),
+      DT(new SPIRVGeneralDuplicatesTracker()),
+      // FIXME:
+      // .get() here is unsafe, works due to subtarget is destroyed
+      // later than these objects
+      // see comment in the SPIRVSubtarget.h
+      TR(new SPIRVTypeRegistry(*DT.get(), pointerSize)),
+      CallLoweringInfo(new SPIRVCallLowering(TLInfo, TR.get(), DT.get())),
       RegBankInfo(new SPIRVRegisterBankInfo()) {
 
   initAvailableExtensions(TT);
@@ -139,7 +144,9 @@ bool SPIRVSubtarget::isShader() const {
 
 // If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual
 bool SPIRVSubtarget::canDirectlyComparePointers() const {
-  return isAtLeastVer(targetSPIRVVersion, v(1, 4));
+  bool res = isAtLeastVer(targetSPIRVVersion, v(1, 4));
+  errs() << "Can" << (res ? "" : "'t") << " compare pointers\n";
+  return res;
 }
 
 // TODO use command line args for this rather than defaults

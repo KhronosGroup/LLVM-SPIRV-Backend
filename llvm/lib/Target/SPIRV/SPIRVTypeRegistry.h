@@ -11,21 +11,13 @@
 // into an OpTypeXXX instruction, and map it to a virtual register using and
 // ASSIGN_TYPE pseudo instruction.
 //
-// Passes requiring type info can reconstruct the vreg->OpTypeXXX mapping
-// by calling rebuildTypeTablesForFunction(MF) at the start. They must also
-// call reset() when the function ends to avoid maintaining invalid state
-// between function passes.
-//
-// Type info from this class can only be used before it gets stripped out by the
-// InstructionSelector stage. All type info is function-local until the final
-// SPIRVGlobalTypesAndRegNums pass hoists it globally and deduplicates it all.
-//
 //===----------------------------------------------------------------------===//
 
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
 
 #include "SPIRVEnums.h"
+#include "SPIRVDuplicatesTracker.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 #include <unordered_set>
@@ -42,13 +34,12 @@ class SPIRVTypeRegistry {
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
   // Reconstituted from ASSIGN_TYPE machineInstrs in subsequent passes.
-  DenseMap<Register, SPIRVType *> VRegToTypeMap;
+  std::map<MachineFunction *, std::map<Register, SPIRVType *>> VRegToTypeMap;
 
   // Maps LLVM IR types to SPIR-V types (only used in IRTranslator pass)
-  DenseMap<const Type *, SPIRVType *> TypeToSPIRVTypeMap;
+  DenseMap<const Type *, DenseMap<MachineFunction *, SPIRVType *>> TypeToSPIRVTypeMap;
 
-  // Maps OpTypeXXX opcode to a list of OpTypeXXX instrs (for deduplication).
-  DenseMap<unsigned, std::vector<SPIRVType *> *> OpcodeToSPIRVTypeMap;
+  SPIRVGeneralDuplicatesTracker &DT;
 
   // Number of bits pointers and size_t integers require.
   const unsigned int pointerSize;
@@ -58,17 +49,11 @@ class SPIRVTypeRegistry {
                              AQ::AccessQualifier accessQual = AQ::ReadWrite);
 
 public:
-  SPIRVTypeRegistry(unsigned int pointerSize);
+  SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT, unsigned int pointerSize);
+
+  MachineFunction *CurMF;
 
   void generateAssignInstrs(MachineFunction &MF);
-
-  // Run at the start of any pass requiring this to read all ASSIGN_TYPE
-  // instructions to rebuild the VReg -> Type map.
-  void rebuildTypeTablesForFunction(MachineFunction &MF);
-
-  // Erase the VReg -> Type map and any other internal state.
-  // Call after every function pass using this type system.
-  void reset();
 
   // Get or create a SPIR-V type corresponding the given LLVM IR type,
   // and map it to the given VReg by creating an ASSIGN_TYPE instruction.
@@ -101,6 +86,8 @@ public:
     assert(spirvType && "Attempting to get type id for nullptr type.");
     return spirvType->defs().begin()->getReg();
   }
+
+  void setCurrentFunc(MachineFunction &MF) { CurMF = &MF; }
 
   // Whether the given VReg has an OpTypeXXX instruction mapped to it with the
   // given opcode (e.g. OpTypeFloat).
