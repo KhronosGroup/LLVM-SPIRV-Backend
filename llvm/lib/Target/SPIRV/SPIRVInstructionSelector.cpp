@@ -179,6 +179,7 @@ private:
   const SPIRVRegisterInfo &TRI;
   const SPIRVRegisterBankInfo &RBI;
   SPIRVTypeRegistry &TR;
+  SPIRVGeneralDuplicatesTracker &DT;
 };
 
 } // end anonymous namespace
@@ -192,6 +193,7 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(
     const SPIRVRegisterBankInfo &RBI)
     : InstructionSelector(), TM(TM), STI(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), TR(*ST.getSPIRVTypeRegistry()),
+      DT(*ST.getSPIRVDuplicatesTracker()),
 #define GET_GLOBALISEL_PREDICATES_INIT
 #include "SPIRVGenGlobalISel.inc"
 #undef GET_GLOBALISEL_PREDICATES_INIT
@@ -240,6 +242,7 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
   bool hasDefs = I.getNumDefs() > 0;
   Register resVReg = hasDefs ? I.getOperand(0).getReg() : Register(0);
   SPIRVType *resType = hasDefs ? TR.getSPIRVTypeForVReg(resVReg) : nullptr;
+  assert(!hasDefs || resType);
   if (spvSelect(resVReg, resType, I, MIRBuilder)) {
     if (hasDefs) { // Make all vregs 32 bits (for SPIR-V IDs)
       MIRBuilder.getMRI()->setType(resVReg, LLT::scalar(32));
@@ -1029,8 +1032,12 @@ Register
 SPIRVInstructionSelector::buildI32Constant(uint32_t val,
                                            MachineIRBuilder &MIRBuilder) const {
   auto MRI = MIRBuilder.getMRI();
-  auto spvI32Ty = TR.getOpTypeInt(32, MIRBuilder);
+  auto LLVMTy = IntegerType::get(MIRBuilder.getMF().getFunction().getContext(), 32);
+  auto spvI32Ty = TR.getOrCreateSPIRVType(
+      LLVMTy,
+      MIRBuilder);
   Register newReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+  DT.add(ConstantInt::get(LLVMTy, val), &MIRBuilder.getMF(), newReg);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
                  .addDef(newReg)
                  .addUse(TR.getSPIRVTypeID(spvI32Ty))

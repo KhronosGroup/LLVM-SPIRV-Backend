@@ -979,7 +979,9 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
 static SPIRVType *buildOpTypeImageCL(Dim::Dim dim, AQ::AccessQualifier access,
                                      MachineIRBuilder &MIRBuilder,
                                      SPIRVTypeRegistry *TR) {
-  SPIRVType *voidTy = TR->getOpTypeVoid(MIRBuilder);
+  SPIRVType *voidTy = TR->getOrCreateSPIRVType(
+      Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
+      MIRBuilder);
   return TR->getOpTypeImage(MIRBuilder, voidTy, dim, 0, 0, 0, 0,
                             ImageFormat::Unknown, access);
 }

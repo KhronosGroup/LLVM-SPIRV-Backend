@@ -27,8 +27,9 @@
 using namespace llvm;
 
 SPIRVCallLowering::SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                                     SPIRVTypeRegistry *TR)
-    : CallLowering(&TLI), TR(TR) {}
+                                     SPIRVTypeRegistry *TR,
+                                     SPIRVGeneralDuplicatesTracker *DT)
+    : CallLowering(&TLI), TR(TR), DT(DT) {}
 
 bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     const Value *Val, ArrayRef<Register> VRegs,
@@ -76,21 +77,22 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
       SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
-      if (!spirvTy) {
+      if (!spirvTy)
         spirvTy = TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
-      }
       argTypeVRegs.push_back(TR->getSPIRVTypeID(spirvTy));
 
-      if (Arg.hasName()) {
+      if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
-      }
       ++i;
     }
   }
 
   // Generate a SPIR-V type for the function
   auto MRI = MIRBuilder.getMRI();
-  Register funcVReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  Register funcVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+  if (F.isDeclaration())
+    DT->add(&F, &MIRBuilder.getMF(), funcVReg);
+  MRI->setRegClass(funcVReg, &SPIRV::IDRegClass);
   auto funcTy = TR->assignTypeToVReg(F.getFunctionType(), funcVReg, MIRBuilder);
 
   // Build the OpTypeFunction declaring it
@@ -112,9 +114,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   }
 
   // Name the function
-  if (F.hasName()) {
+  if (F.hasName())
     buildOpName(funcVReg, F.getName(), MIRBuilder);
-  }
 
   // Handle entry points and function linkage
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
@@ -137,7 +138,6 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
-
   auto funcName = Info.Callee.getGlobal()->getGlobalIdentifier();
 
   size_t n;
@@ -170,18 +170,25 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     // If it's an externally declared function, be sure to emit its type and
     // function declaration here. It will be hoisted globally later
     auto M = MIRBuilder.getMF().getFunction().getParent();
-    Function *calledFunc = M->getFunction(funcName);
-    if (calledFunc && calledFunc->isDeclaration()) {
+    Function *Callee = M->getFunction(funcName);
+    if (Callee && Callee->isDeclaration()) {
       // Emit the type info and forward function declaration to the first MBB
       // to ensure VReg definition dependencies are valid across all MBBs
       MachineIRBuilder firstBlockBuilder;
       auto &MF = MIRBuilder.getMF();
       firstBlockBuilder.setMF(MF);
       firstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
+
+      SmallVector<ArrayRef<Register>, 8> VRegArgs;
+      for (const Argument &Arg : Callee->args()) {
+        if (MIRBuilder.getDataLayout().getTypeStoreSize(Arg.getType()).isZero())
+          continue; // Don't handle zero sized types.
+        VRegArgs.push_back(MIRBuilder.getMRI()->createGenericVirtualRegister(LLT::scalar(32)));
+      }
       
       // TODO: Reuse FunctionLoweringInfo
       FunctionLoweringInfo FuncInfo;
-      lowerFormalArguments(firstBlockBuilder, *calledFunc, {}, FuncInfo);
+      lowerFormalArguments(firstBlockBuilder, *Callee, VRegArgs, FuncInfo);
     }
 
     // Make sure there's a valid return reg, even for functions returning void

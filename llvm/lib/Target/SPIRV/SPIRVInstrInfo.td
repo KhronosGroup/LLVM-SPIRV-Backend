@@ -20,6 +20,7 @@ include "SPIRVEnums.td"
 //Codegen only metadata instructions
 let isCodeGenOnly=1 in {
   def ASSIGN_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
+  def DECL_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
   def GET_ID: Pseudo<(outs ID:$dst_id), (ins ANYID:$src)>;
   def GET_fID: Pseudo<(outs fID:$dst_id), (ins ANYID:$src)>;
   def GET_pID: Pseudo<(outs pID:$dst_id), (ins ANYID:$src)>;

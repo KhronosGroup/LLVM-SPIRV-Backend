@@ -209,7 +209,7 @@ class SPIRVInstructionSelect : public InstructionSelect {
   bool runOnMachineFunction(MachineFunction &MF) override {
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     auto *TR = ST->getSPIRVTypeRegistry();
-    TR->rebuildTypeTablesForFunction(MF);
+    TR->setCurrentFunc(MF);
     auto &MRI = MF.getRegInfo();
 
     // we need to rewrite dst types for ASSIGN_TYPE instrs
@@ -243,7 +243,6 @@ class SPIRVInstructionSelect : public InstructionSelect {
     }
     for (auto *MI: ToRemove)
       MI->eraseFromParent();
-    TR->reset();
     return success;
   }
 };

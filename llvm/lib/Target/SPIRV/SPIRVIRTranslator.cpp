@@ -108,6 +108,8 @@ bool SPIRVIRTranslator::buildGlobalValue(Register Reg, const GlobalValue *GV,
     //   return false;
     // }
   }
+  if (storage != StorageClass::Function)
+    DT->add(GV, &MIRBuilder.getMF(), Reg);
   return TR->constrainRegOperands(MIB);
 }
 
@@ -128,12 +130,15 @@ bool SPIRVIRTranslator::translate(const Instruction &Inst) {
 }
 
 bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
-  if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
-    // Null (needs handled here to not loose the type info)
-    return buildOpConstantNull(C, Reg, *EntryBuilder, TR);
-  } else if (auto GV = dyn_cast<GlobalValue>(&C)) {
+  if (auto GV = dyn_cast<GlobalValue>(&C)) {
     // Global OpVariables (possibly with constant initializers)
     return buildGlobalValue(Reg, GV, *EntryBuilder);
+  }
+
+  bool Res = false;
+  if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
+    // Null (needs handled here to not loose the type info)
+    Res = buildOpConstantNull(C, Reg, *EntryBuilder, TR);
   } else if (auto CV = dyn_cast<ConstantDataSequential>(&C)) {
     // Vectors or arrays via OpConstantComposite
     if (CV->getNumElements() == 1)
@@ -142,23 +147,28 @@ bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
     for (unsigned i = 0; i < CV->getNumElements(); ++i) {
       Ops.push_back(getOrCreateVReg(*CV->getElementAsConstant(i)));
     }
-    return buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
+    Res = buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
   } else if (auto CV = dyn_cast<ConstantAggregate>(&C)) {
     // Structs via OpConstantComposite
     if (C.getNumOperands() == 1)
-      return translate(*CV->getOperand(0), Reg);
-    SmallVector<Register, 4> Ops;
-    for (unsigned i = 0; i < C.getNumOperands(); ++i) {
-      Ops.push_back(getOrCreateVReg(*C.getOperand(i)));
+      Res = translate(*CV->getOperand(0), Reg);
+    else {
+      SmallVector<Register, 4> Ops;
+      for (unsigned i = 0; i < C.getNumOperands(); ++i) {
+        Ops.push_back(getOrCreateVReg(*C.getOperand(i)));
+      }
+      Res = buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
     }
-    return buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
   } else if (auto CE = dyn_cast<ConstantExpr>(&C)) {
 
     if (translateInst(*CE, CE->getOpcode()))
-      return true;
+      Res = true;
   }
 
-  return IRTranslator::translate(C, Reg);
+  if (!Res)
+    Res = IRTranslator::translate(C, Reg);
+  DT->add(&C, MF, Reg);
+  return Res;
 }
 
 bool SPIRVIRTranslator::translateInst(const User &Inst, unsigned OpCode) {
@@ -256,13 +266,13 @@ ArrayRef<Register> SPIRVIRTranslator::getOrCreateVRegs(const Value &Val) {
       assert(success && "Could not translate constant");
     }
     ResVRegs = *NewVRegs;
+    assert(ResVRegs.size() == 1);
 
     // Add type and name metadata
     if (!TR->hasSPIRVTypeForVReg(ResVRegs[0])) {
       TR->assignTypeToVReg(Ty, ResVRegs[0], *EntryBuilder);
-      if (Val.hasName()) {
+      if (Val.hasName())
         buildOpName(ResVRegs[0], Val.getName(), *EntryBuilder);
-      }
     }
   }
   // Make sure there's always at least 1 placeholder offset to avoid crashes
@@ -276,12 +286,14 @@ ArrayRef<Register> SPIRVIRTranslator::getOrCreateVRegs(const Value &Val) {
 bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-  this->TR = ST->getSPIRVTypeRegistry();
+  TR = ST->getSPIRVTypeRegistry();
+  DT = ST->getSPIRVDuplicatesTracker();
+
+  TR->setCurrentFunc(MF);
+
   // Run the regular IRTranslator
   bool success = IRTranslator::runOnMachineFunction(MF);
   TR->generateAssignInstrs(MF);
-  // Clean up
-  TR->reset();
   return success;
 }
 
@@ -375,18 +387,6 @@ bool SPIRVIRTranslator::translateInsertValue(const User &U,
     MIB.addImm(idx);
   }
   return TR->constrainRegOperands(MIB);
-}
-
-
-// Retrieve an unsigned int from an MDNode with a list of them as operands
-static unsigned int getMetadataUInt(const MDNode *mdNode, unsigned int opIndex,
-                                    unsigned int defaultVal = 0) {
-  if (mdNode && opIndex < mdNode->getNumOperands()) {
-    const auto &op = mdNode->getOperand(opIndex);
-    return mdconst::extract<ConstantInt>(op)->getZExtValue();
-  } else {
-    return defaultVal;
-  }
 }
 
 bool SPIRVIRTranslator::translateOverflowIntrinsic(
