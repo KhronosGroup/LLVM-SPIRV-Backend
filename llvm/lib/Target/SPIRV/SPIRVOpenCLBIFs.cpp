@@ -137,9 +137,11 @@ static bool buildSamplerLiteral(uint64_t samplerBitmask, Register res,
 }
 
 static Register buildSamplerLiteral(uint64_t samplerBitmask,
+                                    const SPIRVType *samplerTy,
                                     MachineIRBuilder &MIRBuilder,
                                     SPIRVTypeRegistry *TR) {
-  SPIRVType *sampTy = TR->getSamplerType(MIRBuilder);
+  SPIRVType *sampTy =
+      TR->getOrCreateSPIRVType(TR->getTypeForSPIRVType(samplerTy), MIRBuilder);
   auto sampler = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
   buildSamplerLiteral(samplerBitmask, sampler, sampTy, MIRBuilder, TR);
   return sampler;
@@ -199,7 +201,7 @@ static Register buildOpVariable(SPIRVType *baseType,
                                 SPIRVTypeRegistry *TR) {
 
   auto resVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-  SPIRVType *ptrTy = TR->getOpTypePointer(storage, baseType, MIRBuilder);
+  SPIRVType *ptrTy = TR->getOrCreateSPIRVPointerType(baseType, MIRBuilder, storage);
   TR->assignSPIRVTypeToVReg(ptrTy, resVReg, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
                  .addDef(resVReg)
@@ -235,7 +237,8 @@ static Register buildOpSampledImage(Register image, Register sampler,
                                     SPIRVTypeRegistry *TR) {
   const auto MRI = MIRBuilder.getMRI();
   SPIRVType *imageType = TR->getSPIRVTypeForVReg(image);
-  SPIRVType *sampImTy = TR->getSampledImageType(imageType, MIRBuilder);
+  SPIRVType *sampImTy =
+      TR->getOrCreateSPIRVType(TR->getTypeForSPIRVType(imageType), MIRBuilder);
 
   Register sampledImage = MRI->createVirtualRegister(&SPIRV::IDRegClass);
   auto SampImMIB = MIRBuilder.buildInstr(SPIRV::OpSampledImage)
@@ -323,7 +326,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   const unsigned resWidth = retType->getOperand(1).getImm();
   const unsigned int ptrSize = TR->getPointerSize();
 
-  const auto sizeT = TR->getPtrUIntType(MIRBuilder);
+  const auto PtrSizeTy = TR->getOrCreateSPIRVIntegerType(ptrSize, MIRBuilder);
 
   const auto MRI = MIRBuilder.getMRI();
   auto idxInstr = MRI->getVRegDef(idxVReg);
@@ -340,28 +343,28 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     Register defaultReg = resVReg;
     if (ptrSize != resWidth) {
       defaultReg = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-      TR->assignSPIRVTypeToVReg(sizeT, defaultReg, MIRBuilder);
+      TR->assignSPIRVTypeToVReg(PtrSizeTy, defaultReg, MIRBuilder);
       toTruncate = defaultReg;
     }
-    buildIConstant(defaultReg, defaultVal, sizeT, MIRBuilder, TR);
+    buildIConstant(defaultReg, defaultVal, PtrSizeTy, MIRBuilder, TR);
   } else { // If it could be in range, we need to load from the given builtin
 
-    auto v3 = TR->getOpTypeVector(3, sizeT, MIRBuilder);
+    auto Vec3Ty = TR->getOrCreateSPIRVVectorType(PtrSizeTy, 3, MIRBuilder);
 
     // Set up the global OpVariable with the necessary builtin decorations
-    Register globVar = buildOpVariable(v3, StorageClass::Input, MIRBuilder, TR);
+    Register globVar = buildOpVariable(Vec3Ty, StorageClass::Input, MIRBuilder, TR);
     decorateBuiltIn(globVar, builtIn, MIRBuilder, TR);
     decorateConstant(globVar, MIRBuilder, TR);
 
     // Load the Vec3 from the global variable
-    Register loadedVector = buildLoad(v3, globVar, MIRBuilder, TR);
+    Register loadedVector = buildLoad(Vec3Ty, globVar, MIRBuilder, TR);
     MRI->setType(loadedVector, LLT::fixed_vector(3, ptrSize));
 
     // Set up the vreg to extract the result to (possibly a new temporary one)
     Register extr = resVReg;
     if (!isConstantIndex || ptrSize != resWidth) {
       extr = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-      TR->assignSPIRVTypeToVReg(sizeT, extr, MIRBuilder);
+      TR->assignSPIRVTypeToVReg(PtrSizeTy, extr, MIRBuilder);
     }
 
     // Use G_EXTRACT_VECTOR_ELT so dynamic vs static extraction is handled later
@@ -370,7 +373,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     // If the index is dynamic, need check if it's < 3, and then use a select
     if (!isConstantIndex) {
       auto idxTy = TR->getSPIRVTypeForVReg(idxVReg);
-      auto boolTy = TR->getOpTypeBool(MIRBuilder);
+      auto boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
 
       Register cmpReg = MRI->createGenericVirtualRegister(LLT::scalar(1));
       TR->assignSPIRVTypeToVReg(boolTy, cmpReg, MIRBuilder);
@@ -380,13 +383,13 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       MIRBuilder.buildICmp(CmpInst::ICMP_ULT, cmpReg, idxVReg, three);
 
       // Get constant for the default value (0 or 1 depending on which function)
-      Register defaultReg = buildIConstant(defaultVal, sizeT, MIRBuilder, TR);
+      Register defaultReg = buildIConstant(defaultVal, PtrSizeTy, MIRBuilder, TR);
 
       // Get a register for the selection result (possibly a new temporary one)
       Register selRes = resVReg;
       if (ptrSize != resWidth) {
         selRes = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-        TR->assignSPIRVTypeToVReg(sizeT, selRes, MIRBuilder);
+        TR->assignSPIRVTypeToVReg(PtrSizeTy, selRes, MIRBuilder);
       }
 
       // Create the final G_SELECT to return the extracted value or the default
@@ -413,11 +416,12 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
   const auto MRI = MIRBuilder.getMRI();
 
   Register image = OrigArgs[0];
-
   Register sampler = OrigArgs[1];
+
   if (!TR->isScalarOfType(OrigArgs[1], SPIRV::OpTypeSampler)) {
     auto sampMask = getLiteralValueForConstant(OrigArgs[1], MRI);
-    sampler = buildSamplerLiteral(sampMask, MIRBuilder, TR);
+    sampler = buildSamplerLiteral(sampMask, TR->getSPIRVTypeForVReg(sampler),
+                                  MIRBuilder, TR);
   }
 
   Register sampledImage = buildOpSampledImage(image, sampler, MIRBuilder, TR);
@@ -491,9 +495,8 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   const auto MRI = MIRBuilder.getMRI();
 
   unsigned numRetComps = 1;
-  if (retType->getOpcode() == SPIRV::OpTypeVector) {
+  if (retType->getOpcode() == SPIRV::OpTypeVector)
     numRetComps = retType->getOperand(2).getImm();
-  }
 
   SPIRVType *imgType = TR->getSPIRVTypeForVReg(img);
   unsigned numTempComps = getNumSizeComponents(imgType);
@@ -502,8 +505,8 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   SPIRVType *sizeVecTy = retType;
   if (numTempComps != numRetComps) {
     sizeVec = MRI->createGenericVirtualRegister(LLT::fixed_vector(numTempComps, 32));
-    auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
-    sizeVecTy = TR->getOpTypeVector(numTempComps, I32Ty, MIRBuilder);
+    auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
+    sizeVecTy = TR->getOrCreateSPIRVVectorType(I32Ty, numTempComps, MIRBuilder);
     TR->assignSPIRVTypeToVReg(sizeVecTy, sizeVec, MIRBuilder);
   }
 
@@ -602,7 +605,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
                           SPIRVTypeRegistry* TR) {
   using namespace SPIRV;
 
-  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+  auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
   Register scopeReg;
   auto scope = Scope::Device;
@@ -630,7 +633,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
                          SPIRVTypeRegistry *TR) {
   assert(OrigArgs.size() >= 2 && "Need 2 args for atomic store instr");
   using namespace SPIRV;
-  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+  auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
   Register scopeReg;
   auto scope = Scope::Device;
@@ -691,7 +694,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
     if (memOrdNeq == memSemEqual)
       memSemUnequalReg = OrigArgs[4];
   }
-  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+  auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
   if (!memSemEqualReg.isValid())
     memSemEqualReg = buildIConstant(memSemEqual, I32Ty, MIRBuilder, TR);
   if (!memSemUnequalReg.isValid())
@@ -733,7 +736,7 @@ static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
                          SPIRVTypeRegistry *TR) {
   assert(OrigArgs.size() >= 2 && "Need 2+ args to atomic RMW instr");
   const auto MRI = MIRBuilder.getMRI();
-  auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+  auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
   Register scopeReg;
   auto scope = Scope::Device;
@@ -819,7 +822,7 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder,
                        SPIRVTypeRegistry *TR) {
   assert(OrigArgs.size() >= 1 && "Missing args for OpenCL barrier func");
   const auto MRI = MIRBuilder.getMRI();
-  const auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
+  const auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
   unsigned memFlags = getIConstVal(OrigArgs[0], MRI);
   unsigned memSem = MemorySemantics::None;
@@ -976,16 +979,6 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
   return TR->constrainRegOperands(MIB);
 }
 
-static SPIRVType *buildOpTypeImageCL(Dim::Dim dim, AQ::AccessQualifier access,
-                                     MachineIRBuilder &MIRBuilder,
-                                     SPIRVTypeRegistry *TR) {
-  SPIRVType *voidTy = TR->getOrCreateSPIRVType(
-      Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
-      MIRBuilder);
-  return TR->getOpTypeImage(MIRBuilder, voidTy, dim, 0, 0, 0, 0,
-                            ImageFormat::Unknown, access);
-}
-
 static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
                              MachineIRBuilder &MIRBuilder, Register ret,
                              const SPIRVType *retTy,
@@ -1002,55 +995,16 @@ static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
   return TR->constrainRegOperands(MIB);
 }
 
-SPIRVType *llvm::generateOpenCLOpaqueType(const StringRef name,
-                                          MachineIRBuilder &MIRBuilder,
-                                          SPIRVTypeRegistry *TR,
-                                          AQ::AccessQualifier accessQual) {
-  assert(name.startswith("opencl.") && "CL types should start with 'opencl.'");
-  using namespace Dim;
-  auto typeName = name.substr(strlen("opencl."));
-
-  if (typeName.startswith("image")) {
-    if (typeName.endswith("_ro_t")) {
-      accessQual = AQ::ReadOnly;
-    } else if (typeName.endswith("_wo_t")) {
-      accessQual = AQ::WriteOnly;
-    } else if (typeName.endswith("_rw_t")) {
-      accessQual = AQ::ReadWrite;
-    }
-    char dimC = typeName[strlen("image")];
-    if (dimC >= '1' && dimC <= '3') {
-      auto dim = dimC == '1' ? DIM_1D : dimC == '2' ? DIM_2D : DIM_3D;
-      return buildOpTypeImageCL(dim, accessQual, MIRBuilder, TR);
-    }
-  } else if (typeName.startswith("sampler_t")) {
-    return TR->getSamplerType(MIRBuilder);
-  } else if (typeName.startswith("pipe")) {
-    if (typeName.endswith("_ro_t")) {
-      accessQual = AQ::ReadOnly;
-    } else if (typeName.endswith("_wo_t")) {
-      accessQual = AQ::WriteOnly;
-    } else if (typeName.endswith("_rw_t")) {
-      accessQual = AQ::ReadWrite;
-    }
-    return TR->getOpTypePipe(MIRBuilder, accessQual);
-  }
-
-  report_fatal_error("Cannot generate OpenCL type: " + name);
-}
-
 bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
-                                     MachineIRBuilder &MIRBuilder, Register ret,
-                                     const Type *OrigRetTy,
+                                     MachineIRBuilder &MIRBuilder,
+                                     Register OrigRet, const Type *OrigRetTy,
                                      const SmallVectorImpl<Register> &args,
                                      SPIRVTypeRegistry *TR) {
-
   LLVM_DEBUG(dbgs() << "Generating OpenCL Builtin: " << demangledName << "\n");
 
   SPIRVType *retTy = nullptr;
-  if (OrigRetTy && !OrigRetTy->isVoidTy()) {
-    retTy = TR->assignTypeToVReg(OrigRetTy, ret, MIRBuilder);
-  }
+  if (OrigRetTy && !OrigRetTy->isVoidTy())
+    retTy = TR->assignTypeToVReg(OrigRetTy, OrigRet, MIRBuilder);
 
   auto firstBraceIdx = demangledName.find_first_of('(');
   auto nameNoArgs = demangledName.substr(0, firstBraceIdx);
@@ -1058,7 +1012,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs.str());
   if (extInstIDOpt.hasValue()) {
     auto extInstID = extInstIDOpt.getValue();
-    return genOpenCLExtInst(extInstID, MIRBuilder, ret, retTy, args, TR);
+    return genOpenCLExtInst(extInstID, MIRBuilder, OrigRet, retTy, args, TR);
   }
 
   namespace CL = OpenCL_std;
@@ -1083,17 +1037,17 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   if (extInstMatch != typeDependantExtInstMap.end()) {
     char typeChar = demangledName[firstBraceIdx + 1];
     int idx = -1;
-    if (typeChar == 'u') {
+    if (typeChar == 'u')
       idx = 0;
-    } else if (typeChar == 'c' || typeChar == 's' || typeChar == 'i' || typeChar == 'l') {
+    else if (typeChar == 'c' || typeChar == 's' || typeChar == 'i' ||
+             typeChar == 'l')
       idx = 1;
-    } else if (typeChar == 'f' || typeChar == 'd') {
+    else if (typeChar == 'f' || typeChar == 'd')
       idx = 2;
-    }
     if (idx != -1) {
       assert(unsigned(idx) < extInstMatch->second.size());
       CL::OpenCL_std extInstId = extInstMatch->second[idx];
-      return genOpenCLExtInst(extInstId, MIRBuilder, ret, retTy, args, TR);
+      return genOpenCLExtInst(extInstId, MIRBuilder, OrigRet, retTy, args, TR);
     }
   }
 
@@ -1103,29 +1057,26 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     if (nameNoArgs.startswith("atom")) {
       // Handle atom_add, atomic_add, and atomic_fetch_add etc.
       auto idx = strlen("atom_");
-      if (nameNoArgs.startswith("atomic_")) {
+      if (nameNoArgs.startswith("atomic_"))
         idx = nameNoArgs.startswith("atomic_fetch_") ? strlen("atomic_fetch_")
                                                      : strlen("atomic_");
-      }
       const auto atomic = nameNoArgs.substr(idx);
-      return genAtomicInstr(MIRBuilder, atomic, ret, retTy, args, TR);
+      return genAtomicInstr(MIRBuilder, atomic, OrigRet, retTy, args, TR);
     }
     break;
   case 'b':
-    if (nameNoArgs.startswith("barrier")) {
+    if (nameNoArgs.startswith("barrier"))
       return genBarrier(MIRBuilder, args, TR);
-    }
     break;
   case 'c':
     if (nameNoArgs.startswith("convert_")) {
       const auto convTy = demangledName.substr(strlen("convert_"));
-      return genConvertInstr(MIRBuilder, convTy, ret, retTy, args, TR);
+      return genConvertInstr(MIRBuilder, convTy, OrigRet, retTy, args, TR);
     }
     break;
   case 'd':
-    if (nameNoArgs.startswith("dot")) {
-      return genDotOrFMul(ret, retTy, MIRBuilder, args, TR);
-    }
+    if (nameNoArgs.startswith("dot"))
+      return genDotOrFMul(OrigRet, retTy, MIRBuilder, args, TR);
     break;
   case 'g': {
     bool local = nameNoArgs.startswith("get_local_");
@@ -1133,44 +1084,41 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     if (local || global) {
       auto subIdx = global ? strlen("get_global_") : strlen("get_local_");
       const auto str = nameNoArgs.substr(subIdx);
-      return genGlobalLocalQuery(MIRBuilder, str, global, ret, retTy, args, TR);
+      return genGlobalLocalQuery(MIRBuilder, str, global, OrigRet, retTy, args, TR);
     } else if (nameNoArgs.startswith("get_image_")) {
       const auto imgStr = nameNoArgs.substr(strlen("get_image_"));
-      return genImageQuery(MIRBuilder, imgStr, ret, retTy, args, TR);
-    } else if (nameNoArgs.startswith("get_group_id")) {
-      return genWorkgroupQuery(MIRBuilder, ret, retTy, args, TR,
+      return genImageQuery(MIRBuilder, imgStr, OrigRet, retTy, args, TR);
+    } else if (nameNoArgs.startswith("get_group_id"))
+      return genWorkgroupQuery(MIRBuilder, OrigRet, retTy, args, TR,
                                BuiltIn::WorkgroupId, 0);
-    } else if (nameNoArgs.startswith("get_enqueued_local_size")) {
-      return genWorkgroupQuery(MIRBuilder, ret, retTy, args, TR,
+    else if (nameNoArgs.startswith("get_enqueued_local_size"))
+      return genWorkgroupQuery(MIRBuilder, OrigRet, retTy, args, TR,
                                BuiltIn::EnqueuedWorkgroupSize, 1);
-    } else if (nameNoArgs.startswith("get_num_groups")) {
-      return genWorkgroupQuery(MIRBuilder, ret, retTy, args, TR,
+    else if (nameNoArgs.startswith("get_num_groups"))
+      return genWorkgroupQuery(MIRBuilder, OrigRet, retTy, args, TR,
                                BuiltIn::NumWorkGroups, 1);
-    } else if (nameNoArgs.startswith("get_work_dim")) {
+    else if (nameNoArgs.startswith("get_work_dim"))
       // TODO
-    }
+      llvm_unreachable("not implemented");
     break;
   }
   case 'r':
     if (nameNoArgs.startswith("read_image")) {
-      if (args.size() > 2) {
-        return genSampledReadImage(MIRBuilder, ret, retTy, args, TR);
-      } else {
-        return genReadImage(MIRBuilder, ret, retTy, args, TR);
-      }
+      if (args.size() > 2)
+        return genSampledReadImage(MIRBuilder, OrigRet, retTy, args, TR);
+      else
+        return genReadImage(MIRBuilder, OrigRet, retTy, args, TR);
     }
     break;
   case 'w':
-    if (nameNoArgs.startswith("write_image")) {
+    if (nameNoArgs.startswith("write_image"))
       return genWriteImage(MIRBuilder, args, TR);
-    } else if (nameNoArgs.startswith("work_group_barrier")) {
+    else if (nameNoArgs.startswith("work_group_barrier"))
       return genBarrier(MIRBuilder, args, TR);
-    }
     break;
   case '_':
-    if (nameNoArgs.startswith("__translate_sampler_initializer")) {
-      return buildSamplerLiteral(args[0], ret, retTy, MIRBuilder, TR);
-    }
+    if (nameNoArgs.startswith("__translate_sampler_initializer"))
+      return buildSamplerLiteral(args[0], OrigRet, retTy, MIRBuilder, TR);
     break;
   default:
     break;

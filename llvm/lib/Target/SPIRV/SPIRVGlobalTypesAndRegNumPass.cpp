@@ -190,8 +190,6 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
                            const SPIRVDuplicatesTracker<T> *DT,
                            MetaBlockType MBType,
                            LocalAliasTablesTy &LocalAliasTables) {
-  const auto *ST =
-      static_cast<const SPIRVSubtarget *>(&MetaBuilder.getMF().getSubtarget());
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
 
@@ -243,12 +241,10 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
 // OpFunctionParameter generation here instead handling it
 // in CallLowering
 template <>
-static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
+void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
                            const SPIRVDuplicatesTracker<Function> *DT,
                            MetaBlockType MBType,
                            LocalAliasTablesTy &LocalAliasTables) {
-  const auto *ST =
-      static_cast<const SPIRVSubtarget *>(&MetaBuilder.getMF().getSubtarget());
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
 
@@ -324,19 +320,13 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
                                    MachineIRBuilder &MIRBuilder,
                                    LocalAliasTablesTy &LocalAliasTables,
                                    SPIRVRequirementHandler &reqs) {
-
-  const auto TII = static_cast<const SPIRVInstrInfo *>(&MIRBuilder.getTII());
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MIRBuilder.getMF().getSubtarget());
-  auto *TR = ST->getSPIRVTypeRegistry();
   auto *DT = ST->getSPIRVDuplicatesTracker();
-  const auto ID = SPIRV::IDRegClass;
-  const auto TYPE = SPIRV::TYPERegClass;
 
   hoistGlobalOps<Type>(MIRBuilder, DT->get<Type>(), MB_TypeConstVars, LocalAliasTables);
   hoistGlobalOps<Constant>(MIRBuilder, DT->get<Constant>(), MB_TypeConstVars, LocalAliasTables);
 
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
-  auto &locToGlobMap = LocalAliasTables[MF];
 
   // Iterate through and hoist any instructions we can at this stage.
   // bool hasSeenFirstOpFunction = false;

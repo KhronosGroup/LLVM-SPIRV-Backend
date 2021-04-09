@@ -188,29 +188,32 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeArray(uint32_t numElems,
   return MIB;
 }
 
-SPIRVType *SPIRVTypeRegistry::getOpTypeOpaque(const StringRef name,
+SPIRVType *SPIRVTypeRegistry::getOpTypeOpaque(const StructType *Ty,
                                               MachineIRBuilder &MIRBuilder) {
-  Register resVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeOpaque).addDef(resVReg);
-  addStringImm(name, MIB);
-  buildOpName(resVReg, name, MIRBuilder);
+  assert(Ty->hasName());
+  const StringRef Name = Ty->hasName() ? Ty->getName() : "";
+  Register ResVReg = createTypeVReg(MIRBuilder);
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeOpaque).addDef(ResVReg);
+  addStringImm(Name, MIB);
+  buildOpName(ResVReg, Name, MIRBuilder);
   return MIB;
 }
 
 SPIRVType *
-SPIRVTypeRegistry::getOpTypeStruct(const SmallVectorImpl<SPIRVType *> &elems,
-                                   MachineIRBuilder &MIRBuilder,
-                                   StringRef name) {
-  Register resVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeStruct).addDef(resVReg);
-  for (const auto &elementType : elems) {
-    if (elementType->getOpcode() == SPIRV::OpTypeVoid) {
-      errs() << elementType;
+SPIRVTypeRegistry::getOpTypeStruct(const StructType *Ty,
+                                   MachineIRBuilder &MIRBuilder) {
+  Register ResVReg = createTypeVReg(MIRBuilder);
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeStruct).addDef(ResVReg);
+  for (const auto &Elem : Ty->elements()) {
+    auto ElemTy = getOrCreateSPIRVType(Elem, MIRBuilder);
+    if (ElemTy->getOpcode() == SPIRV::OpTypeVoid) {
+      errs() << ElemTy;
       report_fatal_error("Invalid struct element type");
     }
-    MIB.addUse(getSPIRVTypeID(elementType));
+    MIB.addUse(getSPIRVTypeID(ElemTy));
   }
-  buildOpName(resVReg, name, MIRBuilder);
+  if (Ty->hasName())
+    buildOpName(ResVReg, Ty->getName(), MIRBuilder);
   return MIB;
 }
 
@@ -219,14 +222,14 @@ static bool isOpenCLBuiltinType(const StructType *stype) {
          stype->getName().startswith("opencl.");
 }
 
-static SPIRVType *handleOpenCLBuiltin(const StringRef name,
-                                      MachineIRBuilder &MIRBuilder,
-                                      SPIRVTypeRegistry *TR,
-                                      AQ::AccessQualifier aq) {
-  unsigned numStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
-  auto resTy = generateOpenCLOpaqueType(name, MIRBuilder, TR, aq);
-  if (numStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
-    buildOpName(TR->getSPIRVTypeID(resTy), name, MIRBuilder);
+SPIRVType *SPIRVTypeRegistry::handleOpenCLBuiltin(const StructType *Ty,
+                                                  MachineIRBuilder &MIRBuilder,
+                                                  AQ::AccessQualifier aq) {
+  assert(Ty->hasName());
+  unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
+  auto resTy = generateOpenCLOpaqueType(Ty, MIRBuilder, aq);
+  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
+    buildOpName(getSPIRVTypeID(resTy), Ty->getName(), MIRBuilder);
   return resTy;
 }
 
@@ -254,40 +257,37 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeFunction(
 SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
                                               MachineIRBuilder &MIRBuilder,
                                               AQ::AccessQualifier aq) {
+  auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
   auto t = TypeToSPIRVTypeMap.find(Ty);
   if (t != TypeToSPIRVTypeMap.end()) {
     auto tt = t->second.find(&MIRBuilder.getMF());
     if (tt != t->second.end())
-      return tt->second;
+      return getSPIRVTypeForVReg(tt->second);
   }
 
   if (auto itype = dyn_cast<IntegerType>(Ty)) {
     const unsigned int width = itype->getBitWidth();
     return width == 1 ? getOpTypeBool(MIRBuilder)
                       : getOpTypeInt(width, MIRBuilder, false);
-  } else if (Ty->isFloatingPointTy()) {
+  } else if (Ty->isFloatingPointTy())
     return getOpTypeFloat(Ty->getPrimitiveSizeInBits(), MIRBuilder);
-  } else if (Ty->isVoidTy()) {
+  else if (Ty->isVoidTy())
     return getOpTypeVoid(MIRBuilder);
-  } else if (Ty->isVectorTy()) {
-    auto el = getOrCreateSPIRVType(cast<FixedVectorType>(Ty)->getElementType(), MIRBuilder);
-    return getOpTypeVector(cast<FixedVectorType>(Ty)->getNumElements(), el, MIRBuilder);
+  else if (Ty->isVectorTy()) {
+    auto el = getOrCreateSPIRVType(cast<FixedVectorType>(Ty)->getElementType(),
+                                   MIRBuilder);
+    return getOpTypeVector(cast<FixedVectorType>(Ty)->getNumElements(), el,
+                           MIRBuilder);
   } else if (Ty->isArrayTy()) {
     auto *el = getOrCreateSPIRVType(Ty->getArrayElementType(), MIRBuilder);
     return getOpTypeArray(Ty->getArrayNumElements(), el, MIRBuilder);
   } else if (auto stype = dyn_cast<StructType>(Ty)) {
-    const StringRef name = stype->hasName() ? stype->getName() : "";
-    if (isOpenCLBuiltinType(stype)) {
-      return handleOpenCLBuiltin(name, MIRBuilder, this, aq);
-    } else if (stype->isOpaque()) {
-      return getOpTypeOpaque(name, MIRBuilder);
-    } else {
-      SmallVector<SPIRVType *, 8> elementTypes;
-      for (const auto &t : stype->elements()) {
-        elementTypes.push_back(getOrCreateSPIRVType(t, MIRBuilder));
-      }
-      return getOpTypeStruct(elementTypes, MIRBuilder, name);
-    }
+    if (isOpenCLBuiltinType(stype))
+      return handleOpenCLBuiltin(stype, MIRBuilder, aq);
+    else if (stype->isOpaque())
+      return getOpTypeOpaque(stype, MIRBuilder);
+    else
+      return getOpTypeStruct(stype, MIRBuilder);
   } else if (auto ftype = dyn_cast<FunctionType>(Ty)) {
     SPIRVType *retTy = getOrCreateSPIRVType(ftype->getReturnType(), MIRBuilder);
     SmallVector<SPIRVType *, 4> paramTypes;
@@ -300,12 +300,10 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
 
     // Some OpenCL builtins like image2d_t are passed in as pointers, but
     // should be treated as custom types like OpTypeImage
-    if (auto stype = dyn_cast<StructType>(elemType)) {
-      if (isOpenCLBuiltinType(stype)) {
-        const StringRef name = stype->hasName() ? stype->getName() : "";
-        return handleOpenCLBuiltin(name, MIRBuilder, this, aq);
-      }
-    }
+    if (auto stype = dyn_cast<StructType>(elemType))
+      if (isOpenCLBuiltinType(stype))
+        return handleOpenCLBuiltin(stype, MIRBuilder, aq);
+
 
     // Otherwise, treat it as a regular pointer type
     auto sc = addressSpaceToStorageClass(ptype->getAddressSpace());
@@ -317,7 +315,7 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
   }
 }
 
-SPIRVType *SPIRVTypeRegistry::getSPIRVTypeForVReg(Register VReg) {
+SPIRVType *SPIRVTypeRegistry::getSPIRVTypeForVReg(Register VReg) const {
   auto t = VRegToTypeMap.find(CurMF);
   if (t != VRegToTypeMap.end()) {
     auto tt = t->second.find(VReg);
@@ -331,38 +329,28 @@ SPIRVType *
 SPIRVTypeRegistry::getOrCreateSPIRVType(const Type *type,
                                         MachineIRBuilder &MIRBuilder,
                                         AQ::AccessQualifier accessQual) {
+  auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
   auto SPIRVTypeIt = TypeToSPIRVTypeMap.find(type);
   if (SPIRVTypeIt != TypeToSPIRVTypeMap.end()) {
     auto SPIRVTypeFuncIt = SPIRVTypeIt->second.find(&MIRBuilder.getMF());
-    if (SPIRVTypeFuncIt != SPIRVTypeIt->second.end()) {
-      return SPIRVTypeFuncIt->second;
-    }
+    if (SPIRVTypeFuncIt != SPIRVTypeIt->second.end())
+      return getSPIRVTypeForVReg(SPIRVTypeFuncIt->second);
   }
   SPIRVType *spirvType = createSPIRVType(type, MIRBuilder, accessQual);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(spirvType)] = spirvType;
-  TypeToSPIRVTypeMap[type][&MIRBuilder.getMF()] = spirvType;
+  SPIRVToLLVMType[spirvType] = type;
   DT.add(type, &MIRBuilder.getMF(), getSPIRVTypeID(spirvType));
   return spirvType;
 }
 
-SPIRVType *SPIRVTypeRegistry::getPtrUIntType(MachineIRBuilder &MIRBuilder) {
-  return getOpTypeInt(pointerSize, MIRBuilder, false);
-}
-
-SPIRVType *SPIRVTypeRegistry::getPairStruct(SPIRVType *elem0, SPIRVType *elem1,
-                                           MachineIRBuilder &MIRBuilder) {
-  SmallVector<SPIRVType *, 2> elems = {elem0, elem1};
-  return getOpTypeStruct(elems, MIRBuilder);
-}
-
-bool SPIRVTypeRegistry::isScalarOfType(Register vreg, unsigned int typeOpcode) {
+bool SPIRVTypeRegistry::isScalarOfType(Register vreg, unsigned int typeOpcode) const {
   SPIRVType *type = getSPIRVTypeForVReg(vreg);
   assert(type && "isScalarOfType vreg has no type assigned");
   return type->getOpcode() == typeOpcode;
 }
 
 bool SPIRVTypeRegistry::isScalarOrVectorOfType(Register vreg,
-                                              unsigned int typeOpcode) {
+                                               unsigned int typeOpcode) const {
   SPIRVType *type = getSPIRVTypeForVReg(vreg);
   assert(type && "isScalarOrVectorOfType vreg has no type assigned");
   if (type->getOpcode() == typeOpcode) {
@@ -375,7 +363,7 @@ bool SPIRVTypeRegistry::isScalarOrVectorOfType(Register vreg,
   return false;
 }
 
-unsigned SPIRVTypeRegistry::getScalarOrVectorBitWidth(const SPIRVType *type) {
+unsigned SPIRVTypeRegistry::getScalarOrVectorBitWidth(const SPIRVType *type) const {
   if (type && type->getOpcode() == SPIRV::OpTypeVector) {
     auto eleTypeReg = type->getOperand(1).getReg();
     type = getSPIRVTypeForVReg(eleTypeReg);
@@ -387,7 +375,7 @@ unsigned SPIRVTypeRegistry::getScalarOrVectorBitWidth(const SPIRVType *type) {
   llvm_unreachable("Attempting to get bit width of non-integer/float type.");
 }
 
-bool SPIRVTypeRegistry::isScalarOrVectorSigned(const SPIRVType *type) {
+bool SPIRVTypeRegistry::isScalarOrVectorSigned(const SPIRVType *type) const {
   if (type && type->getOpcode() == SPIRV::OpTypeVector) {
     auto eleTypeReg = type->getOperand(1).getReg();
     type = getSPIRVTypeForVReg(eleTypeReg);
@@ -399,28 +387,13 @@ bool SPIRVTypeRegistry::isScalarOrVectorSigned(const SPIRVType *type) {
 }
 
 StorageClass::StorageClass
-SPIRVTypeRegistry::getPointerStorageClass(Register vreg) {
+SPIRVTypeRegistry::getPointerStorageClass(Register vreg) const {
   SPIRVType *type = getSPIRVTypeForVReg(vreg);
   if (type && type->getOpcode() == SPIRV::OpTypePointer) {
     auto scOp = type->getOperand(1).getImm();
     return static_cast<StorageClass::StorageClass>(scOp);
   }
   llvm_unreachable("Attempting to get storage class of non-pointer type.");
-}
-
-SPIRVType *SPIRVTypeRegistry::getGenericPtrType(SPIRVType *origPtrType,
-                                               MachineIRBuilder &MIRBuilder) {
-  using namespace StorageClass;
-  if (origPtrType && origPtrType->getOpcode() == SPIRV::OpTypePointer) {
-    auto scOp = origPtrType->getOperand(1).getImm();
-    if (scOp == Generic) {
-      return origPtrType;
-    } else {
-      auto elemTy = getSPIRVTypeForVReg(origPtrType->getOperand(2).getReg());
-      return getOpTypePointer(Generic, elemTy, MIRBuilder);
-    }
-  }
-  llvm_unreachable("Attempting to get generic equivalent of non-pointer type.");
 }
 
 SPIRVType *SPIRVTypeRegistry::getOpTypeImage(
@@ -469,6 +442,77 @@ SPIRVTypeRegistry::getSampledImageType(SPIRVType *imageType,
                  .addUse(getSPIRVTypeID(imageType));
   constrainRegOperands(MIB);
   return MIB;
+}
+
+SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
+                                          MachineIRBuilder &MIRBuilder,
+                                          AQ::AccessQualifier accessQual) {
+  const StringRef Name = Ty->getName();
+  assert(Name.startswith("opencl.") && "CL types should start with 'opencl.'");
+  using namespace Dim;
+  auto TypeName = Name.substr(strlen("opencl."));
+
+  if (TypeName.startswith("image")) {
+    if (TypeName.endswith("_ro_t"))
+      accessQual = AQ::ReadOnly;
+    else if (TypeName.endswith("_wo_t"))
+      accessQual = AQ::WriteOnly;
+    else if (TypeName.endswith("_rw_t"))
+      accessQual = AQ::ReadWrite;
+    char dimC = TypeName[strlen("image")];
+    if (dimC >= '1' && dimC <= '3') {
+      auto dim = dimC == '1' ? DIM_1D : dimC == '2' ? DIM_2D : DIM_3D;
+      auto *VoidTy = getOrCreateSPIRVType(
+          Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
+          MIRBuilder);
+      return getOpTypeImage(MIRBuilder, VoidTy, dim, 0, 0, 0, 0,
+                            ImageFormat::Unknown, accessQual);
+    }
+  } else if (TypeName.startswith("sampler_t")) {
+    return getSamplerType(MIRBuilder);
+  } else if (TypeName.startswith("pipe")) {
+    if (TypeName.endswith("_ro_t"))
+      accessQual = AQ::ReadOnly;
+    else if (TypeName.endswith("_wo_t"))
+      accessQual = AQ::WriteOnly;
+    else if (TypeName.endswith("_rw_t"))
+      accessQual = AQ::ReadWrite;
+    return getOpTypePipe(MIRBuilder, accessQual);
+  }
+
+  report_fatal_error("Cannot generate OpenCL type: " + Name);
+}
+
+SPIRVType *
+SPIRVTypeRegistry::getOrCreateSPIRVIntegerType(unsigned BitWidth,
+                                               MachineIRBuilder &MIRBuilder) {
+  return getOrCreateSPIRVType(
+      IntegerType::get(MIRBuilder.getMF().getFunction().getContext(), BitWidth),
+      MIRBuilder);
+}
+
+SPIRVType *
+SPIRVTypeRegistry::getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder) {
+  return getOrCreateSPIRVType(
+      IntegerType::get(MIRBuilder.getMF().getFunction().getContext(), 1),
+      MIRBuilder);
+}
+
+SPIRVType *SPIRVTypeRegistry::getOrCreateSPIRVVectorType(
+    SPIRVType *BaseType, unsigned NumElements, MachineIRBuilder &MIRBuilder) {
+  return getOrCreateSPIRVType(
+      FixedVectorType::get(const_cast<Type *>(getTypeForSPIRVType(BaseType)),
+                           NumElements),
+      MIRBuilder);
+}
+
+SPIRVType *SPIRVTypeRegistry::getOrCreateSPIRVPointerType(
+    SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
+    StorageClass::StorageClass SClass) {
+  return getOrCreateSPIRVType(
+      PointerType::get(const_cast<Type *>(getTypeForSPIRVType(BaseType)),
+                       StorageClassToAddressSpace(SClass)),
+      MIRBuilder);
 }
 
 unsigned int

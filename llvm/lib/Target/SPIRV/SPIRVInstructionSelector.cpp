@@ -101,9 +101,11 @@ private:
                            const MachineInstr &I,
                            MachineIRBuilder &MIRBuilder) const;
 
+#if 0
   bool selectOverflowOp(Register resVReg, const SPIRVType *resType,
                         const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                         unsigned newOpcode) const;
+#endif
 
   bool selectCmp(Register resVReg, const SPIRVType *resType,
                  unsigned scalarTypeOpcode, unsigned comparisonOpcode,
@@ -306,6 +308,9 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_CTPOP:
     return selectUnOp(resVReg, resType, I, MIRBuilder, OpBitCount);
 
+  // even SPIRV-LLVM translator doens't support overflow intrinsics
+  // so we don't even have a reliable tests for this functionality
+#if 0
   case TargetOpcode::G_UADDO:
     return selectOverflowOp(resVReg, resType, I, MIRBuilder, OpIAddCarry);
   case TargetOpcode::G_USUBO:
@@ -314,6 +319,7 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
     return selectOverflowOp(resVReg, resType, I, MIRBuilder, OpSMulExtended);
   case TargetOpcode::G_SMULO:
     return selectOverflowOp(resVReg, resType, I, MIRBuilder, OpUMulExtended);
+#endif
 
   case TargetOpcode::G_SMIN:
     return selectExtInst(resVReg, resType, I, MIRBuilder, CL::s_min, GL::SMin);
@@ -767,7 +773,8 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(
     // We're casting between 2 eligable pointers using Generic as an
     // intermediary
     auto tmp = MIRBuilder.getMRI()->createVirtualRegister(&IDRegClass);
-    auto genericPtrTy = TR.getGenericPtrType(srcPtrTy, MIRBuilder);
+    auto genericPtrTy = TR.getOrCreateSPIRVPointerType(srcPtrTy, MIRBuilder,
+                                                       StorageClass::Generic);
     bool success = MIRBuilder.buildInstr(OpPtrCastToGeneric)
                        .addDef(tmp)
                        .addUse(TR.getSPIRVTypeID(genericPtrTy))
@@ -785,6 +792,7 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(
   }
 }
 
+#if 0
 bool SPIRVInstructionSelector::selectOverflowOp(Register resVReg,
                                                 const SPIRVType *resType,
                                                 const MachineInstr &I,
@@ -832,6 +840,7 @@ bool SPIRVInstructionSelector::selectOverflowOp(Register resVReg,
                         .addUse(boolReg)
                         .constrainAllUses(TII, TRI, RBI);
 }
+#endif
 
 static unsigned int getFCmpOpcode(unsigned predNum) {
   auto pred = static_cast<CmpInst::Predicate>(predNum);
