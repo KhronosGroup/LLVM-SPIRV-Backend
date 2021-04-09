@@ -15,6 +15,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVOPENCLBIFS_H
 
 #include "SPIRVTypeRegistry.h"
+#include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace AQ = AccessQualifier;
@@ -23,12 +24,7 @@ namespace llvm {
 bool generateOpenCLBuiltinCall(const StringRef demangledName,
                                MachineIRBuilder &MIRBuilder, Register OrigRet,
                                const Type *OrigRetTy,
-                               const SmallVectorImpl<Register> &OrigArgs,
+                               const SmallVectorImpl<Register> &args,
                                SPIRVTypeRegistry *TR);
-
-SPIRVType *generateOpenCLOpaqueType(const StringRef name,
-                                    MachineIRBuilder &MIRBuilder,
-                                    SPIRVTypeRegistry *TR,
-                                    AQ::AccessQualifier aq = AQ::ReadWrite);
 } // end namespace llvm
 #endif

@@ -33,13 +33,14 @@ using SPIRVType = const MachineInstr;
 class SPIRVTypeRegistry {
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
-  // Reconstituted from ASSIGN_TYPE machineInstrs in subsequent passes.
-  std::map<MachineFunction *, std::map<Register, SPIRVType *>> VRegToTypeMap;
-
-  // Maps LLVM IR types to SPIR-V types (only used in IRTranslator pass)
-  DenseMap<const Type *, DenseMap<MachineFunction *, SPIRVType *>> TypeToSPIRVTypeMap;
+  // Do not confuse this with DuplicatesTracker as DT maps Type* to <MF, Reg>
+  // where Reg = OpType...
+  // while VRegToTypeMap tracks SPIR-V type assigned to other regs (i.e. not type-declaring ones)
+  DenseMap<MachineFunction *, DenseMap<Register, SPIRVType *>> VRegToTypeMap;
 
   SPIRVGeneralDuplicatesTracker &DT;
+
+  DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
   // Number of bits pointers and size_t integers require.
   const unsigned int pointerSize;
@@ -72,12 +73,18 @@ public:
   getOrCreateSPIRVType(const Type *type, MachineIRBuilder &MIRBuilder,
                        AQ::AccessQualifier accessQual = AQ ::ReadWrite);
 
+  const Type *getTypeForSPIRVType(const SPIRVType *Ty) const {
+    auto Res = SPIRVToLLVMType.find(Ty);
+    assert(Res != SPIRVToLLVMType.end());
+    return Res->second;
+  }
+
   // Return the SPIR-V type instruction corresponding to the given VReg, or
   // nullptr if no such type instruction exists.
-  SPIRVType *getSPIRVTypeForVReg(Register VReg);
+  SPIRVType *getSPIRVTypeForVReg(Register VReg) const;
 
   // Whether the given VReg has a SPIR-V type mapped to it yet.
-  bool hasSPIRVTypeForVReg(Register VReg) {
+  bool hasSPIRVTypeForVReg(Register VReg) const {
     return getSPIRVTypeForVReg(VReg) != nullptr;
   }
 
@@ -91,33 +98,30 @@ public:
 
   // Whether the given VReg has an OpTypeXXX instruction mapped to it with the
   // given opcode (e.g. OpTypeFloat).
-  bool isScalarOfType(Register vreg, unsigned int typeOpcode);
+  bool isScalarOfType(Register vreg, unsigned int typeOpcode) const;
 
   // Return true if the given VReg's assigned SPIR-V type is either a scalar
   // matching the given opcode, or a vector with an element type matching that
   // opcode (e.g. OpTypeBool, or OpTypeVector %x 4, where %x is OpTypeBool).
-  bool isScalarOrVectorOfType(Register vreg, unsigned int typeOpcode);
+  bool isScalarOrVectorOfType(Register vreg, unsigned int typeOpcode) const;
 
   // For vectors or scalars of ints or floats, return the scalar type's bitwidth
-  unsigned getScalarOrVectorBitWidth(const SPIRVType *type);
+  unsigned getScalarOrVectorBitWidth(const SPIRVType *type) const;
 
   // For integer vectors or scalars, return whether the integers are signed
-  bool isScalarOrVectorSigned(const SPIRVType *type);
+  bool isScalarOrVectorSigned(const SPIRVType *type) const;
 
   // Gets the storage class of the pointer type assigned to this vreg
-  StorageClass::StorageClass getPointerStorageClass(Register vreg);
+  StorageClass::StorageClass getPointerStorageClass(Register vreg) const;
 
   // Return the number of bits SPIR-V pointers and size_t variables require.
   unsigned getPointerSize() const { return pointerSize; }
 
-  // Gets a Generic storage class pointer to the same type as the given ptr.
-  SPIRVType *getGenericPtrType(SPIRVType *origPtrType,
-                               MachineIRBuilder &MIRBuilder);
-
-  // Get or create an OpTypeSampler instruction.
+private:
+  // Internal methods for creating types which are unsafe in duplications
+  // check sense hence can only be called within getOrCreateSPIRVType callstack
   SPIRVType *getSamplerType(MachineIRBuilder &MIRBuilder);
 
-  // Get or create an OpTypeSampledImage of for the given image type.
   SPIRVType *getSampledImageType(SPIRVType *imageType,
                                  MachineIRBuilder &MIRBuilder);
 
@@ -136,11 +140,11 @@ public:
   SPIRVType *getOpTypeArray(uint32_t numElems, SPIRVType *elemType,
                             MachineIRBuilder &MIRBuilder);
 
-  SPIRVType *getOpTypeOpaque(const StringRef name,
+  SPIRVType *getOpTypeOpaque(const StructType *Ty,
                              MachineIRBuilder &MIRBuilder);
 
-  SPIRVType *getOpTypeStruct(const SmallVectorImpl<SPIRVType *> &elems,
-                             MachineIRBuilder &MIRBuilder, StringRef name = "");
+  SPIRVType *getOpTypeStruct(const StructType *Ty,
+                             MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypePointer(StorageClass::StorageClass sc,
                               SPIRVType *elemType,
@@ -150,14 +154,6 @@ public:
                                const SmallVectorImpl<SPIRVType *> &argTypes,
                                MachineIRBuilder &MIRBuilder);
 
-  // Get or create the SPIR-V integer type that a pointer could be bitcast to.
-  SPIRVType *getPtrUIntType(MachineIRBuilder &MIRBuilder);
-
-  // Get a 2-element struct type with the given element types.
-  SPIRVType *getPairStruct(SPIRVType *elem0, SPIRVType *elem1,
-                           MachineIRBuilder &MIRBuilder);
-
-  // Get or create an OpTypeImage with the given parameters.
   SPIRVType *getOpTypeImage(MachineIRBuilder &MIRBuilder,
                             SPIRVType *sampledType, Dim::Dim dim,
                             uint32_t depth, uint32_t arrayed,
@@ -165,11 +161,29 @@ public:
                             ImageFormat::ImageFormat imageFormat,
                             AQ::AccessQualifier accessQualifier);
 
-  // Get or create an OpTypePipe with the given accessQualifier.
   SPIRVType *getOpTypePipe(MachineIRBuilder &MIRBuilder,
                            AQ::AccessQualifier accessQualifier);
 
-  std::vector<SPIRVType *> *getExistingTypesForOpcode(unsigned opcode);
+  SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
+                                 MachineIRBuilder &MIRBuilder,
+                                 AQ::AccessQualifier aq);
+
+  SPIRVType *generateOpenCLOpaqueType(const StructType *Ty,
+                                      MachineIRBuilder &MIRBuilder,
+                                      AQ::AccessQualifier aq = AQ::ReadWrite);
+
+public:
+  // convenient helpers for getting types
+  // w/ check for duplicates
+  SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
+                                         MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
+                                        unsigned NumElements,
+                                        MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVPointerType(
+      SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
+      StorageClass::StorageClass SClass = StorageClass::Function);
 
   // Convert a SPIR-V storage class to the corresponding LLVM IR address space.
   unsigned int StorageClassToAddressSpace(StorageClass::StorageClass sc);
