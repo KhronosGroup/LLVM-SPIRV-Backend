@@ -195,35 +195,37 @@ static bool decorateBuiltIn(Register target, BuiltIn::BuiltIn builtInID,
   return succ;
 }
 
-static Register buildOpVariable(SPIRVType *baseType,
-                                StorageClass::StorageClass storage,
+static Register buildOpVariable(SPIRVType *BaseType,
+                                StorageClass::StorageClass Storage,
                                 MachineIRBuilder &MIRBuilder,
                                 SPIRVTypeRegistry *TR) {
-
-  auto resVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-  SPIRVType *ptrTy = TR->getOrCreateSPIRVPointerType(baseType, MIRBuilder, storage);
-  TR->assignSPIRVTypeToVReg(ptrTy, resVReg, MIRBuilder);
+  auto Reg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+  // TODO: consider using correct address space
+  // p0 is canonical type for selection though
+  MIRBuilder.getMRI()->setType(Reg, LLT::pointer(0, TR->getPointerSize()));
+  SPIRVType *PtrTy =
+      TR->getOrCreateSPIRVPointerType(BaseType, MIRBuilder, Storage);
+  TR->assignSPIRVTypeToVReg(PtrTy, Reg, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
-                 .addDef(resVReg)
-                 .addUse(TR->getSPIRVTypeID(ptrTy))
-                 .addImm(storage);
+                 .addDef(Reg)
+                 .addUse(TR->getSPIRVTypeID(PtrTy))
+                 .addImm(Storage);
   TR->constrainRegOperands(MIB);
-  return resVReg;
+  return Reg;
 }
 
-static Register buildLoad(SPIRVType *baseType, Register ptrVRegToLoadFrom,
+static Register buildLoad(SPIRVType *BaseType, Register PtrVReg,
                           MachineIRBuilder &MIRBuilder, SPIRVTypeRegistry *TR) {
   const auto MRI = MIRBuilder.getMRI();
-  Register resVReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-  TR->assignSPIRVTypeToVReg(baseType, resVReg, MIRBuilder);
+  Register Reg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  MRI->setType(Reg, LLT::scalar(32));
+  TR->assignSPIRVTypeToVReg(BaseType, Reg, MIRBuilder);
 
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpLoad)
-                 .addDef(resVReg)
-                 .addUse(TR->getSPIRVTypeID(baseType))
-                 .addUse(ptrVRegToLoadFrom);
-
-  TR->constrainRegOperands(MIB);
-  return resVReg;
+  // TODO: consider using correct address space and alignment
+  // p0 is canonical type for selection though
+  auto PtrInfo = MachinePointerInfo();
+  MIRBuilder.buildLoad(Reg, PtrVReg, PtrInfo, Align());
+  return Reg;
 }
 
 static uint64_t getLiteralValueForConstant(Register constVReg,
@@ -357,8 +359,9 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     decorateConstant(globVar, MIRBuilder, TR);
 
     // Load the Vec3 from the global variable
-    Register loadedVector = buildLoad(Vec3Ty, globVar, MIRBuilder, TR);
-    MRI->setType(loadedVector, LLT::fixed_vector(3, ptrSize));
+    Register loadedVector =
+        buildLoad(Vec3Ty, globVar, MIRBuilder, TR);
+    MRI->setType(loadedVector, LLT::vector(3, ptrSize));
 
     // Set up the vreg to extract the result to (possibly a new temporary one)
     Register extr = resVReg;
