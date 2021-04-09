@@ -51,6 +51,13 @@ namespace {
 #undef GET_GLOBALISEL_PREDICATE_BITSET
 
 class SPIRVInstructionSelector : public InstructionSelector {
+  const SPIRVSubtarget &STI;
+  const SPIRVInstrInfo &TII;
+  const SPIRVRegisterInfo &TRI;
+  const SPIRVRegisterBankInfo &RBI;
+  SPIRVTypeRegistry &TR;
+  SPIRVGeneralDuplicatesTracker &DT;
+
 public:
   SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                            const SPIRVSubtarget &ST,
@@ -174,14 +181,6 @@ private:
                          MachineIRBuilder &MIRBuilder) const;
   Register buildOnesVal(bool allOnes, const SPIRVType *resType,
                         MachineIRBuilder &MIRBuilder) const;
-
-  const SPIRVTargetMachine &TM;
-  const SPIRVSubtarget &STI;
-  const SPIRVInstrInfo &TII;
-  const SPIRVRegisterInfo &TRI;
-  const SPIRVRegisterBankInfo &RBI;
-  SPIRVTypeRegistry &TR;
-  SPIRVGeneralDuplicatesTracker &DT;
 };
 
 } // end anonymous namespace
@@ -193,7 +192,7 @@ private:
 SPIRVInstructionSelector::SPIRVInstructionSelector(
     const SPIRVTargetMachine &TM, const SPIRVSubtarget &ST,
     const SPIRVRegisterBankInfo &RBI)
-    : InstructionSelector(), TM(TM), STI(ST), TII(*ST.getInstrInfo()),
+    : InstructionSelector(), STI(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), TR(*ST.getSPIRVTypeRegistry()),
       DT(*ST.getSPIRVDuplicatesTracker()),
 #define GET_GLOBALISEL_PREDICATES_INIT
@@ -526,14 +525,6 @@ static bool canUseNUW(unsigned opCode) {
 static void decorate(Register target, Decoration::Decoration dec,
                      MachineIRBuilder &MIRBuilder) {
   MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(target).addImm(dec);
-}
-
-static void decorate(Register target, Decoration::Decoration dec, uint32_t imm,
-                     MachineIRBuilder &MIRBuilder) {
-  MIRBuilder.buildInstr(SPIRV::OpDecorate)
-      .addUse(target)
-      .addImm(dec)
-      .addImm(imm);
 }
 
 // TODO: move to GenerateDecorations pass
