@@ -133,7 +133,8 @@ bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
   if (auto GV = dyn_cast<GlobalValue>(&C)) {
     // Global OpVariables (possibly with constant initializers)
     return buildGlobalValue(Reg, GV, *EntryBuilder);
-  }
+  } else if (auto CE = dyn_cast<ConstantExpr>(&C))
+    return IRTranslator::translate(*CE, CE->getOpcode());
 
   bool Res = false;
   if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
@@ -159,10 +160,6 @@ bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
       }
       Res = buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, TR);
     }
-  } else if (auto CE = dyn_cast<ConstantExpr>(&C)) {
-
-    if (translateInst(*CE, CE->getOpcode()))
-      Res = true;
   }
 
   if (!Res)
