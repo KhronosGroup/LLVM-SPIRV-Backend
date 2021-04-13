@@ -147,9 +147,12 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   assert(Info.OrigRet.Regs.size() < 2 && "Call returns multiple vregs");
 
   Register resVReg = Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
+  bool singleUnderscore = funcName.size() >= 1 && funcName[0] == '_';
   bool doubleUnderscore =
-      funcName.size() >= 2 && funcName[0] == '_' && funcName[1] == '_';
-  if (status == demangle_success || doubleUnderscore) {
+      singleUnderscore && funcName.size() >= 2 && funcName[1] == '_';
+  // FIXME: OCL builtin checks should be the same as in clang
+  //        or SPIRV-LLVM translator
+  if (status == demangle_success && (singleUnderscore/* || doubleUnderscore*/)) {
     const auto &MF = MIRBuilder.getMF();
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
@@ -180,10 +183,13 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       firstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
 
       SmallVector<ArrayRef<Register>, 8> VRegArgs;
+      SmallVector<SmallVector<Register, 1>, 8> ToInsert;
       for (const Argument &Arg : Callee->args()) {
         if (MIRBuilder.getDataLayout().getTypeStoreSize(Arg.getType()).isZero())
           continue; // Don't handle zero sized types.
-        VRegArgs.push_back(MIRBuilder.getMRI()->createGenericVirtualRegister(LLT::scalar(32)));
+        ToInsert.push_back({MIRBuilder.getMRI()->createGenericVirtualRegister(
+            LLT::scalar(32))});
+        VRegArgs.push_back(ToInsert.back());
       }
       
       // TODO: Reuse FunctionLoweringInfo
