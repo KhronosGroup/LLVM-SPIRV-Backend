@@ -255,12 +255,12 @@ void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
     for (auto &Arg : CU.first->args())
       MetaRegs.push_back(
           MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass));
-    auto CurMetaReg = MetaRegs.begin();
 
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
       auto *ToHoist = MF->getRegInfo().getVRegDef(Reg);
+      auto CurMetaReg = MetaRegs.begin();
       while (ToHoist && (ToHoist->getOpcode() == SPIRV::OpFunction ||
                          ToHoist->getOpcode() == SPIRV::OpFunctionParameter)) {
         ToRemove.push_back(ToHoist);
