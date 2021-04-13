@@ -1,12 +1,13 @@
-//===-- SPIRVTypeRegistry.h - SPIR-V Type Registry --------------*- C++ -*-===//
+//===-- SPIRVDuplicatesTracker.h - SPIR-V Duplicates Tracker --------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
-
+// General infrastructure for keeping track of the values that according to
+// the SPIR-V binary layout should be global to the whole module.
+// Actual hoisting happens in SPIRVGlobalTypesAndRegNum pass.
 //
 //===----------------------------------------------------------------------===//
 
@@ -71,20 +72,7 @@ public:
   // NOTE:
   // T *Arg = nullptr is added as compiler fails to infer T for specializations
   // based just on templated return type
-  template <typename T> const SPIRVDuplicatesTracker<T> *get(T *Arg = nullptr) {
-    llvm_unreachable("Querying duplicates of unsupported type");
-    return nullptr;
-  }
-
-  template <> const SPIRVTypeTracker *get(Type *Arg) { return &TT; }
-
-  template <> const SPIRVConstantTracker *get(Constant *Arg) { return &CT; }
-
-  template <> const SPIRVGlobalValueTracker *get(GlobalValue *Arg) {
-    return &GT;
-  }
-
-  template <> const SPIRVFuncDeclsTracker *get(Function *Arg) { return &FT; }
+  template <typename T> const SPIRVDuplicatesTracker<T> *get(T *Arg = nullptr);
 };
 
 } // end namespace llvm
