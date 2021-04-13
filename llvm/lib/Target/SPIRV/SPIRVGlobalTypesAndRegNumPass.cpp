@@ -373,7 +373,7 @@ static void addOpExtInstImports(Module &M, MachineModuleInfo &MMI,
                                 MachineIRBuilder &MIRBuilder,
                                 LocalAliasTablesTy &LocalAliasTables) {
 
-  std::set<ExtInstSet> usedExtInstSets;
+  std::set<ExtInstSet> usedExtInstSets = {ExtInstSet::OpenCL_std};
   SmallVector<std::pair<MachineInstr *, LocalToGlobalRegTable *>, 8>
       extInstInstrs;
 
