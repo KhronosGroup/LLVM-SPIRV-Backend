@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 -global-isel --mattr=+spirv1.3  %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV:ConvertPtrToU 
 ; CHECK-SPIRV:ConvertPtrToU

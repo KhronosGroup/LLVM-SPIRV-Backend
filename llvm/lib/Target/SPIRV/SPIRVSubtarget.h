@@ -45,22 +45,21 @@ class SPIRVTypeRegistry;
 
 class SPIRVSubtarget : public SPIRVGenSubtargetInfo {
 private:
-  SPIRVInstrInfo InstrInfo;
-  SPIRVFrameLowering FrameLowering;
-  SPIRVTargetLowering TLInfo;
-
   const unsigned int pointerSize;
 
   const bool usesLogicalAddressing;
   const bool usesVulkanEnv;
   const bool usesOpenCLEnv;
 
-  const uint32_t targetSPIRVVersion;
-  const uint32_t targetOpenCLVersion;
-  const uint32_t targetVulkanVersion;
+  uint32_t targetSPIRVVersion;
+  uint32_t targetOpenCLVersion;
+  uint32_t targetVulkanVersion;
+  bool openCLFullProfile;
+  bool openCLImageSupport;
 
-  const bool openCLFullProfile;
-  const bool openCLImageSupport;
+  SPIRVInstrInfo InstrInfo;
+  SPIRVFrameLowering FrameLowering;
+  SPIRVTargetLowering TLInfo;
 
   // TODO Some of these fields might work without unique_ptr.
   //      But they are shared with other classes, so if the SPIRVSubtarget
@@ -89,11 +88,6 @@ private:
   void initAvailableExtensions(const Triple &TT);
   void initAvailableExtInstSets(const Triple &TT);
   void initAvailableCapabilities(const Triple &TT);
-
-protected:
-  // DummyFeature defined in SPIRV.td. This is for illustration purpose only
-  // and isn't used in practice.
-  bool isDummyMode;
 
 public:
   // This constructor initializes the data members to match that

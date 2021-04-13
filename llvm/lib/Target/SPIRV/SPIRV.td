@@ -19,8 +19,21 @@ class Proc<string Name, list<SubtargetFeature> Features>
 
 def : Proc<"generic", []>;
 
-def DummyFeature : SubtargetFeature<"dummy", "isDummyMode",
-                                    "true", "unused feature">;
+def SPIRV10 : SubtargetFeature<"spirv1.0", "targetSPIRVVersion", "10",
+                             "Use SPIR-V version 1.0">;
+def SPIRV11 : SubtargetFeature<"spirv1.1", "targetSPIRVVersion", "11",
+                             "Use SPIR-V version 1.1">;
+def SPIRV12 : SubtargetFeature<"spirv1.2", "targetSPIRVVersion", "12",
+                             "Use SPIR-V version 1.2">;
+def SPIRV13 : SubtargetFeature<"spirv1.3", "targetSPIRVVersion", "13",
+                             "Use SPIR-V version 1.3">;
+
+def OCL12 : SubtargetFeature<"CL1.2", "targetOpenCLVersion", "12",
+                             "Use OpenCL version 1.2">;
+def OCL20 : SubtargetFeature<"CL2.0", "targetOpenCLVersion", "20",
+                             "Use OpenCL version 2.0">;
+def OCL22 : SubtargetFeature<"CL2.2", "targetOpenCLVersion", "22",
+                             "Use OpenCL version 2.2">;
 
 def SPIRVInstPrinter : AsmWriter {
   string AsmWriterClassName  = "InstPrinter";

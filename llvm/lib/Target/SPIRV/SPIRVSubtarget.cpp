@@ -43,25 +43,6 @@ static unsigned computePointerSize(const Triple &TT) {
   return arch == Triple::spirv32 ? 32 : arch == Triple::spirv64 ? 64 : 8;
 }
 
-// TODO use command line args for this rather than defaulting to 1.4
-static uint32_t computeTargetSPIRVVersion(const Triple &TT) {
-  return v(1, 4); // TODO - remove this as it's just here for the ptrcmp.ll test
-  // if (TT.isVulkanEnvironment()) {
-  //   return v(1, 0);
-  // } else {
-  //   return v(1, 2);
-  // }
-}
-
-// TODO use command line args for this rather than defaulting to 2.2
-static uint32_t computeTargetOpenCLVersion(const Triple &TT) {
-  if (TT.isVulkanEnvironment()) {
-    return 0;
-  } else {
-    return v(2, 2);
-  }
-}
-
 // TODO use command line args for this rather than defaulting to 1.1
 static uint32_t computeTargetVulkanVersion(const Triple &TT) {
   if (TT.isVulkanEnvironment()) {
@@ -80,17 +61,20 @@ static bool computeOpenCLFullProfile(const Triple &TT) { return true; }
 SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
                                const std::string &FS,
                                const SPIRVTargetMachine &TM)
-    : SPIRVGenSubtargetInfo(TT, CPU, /* TuneCPU */ CPU, FS), InstrInfo(),
-      FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
+    : SPIRVGenSubtargetInfo(TT, CPU, /* TuneCPU */ CPU, FS),
       pointerSize(computePointerSize(TT)),
       usesLogicalAddressing(TT.isSPIRVLogical()),
       usesVulkanEnv(TT.isVulkanEnvironment()),
       usesOpenCLEnv(TT.isOpenCLEnvironment()),
-      targetSPIRVVersion(computeTargetSPIRVVersion(TT)),
-      targetOpenCLVersion(computeTargetOpenCLVersion(TT)),
+      targetSPIRVVersion(0),
+      targetOpenCLVersion(0),
       targetVulkanVersion(computeTargetVulkanVersion(TT)),
       openCLFullProfile(computeOpenCLFullProfile(TT)),
       openCLImageSupport(computeOpenCLImageSupport(TT)),
+      InstrInfo(),
+      FrameLowering(initSubtargetDependencies(CPU, FS)),
+      TLInfo(TM, *this),
+
       DT(new SPIRVGeneralDuplicatesTracker()),
       // FIXME:
       // .get() here is unsafe, works due to subtarget is destroyed
@@ -112,6 +96,12 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
   ParseSubtargetFeatures(CPU, /* TuneCPU */ CPU, FS);
+
+  if (targetSPIRVVersion == 0)
+    targetSPIRVVersion = 14;
+  if (targetOpenCLVersion == 0)
+    targetOpenCLVersion = 22;
+
   return *this;
 }
 
@@ -144,8 +134,7 @@ bool SPIRVSubtarget::isShader() const {
 
 // If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual
 bool SPIRVSubtarget::canDirectlyComparePointers() const {
-  bool res = isAtLeastVer(targetSPIRVVersion, v(1, 4));
-  errs() << "Can" << (res ? "" : "'t") << " compare pointers\n";
+  bool res = isAtLeastVer(targetSPIRVVersion, 14);
   return res;
 }
 
@@ -189,12 +178,12 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
     if (openCLImageSupport) {
       addCaps(availableCaps, {ImageBasic, LiteralSampler, Image1D,
                               SampledBuffer, ImageBuffer});
-      if (isAtLeastVer(targetOpenCLVersion, v(2, 0))) {
+      if (isAtLeastVer(targetOpenCLVersion, 20)) {
         addCaps(availableCaps, {ImageReadWrite});
       }
     }
-    if (isAtLeastVer(targetSPIRVVersion, v(1, 1)) &&
-        isAtLeastVer(targetOpenCLVersion, v(2, 2))) {
+    if (isAtLeastVer(targetSPIRVVersion, 11) &&
+        isAtLeastVer(targetOpenCLVersion, 22)) {
       addCaps(availableCaps, {SubgroupDispatch, PipeStorage});
     }
 
