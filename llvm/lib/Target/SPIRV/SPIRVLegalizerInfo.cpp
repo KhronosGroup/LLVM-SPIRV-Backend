@@ -193,9 +193,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_IMPLICIT_DEF).alwaysLegal();
 
   getActionDefinitionsBuilder(G_INTTOPTR)
-      .legalForCartesianProduct(allPtrs, {PInt});
+      .legalForCartesianProduct(allPtrs, allIntScalars);
   getActionDefinitionsBuilder(G_PTRTOINT)
-      .legalForCartesianProduct({PInt}, allPtrs);
+      .legalForCartesianProduct(allIntScalars, allPtrs);
 
   // Constants
   // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
