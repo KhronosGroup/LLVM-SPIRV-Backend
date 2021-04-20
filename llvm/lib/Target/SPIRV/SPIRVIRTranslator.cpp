@@ -75,7 +75,7 @@ bool SPIRVIRTranslator::buildGlobalValue(Register Reg, const GlobalValue *GV,
   auto globalVar = GV->getParent()->getGlobalVariable(globalIdent);
 
   Register initVReg = 0;
-  if (globalVar->hasInitializer()) {
+  if (globalVar && globalVar->hasInitializer()) {
     Constant *InitVal = globalVar->getInitializer();
     initVReg = getOrCreateVReg(*InitVal);
   }
@@ -133,8 +133,11 @@ bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
   if (auto GV = dyn_cast<GlobalValue>(&C)) {
     // Global OpVariables (possibly with constant initializers)
     return buildGlobalValue(Reg, GV, *EntryBuilder);
-  } else if (auto CE = dyn_cast<ConstantExpr>(&C))
-    return IRTranslator::translate(*CE, CE->getOpcode());
+  } else if (auto CE = dyn_cast<ConstantExpr>(&C)) {
+    if (translateInst(*CE, CE->getOpcode()))
+      return true;
+    return IRTranslator::translate(C, Reg);
+  }
 
   bool Res = false;
   if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
