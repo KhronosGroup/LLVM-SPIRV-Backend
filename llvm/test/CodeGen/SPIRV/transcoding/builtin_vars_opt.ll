@@ -29,8 +29,7 @@
 ; clang -fsycl -fsycl-device-only -Xclang -fsycl-enable-optimizations tmp.cpp -o tmp.bc
 ; llvm-spirv tmp.bc -s -o builtin_vars_opt.ll
 
-; FIXME: check last operands of OpDecorate, when it works
-; CHECK-SPIRV: OpDecorate %[[#SG_MaxSize_BI:]] BuiltIn 37
+; CHECK-SPIRV: OpDecorate %[[#SG_MaxSize_BI:]] BuiltIn SubgroupMaxSize
 ; CHECK-SPIRV: OpDecorate %[[#SG_MaxSize_BI:]] Constant
 ; CHECK-SPIRV: OpDecorate %[[#SG_MaxSize_BI:]] LinkageAttributes "__spirv_BuiltInSubgroupMaxSize" Import
 
