@@ -25,10 +25,9 @@
 ; clang++ -fsycl -fsycl-device-only emit-llvm tmp.cpp -o tmp.bc
 ; llvm-spirv tmp.bc -spirv-text -o builtin_vars_arithmetics.ll
 
-; FIXME: check last operands of OpDecorate, when it works
-; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId:[0-9]+]] BuiltIn 28
-; CHECK-SPIRV: OpDecorate %[[GlobalSize:[0-9]+]] BuiltIn 31
-; CHECK-SPIRV: OpDecorate %[[GlobalOffset:[0-9]+]] BuiltIn 33
+; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId:[0-9]+]] BuiltIn GlobalInvocationId
+; CHECK-SPIRV: OpDecorate %[[GlobalSize:[0-9]+]] BuiltIn GlobalSize
+; CHECK-SPIRV: OpDecorate %[[GlobalOffset:[0-9]+]] BuiltIn GlobalOffset
 ; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId]] Constant
 ; CHECK-SPIRV: OpDecorate %[[GlobalSize]] Constant
 ; CHECK-SPIRV: OpDecorate %[[GlobalOffset]] Constant
