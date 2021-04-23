@@ -56,7 +56,8 @@ static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_LSHR,
     TargetOpcode::G_SELECT,
     TargetOpcode::G_EXTRACT_VECTOR_ELT,
-    TargetOpcode::G_INSERT_VECTOR_ELT};
+    TargetOpcode::G_INSERT_VECTOR_ELT
+};
 
 const std::unordered_set<unsigned>& getTypeFoldingSupportingOpcs() {
   return TypeFoldingSupportingOpcs;
@@ -73,6 +74,7 @@ SPIRVTypeRegistry::SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT,
 void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
   MachineIRBuilder MIB(MF);
   MachineRegisterInfo &MRI = MF.getRegInfo();
+  std::vector<std::pair<Register, Register>> PostProcessList;
   for (auto P : VRegToTypeMap[&MF]) {
     auto Reg = P.first;
     if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
@@ -86,6 +88,7 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
                                         : Def->getParent()->end()));
     auto &MRI = MF.getRegInfo();
     auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+    PostProcessList.push_back({Reg, NewReg});
     if (auto *RC = MRI.getRegClassOrNull(Reg))
       MRI.setRegClass(NewReg, RC);
     auto MI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
@@ -95,6 +98,10 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
     Def->getOperand(0).setReg(NewReg);
     constrainRegOperands(MI, &MF);
   }
+  // this to make it convenient for Legalizer to get the SPIRVType
+  // when processing the actual MI (ie not pseudo one)
+  for (auto &P : PostProcessList)
+    assignSPIRVTypeToVReg(getSPIRVTypeForVReg(P.first), P.second, MIB);
 }
 
 SPIRVType *SPIRVTypeRegistry::assignTypeToVReg(const Type *type, Register VReg,

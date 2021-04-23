@@ -146,12 +146,14 @@ private:
   bool selectOpUndef(Register resVReg, const SPIRVType *resType,
                      MachineIRBuilder &MIRBuilder) const;
 
+#if 0
   bool selectVectorExtract(Register resVReg, const SPIRVType *resType,
                            const MachineInstr &I,
                            MachineIRBuilder &MIRBuilder) const;
   bool selectVectorInsert(Register resVReg, const SPIRVType *resType,
                           const MachineInstr &I,
                           MachineIRBuilder &MIRBuilder) const;
+#endif
 
   bool selectFrameIndex(Register resVReg, const SPIRVType *resType,
                         MachineIRBuilder &MIRBuilder) const;
@@ -268,10 +270,14 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_IMPLICIT_DEF:
     return selectOpUndef(resVReg, resType, MIRBuilder);
 
+#if 0
+  // won't reach this anyway as these two are TypeFoldingSupp set
+  // so assert should've fired already
   case TargetOpcode::G_INSERT_VECTOR_ELT:
     return selectVectorInsert(resVReg, resType, I, MIRBuilder);
   case TargetOpcode::G_EXTRACT_VECTOR_ELT:
     return selectVectorExtract(resVReg, resType, I, MIRBuilder);
+#endif
 
   case TargetOpcode::G_ICMP:
     return selectICmp(resVReg, resType, I, MIRBuilder);
@@ -1154,6 +1160,7 @@ bool SPIRVInstructionSelector::selectOpUndef(
       .constrainAllUses(TII, TRI, RBI);
 }
 
+#if 0
 bool SPIRVInstructionSelector::selectVectorExtract(
     Register resVReg, const SPIRVType *resType, const MachineInstr &I,
     MachineIRBuilder &MIRBuilder) const {
@@ -1199,6 +1206,7 @@ bool SPIRVInstructionSelector::selectVectorInsert(
   }
   return MIB.constrainAllUses(TII, TRI, RBI);
 }
+#endif
 
 bool SPIRVInstructionSelector::selectFrameIndex(
     Register resVReg, const SPIRVType *resType,
