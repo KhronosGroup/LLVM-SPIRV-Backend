@@ -222,8 +222,8 @@ def ConstPseudoFalse: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.ge
 multiclass IntFPImm<bits<16> opCode, string name> {
   def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstI:$src, TYPE:$type))]>;
-  def F: Op<opCode, (outs fID:$dst), (ins TYPE:$type, fID:$src),
-                  "$dst = "#name#" $type $src", [(set fID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
+  def F: Op<opCode, (outs ID:$dst), (ins TYPE:$type, fID:$src),
+                  "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
 }
 
 def OpConstantTrue: Op<41, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantTrue $src_ty",
@@ -431,11 +431,16 @@ def OpGenericCastToPtrExplicit : Op<123, (outs ID:$r), (ins TYPE:$t, ID:$p, Stor
 def OpBitcast : UnOp<"OpBitcast", 124>;
 
 //3.32.12 Composite Instructions
-def OpVectorExtractDynamic: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
+def OpVectorExtractDynamicI: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
                   "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vID:$vec, ID:$idx), TYPE:$type))]>;
+def OpVectorExtractDynamicF: Op<77, (outs ID:$res), (ins TYPE:$type, vfID:$vec, ID:$idx),
+                  "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vfID:$vec, ID:$idx), TYPE:$type))]>;
 
-def OpVectorInsertDynamic: Op<78, (outs ID:$res), (ins TYPE:$ty, vID:$vec, ID:$comp, ID:$idx),
+def OpVectorInsertDynamicI: Op<78, (outs ID:$res), (ins TYPE:$ty, vID:$vec, ID:$comp, ID:$idx),
                   "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vID:$vec, ID:$comp, ID:$idx), TYPE:$ty))]>;
+def OpVectorInsertDynamicF: Op<78, (outs ID:$res), (ins TYPE:$ty, vfID:$vec, fID:$comp, ID:$idx),
+                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vfID:$vec, fID:$comp, ID:$idx), TYPE:$ty))]>;
+
 def OpVectorShuffle: Op<79, (outs ID:$res), (ins TYPE:$ty, ID:$v1, ID:$v2, variable_ops),
                   "$res = OpVectorShuffle $ty $v1 $v2">;
 def OpCompositeConstruct: Op<80, (outs ID:$res), (ins TYPE:$type, variable_ops),

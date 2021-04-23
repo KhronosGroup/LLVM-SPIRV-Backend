@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Add two placeholder register banks - one for type ids from OpTypeXXX
-// instructions, and one for every other variable's ID. These shouldn't
-// be used though as RegisterBankSelection is disabled.
+// Although RegisterBankSelection is disabled we need to distinct the banks
+// as InstructionSelector RegClass checking code relies on them
 def IDRegBank : RegisterBank<"IDBank", [ID]>;
+def fIDRegBank : RegisterBank<"fIDBank", [fID]>;
+def vIDRegBank : RegisterBank<"vIDBank", [vID]>;
+def vfIDRegBank : RegisterBank<"vfIDBank", [vfID]>;
 def TYPERegBank : RegisterBank<"TYPEBank", [TYPE]>;

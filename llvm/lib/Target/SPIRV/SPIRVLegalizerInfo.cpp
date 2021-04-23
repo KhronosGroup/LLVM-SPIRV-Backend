@@ -290,34 +290,27 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   verify(*ST.getInstrInfo());
 }
 
-static unsigned isFPOpcode(unsigned Opc)
-{
-  switch (Opc) {
-    case TargetOpcode::G_FADD:
-    case TargetOpcode::G_FSUB:
-    case TargetOpcode::G_FMUL:
-    case TargetOpcode::G_FDIV:
-    case TargetOpcode::G_FREM:
-    case TargetOpcode::G_FNEG:
-      return true;
-    default:
-      return false;
-  }
-}
-
 static std::pair<Register, unsigned>
-createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI) {
+createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
+               const SPIRVTypeRegistry &TR) {
   auto NewT = LLT::scalar(32);
-  auto GetIdOp = isFPOpcode(Opcode) ? SPIRV::GET_fID : SPIRV::GET_ID;
-  auto DstClass = isFPOpcode(Opcode) ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
+  auto SpvType = TR.getSPIRVTypeForVReg(ValReg);
+  bool isFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
+  bool isVectorFloat =
+      SpvType->getOpcode() == SPIRV::OpTypeVector &&
+      TR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
+          SPIRV::OpTypeFloat;
+  isFloat |= isVectorFloat;
+  auto GetIdOp = isFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
+  auto DstClass = isFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
   if (MRI.getType(ValReg).isPointer()) {
     NewT = LLT::pointer(0, 32);
     GetIdOp = SPIRV::GET_pID;
     DstClass = &SPIRV::pIDRegClass;
   } else if (MRI.getType(ValReg).isVector()) {
     NewT = LLT::fixed_vector(2, NewT);
-    GetIdOp = isFPOpcode(Opcode) ? SPIRV::GET_vfID : SPIRV::GET_vID;
-    DstClass = isFPOpcode(Opcode) ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
+    GetIdOp = isFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
+    DstClass = isFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
   }
   auto IdReg = MRI.createGenericVirtualRegister(NewT);
   MRI.setRegClass(IdReg, DstClass);
@@ -353,43 +346,23 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
   }
   auto &MRI = MI.getMF()->getRegInfo();
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
-  if (Opc == TargetOpcode::G_CONSTANT ||
-      Opc == TargetOpcode::G_FCONSTANT) {
-    auto NewT = LLT::scalar(32);
-    // TODO: use getOperand(1).getCImm
-    auto ValReg = MI.getOperand(0).getReg();
-    if (MRI.getType(ValReg).isPointer()) {
-      NewT = LLT::pointer(0, 32);
-      // DstClass = &SPIRV::pIDRegClass;
-    } else if (MRI.getType(ValReg).isVector()) {
-      NewT = LLT::fixed_vector(2, NewT);
-      // DstClass = &SPIRV::vIDRegClass;
-    } else if (isFPOpcode(Opc)) {
-      // DstClass = &SPIRV::fIDRegClass;
-    }
-    MRI.setType(MI.getOperand(0).getReg(), NewT);
-  } else {
-    auto NewReg =
-        createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI).first;
-    MRI.use_instr_begin(MI.getOperand(0).getReg())
-        ->getOperand(1)
-        .setReg(NewReg);
-    MI.getOperand(0).setReg(NewReg);
-    for (auto &Op : MI.operands()) {
-      if (!Op.isReg() || Op.isDef())
-        continue;
-      // if (Ids.count(&Op) > 0) {
-      //   Op.setReg(Ids.at(&Op));
-      //   // NewI.addUse(Ids.at(&Op));
-      // } else {
-      auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI);
-      Helper.MIRBuilder.buildInstr(IdOpInfo.second)
-          .addDef(IdOpInfo.first)
-          .addUse(Op.getReg());
-      // Ids[&Op] = IdOpInfo.first;
-      Op.setReg(IdOpInfo.first);
-      // }
-    }
+  auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *TR).first;
+  MRI.use_instr_begin(MI.getOperand(0).getReg())->getOperand(1).setReg(NewReg);
+  MI.getOperand(0).setReg(NewReg);
+  for (auto &Op : MI.operands()) {
+    if (!Op.isReg() || Op.isDef())
+      continue;
+    // if (Ids.count(&Op) > 0) {
+    //   Op.setReg(Ids.at(&Op));
+    //   // NewI.addUse(Ids.at(&Op));
+    // } else {
+    auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *TR);
+    Helper.MIRBuilder.buildInstr(IdOpInfo.second)
+        .addDef(IdOpInfo.first)
+        .addUse(Op.getReg());
+    // Ids[&Op] = IdOpInfo.first;
+    Op.setReg(IdOpInfo.first);
+    // }
   }
   return true;
 }

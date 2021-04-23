@@ -25,16 +25,24 @@
 
 using namespace llvm;
 
-const RegisterBank &SPIRVRegisterBankInfo::getRegBankFromRegClass(
-    const TargetRegisterClass &RC, LLT Ty) const {
+// This required for .td selection patterns to work or we'd end up
+// with RegClass checks being redundant as all the classes would be mapped
+// to the same bank
+const RegisterBank &
+SPIRVRegisterBankInfo::getRegBankFromRegClass(const TargetRegisterClass &RC,
+                                              LLT Ty) const {
   switch (RC.getID()) {
   case SPIRV::TYPERegClassID:
     return SPIRV::TYPERegBank;
-  case SPIRV::IDRegClassID:
-  case SPIRV::fIDRegClassID:
   case SPIRV::pIDRegClassID:
+  case SPIRV::IDRegClassID:
+    return SPIRV::IDRegBank;
+  case SPIRV::fIDRegClassID:
+    return SPIRV::fIDRegBank;
   case SPIRV::vIDRegClassID:
+    return SPIRV::vIDRegBank;
   case SPIRV::vfIDRegClassID:
+    return SPIRV::vfIDRegBank;
   case SPIRV::ANYIDRegClassID:
   case SPIRV::ANYRegClassID:
     return SPIRV::IDRegBank;
