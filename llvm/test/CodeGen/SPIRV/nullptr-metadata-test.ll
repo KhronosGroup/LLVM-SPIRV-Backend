@@ -1,5 +1,5 @@
 ; This test ensures that the translator does not crash
-; RUN: llc -O0 -global-isel %s
+; RUN: llc -O0 -global-isel %s -o /dev/null
 
 ; ModuleID = 'test.bc'
 target triple = "spirv64-unknown-unknown"
