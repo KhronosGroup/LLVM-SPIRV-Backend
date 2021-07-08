@@ -4,6 +4,11 @@
 ; CHECK-SPIRV: %[[MemScope_Device:[0-9]+]] = OpConstant %[[Int]] 1
 ; CHECK-SPIRV: %[[MemSemEqual_SeqCst:[0-9]+]] = OpConstant %[[Int]] 16
 ; CHECK-SPIRV: %[[MemSemUnequal_Acquire:[0-9]+]] = OpConstant %[[Int]] 2
+; CHECK-SPIRV: %[[Constant_456:[0-9]+]] = OpConstant %[[Int]] 456
+; CHECK-SPIRV: %[[Constant_128:[0-9]+]] = OpConstant %[[Int]] 128
+; CHECK-SPIRV: %[[Bool:[0-9]+]] = OpTypeBool
+; CHECK-SPIRV: %[[Struct:[0-9]+]] = OpTypeStruct %[[Int]] %[[Bool]]
+; CHECK-SPIRV: %[[UndefStruct:[0-9]+]] = OpUndef %[[Struct]]
 
 ; CHECK-SPIRV: %[[Pointer:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV: %[[Value_ptr:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
@@ -13,9 +18,9 @@
 ; CHECK-SPIRV: %[[Res:[0-9]+]] = OpAtomicCompareExchange %[[Int]] %[[Pointer]] %[[MemScope_Device]]
 ; CHECK-SPIRV-SAME:                  %[[MemSemEqual_SeqCst]] %[[MemSemUnequal_Acquire]] %[[Value]] %[[Comparator]]
 ; CHECK-SPIRV: %[[Success:[0-9]+]] = OpIEqual %{{[0-9]+}} %[[Res]] %[[Comparator]]
-; CHECK-SPIRV: OpBranchConditional %[[Success]]
-
-; CHECK-SPIRV: OpStore %[[Value_ptr]] %[[Res]]
+; CHECK-SPIRV: %[[Composite_0:[0-9]+]] = OpCompositeInsert %[[Struct]] %[[Res]] %[[UndefStruct]] 0
+; CHECK-SPIRV: %[[Composite_1:[0-9]+]] = OpCompositeInsert %[[Struct]] %[[Success]] %[[Composite_0]] 1
+; CHECK-SPIRV: %{{[0-9]+}} = OpCompositeExtract %[[Bool]] %[[Composite_1]] 1
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
@@ -34,6 +39,24 @@ cmpxchg.store_expected:                           ; preds = %entry
   br label %cmpxchg.continue
 
 cmpxchg.continue:                                 ; preds = %cmpxchg.store_expected, %entry
+  ret void
+}
+
+; CHECK-SPIRV: %[[Ptr:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
+; CHECK-SPIRV: %[[Store_ptr:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
+
+; CHECK-SPIRV: %[[Res_1:[0-9]+]] = OpAtomicCompareExchange %[[Int]] %[[Ptr]] %[[MemScope_Device]]
+; CHECK-SPIRV-SAME:                  %[[MemSemEqual_SeqCst]] %[[MemSemUnequal_Acquire]] %[[Constant_456]] %[[Constant_128]]
+; CHECK-SPIRV: %[[Success_1:[0-9]+]] = OpIEqual %{{[0-9]+}} %[[Res_1]] %[[Constant_128]]
+; CHECK-SPIRV: %[[Composite:[0-9]+]] = OpCompositeInsert %[[Struct]] %[[Res_1]] %[[UndefStruct]] 0
+; CHECK-SPIRV: %[[Composite_1:[0-9]+]] = OpCompositeInsert %[[Struct]] %[[Success_1]] %[[Composite]] 1
+; CHECK-SPIRV: OpStore %[[Store_ptr]] %[[Composite_1]]
+
+; Function Attrs: nounwind
+define dso_local spir_func void @test2(i32* %ptr, {i32, i1}* %store_ptr) local_unnamed_addr #0 {
+entry:
+  %0 = cmpxchg i32* %ptr, i32 128, i32 456 seq_cst acquire
+  store { i32, i1 } %0, { i32, i1 }* %store_ptr, align 4
   ret void
 }
 

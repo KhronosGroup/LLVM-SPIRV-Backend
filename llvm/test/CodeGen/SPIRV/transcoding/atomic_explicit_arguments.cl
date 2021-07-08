@@ -1,4 +1,4 @@
-// RUN: clang -cc1 -nostdsysteminc -triple spir -cl-std=cl2.0 %s -finclude-default-header -emit-llvm -o - | sed -Ee 's#target triple = "spir"#target triple = "spirv32-unknown-unknown"#' | llc -O0 -global-isel -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+// RUN: clang -cc1 -nostdsysteminc -triple spir -cl-std=cl2.0 %s -fdeclare-opencl-builtins -finclude-default-header -emit-llvm -o - | sed -Ee 's#target triple = "spir"#target triple = "spirv32-unknown-unknown"#' | llc -O0 -global-isel -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 int load (volatile atomic_int* obj, memory_order order, memory_scope scope) {
   return atomic_load_explicit(obj, order, scope);
