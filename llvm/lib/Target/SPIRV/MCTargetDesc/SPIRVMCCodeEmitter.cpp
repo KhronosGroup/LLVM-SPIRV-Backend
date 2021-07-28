@@ -81,7 +81,8 @@ static bool hasType(const MCInst &MI, const MCInstrInfo &MII,
     // Check if we define an ID, and take a type as operand 1
     auto defOpInfo = MCDesc.opInfo_begin();
     auto firstArgOpInfo = MCDesc.opInfo_begin() + 1;
-    return defOpInfo->RegClass == SPIRV::IDRegClassID &&
+    return (defOpInfo->RegClass == SPIRV::IDRegClassID ||
+            defOpInfo->RegClass == SPIRV::ANYIDRegClassID) &&
            firstArgOpInfo->RegClass == SPIRV::TYPERegClassID;
   }
   return false;
