@@ -1,4 +1,4 @@
-add_llvm_library(LLVMSPIRVDesc
+add_llvm_component_library(LLVMSPIRVDesc
   SPIRVMCTargetDesc.cpp
   SPIRVAsmBackend.cpp
   SPIRVMCCodeEmitter.cpp
