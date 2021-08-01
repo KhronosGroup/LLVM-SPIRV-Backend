@@ -1704,6 +1704,7 @@ bool IRTranslator::translateInlineAsm(const CallBase &CB,
 bool IRTranslator::translateCallBase(const CallBase &CB,
                                      MachineIRBuilder &MIRBuilder) {
   ArrayRef<Register> Res = getOrCreateVRegs(CB);
+  errs() << "Translate callbase " << CB << "\n";
 
   SmallVector<ArrayRef<Register>, 8> Args;
   Register SwiftInVReg = 0;
@@ -1742,6 +1743,7 @@ bool IRTranslator::translateCallBase(const CallBase &CB,
 
 bool IRTranslator::translateCall(const User &U, MachineIRBuilder &MIRBuilder) {
   const CallInst &CI = cast<CallInst>(U);
+  errs() << "Translating call " << CI << "\n";
   auto TII = MF->getTarget().getIntrinsicInfo();
   const Function *F = CI.getCalledFunction();
 
@@ -1798,9 +1800,16 @@ bool IRTranslator::translateCall(const User &U, MachineIRBuilder &MIRBuilder) {
         MIB.addFPImm(cast<ConstantFP>(Arg.value()));
       }
     } else if (auto MD = dyn_cast<MetadataAsValue>(Arg.value())) {
-      auto *MDN = dyn_cast<MDNode>(MD->getMetadata());
-      if (!MDN) // This was probably an MDString.
-        return false;
+      auto *MD0 = MD->getMetadata();
+      auto *MDN = dyn_cast<MDNode>(MD0);
+      if (!MDN) {// This was probably an MDString.
+        if (auto *ConstMD = dyn_cast<ConstantAsMetadata>(MD0)) {
+          MDN = MDNode::get(MF->getFunction().getContext(), ConstMD);
+        } else {
+          errs() << "MD error\n";
+          return false;
+        }
+      }
       MIB.addMetadata(MDN);
     } else {
       ArrayRef<Register> VRegs = getOrCreateVRegs(*Arg.value());

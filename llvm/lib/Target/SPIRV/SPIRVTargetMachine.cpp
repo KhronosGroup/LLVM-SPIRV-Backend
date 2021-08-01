@@ -107,6 +107,7 @@ public:
   SPIRVTargetMachine &getSPIRVTargetMachine() const {
     return getTM<SPIRVTargetMachine>();
   }
+  void addIRPasses() override;
   void addISelPrepare() override;
 
   bool addIRTranslator() override;
@@ -152,6 +153,11 @@ void SPIRVPassConfig::addPostRegAlloc() {
 
 TargetPassConfig *SPIRVTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new SPIRVPassConfig(*this, PM);
+}
+
+void SPIRVPassConfig::addIRPasses() {
+  TargetPassConfig::addIRPasses();
+  addPass(createSPIRVTypeAssignerPass());
 }
 
 void SPIRVPassConfig::addISelPrepare() {

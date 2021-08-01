@@ -34,6 +34,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVStrings.cpp
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
+  SPIRVTypeAssigner.cpp
   SPIRVTypeRegistry.cpp
   )
 

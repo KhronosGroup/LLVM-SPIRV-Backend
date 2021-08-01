@@ -10,4 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-//TODO define some intrinsics
+let TargetPrefix = "spv" in {
+  def int_spv_assign_type : Intrinsic<[], [llvm_any_ty, llvm_metadata_ty]>;
+}

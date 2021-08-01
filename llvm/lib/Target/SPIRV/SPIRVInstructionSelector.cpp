@@ -145,6 +145,9 @@ private:
 
   bool selectOpUndef(Register resVReg, const SPIRVType *resType,
                      MachineIRBuilder &MIRBuilder) const;
+  bool selectIntrinsic(Register resVReg, const SPIRVType *resType,
+                       const MachineInstr &I,
+                       MachineIRBuilder &MIRBuilder) const;
 
 #if 0
   bool selectVectorExtract(Register resVReg, const SPIRVType *resType,
@@ -270,6 +273,8 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_IMPLICIT_DEF:
     return selectOpUndef(resVReg, resType, MIRBuilder);
 
+  case TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS:
+    return selectIntrinsic(resVReg, resType, I, MIRBuilder);
 #if 0
   // won't reach this anyway as these two are TypeFoldingSupp set
   // so assert should've fired already
@@ -1158,6 +1163,16 @@ bool SPIRVInstructionSelector::selectOpUndef(
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
       .constrainAllUses(TII, TRI, RBI);
+}
+
+bool SPIRVInstructionSelector::selectIntrinsic(
+    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
+    MachineIRBuilder &MIRBuilder) const {
+  errs() << "Selecting intrinsic " << I.getIntrinsicID() << ", type = ";
+  auto *Ty = cast<ValueAsMetadata>(I.getOperand(2).getMetadata()->getOperand(0))->getType();
+  assert(Ty);
+  errs() << *Ty << "\n";
+  return true;
 }
 
 #if 0

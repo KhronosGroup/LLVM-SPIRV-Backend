@@ -135,6 +135,7 @@ bool SPIRVCallLowering::lowerFormalArguments(
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
   auto funcName = Info.Callee.getGlobal()->getGlobalIdentifier();
+  errs() << "lowering spv call " << Info.Callee.getSymbolName() << "\n";
 
   size_t n;
   int status;
