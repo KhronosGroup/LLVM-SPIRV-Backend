@@ -234,7 +234,6 @@ class SPIRVInstructionSelect : public InstructionSelect {
             MI.getOpcode() == SPIRV::GET_pID ||
             MI.getOpcode() == SPIRV::GET_vfID ||
             MI.getOpcode() == SPIRV::GET_vID) {
-          auto &Op = MI.getOperand(0);
           MRI.replaceRegWith(MI.getOperand(0).getReg(), MI.getOperand(1).getReg());
           ToRemove.push_back(&MI);
         }
