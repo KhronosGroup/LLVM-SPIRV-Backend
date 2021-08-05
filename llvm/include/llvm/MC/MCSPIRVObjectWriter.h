@@ -23,7 +23,7 @@ protected:
 public:
   ~MCSPIRVObjectTargetWriter() = default;
 
-  virtual Triple::ObjectFormatType getFormat() const { return Triple::SPIRV; }
+  Triple::ObjectFormatType getFormat() const override { return Triple::SPIRV; }
   static bool classof(const MCObjectTargetWriter *W) {
     return W->getFormat() == Triple::SPIRV;
   }
