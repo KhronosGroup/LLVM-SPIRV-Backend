@@ -12,4 +12,11 @@
 
 let TargetPrefix = "spv" in {
   def int_spv_assign_type : Intrinsic<[], [llvm_any_ty, llvm_metadata_ty]>;
+  //def int_spv_assign_type_to_const : Intrinsic<[], [llvm_any_ty, llvm_metadata_ty]>;
+
+  def int_spv_gep : Intrinsic<[llvm_anyptr_ty], [llvm_i1_ty, llvm_any_ty, llvm_vararg_ty]>;
+  def int_spv_load : Intrinsic<[llvm_i32_ty], [llvm_anyptr_ty, llvm_i16_ty]>;
+  def int_spv_store : Intrinsic<[], [llvm_i32_ty, llvm_anyptr_ty, llvm_i16_ty]>;
+  def int_spv_extractv : Intrinsic<[llvm_any_ty], [llvm_i32_ty, llvm_vararg_ty]>;
+  def int_spv_insertv : Intrinsic<[llvm_i32_ty], [llvm_i32_ty, llvm_vararg_ty]>;
 }

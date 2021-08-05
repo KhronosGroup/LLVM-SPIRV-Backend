@@ -38,6 +38,7 @@ public:
   void add(const T *V, MachineFunction *MF, Register R) {
     // TODO: assert if a record already exists
     Storage[V][MF] = R;
+    errs() << "DT[" << *V << "][" << MF->getName() << "] = " << Register::virtReg2Index(R) << "\n";
   }
 
   const StorageTy &getAllUses() const { return Storage; }

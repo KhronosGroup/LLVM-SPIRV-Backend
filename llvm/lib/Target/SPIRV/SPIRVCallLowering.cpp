@@ -72,9 +72,10 @@ bool SPIRVCallLowering::lowerFormalArguments(
     unsigned int i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-      SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
-      if (!spirvTy)
-        spirvTy = TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
+      // auto *spirvTy = TR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
+      // SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
+      // if (!spirvTy)
+      auto *spirvTy = TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
       argTypeVRegs.push_back(TR->getSPIRVTypeID(spirvTy));
 
       if (Arg.hasName())
@@ -135,7 +136,7 @@ bool SPIRVCallLowering::lowerFormalArguments(
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
   auto funcName = Info.Callee.getGlobal()->getGlobalIdentifier();
-  errs() << "lowering spv call " << Info.Callee.getSymbolName() << "\n";
+  errs() << "lowering spv call " << funcName << "\n";
 
   size_t n;
   int status;

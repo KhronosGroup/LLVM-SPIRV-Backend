@@ -19,7 +19,7 @@ class SPIRVRegisterBankInfo;
 class SPIRVSubtarget;
 class InstructionSelector;
 
-FunctionPass *createSPIRVTypeAssignerPass();
+FunctionPass *createSPIRVTypeAssignerPass(SPIRVTargetMachine *TM);
 FunctionPass *createSPIRVBasicBlockDominancePass();
 FunctionPass *createSPIRVBlockLabelerPass();
 FunctionPass *createSPIRVAddRequirementsPass();

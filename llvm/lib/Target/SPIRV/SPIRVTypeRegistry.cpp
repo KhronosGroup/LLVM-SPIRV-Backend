@@ -24,6 +24,7 @@
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/DerivedTypes.h"
 
+#include "llvm/IR/IntrinsicsSPIRV.h"
 #include "SPIRVEnums.h"
 #include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
@@ -71,43 +72,127 @@ SPIRVTypeRegistry::SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT,
                                      unsigned int pointerSize)
     : DT(DT), pointerSize(pointerSize) {}
 
+// void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
+//   MachineIRBuilder MIB(MF);
+//   MachineRegisterInfo &MRI = MF.getRegInfo();
+//   std::vector<std::pair<Register, Register>> PostProcessList;
+//   for (auto P : VRegToTypeMap[&MF]) {
+//     auto Reg = P.first;
+//     if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
+//       continue;
+//     // MRI.setType(Reg, LLT::scalar(32));
+//     auto *Ty = P.second;
+//     auto *Def = MRI.getVRegDef(Reg);
+
+//     MIB.setInsertPt(*Def->getParent(),
+//                     (Def->getNextNode() ? Def->getNextNode()->getIterator()
+//                                         : Def->getParent()->end()));
+//     auto &MRI = MF.getRegInfo();
+//     auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+//     PostProcessList.push_back({Reg, NewReg});
+//     if (auto *RC = MRI.getRegClassOrNull(Reg))
+//       MRI.setRegClass(NewReg, RC);
+//     auto MI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+//                   .addDef(Reg)
+//                   .addUse(NewReg)
+//                   .addUse(getSPIRVTypeID(Ty));
+//     Def->getOperand(0).setReg(NewReg);
+//     constrainRegOperands(MI, &MF);
+//   }
+//   // this to make it convenient for Legalizer to get the SPIRVType
+//   // when processing the actual MI (ie not pseudo one)
+//   for (auto &P : PostProcessList)
+//     assignSPIRVTypeToVReg(getSPIRVTypeForVReg(P.first), P.second, MIB);
+// }
+
 void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
   MachineIRBuilder MIB(MF);
   MachineRegisterInfo &MRI = MF.getRegInfo();
   std::vector<std::pair<Register, Register>> PostProcessList;
-  for (auto P : VRegToTypeMap[&MF]) {
-    auto Reg = P.first;
-    if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
-      continue;
-    // MRI.setType(Reg, LLT::scalar(32));
-    auto *Ty = P.second;
-    auto *Def = MRI.getVRegDef(Reg);
+  std::vector<MachineInstr *> ToDelete;
+  for (auto &MBB : MF) {
+    for (auto &MI : MBB) {
+      if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+          MI.getOperand(0).isIntrinsicID() &&
+          MI.getOperand(0).getIntrinsicID() == Intrinsic::spv_assign_type) {
+        auto Reg = MI.getOperand(1).getReg();
+        auto *Ty =
+            cast<ValueAsMetadata>(MI.getOperand(2).getMetadata()->getOperand(0))
+                ->getType();
+        auto *Def = MRI.getVRegDef(Reg);
 
-    MIB.setInsertPt(*Def->getParent(),
-                    (Def->getNextNode() ? Def->getNextNode()->getIterator()
-                                        : Def->getParent()->end()));
-    auto &MRI = MF.getRegInfo();
-    auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
-    PostProcessList.push_back({Reg, NewReg});
-    if (auto *RC = MRI.getRegClassOrNull(Reg))
-      MRI.setRegClass(NewReg, RC);
-    auto MI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-                  .addDef(Reg)
-                  .addUse(NewReg)
-                  .addUse(getSPIRVTypeID(Ty));
-    Def->getOperand(0).setReg(NewReg);
-    constrainRegOperands(MI, &MF);
+        MIB.setInsertPt(*Def->getParent(),
+                        (Def->getNextNode() ? Def->getNextNode()->getIterator()
+                                            : Def->getParent()->end()));
+        auto &MRI = MF.getRegInfo();
+        auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+        PostProcessList.push_back({Reg, NewReg});
+        if (auto *RC = MRI.getRegClassOrNull(Reg))
+          MRI.setRegClass(NewReg, RC);
+        auto *spvTy = getOrCreateSPIRVType(Ty, MIB);
+        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
+        auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+                      .addDef(Reg)
+                      .addUse(NewReg)
+                      .addUse(getSPIRVTypeID(spvTy));
+        Def->getOperand(0).setReg(NewReg);
+        constrainRegOperands(NewMI, &MF);
+        ToDelete.push_back(&MI);
+      } else if (MI.getOpcode() == TargetOpcode::G_CONSTANT || MI.getOpcode() == TargetOpcode::G_FCONSTANT) {
+        // %rc = G_CONSTANT ty val
+        // ===>
+        // %cty = OpType* ty
+        // %rctmp = G_CONSTANT ty val
+        // %rc = ASSIGN_TYPE %rctmp, %cty
+        auto Reg = MI.getOperand(0).getReg();
+        if (std::any_of(MRI.use_instructions(Reg).begin(),
+                        MRI.use_instructions(Reg).end(), [](MachineInstr &UI) {
+                          return UI.getOpcode() ==
+                                     TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+                                 UI.getOperand(0).isIntrinsicID() &&
+                                 UI.getOperand(0).getIntrinsicID() ==
+                                     Intrinsic::spv_assign_type;
+                        }))
+          continue;
+        Type *Ty = nullptr;
+        if (MI.getOpcode() == TargetOpcode::G_CONSTANT)
+          Ty = MI.getOperand(1).getCImm()->getType();
+        else
+          Ty = MI.getOperand(1).getFPImm()->getType();
+        auto *Def = MRI.getVRegDef(Reg);
+
+        MIB.setInsertPt(*Def->getParent(),
+                        (Def->getNextNode() ? Def->getNextNode()->getIterator()
+                                            : Def->getParent()->end()));
+        auto &MRI = MF.getRegInfo();
+        auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+        PostProcessList.push_back({Reg, NewReg});
+        if (auto *RC = MRI.getRegClassOrNull(Reg))
+          MRI.setRegClass(NewReg, RC);
+        auto *spvTy = getOrCreateSPIRVType(Ty, MIB);
+        auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+                      .addDef(Reg)
+                      .addUse(NewReg)
+                      .addUse(getSPIRVTypeID(spvTy));
+        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
+        Def->getOperand(0).setReg(NewReg);
+        constrainRegOperands(NewMI, &MF);
+      }
+    }
   }
   // this to make it convenient for Legalizer to get the SPIRVType
   // when processing the actual MI (ie not pseudo one)
   for (auto &P : PostProcessList)
     assignSPIRVTypeToVReg(getSPIRVTypeForVReg(P.first), P.second, MIB);
+
+  for (auto &MI: ToDelete)
+    MI->eraseFromParent();
 }
 
 SPIRVType *SPIRVTypeRegistry::assignTypeToVReg(const Type *type, Register VReg,
                                                MachineIRBuilder &MIRBuilder,
                                                AQ::AccessQualifier accessQual) {
-
+  errs() << "Assigning " << *type << " to reg " << Register::virtReg2Index(VReg) << "\n";
   SPIRVType *spirvType = getOrCreateSPIRVType(type, MIRBuilder, accessQual);
   assignSPIRVTypeToVReg(spirvType, VReg, MIRBuilder);
   return spirvType;
@@ -117,6 +202,8 @@ void SPIRVTypeRegistry::assignSPIRVTypeToVReg(SPIRVType *spirvType,
                                               Register VReg,
                                               MachineIRBuilder &MIRBuilder) {
   VRegToTypeMap[&MIRBuilder.getMF()][VReg] = spirvType;
+  errs() << "Type[" << MIRBuilder.getMF().getName() << "][" << Register::virtReg2Index(VReg)
+         << "] = " << spirvType << "\n";
 }
 
 static Register createTypeVReg(MachineIRBuilder &MIRBuilder) {
@@ -324,6 +411,8 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
 }
 
 SPIRVType *SPIRVTypeRegistry::getSPIRVTypeForVReg(Register VReg) const {
+  errs() << "Looking for spv type for vreg " << Register::virtReg2Index(VReg)
+         << " in " << CurMF->getName() << "\n";
   auto t = VRegToTypeMap.find(CurMF);
   if (t != VRegToTypeMap.end()) {
     auto tt = t->second.find(VReg);
@@ -340,13 +429,20 @@ SPIRVTypeRegistry::getOrCreateSPIRVType(const Type *type,
   auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
   auto SPIRVTypeIt = TypeToSPIRVTypeMap.find(type);
   if (SPIRVTypeIt != TypeToSPIRVTypeMap.end()) {
+    errs() << "Type " << *type << " exists\n";
     auto SPIRVTypeFuncIt = SPIRVTypeIt->second.find(&MIRBuilder.getMF());
-    if (SPIRVTypeFuncIt != SPIRVTypeIt->second.end())
+    if (SPIRVTypeFuncIt != SPIRVTypeIt->second.end()) {
+      errs() << "Func " << MIRBuilder.getMF().getName() << " exists\n";
       return getSPIRVTypeForVReg(SPIRVTypeFuncIt->second);
+    }
   }
   SPIRVType *spirvType = createSPIRVType(type, MIRBuilder, accessQual);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(spirvType)] = spirvType;
+  errs() << "VRegToType[" << MIRBuilder.getMF().getName() << "]["
+         << Register::virtReg2Index(getSPIRVTypeID(spirvType))
+         << "] = " << spirvType << "\n";
   SPIRVToLLVMType[spirvType] = type;
+  errs() << "Created type " << spirvType << " for " << *type << " in " << MIRBuilder.getMF().getName() << "\n";
   DT.add(type, &MIRBuilder.getMF(), getSPIRVTypeID(spirvType));
   return spirvType;
 }

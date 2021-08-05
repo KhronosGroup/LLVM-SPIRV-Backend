@@ -91,7 +91,7 @@ SPIRVTargetMachine::SPIRVTargetMachine(const Target &T, const Triple &TT,
       Subtarget(TT, CPU.str(), FS.str(), *this) {
   initAsmInfo();
   setGlobalISel(true);
-  setGlobalISelAbort(GlobalISelAbortMode::Enable);
+  // setGlobalISelAbort(GlobalISelAbortMode::Disable);
   setFastISel(false);
   setO0WantsFastISel(false);
   setRequiresStructuredCFG(TT.isVulkanEnvironment());
@@ -157,7 +157,8 @@ TargetPassConfig *SPIRVTargetMachine::createPassConfig(PassManagerBase &PM) {
 
 void SPIRVPassConfig::addIRPasses() {
   TargetPassConfig::addIRPasses();
-  addPass(createSPIRVTypeAssignerPass());
+  auto *TM = &getTM<SPIRVTargetMachine>();
+  addPass(createSPIRVTypeAssignerPass(TM));
 }
 
 void SPIRVPassConfig::addISelPrepare() {
