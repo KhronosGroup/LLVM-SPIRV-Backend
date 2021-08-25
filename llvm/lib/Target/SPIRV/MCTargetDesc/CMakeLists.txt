@@ -1,5 +1,6 @@
 add_llvm_component_library(LLVMSPIRVDesc
   SPIRVMCTargetDesc.cpp
+  SPIRVTargetStreamer.cpp
   SPIRVAsmBackend.cpp
   SPIRVMCCodeEmitter.cpp
   SPIRVObjectTargetWriter.cpp
