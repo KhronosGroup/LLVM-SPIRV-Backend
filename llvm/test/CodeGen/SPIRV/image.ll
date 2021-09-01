@@ -1,9 +1,11 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; FIXME: Why was "6" as "<id> Sampled Type" (before "2D")?
-; CHECK-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
-; CHECK-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown WriteOnly
-; CHECK-NOT: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown WriteOnly
+; CHECK-SPIRV-NOT: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
+; CHECK-SPIRV: OpImageSampleExplicitLod
+; CHECK-SPIRV: OpImageWrite
 
 ; ModuleID = 'image.bc'
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
