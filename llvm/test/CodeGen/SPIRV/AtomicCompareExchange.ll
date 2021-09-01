@@ -1,14 +1,14 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[Int:[0-9]+]] = OpTypeInt 32 0
-; CHECK-SPIRV: %[[MemScope_Device:[0-9]+]] = OpConstant %[[Int]] 1
-; CHECK-SPIRV: %[[MemSemEqual_SeqCst:[0-9]+]] = OpConstant %[[Int]] 16
-; CHECK-SPIRV: %[[MemSemUnequal_Acquire:[0-9]+]] = OpConstant %[[Int]] 2
-; CHECK-SPIRV: %[[Constant_456:[0-9]+]] = OpConstant %[[Int]] 456
-; CHECK-SPIRV: %[[Constant_128:[0-9]+]] = OpConstant %[[Int]] 128
-; CHECK-SPIRV: %[[Bool:[0-9]+]] = OpTypeBool
-; CHECK-SPIRV: %[[Struct:[0-9]+]] = OpTypeStruct %[[Int]] %[[Bool]]
-; CHECK-SPIRV: %[[UndefStruct:[0-9]+]] = OpUndef %[[Struct]]
+; CHECK-SPIRV-DAG: %[[MemScope_Device:[0-9]+]] = OpConstant %[[Int]] 1
+; CHECK-SPIRV-DAG: %[[MemSemEqual_SeqCst:[0-9]+]] = OpConstant %[[Int]] 16
+; CHECK-SPIRV-DAG: %[[MemSemUnequal_Acquire:[0-9]+]] = OpConstant %[[Int]] 2
+; CHECK-SPIRV-DAG: %[[Constant_456:[0-9]+]] = OpConstant %[[Int]] 456
+; CHECK-SPIRV-DAG: %[[Constant_128:[0-9]+]] = OpConstant %[[Int]] 128
+; CHECK-SPIRV-DAG: %[[Bool:[0-9]+]] = OpTypeBool
+; CHECK-SPIRV-DAG: %[[Struct:[0-9]+]] = OpTypeStruct %[[Int]] %[[Bool]]
+; CHECK-SPIRV-DAG: %[[UndefStruct:[0-9]+]] = OpUndef %[[Struct]]
 
 ; CHECK-SPIRV: %[[Pointer:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV: %[[Value_ptr:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}

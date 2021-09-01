@@ -1,7 +1,7 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
-; CHECK-DAG: %[[Scope_Device:[0-9]+]] = OpConstant %[[Int]] 1 {{$}}
+; CHECK-DAG: %[[Scope_Device:[0-9]+]] = OpConstant %[[Int]] 1{{$}}
 ; CHECK-DAG: %[[MemSem_Relaxed:[0-9]+]] = OpConstant %[[Int]] 0
 ; CHECK-DAG: %[[MemSem_Acquire:[0-9]+]] = OpConstant %[[Int]] 2
 ; CHECK-DAG: %[[MemSem_Release:[0-9]+]] = OpConstant %[[Int]] 4 {{$}}
