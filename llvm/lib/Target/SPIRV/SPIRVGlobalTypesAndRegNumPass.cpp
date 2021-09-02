@@ -193,6 +193,8 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
 
+  std::unordered_map<MachineOperand*, MachineInstrBuilder*> FwDecls;
+
   for (auto &CU : DT->getAllUses()) {
     auto MetaReg =
         MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
@@ -203,21 +205,28 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
       auto *ToHoist = MF->getRegInfo().getVRegDef(Reg);
       ToRemove.push_back(ToHoist);
 
+      for (unsigned i = 0; i < ToHoist->getNumExplicitDefs(); ++i)
+        if (FwDecls.count(&ToHoist->getOperand(i)))
+          FwDecls[&ToHoist->getOperand(i)]->addUse(MetaReg);
+
       if (!MetaBuilder.getMRI()->getVRegDef(MetaReg)) {
         auto MIB = MetaBuilder.buildInstr(ToHoist->getOpcode());
         MIB.addDef(MetaReg);
 
         for (unsigned int i = ToHoist->getNumExplicitDefs();
              i < ToHoist->getNumOperands(); ++i) {
-          MachineOperand Op = ToHoist->getOperand(i);
+          MachineOperand &Op = ToHoist->getOperand(i);
           if (Op.isImm()) {
             MIB.addImm(Op.getImm());
           } else if (Op.isFPImm()) {
             MIB.addFPImm(Op.getFPImm());
           } else if (Op.isReg()) {
-            Register metaReg = LocalAliasTables[MF].at(Op.getReg());
-            assert(metaReg.isValid() && "No reg alias found");
-            MIB.addUse(metaReg);
+            if (LocalAliasTables[MF].count(Op.getReg())) {
+              Register metaReg = LocalAliasTables[MF].at(Op.getReg());
+              assert(metaReg.isValid() && "No reg alias found");
+              MIB.addUse(metaReg);
+            } else
+              FwDecls[&Op] = &MIB;
           } else {
             errs() << *ToHoist << "\n";
             llvm_unreachable(

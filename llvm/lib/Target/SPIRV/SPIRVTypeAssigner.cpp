@@ -91,7 +91,8 @@ bool SPIRVTypeAssigner::runOnFunction(Function &F) {
       Gep->replaceAllUsesWith(NewGep);
       Gep->eraseFromParent();
       I = NewGep;
-    } else if (auto *SI = dyn_cast<StoreInst>(I)) {
+    } else if (isa<StoreInst>(I) && cast<PointerType>(I->getOperand(1)->getType())->getElementType()->isAggregateType()) {
+      auto *SI = cast<StoreInst>(I);
       auto *IntrFn = Intrinsic::getDeclaration(
           F.getParent(), Intrinsic::spv_store,
           {SI->getPointerOperand()->getType()});
@@ -99,7 +100,8 @@ bool SPIRVTypeAssigner::runOnFunction(Function &F) {
       MachineMemOperand::Flags Flags = TLI->getStoreMemOperandFlags(*SI, F.getParent()->getDataLayout());
       I = B.CreateCall(IntrFn, {SI->getValueOperand(), SI->getPointerOperand(), B.getInt16(Flags)});
       SI->eraseFromParent();
-    } else if (auto *LI = dyn_cast<LoadInst>(I)) {
+    } else if (isa<LoadInst>(I) && I->getType()->isAggregateType()) {
+      auto *LI = cast<LoadInst>(I);
       auto *IntrFn = Intrinsic::getDeclaration(
           F.getParent(), Intrinsic::spv_load,
           {LI->getOperand(0)->getType()});
@@ -124,7 +126,8 @@ bool SPIRVTypeAssigner::runOnFunction(Function &F) {
       I = NewEVI;
     } else if (auto *IVI = dyn_cast<InsertValueInst>(I)) {
       auto *IntrFn = Intrinsic::getDeclaration(
-          F.getParent(), Intrinsic::spv_insertv);
+          F.getParent(), Intrinsic::spv_insertv,
+          {IVI->getInsertedValueOperand()->getType()});
       std::vector<Value *> Args;
       for (auto &Op : IVI->operands())
         Args.push_back(Op);

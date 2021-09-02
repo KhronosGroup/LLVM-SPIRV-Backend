@@ -1226,14 +1226,26 @@ bool SPIRVInstructionSelector::selectOpUndef(
       .constrainAllUses(TII, TRI, RBI);
 }
 
+static int64_t foldImm(const MachineOperand &MO) {
+  auto &MRI = MO.getParent()->getMF()->getRegInfo();
+  auto *TypeInst = MRI.getVRegDef(MO.getReg());
+  auto *ImmInst = MRI.getVRegDef(TypeInst->getOperand(1).getReg());
+  assert(ImmInst->getOpcode() == TargetOpcode::G_CONSTANT);
+  return ImmInst->getOperand(1).getCImm()->getZExtValue();
+}
+
 bool SPIRVInstructionSelector::selectInsertVal(
     Register resVReg, const SPIRVType *resType, const MachineInstr &I,
     MachineIRBuilder &MIRBuilder) const {
   return MIRBuilder.buildInstr(SPIRV::OpCompositeInsert)
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
-      .addUse(I.getOperand(2).getReg())
+      // object to insert
       .addUse(I.getOperand(3).getReg())
+      // composite to insert into
+      .addUse(I.getOperand(2).getReg())
+      // TODO: support arbitrary number of indices
+      .addImm(foldImm(I.getOperand(4)))
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1244,7 +1256,8 @@ bool SPIRVInstructionSelector::selectExtractVal(
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
       .addUse(I.getOperand(2).getReg())
-      .addUse(I.getOperand(3).getReg())
+      // TODO: support arbitrary number of indices
+      .addImm(foldImm(I.getOperand(3)))
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1252,10 +1265,12 @@ bool SPIRVInstructionSelector::selectGEP(Register resVReg,
                                          const SPIRVType *resType,
                                          const MachineInstr &I,
                                          MachineIRBuilder &MIRBuilder) const {
-  auto* InBoundsTypeInst = MF->getRegInfo().getVRegDef(I.getOperand(2).getReg());
-  auto* InBoundsConst = MF->getRegInfo().getVRegDef(InBoundsTypeInst->getOperand(1).getReg());
-  assert(InBoundsConst->getOpcode() == TargetOpcode::G_CONSTANT);
-  return MIRBuilder.buildInstr(InBoundsConst->getOperand(1).getCImm()->getZExtValue() ? SPIRV::OpInBoundsAccessChain : SPIRV::OpAccessChain)
+  // In general we should also support OpAccessChain instrs here (i.e. not
+  // PtrAccessChain) but SPIRV-LLVM Translator doesn't emit them at all and so
+  // do we to stay compliant with its test and more importantly consumers
+  auto Opcode = I.getOperand(2).getImm() ? SPIRV::OpInBoundsPtrAccessChain
+                                         : SPIRV::OpPtrAccessChain;
+  return MIRBuilder.buildInstr(Opcode)
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
       .addUse(I.getOperand(3).getReg())

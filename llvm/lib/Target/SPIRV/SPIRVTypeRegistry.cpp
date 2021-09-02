@@ -145,14 +145,11 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
         // %rctmp = G_CONSTANT ty val
         // %rc = ASSIGN_TYPE %rctmp, %cty
         auto Reg = MI.getOperand(0).getReg();
-        if (std::any_of(MRI.use_instructions(Reg).begin(),
-                        MRI.use_instructions(Reg).end(), [](MachineInstr &UI) {
-                          return UI.getOpcode() ==
-                                     TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-                                 UI.getOperand(0).isIntrinsicID() &&
-                                 UI.getOperand(0).getIntrinsicID() ==
-                                     Intrinsic::spv_assign_type;
-                        }))
+        if (MRI.hasOneUse(Reg) &&
+            MRI.use_instr_begin(Reg)->getOpcode() ==
+                TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+            MRI.use_instr_begin(Reg)->getIntrinsicID() ==
+                Intrinsic::spv_assign_type)
           continue;
         Type *Ty = nullptr;
         if (MI.getOpcode() == TargetOpcode::G_CONSTANT)
