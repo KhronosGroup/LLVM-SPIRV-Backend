@@ -1,8 +1,8 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
 
-; CHECK-DAG: Capability Int8
-; CHECK-DAG: Capability Int16
-; CHECK-DAG: Capability Int64
+; CHECK-DAG: OpCapability Int8
+; CHECK-DAG: OpCapability Int16
+; CHECK-DAG: OpCapability Int64
 
 ; CHECK-DAG: %{{[0-9]+}} = OpTypeInt 8 0
 ; CHECK-DAG: %{{[0-9]+}} = OpTypeInt 16 0
