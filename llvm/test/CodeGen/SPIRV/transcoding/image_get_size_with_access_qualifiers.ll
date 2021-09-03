@@ -1,10 +1,9 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; FIXME: CHECK-SPIRV-DAG for OpTypeInt, OpTypeVoid and OpTypeImage?
-; CHECK-SPIRV: %[[IntTyID:[0-9]+]] = OpTypeInt
-; CHECK-SPIRV: %[[VoidTyID:[0-9]+]] = OpTypeVoid
-; CHECK-SPIRV: %[[ImageTyID:[0-9]+]] = OpTypeImage %[[VoidTyID]] 2D 0 1 0 0 Unknown ReadOnly
-; CHECK-SPIRV: %[[VectorTyID:[0-9]+]] = OpTypeVector %[[IntTyID]] {{[0-9]+}}
+; CHECK-SPIRV-DAG: %[[IntTyID:[0-9]+]] = OpTypeInt
+; CHECK-SPIRV-DAG: %[[VoidTyID:[0-9]+]] = OpTypeVoid
+; CHECK-SPIRV-DAG: %[[ImageTyID:[0-9]+]] = OpTypeImage %[[VoidTyID]] 2D 0 1 0 0 Unknown ReadOnly
+; CHECK-SPIRV-DAG: %[[VectorTyID:[0-9]+]] = OpTypeVector %[[IntTyID]] {{[0-9]+}}
 ; CHECK-SPIRV: %[[ImageArgID:[0-9]+]] = OpFunctionParameter %[[ImageTyID]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpImageQuerySizeLod %[[VectorTyID]] %[[ImageArgID]]
 
