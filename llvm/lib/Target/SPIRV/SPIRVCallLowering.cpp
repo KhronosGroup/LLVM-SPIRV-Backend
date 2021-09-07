@@ -170,7 +170,9 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     // function declaration here. It will be hoisted globally later
     auto M = MIRBuilder.getMF().getFunction().getParent();
     Function *Callee = M->getFunction(funcName);
-    if (Callee && Callee->isDeclaration()) {
+    Register funcVReg;
+    if (Callee && Callee->isDeclaration() &&
+        (DT->find(Callee, &MIRBuilder.getMF(), funcVReg) == false)) {
       // Emit the type info and forward function declaration to the first MBB
       // to ensure VReg definition dependencies are valid across all MBBs
       MachineIRBuilder firstBlockBuilder;

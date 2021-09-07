@@ -254,16 +254,23 @@ ArrayRef<Register> SPIRVIRTranslator::getOrCreateVRegs(const Value &Val) {
   } else {
     assert(Ty->isSized() && "Cannot create unsized vreg");
 
-    // Create entry for this type.
+    // Try to find the constant in DT, create new entry if it's needed.
     auto *NewVRegs = VMap.getVRegs(Val);
-    auto llt = getLLTForType(*Ty, *DL);
-    Register vreg = MRI->createGenericVirtualRegister(llt);
-    NewVRegs->push_back(vreg);
+    Register vreg;
+    auto C = dyn_cast<Constant>(&Val);
+    if (C && DT->find(C, MF, vreg)) {
+      NewVRegs->push_back(vreg);
+    } else {
+      auto llt = getLLTForType(*Ty, *DL);
+      Register vreg = MRI->createGenericVirtualRegister(llt);
+      NewVRegs->push_back(vreg);
 
-    if (auto C = dyn_cast<Constant>(&Val)) {
-      bool success = translate(*C, vreg);
-      assert(success && "Could not translate constant");
+      if (C) {
+        bool success = translate(*C, vreg);
+        assert(success && "Could not translate constant");
+      }
     }
+
     ResVRegs = *NewVRegs;
     assert(ResVRegs.size() == 1);
 

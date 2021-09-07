@@ -49,6 +49,7 @@ public:
 
   // TODO: consider if these are necessary
   // void emitFunctionHeader() override {}
+  void emitFunctionEntryLabel() override {};
   void emitBasicBlockStart(const MachineBasicBlock &MBB) override {}
   void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
   // void emitGlobalVariable(const GlobalVariable *GV) override {}

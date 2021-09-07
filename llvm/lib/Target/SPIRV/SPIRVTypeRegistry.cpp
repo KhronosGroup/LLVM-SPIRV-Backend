@@ -170,14 +170,19 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeVector(uint32_t numElems,
   return MIB;
 }
 
-static Register buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
-                                 SPIRVTypeRegistry *TR) {
+Register SPIRVTypeRegistry::buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
+                                             SPIRVTypeRegistry *TR) {
   auto &MF = MIRBuilder.getMF();
-  Register res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(32));
+  Register res;
   auto IntTy = IntegerType::getInt32Ty(MF.getFunction().getContext());
+  // Find a constant in DT or build a new one.
   const auto ConstInt = ConstantInt::get(IntTy, val);
-  TR->assignTypeToVReg(IntTy, res, MIRBuilder);
-  MIRBuilder.buildConstant(res, *ConstInt);
+  if (DT.find(ConstInt, &MIRBuilder.getMF(), res) == false) {
+    res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(32));
+    TR->assignTypeToVReg(IntTy, res, MIRBuilder);
+    DT.add(ConstInt, &MIRBuilder.getMF(), res);
+    MIRBuilder.buildConstant(res, *ConstInt);
+  }
   return res;
 }
 
@@ -337,12 +342,9 @@ SPIRVType *
 SPIRVTypeRegistry::getOrCreateSPIRVType(const Type *type,
                                         MachineIRBuilder &MIRBuilder,
                                         AQ::AccessQualifier accessQual) {
-  auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
-  auto SPIRVTypeIt = TypeToSPIRVTypeMap.find(type);
-  if (SPIRVTypeIt != TypeToSPIRVTypeMap.end()) {
-    auto SPIRVTypeFuncIt = SPIRVTypeIt->second.find(&MIRBuilder.getMF());
-    if (SPIRVTypeFuncIt != SPIRVTypeIt->second.end())
-      return getSPIRVTypeForVReg(SPIRVTypeFuncIt->second);
+  Register reg;
+  if (DT.find(type, &MIRBuilder.getMF(), reg)) {
+    return getSPIRVTypeForVReg(reg);
   }
   SPIRVType *spirvType = createSPIRVType(type, MIRBuilder, accessQual);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(spirvType)] = spirvType;
