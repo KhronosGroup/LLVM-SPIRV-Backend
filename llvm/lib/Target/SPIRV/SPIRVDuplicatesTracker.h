@@ -36,8 +36,21 @@ public:
   SPIRVDuplicatesTracker() {}
 
   void add(const T *V, MachineFunction *MF, Register R) {
-    // TODO: assert if a record already exists
+    assert (find(V, MF, R) == false && "DT: record already exists");
     Storage[V][MF] = R;
+  }
+
+  bool find(const T *V, MachineFunction *MF, Register& R) {
+    auto iter = Storage.find(V);
+    if (iter != Storage.end()) {
+      auto Map = iter->second;
+      auto iter2 = Map.find(MF);
+      if (iter2 != Map.end()) {
+        R = iter2->second;
+        return true;
+      }
+    }
+    return false;
   }
 
   const StorageTy &getAllUses() const { return Storage; }
@@ -67,6 +80,22 @@ public:
 
   void add(const Function *F, MachineFunction *MF, Register R) {
     FT.add(F, MF, R);
+  }
+
+  bool find(const Type *T, MachineFunction *MF, Register& R) {
+    return TT.find(T, MF, R);
+  }
+
+  bool find(const Constant *C, MachineFunction *MF, Register& R) {
+    return CT.find(C, MF, R);
+  }
+
+  bool find(const GlobalValue *GV, MachineFunction *MF, Register R) {
+    return GT.find(GV, MF, R);
+  }
+
+  bool find(const Function *F, MachineFunction *MF, Register R) {
+    return FT.find(F, MF, R);
   }
 
   // NOTE:

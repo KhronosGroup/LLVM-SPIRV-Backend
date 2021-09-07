@@ -172,6 +172,8 @@ private:
                                       MachineIRBuilder &MIRBuilder,
                                       AQ::AccessQualifier aq = AQ::ReadWrite);
 
+  Register buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
+                            SPIRVTypeRegistry *TR);
 public:
   // convenient helpers for getting types
   // w/ check for duplicates

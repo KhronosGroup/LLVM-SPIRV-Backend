@@ -186,12 +186,12 @@ static void initMetaBlockBuilder(Module &M, MachineModuleInfo &MMI,
 using LocalAliasTablesTy = std::map<MachineFunction *, LocalToGlobalRegTable>;
 
 template <typename T>
-static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
+static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
                            const SPIRVDuplicatesTracker<T> *DT,
                            MetaBlockType MBType,
                            LocalAliasTablesTy &LocalAliasTables) {
+  // FIXME: setMetaBlock
   setMetaBlock(MetaBuilder, MBType);
-  SmallVector<MachineInstr *, 8> ToRemove;
 
   for (auto &CU : DT->getAllUses()) {
     auto MetaReg =
@@ -200,6 +200,26 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
+      LocalAliasTables[MF][Reg] = MetaReg;
+    }
+  }
+}
+
+template <typename T>
+static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
+                           const SPIRVDuplicatesTracker<T> *DT,
+                           MetaBlockType MBType,
+                           LocalAliasTablesTy &LocalAliasTables) {
+  setMetaBlock(MetaBuilder, MBType);
+  SmallVector<MachineInstr *, 8> ToRemove;
+  for (auto &CU : DT->getAllUses()) {
+    for (auto &U : CU.second) {
+      auto *MF = U.first;
+      auto Reg = U.second;
+      assert(LocalAliasTables[MF].find(Reg) != LocalAliasTables[MF].end() &&
+             "Cannot find reg alias in LocalAliasTables");
+      auto MetaReg = LocalAliasTables[MF][Reg];
+
       auto *ToHoist = MF->getRegInfo().getVRegDef(Reg);
       ToRemove.push_back(ToHoist);
 
@@ -215,9 +235,14 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
           } else if (Op.isFPImm()) {
             MIB.addFPImm(Op.getFPImm());
           } else if (Op.isReg()) {
-            Register metaReg = LocalAliasTables[MF].at(Op.getReg());
-            assert(metaReg.isValid() && "No reg alias found");
-            MIB.addUse(metaReg);
+            auto metaRegID = LocalAliasTables[MF].find(Op.getReg());
+            if (metaRegID != LocalAliasTables[MF].end()) {
+              Register metaReg = metaRegID->second;
+              assert(metaReg.isValid() && "No reg alias found");
+              MIB.addUse(metaReg);
+            } else {
+              llvm_unreachable("Generate WRONG type!\n");
+            }
           } else {
             errs() << *ToHoist << "\n";
             llvm_unreachable(
@@ -225,7 +250,6 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
           }
         }
       }
-      LocalAliasTables[MF][Reg] = MetaReg;
     }
   }
 
@@ -323,6 +347,11 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MIRBuilder.getMF().getSubtarget());
   auto *DT = ST->getSPIRVDuplicatesTracker();
 
+  // OpTypes and OpConstants can have cross references so at first we create
+  // new meta regs and map them to old regs, then walk the list of instructions,
+  // and create new (hoisted) instructions with new meta regs instead of old ones.
+  fillLocalAliasTables<Type>(MIRBuilder, DT->get<Type>(), MB_TypeConstVars, LocalAliasTables);
+  fillLocalAliasTables<Constant>(MIRBuilder, DT->get<Constant>(), MB_TypeConstVars, LocalAliasTables);
   hoistGlobalOps<Type>(MIRBuilder, DT->get<Type>(), MB_TypeConstVars, LocalAliasTables);
   hoistGlobalOps<Constant>(MIRBuilder, DT->get<Constant>(), MB_TypeConstVars, LocalAliasTables);
 
@@ -349,7 +378,9 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
     MI->removeFromParent();
   }
   END_FOR_MF_IN_MODULE()
+  fillLocalAliasTables<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), MB_TypeConstVars, LocalAliasTables);
   hoistGlobalOps<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), MB_TypeConstVars, LocalAliasTables);
+  fillLocalAliasTables<Function>(MIRBuilder, DT->get<Function>(), MB_ExtFuncDecls, LocalAliasTables);
   hoistGlobalOps<Function>(MIRBuilder, DT->get<Function>(), MB_ExtFuncDecls, LocalAliasTables);
 }
 
