@@ -278,8 +278,8 @@ void SPIRVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
       O << "%" << (Register::virtReg2Index(Op.getReg()) + 1);
     } else if (Op.isImm()) {
       O << formatImm((int64_t)Op.getImm());
-    } else if (Op.isFPImm()) {
-      O << formatImm((float)Op.getFPImm());
+    } else if (Op.isDFPImm()) {
+      O << formatImm((float)Op.getDFPImm());
     } else {
       assert(Op.isExpr() && "Expected an expression");
       printExpr(Op.getExpr(), O);
