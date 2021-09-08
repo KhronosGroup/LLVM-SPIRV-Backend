@@ -593,13 +593,13 @@ static void addMemoryOperands(MachineMemOperand *MemOp, MachineInstrBuilder &MIB
     spvMemOp |= MemoryOperand::Volatile;
   if (MemOp->isNonTemporal())
     spvMemOp |= MemoryOperand::Nontemporal;
-  if (MemOp->getAlignment())
+  if (MemOp->getAlign().value())
     spvMemOp |= MemoryOperand::Aligned;
 
   if (spvMemOp != MemoryOperand::None) {
     MIB.addImm(spvMemOp);
     if (spvMemOp & MemoryOperand::Aligned)
-      MIB.addImm(MemOp->getAlignment());
+      MIB.addImm(MemOp->getAlign().value());
   }
 }
 
