@@ -361,7 +361,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     // Load the Vec3 from the global variable
     Register loadedVector =
         buildLoad(Vec3Ty, globVar, MIRBuilder, TR);
-    MRI->setType(loadedVector, LLT::vector(3, ptrSize));
+    MRI->setType(loadedVector, LLT::fixed_vector(3, ptrSize));
 
     // Set up the vreg to extract the result to (possibly a new temporary one)
     Register extr = resVReg;
