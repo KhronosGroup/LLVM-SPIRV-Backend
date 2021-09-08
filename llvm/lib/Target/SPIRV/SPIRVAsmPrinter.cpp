@@ -45,12 +45,12 @@ public:
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                        const char *ExtraCode, raw_ostream &O) override;
 
-  void EmitInstruction(const MachineInstr *MI) override;
+  void emitInstruction(const MachineInstr *MI) override;
 
-  void EmitFunctionHeader() override {}
-  void EmitBasicBlockStart(const MachineBasicBlock &MBB) const override {}
-  void EmitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
-  void EmitGlobalVariable(const GlobalVariable *GV) override {}
+  void emitFunctionHeader() override {}
+  void emitBasicBlockStart(const MachineBasicBlock &MBB) override {}
+  void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
+  void emitGlobalVariable(const GlobalVariable *GV) override {}
 };
 } // namespace
 
@@ -102,7 +102,7 @@ bool SPIRVAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   return false;
 }
 
-void SPIRVAsmPrinter::EmitInstruction(const MachineInstr *MI) {
+void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   SPIRVMCInstLower MCInstLowering;
   MCInst TmpInst;

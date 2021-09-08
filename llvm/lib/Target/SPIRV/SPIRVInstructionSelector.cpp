@@ -55,7 +55,7 @@ public:
                            SPIRVTypeRegistry &TR);
 
   // Common selection code. Instruction-specific selection occurs in spvSelect()
-  bool select(MachineInstr &I, CodeGenCoverage &CoverageInfo) const override;
+  bool select(MachineInstr &I) override;
   static const char *getName() { return DEBUG_TYPE; }
 
 private:
@@ -178,8 +178,7 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(
     : InstructionSelector(), TM(TM), ST(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), TR(TR) {}
 
-bool SPIRVInstructionSelector::select(MachineInstr &I,
-                                      CodeGenCoverage &CoverageInfo) const {
+bool SPIRVInstructionSelector::select(MachineInstr &I) {
   assert(I.getParent() && "Instruction should be in a basic block!");
   assert(I.getParent()->getParent() && "Instruction should be in a function!");
 
@@ -692,7 +691,7 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register resVReg,
   auto ptr = I.getOperand(1).getReg();
   auto scSem = getMemSemanticsForStorageClass(TR.getPointerStorageClass(ptr));
 
-  auto memSem = getMemSemantics(memOp->getOrdering());
+  auto memSem = getMemSemantics(memOp->getSuccessOrdering());
   Register memSemReg = buildI32Constant(memSem | scSem, MIRBuilder);
 
   return MIRBuilder.buildInstr(newOpcode)
@@ -737,7 +736,7 @@ bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register resVReg,
   auto spvValTy = TR.getSPIRVTypeForVReg(val);
   auto scSem = getMemSemanticsForStorageClass(TR.getPointerStorageClass(ptr));
 
-  auto memSemEq = getMemSemantics(memOp->getOrdering()) | scSem;
+  auto memSemEq = getMemSemantics(memOp->getSuccessOrdering()) | scSem;
   Register memSemEqReg = buildI32Constant(memSemEq, MIRBuilder);
 
   auto memSemNeq = getMemSemantics(memOp->getFailureOrdering()) | scSem;

@@ -68,18 +68,18 @@ void SPIRVInstPrinter::recordOpExtInstImport(const MCInst *MI) {
   extInstSetIDs.insert({reg, set});
 }
 
-void SPIRVInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
-                                 StringRef Annot, const MCSubtargetInfo &STI) {
-
+void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
+                                 StringRef Annot, const MCSubtargetInfo &STI,
+                                 raw_ostream &OS) {
   const unsigned int OpCode = MI->getOpcode();
-  printInstruction(MI, O);
+  printInstruction(MI, Address, OS);
 
   if (OpCode == SPIRV::OpDecorate) {
-    printOpDecorate(MI, O);
+    printOpDecorate(MI, OS);
   } else if (OpCode == SPIRV::OpExtInstImport) {
     recordOpExtInstImport(MI);
   } else if (OpCode == SPIRV::OpExtInst) {
-    printOpExtInst(MI, O);
+    printOpExtInst(MI, OS);
   } else {
 
     // Print any extra operands for variadic instructions
@@ -95,23 +95,23 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
         // operand, but there are a few other cases
         switch (OpCode) {
         case SPIRV::OpTypeImage:
-          O << ' ';
-          printAccessQualifier(MI, firstVariableIndex, O);
+          OS << ' ';
+          printAccessQualifier(MI, firstVariableIndex, OS);
           break;
         case SPIRV::OpVariable:
-          O << ' ';
-          printOperand(MI, firstVariableIndex, O);
+          OS << ' ';
+          printOperand(MI, firstVariableIndex, OS);
           break;
         case SPIRV::OpEntryPoint: {
           // Print the interface ID operands, skipping the name's string literal
-          printRemainingVariableOps(MI, numFixedOps, O, false, true);
+          printRemainingVariableOps(MI, numFixedOps, OS, false, true);
           break;
         }
         case SPIRV::OpExecutionMode:
         case SPIRV::OpExecutionModeId:
         case SPIRV::OpLoopMerge: {
           // Print any literals after the OPERAND_UNKNOWN argument normally
-          printRemainingVariableOps(MI, numFixedOps, O);
+          printRemainingVariableOps(MI, numFixedOps, OS);
           break;
         }
         default:
@@ -124,9 +124,9 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
         switch (OpCode) {
         case SPIRV::OpLoad:
         case SPIRV::OpStore:
-          O << ' ';
-          printMemoryOperand(MI, firstVariableIndex, O);
-          printRemainingVariableOps(MI, firstVariableIndex + 1, O);
+          OS << ' ';
+          printMemoryOperand(MI, firstVariableIndex, OS);
+          printRemainingVariableOps(MI, firstVariableIndex + 1, OS);
           break;
         case SPIRV::OpImageSampleImplicitLod:
         case SPIRV::OpImageSampleDrefImplicitLod:
@@ -146,36 +146,36 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, raw_ostream &O,
         case SPIRV::OpImageSparseDrefGather:
         case SPIRV::OpImageSparseRead:
         case SPIRV::OpImageSampleFootprintNV:
-          printImageOperand(MI, firstVariableIndex, O);
-          printRemainingVariableOps(MI, numFixedOps + 1, O);
+          printImageOperand(MI, firstVariableIndex, OS);
+          printRemainingVariableOps(MI, numFixedOps + 1, OS);
           break;
         case SPIRV::OpCopyMemory:
         case SPIRV::OpCopyMemorySized: {
           const unsigned int numOps = MI->getNumOperands();
           for (unsigned int i = numFixedOps; i < numOps; ++i) {
-            O << ' ';
-            printMemoryOperand(MI, i, O);
+            OS << ' ';
+            printMemoryOperand(MI, i, OS);
             if (MI->getOperand(i).getImm() & MemoryOperand::Aligned) {
               assert(i + 1 < numOps && "Missing alignment operand");
-              O << ' ';
-              printOperand(MI, i + 1, O);
+              OS << ' ';
+              printOperand(MI, i + 1, OS);
               i += 1;
             }
           }
           break;
         }
         case SPIRV::OpConstant:
-          printOpConstantVarOps(MI, numFixedOps, O);
+          printOpConstantVarOps(MI, numFixedOps, OS);
           break;
         default:
-          printRemainingVariableOps(MI, numFixedOps, O);
+          printRemainingVariableOps(MI, numFixedOps, OS);
           break;
         }
       }
     }
   }
 
-  printAnnotation(O, Annot);
+  printAnnotation(OS, Annot);
 }
 
 void SPIRVInstPrinter::printOpExtInst(const MCInst *MI, raw_ostream &O) {

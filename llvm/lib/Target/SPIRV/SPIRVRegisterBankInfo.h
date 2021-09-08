@@ -33,8 +33,8 @@ class SPIRVRegisterBankInfo final : public SPIRVGenRegisterBankInfo {
 public:
   SPIRVRegisterBankInfo() = default;
 
-  const RegisterBank &
-  getRegBankFromRegClass(const TargetRegisterClass &RC) const override;
+  const RegisterBank &getRegBankFromRegClass(const TargetRegisterClass &RC,
+                                             LLT Ty) const override;
 };
 } // namespace llvm
 #endif

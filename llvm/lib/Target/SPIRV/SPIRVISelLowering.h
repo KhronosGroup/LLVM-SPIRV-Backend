@@ -26,7 +26,7 @@ public:
       : TargetLowering(TM) {}
 
   // Stop IRTranslator breaking up FMA instrs to preserve types information
-  bool isFMAFasterThanFMulAndFAdd(EVT) const override { return true; }
+  bool isFMAFasterThanFMulAndFAdd(const MachineFunction &MF, EVT) const override { return true; }
 };
 } // namespace llvm
 

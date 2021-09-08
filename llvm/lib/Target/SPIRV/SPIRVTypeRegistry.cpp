@@ -347,8 +347,8 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
   } else if (Ty->isVoidTy()) {
     return getOpTypeVoid(MIRBuilder);
   } else if (Ty->isVectorTy()) {
-    auto el = getOrCreateSPIRVType(Ty->getVectorElementType(), MIRBuilder);
-    return getOpTypeVector(Ty->getVectorNumElements(), el, MIRBuilder);
+    auto el = getOrCreateSPIRVType(cast<FixedVectorType>(Ty)->getElementType(), MIRBuilder);
+    return getOpTypeVector(cast<FixedVectorType>(Ty)->getNumElements(), el, MIRBuilder);
   } else if (Ty->isArrayTy()) {
     auto *el = getOrCreateSPIRVType(Ty->getArrayElementType(), MIRBuilder);
     return getOpTypeArray(Ty->getArrayNumElements(), el, MIRBuilder);

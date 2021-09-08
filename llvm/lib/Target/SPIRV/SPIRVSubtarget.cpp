@@ -79,7 +79,7 @@ static bool computeOpenCLFullProfile(const Triple &TT) { return true; }
 SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
                                const std::string &FS,
                                const SPIRVTargetMachine &TM)
-    : SPIRVGenSubtargetInfo(TT, CPU, FS), InstrInfo(),
+    : SPIRVGenSubtargetInfo(TT, CPU, /* TuneCPU */ CPU, FS), InstrInfo(),
       FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
       pointerSize(computePointerSize(TT)),
       usesLogicalAddressing(TT.isSPIRVLogical()),
@@ -105,7 +105,7 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
 
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
-  ParseSubtargetFeatures(CPU, FS);
+  ParseSubtargetFeatures(CPU, /* TuneCPU */ CPU, FS);
   return *this;
 }
 

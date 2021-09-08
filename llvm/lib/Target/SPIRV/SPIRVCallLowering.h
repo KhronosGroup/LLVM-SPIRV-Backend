@@ -30,17 +30,17 @@ public:
 
   // Built OpReturn or OpReturnValue
   bool lowerReturn(MachineIRBuilder &MIRBuiler, const Value *Val,
-                   ArrayRef<Register> VReg) const override;
+                   ArrayRef<Register> VRegs, FunctionLoweringInfo &FLI,
+                   Register SwiftErrorVReg) const override;
 
   // Build OpFunction, OpFunctionParameter, and any EntryPoint or Linkage data
   bool lowerFormalArguments(MachineIRBuilder &MIRBuilder, const Function &F,
-                            ArrayRef<ArrayRef<Register>> VRegs) const override;
+                            ArrayRef<ArrayRef<Register>> VRegs,
+                            FunctionLoweringInfo &FLI) const override;
 
   // Build OpCall, or replace with a builtin function
-  bool lowerCall(MachineIRBuilder &MIRBuilder, CallingConv::ID CallConv,
-                 const MachineOperand &Callee, const ArgInfo &OrigRet,
-                 ArrayRef<ArgInfo> OrigArgs,
-                 const MDNode *KnownCallees = nullptr) const override;
+  bool lowerCall(MachineIRBuilder &MIRBuilder,
+                 CallLoweringInfo &Info) const override;
 };
 } // end namespace llvm
 

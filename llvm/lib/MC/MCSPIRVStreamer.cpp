@@ -15,7 +15,7 @@
 
 using namespace llvm;
 
-void MCSPIRVStreamer::EmitInstToData(const MCInst &Inst,
+void MCSPIRVStreamer::emitInstToData(const MCInst &Inst,
                                      const MCSubtargetInfo &STI) {
   MCAssembler &Assembler = getAssembler();
   SmallVector<MCFixup, 0> Fixups;

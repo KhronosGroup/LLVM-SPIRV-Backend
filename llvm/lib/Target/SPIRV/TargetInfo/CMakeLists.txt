@@ -1,3 +1,9 @@
-add_llvm_library(LLVMSPIRVInfo
+add_llvm_component_library(LLVMSPIRVInfo
   SPIRVTargetInfo.cpp
+
+  LINK_COMPONENTS
+  Support
+
+  ADD_TO_COMPONENT
+  SPIRV
   )

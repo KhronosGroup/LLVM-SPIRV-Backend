@@ -35,35 +35,35 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   const LLT s32 = LLT::scalar(32);
   const LLT s64 = LLT::scalar(64);
 
-  const LLT v16s64 = LLT::vector(16, 64);
-  const LLT v16s32 = LLT::vector(16, 32);
-  const LLT v16s16 = LLT::vector(16, 16);
-  const LLT v16s8 = LLT::vector(16, 8);
-  const LLT v16s1 = LLT::vector(16, 1);
+  const LLT v16s64 = LLT::fixed_vector(16, 64);
+  const LLT v16s32 = LLT::fixed_vector(16, 32);
+  const LLT v16s16 = LLT::fixed_vector(16, 16);
+  const LLT v16s8 = LLT::fixed_vector(16, 8);
+  const LLT v16s1 = LLT::fixed_vector(16, 1);
 
-  const LLT v8s64 = LLT::vector(8, 64);
-  const LLT v8s32 = LLT::vector(8, 32);
-  const LLT v8s16 = LLT::vector(8, 16);
-  const LLT v8s8 = LLT::vector(8, 8);
-  const LLT v8s1 = LLT::vector(8, 1);
+  const LLT v8s64 = LLT::fixed_vector(8, 64);
+  const LLT v8s32 = LLT::fixed_vector(8, 32);
+  const LLT v8s16 = LLT::fixed_vector(8, 16);
+  const LLT v8s8 = LLT::fixed_vector(8, 8);
+  const LLT v8s1 = LLT::fixed_vector(8, 1);
 
-  const LLT v4s64 = LLT::vector(4, 64);
-  const LLT v4s32 = LLT::vector(4, 32);
-  const LLT v4s16 = LLT::vector(4, 16);
-  const LLT v4s8 = LLT::vector(4, 8);
-  const LLT v4s1 = LLT::vector(4, 1);
+  const LLT v4s64 = LLT::fixed_vector(4, 64);
+  const LLT v4s32 = LLT::fixed_vector(4, 32);
+  const LLT v4s16 = LLT::fixed_vector(4, 16);
+  const LLT v4s8 = LLT::fixed_vector(4, 8);
+  const LLT v4s1 = LLT::fixed_vector(4, 1);
 
-  const LLT v3s64 = LLT::vector(3, 64);
-  const LLT v3s32 = LLT::vector(3, 32);
-  const LLT v3s16 = LLT::vector(3, 16);
-  const LLT v3s8 = LLT::vector(3, 8);
-  const LLT v3s1 = LLT::vector(3, 1);
+  const LLT v3s64 = LLT::fixed_vector(3, 64);
+  const LLT v3s32 = LLT::fixed_vector(3, 32);
+  const LLT v3s16 = LLT::fixed_vector(3, 16);
+  const LLT v3s8 = LLT::fixed_vector(3, 8);
+  const LLT v3s1 = LLT::fixed_vector(3, 1);
 
-  const LLT v2s64 = LLT::vector(2, 64);
-  const LLT v2s32 = LLT::vector(2, 32);
-  const LLT v2s16 = LLT::vector(2, 16);
-  const LLT v2s8 = LLT::vector(2, 8);
-  const LLT v2s1 = LLT::vector(2, 1);
+  const LLT v2s64 = LLT::fixed_vector(2, 64);
+  const LLT v2s32 = LLT::fixed_vector(2, 32);
+  const LLT v2s16 = LLT::fixed_vector(2, 16);
+  const LLT v2s8 = LLT::fixed_vector(2, 8);
+  const LLT v2s1 = LLT::fixed_vector(2, 1);
 
   const unsigned PSize = ST.getPointerSize();
   const LLT p0 = LLT::pointer(0, PSize); // Function
@@ -257,6 +257,6 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
     getActionDefinitionsBuilder({G_SMULH, G_UMULH}).alwaysLegal();
   }
 
-  computeTables();
+  getLegacyLegalizerInfo().computeTables();
   verify(*ST.getInstrInfo());
 }

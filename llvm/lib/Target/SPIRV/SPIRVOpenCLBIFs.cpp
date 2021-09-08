@@ -355,7 +355,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
     // Load the Vec3 from the global variable
     Register loadedVector = buildLoad(v3, globVar, MIRBuilder, TR);
-    MRI->setType(loadedVector, LLT::vector(3, ptrSize));
+    MRI->setType(loadedVector, LLT::fixed_vector(3, ptrSize));
 
     // Set up the vreg to extract the result to (possibly a new temporary one)
     Register extr = resVReg;
@@ -501,7 +501,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   Register sizeVec = resVReg;
   SPIRVType *sizeVecTy = retType;
   if (numTempComps != numRetComps) {
-    sizeVec = MRI->createGenericVirtualRegister(LLT::vector(numTempComps, 32));
+    sizeVec = MRI->createGenericVirtualRegister(LLT::fixed_vector(numTempComps, 32));
     auto I32Ty = TR->getOpTypeInt(32, MIRBuilder);
     sizeVecTy = TR->getOpTypeVector(numTempComps, I32Ty, MIRBuilder);
     TR->assignSPIRVTypeToVReg(sizeVecTy, sizeVec, MIRBuilder);
@@ -933,7 +933,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   auto firstBraceIdx = demangledName.find_first_of('(');
   auto nameNoArgs = demangledName.substr(0, firstBraceIdx);
 
-  auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs);
+  auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs.str());
   if (extInstIDOpt.hasValue()) {
     auto extInstID = extInstIDOpt.getValue();
     return genOpenCLExtInst(extInstID, MIRBuilder, ret, retTy, args, TR);
@@ -957,7 +957,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
           {"sub_sat", {CL::u_sub_sat, CL::s_sub_sat}},
           {"upsample", {CL::u_upsample, CL::s_upsample}}};
 
-  auto extInstMatch = typeDependantExtInstMap.find(nameNoArgs);
+  auto extInstMatch = typeDependantExtInstMap.find(nameNoArgs.str());
   if (extInstMatch != typeDependantExtInstMap.end()) {
     char typeChar = demangledName[firstBraceIdx + 1];
     int idx = -1;

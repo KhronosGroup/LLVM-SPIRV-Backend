@@ -1,3 +1,5 @@
+add_llvm_component_group(SPIRV)
+
 set(LLVM_TARGET_DEFINITIONS SPIRV.td)
 
 tablegen(LLVM SPIRVGenAsmWriter.inc -gen-asm-writer)
@@ -33,7 +35,25 @@ add_llvm_target(SPIRVCodeGen
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
   SPIRVTypeRegistry.cpp
+
+  LINK_COMPONENTS
+  AsmPrinter
+  Analysis
+  CodeGen
+  Core
+  MC
+  SPIRVDesc
+  SPIRVInfo
+  SelectionDAG
+  Support
+  Target
+  GlobalISel
+  Demangle
+
+  ADD_TO_COMPONENT
+  SPIRV
   )
+
 
 add_subdirectory(InstPrinter)
 add_subdirectory(MCTargetDesc)

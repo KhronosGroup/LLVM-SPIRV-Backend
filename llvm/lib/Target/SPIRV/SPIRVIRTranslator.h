@@ -70,7 +70,7 @@ protected:
 
   // Override to define a single struct reg rather than 2 separate regs
   bool translateOverflowIntrinsic(const CallInst &CI, unsigned Op,
-                                  MachineIRBuilder &MIRBuilder) override;
+                                  MachineIRBuilder &MIRBuilder);
 
   // Override to define a single struct reg rather than 2 separate regs
   bool translateAtomicCmpXchg(const User &U,

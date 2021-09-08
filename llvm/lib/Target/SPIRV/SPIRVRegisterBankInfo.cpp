@@ -26,7 +26,7 @@
 using namespace llvm;
 
 const RegisterBank &SPIRVRegisterBankInfo::getRegBankFromRegClass(
-    const TargetRegisterClass &RC) const {
+    const TargetRegisterClass &RC, LLT Ty) const {
   switch (RC.getID()) {
   case SPIRV::TYPERegClassID:
     return SPIRV::TYPERegBank;

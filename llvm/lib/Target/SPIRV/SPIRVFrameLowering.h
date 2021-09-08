@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVFRAMELOWERING_H
 
 #include "llvm/CodeGen/TargetFrameLowering.h"
+#include "llvm/Support/Alignment.h"
 
 namespace llvm {
 class SPIRVSubtarget;
@@ -21,7 +22,7 @@ class SPIRVSubtarget;
 class SPIRVFrameLowering : public TargetFrameLowering {
 public:
   explicit SPIRVFrameLowering(const SPIRVSubtarget &sti)
-      : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 8, 0) {}
+      : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, Align(8), 0) {}
 
   void emitPrologue(MachineFunction &MF,
                     MachineBasicBlock &MBB) const override {}

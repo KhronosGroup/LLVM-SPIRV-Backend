@@ -6,15 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/MC/MCSPIRVObjectWriter.h"
 #include "llvm/MC/MCAssembler.h"
+#include "llvm/MC/MCSPIRVObjectWriter.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCValue.h"
+#include "llvm/Support/EndianStream.h"
 
 using namespace llvm;
 
 class SPIRVObjectWriter : public MCObjectWriter {
-  support::endian::Writer W;
+  ::support::endian::Writer W;
 
   /// The target specific SPIR-V writer instance.
   std::unique_ptr<MCSPIRVObjectTargetWriter> TargetObjectWriter;
@@ -73,5 +74,5 @@ uint64_t SPIRVObjectWriter::writeObject(MCAssembler &Asm,
 std::unique_ptr<MCObjectWriter>
 llvm::createSPIRVObjectWriter(std::unique_ptr<MCSPIRVObjectTargetWriter> MOTW,
                               raw_pwrite_stream &OS) {
-  return llvm::make_unique<SPIRVObjectWriter>(std::move(MOTW), OS);
+  return std::make_unique<SPIRVObjectWriter>(std::move(MOTW), OS);
 }

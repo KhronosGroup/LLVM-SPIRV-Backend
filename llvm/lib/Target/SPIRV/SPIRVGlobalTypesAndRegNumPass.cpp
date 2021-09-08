@@ -52,7 +52,7 @@ public:
 
   // State that we need MachineModuleInfo to operate on MachineFunctions
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineModuleInfo>();
+    AU.addRequired<MachineModuleInfoWrapperPass>();
   }
 };
 } // namespace
@@ -861,10 +861,10 @@ static void addGlobalRequirements(const SPIRVRequirementHandler &reqs,
 // Extract all OpType, OpConst etc. into this meta block
 // Number registers globally, including references to global OpType etc.
 bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
-  MachineModuleInfo &MMI = getAnalysis<MachineModuleInfo>();
+  MachineModuleInfoWrapperPass &MMIWrapper = getAnalysis<MachineModuleInfoWrapperPass>();
 
   MachineIRBuilder MIRBuilder;
-  initMetaBlockBuilder(M, MMI, MIRBuilder);
+  initMetaBlockBuilder(M, MMIWrapper.getMMI(), MIRBuilder);
 
   const auto &metaMF = MIRBuilder.getMF();
   const auto *ST = static_cast<const SPIRVSubtarget *>(&metaMF.getSubtarget());
@@ -874,30 +874,30 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   addHeaderOps(M, MIRBuilder, reqs, *ST);
 
   SmallVector<LocalToGlobalRegTable *, 8> aliasMaps;
-  BEGIN_FOR_MF_IN_MODULE(M, MMI)
+  BEGIN_FOR_MF_IN_MODULE(M, MMIWrapper.getMMI())
   aliasMaps.push_back(new LocalToGlobalRegTable());
   END_FOR_MF_IN_MODULE()
 
-  addOpExtInstImports(M, MMI, MIRBuilder, aliasMaps);
+  addOpExtInstImports(M, MMIWrapper.getMMI(), MIRBuilder, aliasMaps);
 
   // Extract type instructions to the top MetaMBB and keep track of which local
   // VRegs the correspond to with functionLocalAliasTables
-  hoistInstrsToMetablock(M, MMI, MIRBuilder, aliasMaps, reqs);
+  hoistInstrsToMetablock(M, MMIWrapper.getMMI(), MIRBuilder, aliasMaps, reqs);
 
   addMissingExternalFunctionDeclarations(MIRBuilder);
 
-  hoistGlobalOpVariables(M, MMI, MIRBuilder, aliasMaps);
+  hoistGlobalOpVariables(M, MMIWrapper.getMMI(), MIRBuilder, aliasMaps);
 
   // Number registers from 0 onwards, and fix references to global OpType etc
-  numberRegistersGlobally(M, MMI, MIRBuilder, aliasMaps);
+  numberRegistersGlobally(M, MMIWrapper.getMMI(), MIRBuilder, aliasMaps);
 
   // Extract instructions like OpName, OpEntryPoint, OpDecorate etc.
   // which all rely on globally numbered registers, which they forward-reference
-  extractInstructionsWithGlobalRegsToMetablock(M, MMI, MIRBuilder);
+  extractInstructionsWithGlobalRegsToMetablock(M, MMIWrapper.getMMI(), MIRBuilder);
 
-  addEntryPointLinkageInterfaces(M, MMI, MIRBuilder);
+  addEntryPointLinkageInterfaces(M, MMIWrapper.getMMI(), MIRBuilder);
 
-  assignFunctionCallIDs(M, MMI, MIRBuilder);
+  assignFunctionCallIDs(M, MMIWrapper.getMMI(), MIRBuilder);
 
   // If there are no entry points, we need the Linkage capability
   if (MIRBuilder.getMF().getBlockNumbered(MB_EntryPoints)->empty()) {

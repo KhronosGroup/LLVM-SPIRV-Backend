@@ -13,10 +13,10 @@
 
 #include "SPIRVEnumRequirements.h"
 #include "SPIRVSubtarget.h"
-#include <algorithm>
+//#include <algorithm>
 
 #define MAKE_CAPABILITY_CASE(Enum, Var, Val, Caps, Exts, MinVer, MaxVer)       \
-  case Enum::Var:                                                              \
+  case ::Enum::Var:                                                            \
     return Caps;
 
 #define MAKE_EXTENSION_CASE(Enum, Var, Val, Caps, Exts, MinVer, MaxVer)        \
@@ -112,7 +112,7 @@
   DEF_REQUIREMENTS_FUNC_BODY(EnumName)                                         \
   DEF_CAN_USE_FUNC_BODY(EnumName)
 
-GEN_ENUM_REQS_IMPL(Capability)
+// using namespace Capability;
 GEN_ENUM_REQS_IMPL(SourceLanguage)
 GEN_ENUM_REQS_IMPL(ExecutionModel)
 GEN_ENUM_REQS_IMPL(AddressingModel)
@@ -143,3 +143,42 @@ GEN_ENUM_REQS_IMPL(GroupOperation)
 GEN_ENUM_REQS_IMPL(KernelEnqueueFlags)
 GEN_ENUM_REQS_IMPL(KernelProfilingInfo)
 
+#define DEF_CAPABILITY_FUNC_BODY(EnumName, DefEnumCommand)                     \
+  const std::vector<Capability::Capability> get##EnumName##Capabilities(       \
+      EnumName::EnumName e) {                                                  \
+    switch (e) { DefEnumCommand(EnumName, MAKE_CAPABILITY_CASE) }              \
+    return {};                                                                 \
+  }
+
+#define GEN_ENUM_REQS_IMPL(EnumName)                                           \
+  DEF_CAPABILITY_FUNC_BODY(EnumName, DEF_##EnumName)
+
+// GEN_ENUM_REQS_IMPL(Capability)
+
+//#define DEF_CAPABILITY_FUNC_BODY(EnumName, DefEnumCommand)                     \
+
+
+//#define MAKE_CAPABILITY_CASE(Enum, Var, Val, Caps, Exts, MinVer, MaxVer)       \
+//  case ::Enum::Var:                                                              \
+//    return Caps;
+
+//#define MAKE_CAPABILITY_CASE(Enum, Var, Val, Caps, Exts, MinVer, MaxVer) \
+//::Enum::Var;
+
+const std::vector<Capability::Capability>
+getCapabilityCapabilities(Capability::Capability e) {
+  using namespace Capability;
+  //    switch (e) { DefEnumCommand(EnumName, Capability) }
+  ::Capability::Capability::Addresses;
+  // using namespace Decoration;
+  // Decoration::Decoration::Block A;
+
+  //    DEF_Capability(Capability, MAKE_CAPABILITY_CASE)
+
+  switch (e) { DEF_Capability(Capability, MAKE_CAPABILITY_CASE) }
+  /*    switch (e) {
+      case Capability::Capability::Matrix :
+        return {};
+      } */
+  return {};
+}

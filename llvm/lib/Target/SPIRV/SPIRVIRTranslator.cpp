@@ -403,7 +403,7 @@ bool SPIRVIRTranslator::translateAtomicCmpXchg(const User &U,
       .addUse(NewVal)
       .addMemOperand(MF->getMachineMemOperand(
           MachinePointerInfo(I.getPointerOperand()), Flags,
-          DL->getTypeStoreSize(ValType), getMemOpAlignment(I), AAMDNodes(),
+          DL->getTypeStoreSize(ValType), getMemOpAlign(I), AAMDNodes(),
           nullptr, I.getSyncScopeID(), I.getSuccessOrdering(),
           I.getFailureOrdering()));
 

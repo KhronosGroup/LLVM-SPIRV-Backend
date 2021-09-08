@@ -24,7 +24,8 @@ class MCSectionSPIRV final : public MCSection {
   friend class MCContext;
 
   MCSectionSPIRV(SectionKind K, MCSymbol *Begin)
-      : MCSection(SV_SPIRV, K, Begin) {}
+      : MCSection(SV_SPIRV, "", K, Begin) {}
+  // TODO: Add StringRef Name to MCSectionSPIRV
 
 public:
   ~MCSectionSPIRV() = default;

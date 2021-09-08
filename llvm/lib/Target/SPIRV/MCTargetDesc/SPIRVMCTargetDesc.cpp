@@ -48,7 +48,7 @@ static MCRegisterInfo *createSPIRVMCRegisterInfo(const Triple &TT) {
 
 static MCSubtargetInfo *
 createSPIRVMCSubtargetInfo(const Triple &TT, StringRef CPU, StringRef FS) {
-  return createSPIRVMCSubtargetInfoImpl(TT, CPU, FS);
+  return createSPIRVMCSubtargetInfoImpl(TT, CPU, /*TuneCPU*/ CPU, FS);
 }
 
 static MCStreamer *
