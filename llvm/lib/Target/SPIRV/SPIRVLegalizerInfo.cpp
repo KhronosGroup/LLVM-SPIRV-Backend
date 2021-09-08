@@ -292,7 +292,7 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI) {
     GetIdOp = SPIRV::GET_pID;
     DstClass = &SPIRV::pIDRegClass;
   } else if (MRI.getType(ValReg).isVector()) {
-    NewT = LLT::vector(2, NewT);
+    NewT = LLT::fixed_vector(2, NewT);
     GetIdOp = isFPOpcode(Opcode) ? SPIRV::GET_vfID : SPIRV::GET_vID;
     DstClass = isFPOpcode(Opcode) ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
   }
@@ -314,7 +314,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
       NewT = LLT::pointer(0, 32);
       // DstClass = &SPIRV::pIDRegClass;
     } else if (MRI.getType(ValReg).isVector()) {
-      NewT = LLT::vector(2, NewT);
+      NewT = LLT::fixed_vector(2, NewT);
       // DstClass = &SPIRV::vIDRegClass;
     } else if (isFPOpcode(MI.getOpcode())) {
       // DstClass = &SPIRV::fIDRegClass;
