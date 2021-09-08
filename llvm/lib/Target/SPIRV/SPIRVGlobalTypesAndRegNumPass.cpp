@@ -192,13 +192,13 @@ static Register hoistMetaInstr(MachineInstr &toHoist,
   // local-to-global alias tables are used. If first operand is a def, we have
   // already handled it, so start at 1 instead of 0.
   const unsigned int numOperands = toHoist.getNumOperands();
-  for (unsigned int i = hasDef ? 1 : 0; i < numOperands; ++i) {
+  for (unsigned int i = toHoist.getNumExplicitDefs(); i < numOperands; ++i) {
     MachineOperand op = toHoist.getOperand(i);
     if (op.isImm()) {
       MIB.addImm(op.getImm());
     } else if (op.isReg()) {
       Register metaReg = localToMetaVRegAliasMap[op.getReg()];
-      assert(metaReg && "No reg alias found");
+      assert(metaReg.isValid() && "No reg alias found");
       MIB.addUse(metaReg);
     } else {
       errs() << toHoist << "\n";

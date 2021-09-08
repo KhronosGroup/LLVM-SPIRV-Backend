@@ -51,9 +51,11 @@ bool SPIRVInstrInfo::isConstantInstr(const MachineInstr &MI) const {
 
 bool SPIRVInstrInfo::isTypeDeclInstr(const MachineInstr &MI) const {
   auto &MRI = MI.getMF()->getRegInfo();
-  if (MI.getNumDefs() >= 1) {
-    auto defRegClass = MRI.getRegClass(MI.getOperand(0).getReg());
-    return defRegClass->getID() == TYPERegClass.getID();
+  if (MI.getNumDefs() >= 1 && MI.getOperand(0).isReg()) {
+    // MI.dump();
+    // errs() << "Def: " << MI.getOperand(0) << ", " << MI.getOperand(0).getReg() << "\n";
+    auto defRegClass = MRI.getRegClassOrNull(MI.getOperand(0).getReg());
+    return defRegClass && defRegClass->getID() == TYPERegClass.getID();
   } else {
     return false;
   }

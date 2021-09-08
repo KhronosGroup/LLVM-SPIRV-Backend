@@ -47,16 +47,27 @@ using ExtInstList = std::vector<std::pair<ExtInstSet, uint32_t>>;
 
 namespace {
 
+#define GET_GLOBALISEL_PREDICATE_BITSET
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_PREDICATE_BITSET
+
 class SPIRVInstructionSelector : public InstructionSelector {
 public:
   SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                            const SPIRVSubtarget &ST,
-                           const SPIRVRegisterBankInfo &RBI,
-                           SPIRVTypeRegistry &TR);
+                           const SPIRVRegisterBankInfo &RBI);
 
   // Common selection code. Instruction-specific selection occurs in spvSelect()
   bool select(MachineInstr &I) override;
   static const char *getName() { return DEBUG_TYPE; }
+
+#define GET_GLOBALISEL_PREDICATES_DECL
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_PREDICATES_DECL
+
+#define GET_GLOBALISEL_TEMPORARIES_DECL
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_TEMPORARIES_DECL
 
 private:
   // tblgen-erated 'select' implementation, used as the initial selector for
@@ -163,7 +174,7 @@ private:
                                  MachineIRBuilder &MIRBuilder) const;
 
   const SPIRVTargetMachine &TM;
-  const SPIRVSubtarget &ST;
+  const SPIRVSubtarget &STI;
   const SPIRVInstrInfo &TII;
   const SPIRVRegisterInfo &TRI;
   const SPIRVRegisterBankInfo &RBI;
@@ -172,11 +183,28 @@ private:
 
 } // end anonymous namespace
 
+#define GET_GLOBALISEL_IMPL
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_IMPL
+
 SPIRVInstructionSelector::SPIRVInstructionSelector(
     const SPIRVTargetMachine &TM, const SPIRVSubtarget &ST,
-    const SPIRVRegisterBankInfo &RBI, SPIRVTypeRegistry &TR)
-    : InstructionSelector(), TM(TM), ST(ST), TII(*ST.getInstrInfo()),
-      TRI(*ST.getRegisterInfo()), RBI(RBI), TR(TR) {}
+    const SPIRVRegisterBankInfo &RBI)
+    : InstructionSelector(), TM(TM), STI(ST), TII(*ST.getInstrInfo()),
+      TRI(*ST.getRegisterInfo()), RBI(RBI), TR(*ST.getSPIRVTypeRegistry()),
+#define GET_GLOBALISEL_PREDICATES_INIT
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_PREDICATES_INIT
+#define GET_GLOBALISEL_TEMPORARIES_INIT
+#include "SPIRVGenGlobalISel.inc"
+#undef GET_GLOBALISEL_TEMPORARIES_INIT
+{
+}
+
+static bool isTypeFoldingSupported(unsigned Opcode)
+{
+  return Opcode == TargetOpcode::G_ADD;
+}
 
 bool SPIRVInstructionSelector::select(MachineInstr &I) {
   assert(I.getParent() && "Instruction should be in a basic block!");
@@ -199,6 +227,11 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
   // If it's not a GMIR instruction, we've selected it already.
   if (!isPreISelGenericOpcode(Opcode)) {
     if (Opcode == SPIRV::ASSIGN_TYPE) { // These pseudos aren't needed any more
+      auto MRI = MIRBuilder.getMRI();
+      auto *Def = MRI->getVRegDef(I.getOperand(1).getReg());
+      if (isTypeFoldingSupported(Def->getOpcode()))
+        return selectImpl(I, *CoverageInfo);
+      MRI->replaceRegWith(I.getOperand(0).getReg(), I.getOperand(1).getReg());
       I.removeFromParent();
     } else if (I.getNumDefs() == 1) { // Make all vregs 32 bits (for SPIR-V IDs)
       MIRBuilder.getMRI()->setType(I.getOperand(0).getReg(), LLT::scalar(32));
@@ -233,6 +266,7 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   using namespace SPIRV;
   namespace CL = OpenCL_std;
   namespace GL = GLSL_std_450;
+  assert(!isTypeFoldingSupported(I.getOpcode()));
 
   const unsigned Opcode = I.getOpcode();
   switch (Opcode) {
@@ -503,7 +537,7 @@ bool SPIRVInstructionSelector::selectExtInst(Register resVReg,
   for (const auto &ex : insts) {
     ExtInstSet set = ex.first;
     uint32_t opCode = ex.second;
-    if (ST.canUseExtInstSet(set)) {
+    if (STI.canUseExtInstSet(set)) {
       auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInst)
                      .addDef(resVReg)
                      .addUse(TR.getSPIRVTypeID(resType))
@@ -592,6 +626,7 @@ static uint32_t getFastMathFlags(const MachineInstr &I) {
   return flags;
 }
 
+// can remove for a while??
 static void handleIntegerWrapFlags(const MachineInstr &I, Register target,
                                    unsigned newOpcode, const SPIRVSubtarget &ST,
                                    MachineIRBuilder &MIRBuilder) {
@@ -630,7 +665,7 @@ bool SPIRVInstructionSelector::selectBinOp(Register resVReg,
       decorate(resVReg, Decoration::FPFastMathMode, fmFlags, MIRBuilder);
     }
   }
-  handleIntegerWrapFlags(I, resVReg, newOpcode, ST, MIRBuilder);
+  handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder);
   return true;
 }
 
@@ -639,7 +674,7 @@ bool SPIRVInstructionSelector::selectUnOp(Register resVReg,
                                           const MachineInstr &I,
                                           MachineIRBuilder &MIRBuilder,
                                           unsigned newOpcode) const {
-  handleIntegerWrapFlags(I, resVReg, newOpcode, ST, MIRBuilder);
+  handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder);
   return MIRBuilder.buildInstr(newOpcode)
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
@@ -992,11 +1027,11 @@ bool SPIRVInstructionSelector::selectCmp(Register resVReg,
   Register cmp1 = I.getOperand(3).getReg();
   SPIRVType *cmp0Type = TR.getSPIRVTypeForVReg(cmp0);
   SPIRVType *cmp1Type = TR.getSPIRVTypeForVReg(cmp1);
-
   assert(cmp0Type->getOpcode() == cmp1Type->getOpcode());
 
   if (cmp0Type->getOpcode() == OpTypePointer) {
     if (convertToUInt) {
+      // legalize??
       cmp0 = buildConvertPtrToUInt(cmp0, MIRBuilder);
       cmp1 = buildConvertPtrToUInt(cmp1, MIRBuilder);
     }
@@ -1025,7 +1060,7 @@ bool SPIRVInstructionSelector::selectICmp(Register resVReg,
 
   Register cmpOperand = I.getOperand(2).getReg();
   if (TR.isScalarOfType(cmpOperand, SPIRV::OpTypePointer)) {
-    if (ST.canDirectlyComparePointers()) {
+    if (STI.canDirectlyComparePointers()) {
       std::tie(cmpOpc, ptrToUInt) = getPtrCmpOpcode(pred);
     } else {
       ptrToUInt = true;
@@ -1326,7 +1361,6 @@ InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                const SPIRVSubtarget &Subtarget,
                                const SPIRVRegisterBankInfo &RBI) {
-  return new SPIRVInstructionSelector(TM, Subtarget, RBI,
-                                      *Subtarget.getSPIRVTypeRegistry());
+  return new SPIRVInstructionSelector(TM, Subtarget, RBI);
 }
 } // namespace llvm

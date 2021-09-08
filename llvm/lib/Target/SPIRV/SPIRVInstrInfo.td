@@ -19,12 +19,20 @@ include "SPIRVEnums.td"
 
 //Codegen only metadata instructions
 let isCodeGenOnly=1 in {
-  def ASSIGN_TYPE: Pseudo<(outs), (ins TYPE:$type, ID:$id)>;
+  def ASSIGN_TYPE: Pseudo<(outs ID:$dst_id), (ins ID:$src_id, TYPE:$src_ty)>;
 }
 
-class BinOp<string name, bits<16> opCode>
-                : Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src, ID:$src2),
-                  "$dst = "#name#" $type $src $src2">;
+def SPVType   : SDTypeProfile<1, 2, []>;
+def AssType: SDNode<"SPIRVISD::AssType", SPVType>;
+def : GINodeEquiv<ASSIGN_TYPE, AssType>;
+
+class BinOp<string name, bits<16> opCode, list<dag> pattern=[]>
+                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, ID:$src, ID:$src2),
+                  "$dst = "#name#" $src_ty $src $src2", pattern>;
+
+class BinOpTyFolded<string name, bits<16> opCode, dag node>
+                : Op<opCode, (outs ID:$dst), (ins TYPE:$src_ty, ID:$src, ID:$src2),
+                  "$dst = "#name#" $src_ty $src $src2", [(set ID:$dst, (AssType node, TYPE:$src_ty))]>;
 
 class UnOp<string name, bits<16> opCode>
                 : Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
@@ -363,8 +371,7 @@ def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
 def OpFNegate: UnOp<"OpFNegate", 127>;
-
-def OpIAdd: BinOp<"OpIAdd", 128>;
+def OpIAdd: BinOpTyFolded<"OpIAdd", 128, (add ID:$src, ID:$src2)>;
 def OpFAdd: BinOp<"OpFAdd", 129>;
 
 def OpISub: BinOp<"OpISub", 130>;

@@ -57,6 +57,8 @@ private:
 public:
   SPIRVTypeRegistry(unsigned int pointerSize);
 
+  void generateAssignInstrs(MachineFunction &MF);
+
   // Run at the start of any pass requiring this to read all ASSIGN_TYPE
   // instructions to rebuild the VReg -> Type map.
   void rebuildTypeTablesForFunction(MachineFunction &MF);
@@ -184,7 +186,7 @@ public:
 
   // Utility method to constrain an instruction's operands to the correct
   // register classes, and return true if this worked.
-  bool constrainRegOperands(MachineInstrBuilder &MIB) const;
+  bool constrainRegOperands(MachineInstrBuilder &MIB, MachineFunction *MF = nullptr) const;
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H

@@ -33,7 +33,7 @@ public:
     HasFunctionAlignment = false;
   }
 
-  bool shouldOmitSectionDirective(StringRef SectionName) const { return true; }
+  bool shouldOmitSectionDirective(StringRef SectionName) const override { return true; }
 };
 } // namespace llvm
 
