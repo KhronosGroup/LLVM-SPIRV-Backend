@@ -24,10 +24,7 @@ struct SPIRVRegisterInfo : public SPIRVGenRegisterInfo {
 
   SPIRVRegisterInfo();
 
-  const MCPhysReg *
-  getCalleeSavedRegs(const MachineFunction *MF) const override {
-    return nullptr;
-  }
+  const MCPhysReg *getCalleeSavedRegs(const MachineFunction *MF) const override;
 
   BitVector getReservedRegs(const MachineFunction &MF) const override;
 

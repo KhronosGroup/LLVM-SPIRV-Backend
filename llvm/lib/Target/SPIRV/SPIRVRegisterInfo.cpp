@@ -26,3 +26,10 @@ BitVector SPIRVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   return Reserved;
 }
 
+// Dummy to not crash RegisterClassInfo.
+static const MCPhysReg CalleeSavedReg = SPIRV::NoRegister;
+
+const MCPhysReg *SPIRVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  return &CalleeSavedReg;
+}
+
