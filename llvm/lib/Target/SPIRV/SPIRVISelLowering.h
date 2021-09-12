@@ -37,6 +37,26 @@ public:
   MVT getVectorIdxTy(const DataLayout &DL) const override {
     return MVT::getIntegerVT(32);
   }
+
+  // Avoid fail on v3i1 argument. Maybe we need to return 1 for all types.
+  unsigned getNumRegistersForCallingConv(LLVMContext &Context,
+                                         CallingConv::ID CC,
+                                         EVT VT) const override {
+    if(VT.isVector() && VT.getVectorElementType() == MVT::i1
+       && VT.getVectorNumElements() == 3)
+      return 1;
+    return getNumRegisters(Context, VT);;
+  }
+
+  // Avoid fail on v3i1 argument. Maybe we need to return i32 for all types.
+  MVT getRegisterTypeForCallingConv(LLVMContext &Context,
+                                    CallingConv::ID CC,
+                                    EVT VT) const override {
+    if(VT.isVector() && VT.getVectorElementType() == MVT::i1
+       && VT.getVectorNumElements() == 3)
+      return MVT::v4i1;
+    return getRegisterType(Context, VT);
+  }
 };
 } // namespace llvm
 
