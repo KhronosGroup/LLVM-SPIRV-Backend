@@ -164,6 +164,8 @@ private:
   SPIRVType *getOpTypePipe(MachineIRBuilder &MIRBuilder,
                            AQ::AccessQualifier accessQualifier);
 
+  SPIRVType *getOpTypeQueue(MachineIRBuilder &MIRBuilder);
+
   SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
                                  MachineIRBuilder &MIRBuilder,
                                  AQ::AccessQualifier aq);
