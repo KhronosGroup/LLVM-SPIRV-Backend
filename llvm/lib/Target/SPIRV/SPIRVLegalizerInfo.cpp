@@ -202,19 +202,19 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
 
   getActionDefinitionsBuilder(G_ICMP)
-      .legalIf(all(typeInSet(0, allBoolScalarsAndVectors),
-                   typeInSet(1, allPtrsScalarsAndVectors),
-                   LegalityPredicate([&](const LegalityQuery &Query) {
-                     LLT retTy = Query.Types[0];
-                     LLT cmpTy = Query.Types[1];
-                     if (retTy.isVector())
-                       return cmpTy.isVector() &&
-                              retTy.getNumElements() == cmpTy.getNumElements();
-                     else
-                       return cmpTy.isScalar() ||
-                              (cmpTy.isPointer() &&
-                               ST.canDirectlyComparePointers());
-                   })))
+      .customIf(all(typeInSet(0, allBoolScalarsAndVectors),
+                    typeInSet(1, allPtrsScalarsAndVectors),
+                    LegalityPredicate([&](const LegalityQuery &Query) {
+                      LLT retTy = Query.Types[0];
+                      LLT cmpTy = Query.Types[1];
+                      if (retTy.isVector())
+                        return cmpTy.isVector() &&
+                               retTy.getNumElements() == cmpTy.getNumElements();
+                      else
+                        return cmpTy.isScalar() ||
+                               (cmpTy.isPointer() &&
+                                ST.canDirectlyComparePointers());
+                    })))
       .customIf(all(typeInSet(1, allPtrs),
                     LegalityPredicate(([&](const LegalityQuery &Query) {
                       return !ST.canDirectlyComparePointers();
@@ -322,26 +322,42 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
   auto Opc = MI.getOpcode();
   if (!isTypeFoldingSupported(Opc)) {
     assert(Opc == TargetOpcode::G_ICMP);
-    auto ConvT = LLT::scalar(ST->getPointerSize());
     auto &MRI = MI.getMF()->getRegInfo();
-    auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
-    auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
+    // Add missed SPIRV type to the VReg
+    // TODO: move SPIRV type detection to one place 
+    auto resVReg = MI.getOperand(0).getReg();
+    auto resType = TR->getSPIRVTypeForVReg(resVReg);
+    if (!resType) {
+      LLT Ty = MRI.getType(resVReg);
+      LLT BaseTy = Ty.isVector() ? Ty.getElementType() : Ty;
+      Type* LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(), BaseTy.getSizeInBits());
+      if (Ty.isVector())
+        LLVMTy = FixedVectorType::get(LLVMTy, Ty.getNumElements());
+      auto *spirvType = TR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+      TR->assignSPIRVTypeToVReg(spirvType, resVReg, Helper.MIRBuilder);
+    }
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
-    auto *SpirvType = TR->getOrCreateSPIRVType(
-            IntegerType::get(MI.getMF()->getFunction().getContext(),
-                             ST->getPointerSize()),
-        Helper.MIRBuilder);
-    TR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
-    TR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
-    Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
-        .addDef(ConvReg0)
-        .addUse(Op0.getReg());
-    Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
-        .addDef(ConvReg1)
-        .addUse(Op1.getReg());
-    Op0.setReg(ConvReg0);
-    Op1.setReg(ConvReg1);
+    if (MRI.getType(Op0.getReg()).isPointer() &&
+        MRI.getType(Op1.getReg()).isPointer()) {
+      auto ConvT = LLT::scalar(ST->getPointerSize());
+      auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
+      auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
+      auto *SpirvType = TR->getOrCreateSPIRVType(
+              IntegerType::get(MI.getMF()->getFunction().getContext(),
+                               ST->getPointerSize()),
+          Helper.MIRBuilder);
+      TR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
+      TR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
+      Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
+          .addDef(ConvReg0)
+          .addUse(Op0.getReg());
+      Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
+          .addDef(ConvReg1)
+          .addUse(Op1.getReg());
+      Op0.setReg(ConvReg0);
+      Op1.setReg(ConvReg1);
+    }
     return true;
   }
   auto &MRI = MI.getMF()->getRegInfo();
