@@ -114,6 +114,10 @@ private:
                         unsigned newOpcode) const;
 #endif
 
+  bool selectBitreverse(Register resVReg, const SPIRVType *resType,
+                        const MachineInstr &I,
+                        MachineIRBuilder &MIRBuilder) const;
+
   bool selectCmp(Register resVReg, const SPIRVType *resType,
                  unsigned scalarTypeOpcode, unsigned comparisonOpcode,
                  const MachineInstr &I, MachineIRBuilder &MIRBuilder,
@@ -278,6 +282,8 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_EXTRACT_VECTOR_ELT:
     return selectVectorExtract(resVReg, resType, I, MIRBuilder);
 #endif
+  case TargetOpcode::G_BITREVERSE:
+    return selectBitreverse(resVReg, resType, I, MIRBuilder);
 
   case TargetOpcode::G_ICMP:
     return selectICmp(resVReg, resType, I, MIRBuilder);
@@ -929,6 +935,18 @@ static unsigned int getBoolCmpOpcode(unsigned predNum) {
     report_fatal_error("Unknown predicate type for Bool comparison: " +
                        CmpInst::getPredicateName(pred));
   }
+}
+
+bool SPIRVInstructionSelector::selectBitreverse(Register resVReg,
+                                          const SPIRVType *resType,
+                                          const MachineInstr &I,
+                                          MachineIRBuilder &MIRBuilder) const {
+  Register src = I.getOperand(1).getReg();
+  return MIRBuilder.buildInstr(SPIRV::OpBitReverse)
+      .addDef(resVReg)
+      .addUse(TR.getSPIRVTypeID(resType))
+      .addUse(src)
+      .constrainAllUses(TII, TRI, RBI);
 }
 
 bool SPIRVInstructionSelector::selectCmp(Register resVReg,
