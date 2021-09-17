@@ -147,6 +147,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
   //     .legalFor(allScalarsAndVectors);
 
+  getActionDefinitionsBuilder(G_BITREVERSE)
+      .legalFor(allFloatScalarsAndVectors);
+
   getActionDefinitionsBuilder(G_FMA)
       .legalFor(allFloatScalarsAndVectors);
 
