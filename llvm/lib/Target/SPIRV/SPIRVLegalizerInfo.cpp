@@ -214,14 +214,10 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
                         return cmpTy.isVector() &&
                                retTy.getNumElements() == cmpTy.getNumElements();
                       else
-                        return cmpTy.isScalar() ||
-                               (cmpTy.isPointer() &&
-                                ST.canDirectlyComparePointers());
-                    })))
-      .customIf(all(typeInSet(1, allPtrs),
-                    LegalityPredicate(([&](const LegalityQuery &Query) {
-                      return !ST.canDirectlyComparePointers();
-                    }))));
+                        // ST.canDirectlyComparePointers() for ponter args is
+                        // checked in legalizeCustom().
+                        return cmpTy.isScalar() || cmpTy.isPointer();
+                    })));
 
   getActionDefinitionsBuilder(G_FCMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
@@ -341,7 +337,8 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     }
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
-    if (MRI.getType(Op0.getReg()).isPointer() &&
+    if (!ST->canDirectlyComparePointers() &&
+        MRI.getType(Op0.getReg()).isPointer() &&
         MRI.getType(Op1.getReg()).isPointer()) {
       auto ConvT = LLT::scalar(ST->getPointerSize());
       auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
