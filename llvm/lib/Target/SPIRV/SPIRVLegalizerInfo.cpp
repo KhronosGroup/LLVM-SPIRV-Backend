@@ -130,11 +130,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 
-  getActionDefinitionsBuilder(G_LOAD)
-      .legalForCartesianProduct(allValues, allPtrs);
-
-  getActionDefinitionsBuilder(G_STORE)
-      .legalForCartesianProduct(allValues, allPtrs);
+  getActionDefinitionsBuilder({G_LOAD, G_STORE})
+      .legalIf(typeInSet(1, allPtrs));
 
   // getActionDefinitionsBuilder(
   //     {G_ADD, G_SUB, G_MUL, G_SDIV, G_UDIV, G_SREM, G_UREM})
