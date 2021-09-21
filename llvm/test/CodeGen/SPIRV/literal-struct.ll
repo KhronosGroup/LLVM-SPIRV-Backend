@@ -14,7 +14,7 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
-; CHECK: %[[Int8:[0-9]+]] = TypeInt 8 0
+; CHECK: %[[Int8:[0-9]+]] = OpTypeInt 8 0
 ; CHECK: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8]]
 ; CHECK: %[[StructType:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
 
