@@ -173,7 +173,7 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
     addCaps(availableCaps,
             {Addresses, Float16Buffer, Int16, Int8, Kernel, Linkage, Vector16});
     if (openCLFullProfile) {
-      addCaps(availableCaps, {Int64});
+      addCaps(availableCaps, {Int64, Int64Atomics});
     }
     if (openCLImageSupport) {
       addCaps(availableCaps, {ImageBasic, LiteralSampler, Image1D,

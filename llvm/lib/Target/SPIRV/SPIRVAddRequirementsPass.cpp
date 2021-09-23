@@ -291,6 +291,40 @@ static void addInstrRequirements(const MachineInstr &MI,
   case SPIRV::OpConstantNull:
     addVariablePtrInstrReqs(MI, reqs, ST);
     break;
+  case SPIRV::OpAtomicFlagTestAndSet:
+  case SPIRV::OpAtomicLoad:
+  case SPIRV::OpAtomicStore:
+  case SPIRV::OpAtomicExchange:
+  case SPIRV::OpAtomicCompareExchange:
+  case SPIRV::OpAtomicIIncrement:
+  case SPIRV::OpAtomicIDecrement:
+  case SPIRV::OpAtomicIAdd:
+  case SPIRV::OpAtomicISub:
+  case SPIRV::OpAtomicUMin:
+  case SPIRV::OpAtomicUMax:
+  case SPIRV::OpAtomicSMin:
+  case SPIRV::OpAtomicSMax:
+  case SPIRV::OpAtomicAnd:
+  case SPIRV::OpAtomicOr:
+  case SPIRV::OpAtomicXor: {
+    auto &MRI = MI.getMF()->getRegInfo();
+    const MachineInstr* instrPtr = &MI;
+    if (MI.getOpcode() == SPIRV::OpAtomicStore) {
+      auto reg = MI.getOperand(3).getReg();
+      instrPtr = MRI.getVRegDef(reg);
+      assert((instrPtr) && "Unexpected type instruction for OpAtomicStore");
+    }
+    auto typeReg = instrPtr->getOperand(1).getReg();
+    assert(typeReg && "Unexpected type in atomic instruction");
+    auto typeDef = MRI.getVRegDef(typeReg);
+    if (typeDef->getOpcode() == SPIRV::OpTypeInt) {
+      unsigned bitWidth = typeDef->getOperand(1).getImm();
+      if (bitWidth == 64) {
+        reqs.addCapability(Int64Atomics);
+      }
+    }
+    break;
+  }
   default:
     break;
   }
