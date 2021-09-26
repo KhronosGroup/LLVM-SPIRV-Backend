@@ -453,9 +453,10 @@ SPIRVTypeRegistry::getSampledImageType(SPIRVType *imageType,
   return MIB;
 }
 
-SPIRVType *SPIRVTypeRegistry::getOpTypeQueue(MachineIRBuilder &MIRBuilder) {
+SPIRVType *SPIRVTypeRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
+                                                unsigned int opcode) {
   Register resVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeQueue).addDef(resVReg);
+  auto MIB = MIRBuilder.buildInstr(opcode).addDef(resVReg);
   constrainRegOperands(MIB);
   return MIB;
 }
@@ -495,7 +496,9 @@ SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
       accessQual = AQ::ReadWrite;
     return getOpTypePipe(MIRBuilder, accessQual);
   } else if (TypeName.startswith("queue"))
-    return getOpTypeQueue(MIRBuilder);
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeQueue);
+  else if (TypeName.startswith("event_t"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeEvent);
 
   report_fatal_error("Cannot generate OpenCL type: " + Name);
 }
