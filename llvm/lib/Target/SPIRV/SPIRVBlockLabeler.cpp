@@ -130,7 +130,8 @@ bool SPIRVBlockLabeler::runOnMachineFunction(MachineFunction &MF) {
     }
 
     // Add an unconditional branch if the block has no explicit terminator
-    if (!MBB.getLastNonDebugInstr()->isTerminator()) {
+    // and is not the last one.
+    if (!MBB.getLastNonDebugInstr()->isTerminator() && MBB.getNextNode()) {
       MIRBuilder.setMBB(MBB); // Insert at end of block
       auto MIB = MIRBuilder.buildInstr(OpBranch).addMBB(MBB.getNextNode());
       branches.push_back(MIB);
