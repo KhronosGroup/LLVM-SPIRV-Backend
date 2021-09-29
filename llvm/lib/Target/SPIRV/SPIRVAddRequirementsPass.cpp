@@ -228,6 +228,14 @@ static void addInstrRequirements(const MachineInstr &MI,
   case SPIRV::OpTypePointer: {
     auto sc = MI.getOperand(1).getImm();
     reqs.addRequirements(getStorageClassRequirements(sc, ST));
+    // If it's a type of pointer to float16, add Float16Buffer capability.
+    auto targetType = MI.getOperand(2).getReg();
+    auto &MRI = MI.getMF()->getRegInfo();
+    const MachineInstr* typeDef = MRI.getVRegDef(targetType);
+    if (typeDef->getOpcode() == SPIRV::OpTypeFloat &&
+        typeDef->getOperand(1).getImm() == 16) {
+      reqs.addCapability(Float16Buffer);
+    }
     break;
   }
   case SPIRV::OpTypeRuntimeArray:
