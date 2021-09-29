@@ -23,8 +23,8 @@
 ; CHECK-SPIRV-DAG: OpCapability Sampled1D
 ; CHECK-SPIRV-DAG: OpCapability SampledBuffer
 ; CHECK-SPIRV-DAG: %[[VOID:[0-9]+]] = OpTypeVoid
-; CHECK-SPIRV-DAG: %[[PIPE_RD:[0-9]+]] = OpTypePipe 0
-; CHECK-SPIRV-DAG: %[[PIPE_WR:[0-9]+]] = OpTypePipe 1
+; CHECK-SPIRV-DAG: %[[PIPE_RD:[0-9]+]] = OpTypePipe ReadOnly
+; CHECK-SPIRV-DAG: %[[PIPE_WR:[0-9]+]] = OpTypePipe WriteOnly
 ; CHECK-SPIRV-DAG: %[[IMG1D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 1D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %[[IMG2D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 2D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %[[IMG3D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 3D 0 0 0 0 Unknown ReadOnly
@@ -35,7 +35,7 @@
 ; CHECK-SPIRV-DAG: %[[SAMP:[0-9]+]] = OpTypeSampler
 ; CHECK-SPIRV-DAG: %[[SAMPIMG:[0-9]+]] = OpTypeSampledImage %[[IMG2D_RD]]
 
-; CHECK-SPIRV: %[[SAMP_CONST:[0-9]+]] = OpConstantSampler %[[SAMP]] 0 0 1
+; CHECK-SPIRV: %[[SAMP_CONST:[0-9]+]] = OpConstantSampler %[[SAMP]] None 0 Linear
 
 ; ModuleID = 'cl-types.cl'
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
