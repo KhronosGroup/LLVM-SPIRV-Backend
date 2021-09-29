@@ -234,13 +234,20 @@ static bool isOpenCLBuiltinType(const StructType *stype) {
          stype->getName().startswith("opencl.");
 }
 
+static bool isSPIRVBuiltinType(const StructType *stype) {
+  return stype->isOpaque() && stype->hasName() &&
+         stype->getName().startswith("spirv.");
+}
+
 SPIRVType *SPIRVTypeRegistry::handleOpenCLBuiltin(const StructType *Ty,
                                                   MachineIRBuilder &MIRBuilder,
                                                   AQ::AccessQualifier aq) {
   assert(Ty->hasName());
   unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
-  auto resTy = generateOpenCLOpaqueType(Ty, MIRBuilder, aq);
-  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
+  auto newTy = generateOpenCLOpaqueType(Ty, MIRBuilder, aq);
+  auto resTy = checkBuiltinTypeMap(newTy);
+  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs() &&
+      resTy == newTy)
     buildOpName(getSPIRVTypeID(resTy), Ty->getName(), MIRBuilder);
   return resTy;
 }
@@ -296,6 +303,8 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
   } else if (auto stype = dyn_cast<StructType>(Ty)) {
     if (isOpenCLBuiltinType(stype))
       return handleOpenCLBuiltin(stype, MIRBuilder, aq);
+    else if (isSPIRVBuiltinType(stype))
+      return handleSPIRVBuiltin(stype, MIRBuilder, aq);
     else if (stype->isOpaque())
       return getOpTypeOpaque(stype, MIRBuilder);
     else
@@ -461,6 +470,23 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
   return MIB;
 }
 
+SPIRVType *SPIRVTypeRegistry::checkBuiltinTypeMap(SPIRVType *newType) {
+  auto t = BuiltinTypeMap.find(newType->getOpcode());
+  if (t != BuiltinTypeMap.end()) {
+    SmallVector<SPIRVType*> types = t->second;
+    for (auto type : types) {
+      if (type->isIdenticalTo(*newType,
+                              MachineInstr::MICheckType::IgnoreDefs)) {
+        const_cast<llvm::MachineInstr*>(newType)->eraseFromParent();
+        return type;
+      }
+    }
+  }
+  // It's new builtin type, insert it to the map.
+  BuiltinTypeMap[newType->getOpcode()].push_back(newType);
+  return newType;
+}
+
 SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
                                           MachineIRBuilder &MIRBuilder,
                                           AQ::AccessQualifier accessQual) {
@@ -501,6 +527,72 @@ SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeEvent);
 
   report_fatal_error("Cannot generate OpenCL type: " + Name);
+}
+
+SPIRVType *SPIRVTypeRegistry::handleSPIRVBuiltin(const StructType *Ty,
+                                                  MachineIRBuilder &MIRBuilder,
+                                                  AQ::AccessQualifier aq) {
+  assert(Ty->hasName());
+  unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
+  auto newTy = generateSPIRVOpaqueType(Ty, MIRBuilder, aq);
+  auto resTy = checkBuiltinTypeMap(newTy);
+  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs() &&
+      newTy == resTy)
+    buildOpName(getSPIRVTypeID(resTy), Ty->getName(), MIRBuilder);
+  return resTy;
+}
+
+SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
+                                          MachineIRBuilder &MIRBuilder,
+                                          AQ::AccessQualifier accessQual) {
+  const StringRef Name = Ty->getName();
+  assert(Name.startswith("spirv.") && "CL types should start with 'opencl.'");
+  auto TypeName = Name.substr(strlen("spirv."));
+
+  if (TypeName.startswith("Image.")) {
+    // Parse SPIRV ImageType which has following format in LLVM:
+    // Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
+    // e.g. %spirv.Image._void_1_0_0_0_0_0_0
+    auto typeLiteralStr = TypeName.substr(strlen("Image."));
+    SmallVector<StringRef> typeLiterals;
+    SplitString(typeLiteralStr, typeLiterals, "_");
+    assert (typeLiterals.size() == 8 && "Wrong number of literals in Image type");
+    Type* type;
+    auto &ctx = MIRBuilder.getMF().getFunction().getContext();
+    if (typeLiterals[0] == "void")
+      type = Type::getVoidTy(ctx);
+    else if (typeLiterals[0] == "int" || typeLiterals[0] == "uint")
+      type = Type::getInt32Ty(ctx);
+    else if (typeLiterals[0] == "float")
+      type = Type::getFloatTy(ctx);
+    else if (typeLiterals[0] == "half")
+      type = Type::getHalfTy(ctx);
+    else
+      llvm_unreachable("Unable to recognize SampledType");
+    auto *spirvType = getOrCreateSPIRVType(type, MIRBuilder);
+
+    unsigned ddim = 0, depth = 0, arrayed = 0, ms = 0, sampled = 0;
+    unsigned imageFormat = 0, accessQualifier = 0;
+    if (typeLiterals[1].getAsInteger(10, ddim) ||
+        typeLiterals[2].getAsInteger(10, depth) ||
+        typeLiterals[3].getAsInteger(10, arrayed) ||
+        typeLiterals[4].getAsInteger(10, ms) ||
+        typeLiterals[5].getAsInteger(10, sampled) ||
+        typeLiterals[6].getAsInteger(10, imageFormat) ||
+        typeLiterals[7].getAsInteger(10, accessQualifier))
+      llvm_unreachable("Unable to recognize Image type literals");
+
+    return getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
+                          depth, arrayed, ms, sampled,
+                          ImageFormat::ImageFormat(imageFormat),
+                          AQ::AccessQualifier(accessQualifier));
+  }
+  else if (TypeName.startswith("Queue"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeQueue);
+  else if (TypeName.startswith("PipeStorage"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypePipeStorage);
+
+  report_fatal_error("Cannot generate SPIRV built-in type: " + Name);
 }
 
 SPIRVType *

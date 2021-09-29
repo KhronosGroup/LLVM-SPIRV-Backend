@@ -42,6 +42,17 @@ class SPIRVTypeRegistry {
 
   DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
+  // Builtin types may be represented in two ways while translating to SPIR-V:
+  // in OpenCL form and in SPIR-V form. We have to keep only one type for such
+  // pairs so check any builtin type for existance in the map before emitting
+  // it to SPIR-V. The map contains a vector of SPIR-V builtin types already
+  // emitted for a given type opcode.
+  DenseMap<unsigned int, SmallVector<SPIRVType*>> BuiltinTypeMap;
+
+  // Look for an equivalent of the newType in the map. Return the equivalent
+  // if it's found, otherwise insert newType to the map and return the type.
+  SPIRVType *checkBuiltinTypeMap(SPIRVType *newType);
+
   // Number of bits pointers and size_t integers require.
   const unsigned int pointerSize;
 
@@ -174,6 +185,14 @@ private:
   SPIRVType *generateOpenCLOpaqueType(const StructType *Ty,
                                       MachineIRBuilder &MIRBuilder,
                                       AQ::AccessQualifier aq = AQ::ReadWrite);
+
+  SPIRVType *handleSPIRVBuiltin(const StructType *Ty,
+                                MachineIRBuilder &MIRBuilder,
+                                AQ::AccessQualifier aq);
+
+  SPIRVType *generateSPIRVOpaqueType(const StructType *Ty,
+                                     MachineIRBuilder &MIRBuilder,
+                                     AQ::AccessQualifier aq = AQ::ReadWrite);
 
   Register buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
                             SPIRVTypeRegistry *TR);

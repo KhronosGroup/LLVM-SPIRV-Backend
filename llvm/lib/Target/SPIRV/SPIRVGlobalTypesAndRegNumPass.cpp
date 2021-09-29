@@ -254,7 +254,10 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
   }
 
   for (auto *MI : ToRemove)
-    MI->eraseFromParent();
+    // If we have two builtin IR types that correspond to the same SPIR-V type,
+    // current MI may be already erased, so check it before the erase.
+    if (MI && MI->getParent())
+      MI->eraseFromParent();
 }
 
 // we need this specialization as
