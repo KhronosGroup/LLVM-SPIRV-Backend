@@ -14,13 +14,13 @@
 ; CHECK-SPIRV-DAG: OpDecorate %[[SC7:[0-9]+]] SpecId 7
 
 ; CHECK-SPIRV-DAG: %[[SC0]] = OpSpecConstantFalse %{{[0-9]+}}
-; CHECK-SPIRV-DAG: %[[SC1]] = OpSpecConstant {{[0-9]+}} 100
-; CHECK-SPIRV-DAG: %[[SC2]] = OpSpecConstant {{[0-9]+}} 1
-; CHECK-SPIRV-DAG: %[[SC3]] = OpSpecConstant {{[0-9]+}} 2
-; CHECK-SPIRV-DAG: %[[SC4]] = OpSpecConstant {{[0-9]+}} 3 0
-; CHECK-SPIRV-DAG: %[[SC5]] = OpSpecConstant {{[0-9]+}} 14336
-; CHECK-SPIRV-DAG: %[[SC6]] = OpSpecConstant {{[0-9]+}} 1067450368
-; CHECK-SPIRV-DAG: %[[SC7]] = OpSpecConstant {{[0-9]+}} 0 1073807360
+; CHECK-SPIRV-DAG: %[[SC1]] = OpSpecConstant %{{[0-9]+}} 100
+; CHECK-SPIRV-DAG: %[[SC2]] = OpSpecConstant %{{[0-9]+}} 1
+; CHECK-SPIRV-DAG: %[[SC3]] = OpSpecConstant %{{[0-9]+}} 2
+; CHECK-SPIRV-DAG: %[[SC4]] = OpSpecConstant %{{[0-9]+}} 3 0
+; CHECK-SPIRV-DAG: %[[SC5]] = OpSpecConstant %{{[0-9]+}} 14336
+; CHECK-SPIRV-DAG: %[[SC6]] = OpSpecConstant %{{[0-9]+}} 1067450368
+; CHECK-SPIRV-DAG: %[[SC7]] = OpSpecConstant %{{[0-9]+}} 0 1073807360
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
