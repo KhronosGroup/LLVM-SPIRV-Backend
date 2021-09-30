@@ -1,6 +1,5 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV-DAG: OpCapability ImageBasic
 ; CHECK-SPIRV-DAG: OpCapability ImageReadWrite
 ; CHECK-SPIRV-DAG: OpCapability LiteralSampler
 ; CHECK-SPIRV-DAG: %[[TyImageID:[0-9]+]] = OpTypeImage %{{[0-9]+}} 1D 0 0 0 0 Unknown ReadWrite 
