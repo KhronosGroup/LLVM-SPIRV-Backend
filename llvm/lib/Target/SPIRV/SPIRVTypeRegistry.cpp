@@ -505,10 +505,15 @@ SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
     char dimC = TypeName[strlen("image")];
     if (dimC >= '1' && dimC <= '3') {
       auto dim = dimC == '1' ? DIM_1D : dimC == '2' ? DIM_2D : DIM_3D;
+      unsigned int arrayed = 0;
+      if (TypeName.contains("buffer"))
+        dim = DIM_Buffer;
+      if (TypeName.contains("array"))
+        arrayed = 1;
       auto *VoidTy = getOrCreateSPIRVType(
           Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
           MIRBuilder);
-      return getOpTypeImage(MIRBuilder, VoidTy, dim, 0, 0, 0, 0,
+      return getOpTypeImage(MIRBuilder, VoidTy, dim, 0, arrayed, 0, 0,
                             ImageFormat::Unknown, accessQual);
     }
   } else if (TypeName.startswith("sampler_t")) {
