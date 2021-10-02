@@ -477,7 +477,8 @@ SPIRVType *SPIRVTypeRegistry::checkBuiltinTypeMap(SPIRVType *newType) {
     for (auto type : types) {
       if (type->isIdenticalTo(*newType,
                               MachineInstr::MICheckType::IgnoreDefs)) {
-        const_cast<llvm::MachineInstr*>(newType)->eraseFromParent();
+        if (newType->getMF() == type->getMF())
+          const_cast<llvm::MachineInstr*>(newType)->eraseFromParent();
         return type;
       }
     }
