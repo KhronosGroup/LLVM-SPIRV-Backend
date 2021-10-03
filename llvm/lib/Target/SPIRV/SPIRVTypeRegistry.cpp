@@ -471,20 +471,22 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
 }
 
 SPIRVType *SPIRVTypeRegistry::checkBuiltinTypeMap(SPIRVType *newType) {
-  auto t = BuiltinTypeMap.find(newType->getOpcode());
+  auto t = BuiltinTypeMap.find(newType->getMF());
   if (t != BuiltinTypeMap.end()) {
-    SmallVector<SPIRVType*> types = t->second;
-    for (auto type : types) {
-      if (type->isIdenticalTo(*newType,
-                              MachineInstr::MICheckType::IgnoreDefs)) {
-        if (newType->getMF() == type->getMF())
+    auto tt = t->second.find(newType->getOpcode());
+    if (tt != t->second.end()) {
+      SmallVector<SPIRVType*> types = tt->second;
+      for (auto type : types) {
+        if (type->isIdenticalTo(*newType,
+                                MachineInstr::MICheckType::IgnoreDefs)) {
           const_cast<llvm::MachineInstr*>(newType)->eraseFromParent();
-        return type;
+          return type;
+        }
       }
     }
   }
   // It's new builtin type, insert it to the map.
-  BuiltinTypeMap[newType->getOpcode()].push_back(newType);
+  BuiltinTypeMap[newType->getMF()][newType->getOpcode()].push_back(newType);
   return newType;
 }
 
