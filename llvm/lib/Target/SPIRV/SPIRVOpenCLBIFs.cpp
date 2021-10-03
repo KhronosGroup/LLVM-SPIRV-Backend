@@ -491,7 +491,7 @@ static unsigned int getNumSizeComponents(SPIRVType *imgType) {
   return arrayed ? numComps + 1 : numComps;
 }
 
-// Used for get_image_width, get_image_dim etc. via OpImageQuerySize
+// Used for get_image_width, get_image_dim etc. via OpImageQuerySize[Lod]
 static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
                               SPIRVType *retType, Register img,
                               unsigned component, SPIRVTypeRegistry *TR) {
@@ -506,23 +506,34 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
   Register sizeVec = resVReg;
   SPIRVType *sizeVecTy = retType;
+  auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
   if (numTempComps != numRetComps) {
     sizeVec = MRI->createGenericVirtualRegister(LLT::fixed_vector(numTempComps, 32));
-    auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
     sizeVecTy = TR->getOrCreateSPIRVVectorType(I32Ty, numTempComps, MIRBuilder);
     TR->assignSPIRVTypeToVReg(sizeVecTy, sizeVec, MIRBuilder);
   }
-
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageQuerySize)
-                 .addDef(sizeVec)
-                 .addUse(TR->getSPIRVTypeID(sizeVecTy))
-                 .addUse(img);
+  auto dim = static_cast<Dim::Dim>(imgType->getOperand(2).getImm());
+  MachineInstrBuilder MIB;
+  if (dim == Dim::DIM_Buffer) {
+    MIB = MIRBuilder.buildInstr(SPIRV::OpImageQuerySize)
+                   .addDef(sizeVec)
+                   .addUse(TR->getSPIRVTypeID(sizeVecTy))
+                   .addUse(img);
+  } else {
+    auto lodReg = buildIConstant(0, I32Ty, MIRBuilder, TR);
+    MIB = MIRBuilder.buildInstr(SPIRV::OpImageQuerySizeLod)
+                   .addDef(sizeVec)
+                   .addUse(TR->getSPIRVTypeID(sizeVecTy))
+                   .addUse(img)
+                   .addUse(lodReg);
+  }
   bool success = TR->constrainRegOperands(MIB);
   if (numTempComps == numRetComps || !success) {
     return success;
   }
   if (numRetComps == 1) {
     // Need an OpCompositeExtract
+    component = component == 3 ? numTempComps - 1 : component;
     assert(component < numTempComps && "Invalid comp index");
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpCompositeExtract)
                    .addDef(resVReg)
@@ -597,6 +608,8 @@ static bool genImageQuery(MachineIRBuilder &MIRBuilder,
     return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 2, TR);
   } else if (queryStr.startswith("dim")) {
     return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 0, TR);
+  } else if (queryStr.startswith("array_size")) {
+    return genImageSizeQuery(MIRBuilder, resVReg, retType, img, 3, TR);
   } else if (queryStr.startswith("num_samples")) {
     return genNumSamplesQuery(MIRBuilder, resVReg, retType, img, TR);
   }
