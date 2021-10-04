@@ -209,7 +209,8 @@ public:
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
       StorageClass::StorageClass SClass = StorageClass::Function);
-
+  SPIRVType *getOrCreateSPIRVSampledImageType(SPIRVType *imageType,
+                                              MachineIRBuilder &MIRBuilder);
   // Convert a SPIR-V storage class to the corresponding LLVM IR address space.
   unsigned int StorageClassToAddressSpace(StorageClass::StorageClass sc);
 

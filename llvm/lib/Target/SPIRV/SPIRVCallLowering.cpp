@@ -152,7 +152,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       singleUnderscore && funcName.size() >= 2 && funcName[1] == '_';
   // FIXME: OCL builtin checks should be the same as in clang
   //        or SPIRV-LLVM translator
-  if (status == demangle_success && (singleUnderscore/* || doubleUnderscore*/)) {
+  if ((status == demangle_success && singleUnderscore) || doubleUnderscore) {
     const auto &MF = MIRBuilder.getMF();
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {

@@ -240,7 +240,7 @@ static Register buildOpSampledImage(Register image, Register sampler,
   const auto MRI = MIRBuilder.getMRI();
   SPIRVType *imageType = TR->getSPIRVTypeForVReg(image);
   SPIRVType *sampImTy =
-      TR->getOrCreateSPIRVType(TR->getTypeForSPIRVType(imageType), MIRBuilder);
+      TR->getOrCreateSPIRVSampledImageType(imageType, MIRBuilder);
 
   Register sampledImage = MRI->createVirtualRegister(&SPIRV::IDRegClass);
   auto SampImMIB = MIRBuilder.buildInstr(SPIRV::OpSampledImage)
@@ -1120,8 +1120,10 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
       return genBarrier(MIRBuilder, args, TR);
     break;
   case '_':
-    if (nameNoArgs.startswith("__translate_sampler_initializer"))
-      return buildSamplerLiteral(args[0], OrigRet, retTy, MIRBuilder, TR);
+    if (nameNoArgs.startswith("__translate_sampler_initializer")) {
+      uint64_t bitMask = getLiteralValueForConstant(args[0], MIRBuilder.getMRI());
+      return buildSamplerLiteral(bitMask, OrigRet, retTy, MIRBuilder, TR);
+    }
     break;
   default:
     break;

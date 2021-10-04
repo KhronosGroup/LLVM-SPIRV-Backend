@@ -635,6 +635,12 @@ SPIRVType *SPIRVTypeRegistry::getOrCreateSPIRVPointerType(
       MIRBuilder);
 }
 
+SPIRVType *SPIRVTypeRegistry::getOrCreateSPIRVSampledImageType(
+    SPIRVType *imageType, MachineIRBuilder &MIRBuilder) {
+  SPIRVType *type = getSampledImageType(imageType, MIRBuilder);
+  return type;
+}
+
 unsigned int
 SPIRVTypeRegistry::StorageClassToAddressSpace(StorageClass::StorageClass sc) {
   // TODO maybe this should be handled in the subtarget to allow for different
