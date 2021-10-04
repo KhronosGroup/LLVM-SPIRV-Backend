@@ -47,7 +47,8 @@ class SPIRVTypeRegistry {
   // pairs so check any builtin type for existance in the map before emitting
   // it to SPIR-V. The map contains a vector of SPIR-V builtin types already
   // emitted for a given type opcode.
-  DenseMap<unsigned int, SmallVector<SPIRVType*>> BuiltinTypeMap;
+  DenseMap<const MachineFunction *,
+           DenseMap<unsigned int, SmallVector<SPIRVType*>>> BuiltinTypeMap;
 
   // Look for an equivalent of the newType in the map. Return the equivalent
   // if it's found, otherwise insert newType to the map and return the type.
