@@ -50,9 +50,9 @@ public:
 } // namespace
 
 // Add the all the requirements needed for the given instruction.
-static void addInstrRequirements(const MachineInstr &MI,
-                                 SPIRVRequirementHandler &reqs,
-                                 const SPIRVSubtarget &ST);
+void addInstrRequirements(const MachineInstr &MI,
+                          SPIRVRequirementHandler &reqs,
+                          const SPIRVSubtarget &ST);
 
 // Insert a deduplicated list of all OpCapability and OpExtension instructions
 // required for MF.
@@ -172,9 +172,9 @@ static void addOpTypeImageReqs(const MachineInstr &MI,
   }
 }
 
-static void addInstrRequirements(const MachineInstr &MI,
-                                 SPIRVRequirementHandler &reqs,
-                                 const SPIRVSubtarget &ST) {
+void addInstrRequirements(const MachineInstr &MI,
+                          SPIRVRequirementHandler &reqs,
+                          const SPIRVSubtarget &ST) {
   using namespace Capability;
   switch (MI.getOpcode()) {
   case SPIRV::OpMemoryModel: {

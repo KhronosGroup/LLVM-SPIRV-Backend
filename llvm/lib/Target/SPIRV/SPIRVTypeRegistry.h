@@ -194,10 +194,11 @@ private:
   SPIRVType *generateSPIRVOpaqueType(const StructType *Ty,
                                      MachineIRBuilder &MIRBuilder,
                                      AQ::AccessQualifier aq = AQ::ReadWrite);
-
-  Register buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
-                            SPIRVTypeRegistry *TR);
 public:
+  Register buildConstantInt(uint64_t val, MachineIRBuilder &MIRBuilder,
+                            SPIRVType *spvType = nullptr);
+  Register buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
+                           SPIRVType *spvType = nullptr);
   // convenient helpers for getting types
   // w/ check for duplicates
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
