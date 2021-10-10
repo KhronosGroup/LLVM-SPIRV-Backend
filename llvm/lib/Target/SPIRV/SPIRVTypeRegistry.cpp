@@ -169,18 +169,52 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeVector(uint32_t numElems,
   return MIB;
 }
 
-Register SPIRVTypeRegistry::buildConstantI32(uint32_t val, MachineIRBuilder &MIRBuilder,
-                                             SPIRVTypeRegistry *TR) {
+Register
+SPIRVTypeRegistry::buildConstantInt(uint64_t val, MachineIRBuilder &MIRBuilder,
+                                    SPIRVType *spvType) {
   auto &MF = MIRBuilder.getMF();
   Register res;
-  auto IntTy = IntegerType::getInt32Ty(MF.getFunction().getContext());
+  IntegerType *LLVMIntTy;
+  if (spvType) {
+    Type* LLVMTy = const_cast<Type*>(getTypeForSPIRVType(spvType));
+    assert(LLVMTy->isIntegerTy());
+    LLVMIntTy = cast<IntegerType>(LLVMTy);
+  } else {
+    LLVMIntTy = IntegerType::getInt32Ty(MF.getFunction().getContext());
+  }
   // Find a constant in DT or build a new one.
-  const auto ConstInt = ConstantInt::get(IntTy, val);
+  const auto ConstInt = ConstantInt::get(LLVMIntTy, val);
   if (DT.find(ConstInt, &MIRBuilder.getMF(), res) == false) {
-    res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(32));
-    TR->assignTypeToVReg(IntTy, res, MIRBuilder);
+    unsigned BitWidth = spvType ? getScalarOrVectorBitWidth(spvType) : 32;
+    res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
+    assignTypeToVReg(LLVMIntTy, res, MIRBuilder);
     DT.add(ConstInt, &MIRBuilder.getMF(), res);
     MIRBuilder.buildConstant(res, *ConstInt);
+  }
+  return res;
+}
+
+Register
+SPIRVTypeRegistry::buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
+                                   SPIRVType *spvType) {
+  auto &MF = MIRBuilder.getMF();
+  Register res;
+  Type *LLVMFPTy;
+  if (spvType) {
+    Type* LLVMTy = const_cast<Type*>(getTypeForSPIRVType(spvType));
+    assert(LLVMTy->isFloatingPointTy());
+    LLVMFPTy = LLVMTy;
+  } else {
+    LLVMFPTy = IntegerType::getFloatTy(MF.getFunction().getContext());
+  }
+  // Find a constant in DT or build a new one.
+  const auto ConstFP = ConstantFP::get(LLVMFPTy->getContext(), val);
+   if (DT.find(ConstFP, &MIRBuilder.getMF(), res) == false) {
+    unsigned BitWidth = spvType ? getScalarOrVectorBitWidth(spvType) : 32;
+    res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
+    assignTypeToVReg(LLVMFPTy, res, MIRBuilder);
+    DT.add(ConstFP, &MIRBuilder.getMF(), res);
+    MIRBuilder.buildFConstant(res, *ConstFP);
   }
   return res;
 }
@@ -192,7 +226,7 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeArray(uint32_t numElems,
     errs() << *elemType;
     report_fatal_error("Invalid array element type");
   }
-  Register numElementsVReg = buildConstantI32(numElems, MIRBuilder, this);
+  Register numElementsVReg = buildConstantInt(numElems, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeArray)
                  .addDef(createTypeVReg(MIRBuilder))
                  .addUse(getSPIRVTypeID(elemType))
@@ -499,6 +533,8 @@ SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
   auto TypeName = Name.substr(strlen("opencl."));
 
   if (TypeName.startswith("image")) {
+    // default is read only
+    accessQual = AQ::ReadOnly;
     if (TypeName.endswith("_ro_t"))
       accessQual = AQ::ReadOnly;
     else if (TypeName.endswith("_wo_t"))
