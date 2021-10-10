@@ -54,6 +54,7 @@ enum CLMemScope {
   memory_scope_work_group,
   memory_scope_device,
   memory_scope_all_svm_devices,
+  memory_scope_sub_group
 };
 
 enum CLMemFenceFlags {
@@ -61,6 +62,9 @@ enum CLMemFenceFlags {
   CLK_GLOBAL_MEM_FENCE = 0x2,
   CLK_IMAGE_MEM_FENCE = 0x4
 };
+
+static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR);
 
 static SamplerAddressingMode::SamplerAddressingMode
 getSamplerAddressingModeFromBitmask(unsigned int bitmask) {
@@ -116,6 +120,8 @@ static Scope::Scope getSPIRVScope(CLMemScope clScope) {
     return Scope::Device;
   case memory_scope_all_svm_devices:
     return Scope::CrossDevice;
+  case memory_scope_sub_group:
+    return Scope::Subgroup;
   }
   llvm_unreachable("Unknown CL memory scope");
 }
@@ -617,22 +623,33 @@ static bool genImageQuery(MachineIRBuilder &MIRBuilder,
 }
 
 static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
-                          MachineIRBuilder& MIRBuilder, Register ptr,
+                          MachineIRBuilder& MIRBuilder,
+                          const SmallVectorImpl<Register> &args,
                           SPIRVTypeRegistry* TR) {
   using namespace SPIRV;
 
   auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
-
+  Register ptr = args[0];
   Register scopeReg;
-  auto scope = Scope::Device;
-  if (!scopeReg.isValid())
+  if (args.size() > 1) {
+    // TODO: Insert call to __translate_ocl_memory_sccope before OpAtomicLoad
+    // and the function implementation. We can use Translator's output for
+    // transcoding/atomic_explicit_arguments.cl as an example.
+    scopeReg = args[1];
+  } else {
+    auto scope = Scope::Device;
     scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+  }
 
-  auto scSem = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
   Register memSemReg;
-  auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
-  if (!memSemReg.isValid())
+  if (args.size() > 2) {
+    // TODO: Insert call to __translate_ocl_memory_order before OpAtomicLoad.
+    memSemReg = args[2];
+  } else {
+    auto scSm = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
+    auto memSem = MemorySemantics::SequentiallyConsistent | scSm;
     memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+  }
 
   auto MIB = MIRBuilder.buildInstr(OpAtomicLoad)
                  .addDef(resVReg)
@@ -673,7 +690,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
 }
 
 static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
-                             SPIRVType *retType, bool isWeak,
+                             SPIRVType *retType, bool isWeak, bool isCmpxchg,
                              const SmallVectorImpl<Register> &OrigArgs,
                              SPIRVTypeRegistry *TR) {
   assert(OrigArgs.size() >= 3 && "Need 3+ args to atomic_compare_exchange");
@@ -681,13 +698,14 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   const auto MRI = MIRBuilder.getMRI();
 
   Register objectPtr = OrigArgs[0];   // Pointer (volatile A *object)
-  Register expectedPtr = OrigArgs[1]; // Comparator (C* expected)
+  Register expectedArg = OrigArgs[1]; // Comparator (C* expected)
   Register desired = OrigArgs[2];     // Value (C desired)
   SPIRVType *spvDesiredTy = TR->getSPIRVTypeForVReg(desired);
   LLT desiredLLT = MRI->getType(desired);
 
   assert(TR->getSPIRVTypeForVReg(objectPtr)->getOpcode() == OpTypePointer);
-  assert(TR->getSPIRVTypeForVReg(expectedPtr)->getOpcode() == OpTypePointer);
+  auto expectedType = TR->getSPIRVTypeForVReg(expectedArg)->getOpcode();
+  assert(isCmpxchg ? expectedType == OpTypeInt : expectedType == OpTypePointer);
   assert(TR->isScalarOfType(desired, OpTypeInt));
 
   SPIRVType *spvObjectPtrTy = TR->getSPIRVTypeForVReg(objectPtr);
@@ -697,8 +715,10 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
 
   Register memSemEqualReg;
   Register memSemUnequalReg;
-  auto memSemEqual = MemorySemantics::SequentiallyConsistent | memSemStorage;
-  auto memSemUnequal = MemorySemantics::SequentiallyConsistent | memSemStorage;
+  auto memSemEqual = isCmpxchg ? MemorySemantics::None :
+      MemorySemantics::SequentiallyConsistent | memSemStorage;
+  auto memSemUnequal = isCmpxchg ? MemorySemantics::None :
+      MemorySemantics::SequentiallyConsistent | memSemStorage;
   if (OrigArgs.size() >= 4) {
     assert(OrigArgs.size() >= 5 && "Need 5+ args for explicit atomic cmpxchg");
     auto memOrdEq = static_cast<CLMemOrder>(getIConstVal(OrigArgs[3], MRI));
@@ -712,12 +732,12 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   }
   auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
   if (!memSemEqualReg.isValid())
-    memSemEqualReg = buildIConstant(memSemEqual, I32Ty, MIRBuilder, TR);
+    memSemEqualReg = TR->buildConstantInt(memSemEqual, MIRBuilder, I32Ty);
   if (!memSemUnequalReg.isValid())
-    memSemUnequalReg = buildIConstant(memSemUnequal, I32Ty, MIRBuilder, TR);
+    memSemUnequalReg = TR->buildConstantInt(memSemUnequal, MIRBuilder, I32Ty);
 
   Register scopeReg;
-  auto scope = Scope::Device;
+  auto scope = isCmpxchg ? Scope::Workgroup : Scope::Device;
   if (OrigArgs.size() >= 6) {
     assert(OrigArgs.size() == 6 && "Extra args for explicit atomic cmpxchg");
     auto clScope = static_cast<CLMemScope>(getIConstVal(OrigArgs[5], MRI));
@@ -726,11 +746,13 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
       scopeReg = OrigArgs[5];
   }
   if (!scopeReg.isValid())
-    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+    scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty);
 
-  Register expected = buildLoad(spvDesiredTy, expectedPtr, MIRBuilder, TR);
+  Register expected = isCmpxchg ? expectedArg :
+      buildLoad(spvDesiredTy, expectedArg, MIRBuilder, TR);
   MRI->setType(expected, desiredLLT);
-  Register tmp = MRI->createGenericVirtualRegister(desiredLLT);
+  Register tmp = !isCmpxchg ? MRI->createGenericVirtualRegister(desiredLLT) :
+                              resVReg;
   TR->assignSPIRVTypeToVReg(spvDesiredTy, tmp, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(OpAtomicCompareExchange)
                  .addDef(tmp)
@@ -741,8 +763,10 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addUse(memSemUnequalReg)
                  .addUse(desired)
                  .addUse(expected);
-  MIRBuilder.buildInstr(OpStore).addUse(expected).addUse(tmp);
-  MIRBuilder.buildICmp(CmpInst::ICMP_EQ, resVReg, tmp, expected);
+  if (!isCmpxchg) {
+    MIRBuilder.buildInstr(OpStore).addUse(expected).addUse(tmp);
+    MIRBuilder.buildICmp(CmpInst::ICMP_EQ, resVReg, tmp, expected);
+  }
   return TR->constrainRegOperands(MIB);
 }
 
@@ -798,17 +822,21 @@ static bool genAtomicInstr(MachineIRBuilder &MIRBuilder,
   using namespace SPIRV;
 
   if (atomicStr.startswith("load")) {
-      assert(args.size() == 1 && "Need ptr arg for atomic load");
-      return genAtomicLoad(ret, retTy, MIRBuilder, args[0], TR);
+      assert((((args.size() == 2 || args.size() == 3) &&
+               atomicStr == "load_explicit") || args.size() == 1) &&
+             "Need ptr arg for atomic load");
+      return genAtomicLoad(ret, retTy, MIRBuilder, args, TR);
   } else if (atomicStr.startswith("store")) {
       return genAtomicStore(MIRBuilder, args, TR);
   } else if (atomicStr.startswith("compare_exchange_")) {
     const auto cmp_xchg = atomicStr.substr(strlen("compare_exchange_"));
     if (cmp_xchg.startswith("weak")) {
-      return genAtomicCmpXchg(MIRBuilder, ret, retTy, true, args, TR);
+      return genAtomicCmpXchg(MIRBuilder, ret, retTy, true, false, args, TR);
     } else if (cmp_xchg.startswith("strong")) {
-      return genAtomicCmpXchg(MIRBuilder, ret, retTy, false, args, TR);
+      return genAtomicCmpXchg(MIRBuilder, ret, retTy, false, false, args, TR);
     }
+  } else if (atomicStr.startswith("cmpxchg")) {
+    return genAtomicCmpXchg(MIRBuilder, ret, retTy, false, true, args, TR);
   } else if (atomicStr.startswith("add")) {
     return genAtomicRMW(ret, retTy, OpAtomicIAdd, MIRBuilder, args, TR);
   } else if (atomicStr.startswith("sub")) {
@@ -826,6 +854,8 @@ static bool genAtomicInstr(MachineIRBuilder &MIRBuilder,
     // } else if (atomicStr.startswith("max")) {
     //   return genAtomicRMW(ret, retTy, OpAtomicUMax, MIRBuilder, args, TR);
     // }
+  } else if (atomicStr.startswith("work_item_fence")) {
+    return genBarrier(MIRBuilder, SPIRV::OpMemoryBarrier, args, TR);
   } else if (atomicStr.startswith("exchange")) {
     return genAtomicRMW(ret, retTy, OpAtomicExchange, MIRBuilder, args, TR);
   }
@@ -833,13 +863,14 @@ static bool genAtomicInstr(MachineIRBuilder &MIRBuilder,
   report_fatal_error("Cannot handle OpenCL atomic func: atomic_" + atomicStr);
 }
 
-static bool genBarrier(MachineIRBuilder &MIRBuilder,
+static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
                        const SmallVectorImpl<Register> &OrigArgs,
                        SPIRVTypeRegistry *TR) {
   assert(OrigArgs.size() >= 1 && "Missing args for OpenCL barrier func");
   const auto MRI = MIRBuilder.getMRI();
   const auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
+  bool isMemBarrier = opcode == SPIRV::OpMemoryBarrier;
   unsigned memFlags = getIConstVal(OrigArgs[0], MRI);
   unsigned memSem = MemorySemantics::None;
   if (memFlags & CLK_LOCAL_MEM_FENCE) {
@@ -851,31 +882,40 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder,
   if (memFlags & CLK_IMAGE_MEM_FENCE) {
     memSem |= MemorySemantics::ImageMemory;
   }
+
+  if (isMemBarrier) {
+    auto memOrd = static_cast<CLMemOrder>(getIConstVal(OrigArgs[1], MRI));
+    memSem = getSPIRVMemSemantics(memOrd) | memSem;
+  }
+
   Register memSemReg;
   if (memFlags == memSem) {
     memSemReg = OrigArgs[0];
   } else {
-    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+    memSemReg = TR->buildConstantInt(memSem, MIRBuilder, I32Ty);
   }
 
   Register scopeReg;
   auto scope = Scope::Workgroup;
   if (OrigArgs.size() >= 2) {
-    assert(OrigArgs.size() == 2 && "Extra args for explicitly scoped barrier");
-    auto clScope = static_cast<CLMemScope>(getIConstVal(OrigArgs[1], MRI));
-    if (!(memFlags & CLK_LOCAL_MEM_FENCE)) {
+    assert(((!isMemBarrier && OrigArgs.size() == 2) ||
+            (isMemBarrier && OrigArgs.size() == 3)) &&
+          "Extra args for explicitly scoped barrier");
+    auto scopeArg = isMemBarrier ? OrigArgs[2] : OrigArgs[1];
+    auto clScope = static_cast<CLMemScope>(getIConstVal(scopeArg, MRI));
+    if (!(memFlags & CLK_LOCAL_MEM_FENCE) || isMemBarrier) {
       scope = getSPIRVScope(clScope);
     }
     if (clScope == static_cast<unsigned>(scope))
       scopeReg = OrigArgs[1];
   }
   if (!scopeReg.isValid())
-    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+    scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty);
 
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpControlBarrier)
-                 .addUse(scopeReg)
-                 .addUse(scopeReg)
-                 .addUse(memSemReg);
+  auto MIB = MIRBuilder.buildInstr(opcode).addUse(scopeReg);
+  if (!isMemBarrier)
+    MIB.addUse(scopeReg);
+  MIB.addUse(memSemReg);
   return TR->constrainRegOperands(MIB);
 }
 
@@ -1082,7 +1122,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     break;
   case 'b':
     if (nameNoArgs.startswith("barrier"))
-      return genBarrier(MIRBuilder, args, TR);
+      return genBarrier(MIRBuilder, SPIRV::OpControlBarrier, args, TR);
     break;
   case 'c':
     if (nameNoArgs.startswith("convert_")) {
@@ -1130,7 +1170,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     if (nameNoArgs.startswith("write_image"))
       return genWriteImage(MIRBuilder, args, TR);
     else if (nameNoArgs.startswith("work_group_barrier"))
-      return genBarrier(MIRBuilder, args, TR);
+      return genBarrier(MIRBuilder, SPIRV::OpControlBarrier, args, TR);
     break;
   case '_':
     if (nameNoArgs.startswith("__translate_sampler_initializer")) {

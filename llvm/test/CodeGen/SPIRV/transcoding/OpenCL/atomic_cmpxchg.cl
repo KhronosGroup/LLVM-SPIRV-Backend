@@ -22,19 +22,19 @@ __kernel void test_atomic_cmpxchg(__global int *p, int cmp, int val) {
 // translator applies some default memory order for it and therefore, constants
 // below include a bit more information than original source
 //
-// 0x1 Device
-// CHECK-SPIRV-DAG: %[[DEVICE_SCOPE:[0-9]+]] = OpConstant %[[UINT]] 1
+// 0x2 Workgroup
+// CHECK-SPIRV-DAG: %[[SCOPE:[0-9]+]] = OpConstant %[[UINT]] 2
 //
-// 0x10 SequentiallyConsistent
+// 0x0 Relaxed
 // TODO: do we need CrossWorkgroupMemory here as well?
-// CHECK-SPIRV-DAG: %[[SEQ_CST:[0-9]+]] = OpConstant %[[UINT]] 16
+// CHECK-SPIRV-DAG: %[[CST:[0-9]+]] = OpConstant %[[UINT]] 0
 //
 // CHECK-SPIRV: %[[TEST]] = OpFunction %{{[0-9]+}}
 // CHECK-SPIRV: %[[PTR:[0-9]+]] = OpFunctionParameter %[[UINT_PTR]]
 // CHECK-SPIRV: %[[CMP:[0-9]+]] = OpFunctionParameter %[[UINT]]
 // CHECK-SPIRV: %[[VAL:[0-9]+]] = OpFunctionParameter %[[UINT]]
-// CHECK-SPIRV: %{{[0-9]+}} = OpAtomicCompareExchange %[[UINT]] %[[PTR]] %[[DEVICE_SCOPE]] %[[SEQ_CST]] %[[SEQ_CST]] %[[VAL]] %[[CMP]]
-// CHECK-SPIRV: %{{[0-9]+}} = OpAtomicCompareExchange %[[UINT]] %[[PTR]] %[[DEVICE_SCOPE]] %[[SEQ_CST]] %[[SEQ_CST]] %[[VAL]] %[[CMP]]
+// CHECK-SPIRV: %{{[0-9]+}} = OpAtomicCompareExchange %[[UINT]] %[[PTR]] %[[SCOPE]] %[[CST]] %[[CST]] %[[VAL]] %[[CMP]]
+// CHECK-SPIRV: %{{[0-9]+}} = OpAtomicCompareExchange %[[UINT]] %[[PTR]] %[[SCOPE]] %[[CST]] %[[CST]] %[[VAL]] %[[CMP]]
 
 // References:
 // [1]: https://www.khronos.org/registry/OpenCL/sdk/2.0/docs/man/xhtml/atomic_cmpxchg.html
