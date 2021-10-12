@@ -15,8 +15,8 @@
 ; FIXME: Check last 3 parameters of OpConstantSampler - how its should be properly converted?
 ; CHECK-SPIRV: %[[SamplerID0:[0-9]+]] = OpConstantSampler %{{[0-9]+}} Repeat 1 Nearest
 ; CHECK-SPIRV: %[[SamplerID1:[0-9]+]] = OpConstantSampler %{{[0-9]+}} None 0 Nearest
-; CHECK-SPIRV: %[[SamplerID0]] = OpSampledImage {{.*}}
-; CHECK-SPIRV: %[[SamplerID1]] = OpSampledImage {{.*}}
+; CHECK-SPIRV: %{{[0-9]+}} = OpSampledImage %{{.*}} %[[SamplerID0]]
+; CHECK-SPIRV: %{{[0-9]+}} = OpSampledImage %{{.*}} %[[SamplerID1]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"

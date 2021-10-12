@@ -35,6 +35,7 @@ enum CLSamplerMasks {
   CLK_ADDRESS_CLAMP_TO_EDGE = 0x2,
   CLK_ADDRESS_REPEAT = 0x6,
   CLK_ADDRESS_MIRRORED_REPEAT = 0x8,
+  CLK_ADDRESS_MODE_MASK = 0xE,
   CLK_NORMALIZED_COORDS_FALSE = 0x0,
   CLK_NORMALIZED_COORDS_TRUE = 0x1,
   CLK_FILTER_NEAREST = 0x10,
@@ -68,16 +69,19 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
 
 static SamplerAddressingMode::SamplerAddressingMode
 getSamplerAddressingModeFromBitmask(unsigned int bitmask) {
-  if (bitmask & CLK_ADDRESS_CLAMP) {
+  switch (bitmask & CLK_ADDRESS_MODE_MASK) {
+  case CLK_ADDRESS_CLAMP:
     return SamplerAddressingMode::Clamp;
-  } else if (bitmask & CLK_ADDRESS_CLAMP_TO_EDGE) {
+  case CLK_ADDRESS_CLAMP_TO_EDGE:
     return SamplerAddressingMode::ClampToEdge;
-  } else if (bitmask & CLK_ADDRESS_REPEAT) {
+  case CLK_ADDRESS_REPEAT:
     return SamplerAddressingMode::Repeat;
-  } else if (bitmask & CLK_ADDRESS_MIRRORED_REPEAT) {
+  case CLK_ADDRESS_MIRRORED_REPEAT:
     return SamplerAddressingMode::RepeatMirrored;
-  } else {
+  case CLK_ADDRESS_NONE:
     return SamplerAddressingMode::None;
+  default:
+    llvm_unreachable("Unknown CL address mode");
   }
 }
 
@@ -130,26 +134,15 @@ static unsigned int getSamplerParamFromBitmask(unsigned int bitmask) {
   return (bitmask & CLK_NORMALIZED_COORDS_TRUE) ? 1 : 0;
 }
 
-static bool buildSamplerLiteral(uint64_t samplerBitmask, Register res,
-                                SPIRVType *resTy, MachineIRBuilder &MIRBuilder,
-                                SPIRVTypeRegistry *TR) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantSampler)
-                 .addDef(res)
-                 .addUse(TR->getSPIRVTypeID(resTy))
-                 .addImm(getSamplerAddressingModeFromBitmask(samplerBitmask))
-                 .addImm(getSamplerParamFromBitmask(samplerBitmask))
-                 .addImm(getSamplerFilterModeFromBitmask(samplerBitmask));
-  return TR->constrainRegOperands(MIB);
-}
-
-static Register buildSamplerLiteral(uint64_t samplerBitmask,
+static Register buildSamplerLiteral(uint64_t samplerBitmask, Register res,
                                     const SPIRVType *samplerTy,
                                     MachineIRBuilder &MIRBuilder,
                                     SPIRVTypeRegistry *TR) {
-  SPIRVType *sampTy =
-      TR->getOrCreateSPIRVType(TR->getTypeForSPIRVType(samplerTy), MIRBuilder);
-  auto sampler = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-  buildSamplerLiteral(samplerBitmask, sampler, sampTy, MIRBuilder, TR);
+  auto sampler = TR->buildConstantSampler(res,
+      getSamplerAddressingModeFromBitmask(samplerBitmask),
+      getSamplerParamFromBitmask(samplerBitmask),
+      getSamplerFilterModeFromBitmask(samplerBitmask),
+      MIRBuilder, samplerTy);
   return sampler;
 }
 
@@ -284,19 +277,6 @@ static Register buildIConstant(uint64_t Val, SPIRVType *type,
   return Reg;
 }
 
-static Register buildConstantFZero(MachineIRBuilder &MIRBuilder,
-                                   SPIRVTypeRegistry *TR) {
-  const auto MRI = MIRBuilder.getMRI();
-  Register resVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
-  const auto &fsingle = APFloat::IEEEsingle();
-  auto &Context = MIRBuilder.getMF().getFunction().getContext();
-  const auto fzero = ConstantFP::get(Context, APFloat::getZero(fsingle));
-
-  MIRBuilder.buildFConstant(resVReg, *fzero);
-  TR->assignTypeToVReg(fzero->getType(), resVReg, MIRBuilder);
-  return resVReg;
-}
-
 // These queries ask for a single size_t result for a given dimension index, e.g
 // size_t get_global_id(uintt dimindex). In SPIR-V, the builtins corresonding to
 // these values are all vec3 types, so we need to extract the correct index or
@@ -429,14 +409,17 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
 
   if (!TR->isScalarOfType(OrigArgs[1], SPIRV::OpTypeSampler)) {
     auto sampMask = getLiteralValueForConstant(OrigArgs[1], MRI);
-    sampler = buildSamplerLiteral(sampMask, TR->getSPIRVTypeForVReg(sampler),
+    Register res;
+    sampler = buildSamplerLiteral(sampMask, res,
+                                  TR->getSPIRVTypeForVReg(sampler),
                                   MIRBuilder, TR);
   }
 
   Register sampledImage = buildOpSampledImage(image, sampler, MIRBuilder, TR);
 
   Register coord = OrigArgs[2];
-  Register lod = buildConstantFZero(MIRBuilder, TR);
+  Register lod = TR->buildConstantFP(APFloat::getZero(APFloat::IEEEsingle()),
+                                     MIRBuilder);
 
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageSampleExplicitLod)
                  .addDef(resVReg)
