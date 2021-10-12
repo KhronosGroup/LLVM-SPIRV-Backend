@@ -1,19 +1,18 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; FIXME: Fix, what to do with 3, 7, 6? "Volatile|Aligned"?
 ; CHECK-SPIRV-NOT: OpStore %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 8
-; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}} 3 8
+; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned 8
 ; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 8
-; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} 3 8
+; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned 8
 ; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Aligned 4
 ; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 8
-; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} 3 8
+; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned 8
 ; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 0
-; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} 3 8
+; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned 8
 ; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 8
-; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} 7 8
+; CHECK-SPIRV: %{{[0-9]+}} = OpLoad %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned|Nontemporal 8
 ; CHECK-SPIRV-NOT: OpStore %{{[0-9]+}} %{{[0-9]+}} Aligned 4
-; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}} 6 4
+; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}} Aligned|Nontemporal 4
 ; CHECK-SPIRV-NOT: OpStore %{{[0-9]+}} %{{[0-9]+}} Aligned 0
 ; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}}
 
