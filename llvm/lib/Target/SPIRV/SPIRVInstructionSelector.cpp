@@ -133,9 +133,6 @@ private:
   void renderFImm32(MachineInstrBuilder &MIB, const MachineInstr &I,
                           int OpIdx) const;
 
-  bool selectConst(Register resVReg, const SPIRVType *resType, const APInt &imm,
-                   MachineIRBuilder &MIRBuilder) const;
-
   bool selectExt(Register resVReg, const SPIRVType *resType,
                  const MachineInstr &I, bool isSigned,
                  MachineIRBuilder &MIRBuilder) const;
@@ -181,7 +178,8 @@ private:
                      const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                      const ExtInstList &extInsts) const;
 
-  Register buildI32Constant(uint32_t val, MachineIRBuilder &MIRBuilder) const;
+  Register buildI32Constant(uint32_t val, MachineIRBuilder &MIRBuilder,
+                            const SPIRVType *resType = nullptr) const;
 
   Register buildZerosVal(const SPIRVType *resType,
                          MachineIRBuilder &MIRBuilder) const;
@@ -1042,35 +1040,30 @@ void SPIRVInstructionSelector::renderImm32(
   transformConst(I.getOperand(1).getCImm()->getValue(), MIB);
 }
 
-bool SPIRVInstructionSelector::selectConst(Register res, const SPIRVType *resTy,
-                                           const APInt &imm,
-                                           MachineIRBuilder &MIRBuilder) const {
-  unsigned int OpCode = SPIRV::OpConstantI;
-  auto MIB = MIRBuilder.buildInstr(OpCode).addDef(res).addUse(
-      TR.getSPIRVTypeID(resTy));
-  transformConst(imm, MIB);
-  return constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
-}
-
 Register
 SPIRVInstructionSelector::buildI32Constant(uint32_t val,
-                                           MachineIRBuilder &MIRBuilder) const {
+    MachineIRBuilder &MIRBuilder, const SPIRVType *resType) const {
   auto MRI = MIRBuilder.getMRI();
   auto LLVMTy = IntegerType::get(MIRBuilder.getMF().getFunction().getContext(), 32);
-  auto spvI32Ty = TR.getOrCreateSPIRVType(
-      LLVMTy,
-      MIRBuilder);
+  auto spvI32Ty = resType ? resType : TR.getOrCreateSPIRVType(LLVMTy,
+                                                              MIRBuilder);
   // Find a constant in DT or build a new one.
   auto ConstInt = ConstantInt::get(LLVMTy, val);
   Register newReg;
   if (DT.find(ConstInt, &MIRBuilder.getMF(), newReg) == false) {
     newReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
     DT.add(ConstInt, &MIRBuilder.getMF(), newReg);
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
+    MachineInstr *MI;
+    if (val == 0)
+      MI = MIRBuilder.buildInstr(SPIRV::OpConstantNull)
+                 .addDef(newReg)
+                 .addUse(TR.getSPIRVTypeID(spvI32Ty));
+    else
+      MI = MIRBuilder.buildInstr(SPIRV::OpConstantI)
                  .addDef(newReg)
                  .addUse(TR.getSPIRVTypeID(spvI32Ty))
                  .addImm(APInt(32, val).getZExtValue());
-    constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
+    constrainSelectedInstRegOperands(*MI, TII, TRI, RBI);
   }
   return newReg;
 }
@@ -1086,24 +1079,17 @@ bool SPIRVInstructionSelector::selectFCmp(Register resVReg,
 Register
 SPIRVInstructionSelector::buildZerosVal(const SPIRVType *resType,
                                         MachineIRBuilder &MIRBuilder) const {
-  auto MRI = MIRBuilder.getMRI();
-  Register zeroReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-  MIRBuilder.buildInstr(SPIRV::OpConstantNull)
-      .addDef(zeroReg)
-      .addUse(TR.getSPIRVTypeID(resType))
-      .constrainAllUses(TII, TRI, RBI);
-  return zeroReg;
+  return buildI32Constant(0, MIRBuilder, resType);
 }
 
 Register
 SPIRVInstructionSelector::buildOnesVal(bool allOnes, const SPIRVType *resType,
                                        MachineIRBuilder &MIRBuilder) const {
   auto MRI = MIRBuilder.getMRI();
-  Register oneReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
   unsigned bitWidth = TR.getScalarOrVectorBitWidth(resType);
   auto one = allOnes ? APInt::getAllOnesValue(bitWidth)
                      : APInt::getOneBitSet(bitWidth, 0);
-  selectConst(oneReg, resType, one, MIRBuilder);
+  Register oneReg = buildI32Constant(one.getZExtValue(), MIRBuilder, resType);
   if (resType->getOpcode() == SPIRV::OpTypeVector) {
     const unsigned numEles = resType->getOperand(2).getImm();
     Register oneVec = MRI->createVirtualRegister(&SPIRV::IDRegClass);

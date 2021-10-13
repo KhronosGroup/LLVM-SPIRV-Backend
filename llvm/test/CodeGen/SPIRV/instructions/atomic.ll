@@ -16,7 +16,7 @@ target triple = "spirv32-unknown-unknown"
 ; Device scope is encoded with constant 1
 ; CHECK-DAG: [[SCOPE:%.*]] = OpConstant [[I32Ty]] 1
 ; "monotonic" maps to the relaxed memory semantics, encoded with constant 0
-; CHECK-DAG: [[RELAXED:%.*]] = OpConstant [[I32Ty]] 0
+; CHECK-DAG: [[RELAXED:%.*]] = OpConstantNull [[I32Ty]]
 
 ; CHECK: [[ADD]] = OpFunction [[I32Ty]]
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
