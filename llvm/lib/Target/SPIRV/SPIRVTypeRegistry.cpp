@@ -209,7 +209,7 @@ SPIRVTypeRegistry::buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
   }
   // Find a constant in DT or build a new one.
   const auto ConstFP = ConstantFP::get(LLVMFPTy->getContext(), val);
-   if (DT.find(ConstFP, &MIRBuilder.getMF(), res) == false) {
+  if (DT.find(ConstFP, &MIRBuilder.getMF(), res) == false) {
     unsigned BitWidth = spvType ? getScalarOrVectorBitWidth(spvType) : 32;
     res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
     assignTypeToVReg(LLVMFPTy, res, MIRBuilder);
@@ -217,6 +217,26 @@ SPIRVTypeRegistry::buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
     MIRBuilder.buildFConstant(res, *ConstFP);
   }
   return res;
+}
+
+Register
+SPIRVTypeRegistry::buildConstantSampler(Register resReg, unsigned int addrMode,
+    unsigned int param, unsigned int filerMode, MachineIRBuilder &MIRBuilder,
+    SPIRVType *spvType) {
+  SPIRVType *sampTy =
+      getOrCreateSPIRVType(getTypeForSPIRVType(spvType), MIRBuilder);
+  auto sampler = resReg.isValid() ? resReg :
+      MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantSampler)
+                 .addDef(sampler)
+                 .addUse(getSPIRVTypeID(sampTy))
+                 .addImm(addrMode)
+                 .addImm(param)
+                 .addImm(filerMode);
+  constrainRegOperands(MIB);
+  auto res = checkSpecialInstrMap(MIB, SpecialTypesAndConstsMap);
+  assert(res->getOperand(0).isReg());
+  return res->getOperand(0).getReg();
 }
 
 SPIRVType *SPIRVTypeRegistry::getOpTypeArray(uint32_t numElems,
@@ -279,7 +299,7 @@ SPIRVType *SPIRVTypeRegistry::handleOpenCLBuiltin(const StructType *Ty,
   assert(Ty->hasName());
   unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
   auto newTy = generateOpenCLOpaqueType(Ty, MIRBuilder, aq);
-  auto resTy = checkBuiltinTypeMap(newTy);
+  auto resTy = checkSpecialInstrMap(newTy, BuiltinTypeMap);
   if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs() &&
       resTy == newTy)
     buildOpName(getSPIRVTypeID(resTy), Ty->getName(), MIRBuilder);
@@ -493,7 +513,7 @@ SPIRVTypeRegistry::getSampledImageType(SPIRVType *imageType,
                  .addDef(resVReg)
                  .addUse(getSPIRVTypeID(imageType));
   constrainRegOperands(MIB);
-  return MIB;
+  return checkSpecialInstrMap(MIB, SpecialTypesAndConstsMap);
 }
 
 SPIRVType *SPIRVTypeRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
@@ -504,24 +524,36 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
   return MIB;
 }
 
-SPIRVType *SPIRVTypeRegistry::checkBuiltinTypeMap(SPIRVType *newType) {
-  auto t = BuiltinTypeMap.find(newType->getMF());
-  if (t != BuiltinTypeMap.end()) {
-    auto tt = t->second.find(newType->getOpcode());
-    if (tt != t->second.end()) {
-      SmallVector<SPIRVType*> types = tt->second;
-      for (auto type : types) {
-        if (type->isIdenticalTo(*newType,
-                                MachineInstr::MICheckType::IgnoreDefs)) {
-          const_cast<llvm::MachineInstr*>(newType)->eraseFromParent();
-          return type;
+const MachineInstr *SPIRVTypeRegistry::checkSpecialInstrMap(
+    const MachineInstr *newInstr, SpecialInstrMapTy &instrMap) {
+  auto t = instrMap.find(newInstr->getOpcode());
+  if (t != instrMap.end()) {
+    for (auto instrGroup : t->second) {
+      // Each group contins identical special instructions in different MFs,
+      // it's enough to check the first instruction in the group.
+      const MachineInstr *instr = instrGroup.begin()->second;
+      if (instr->isIdenticalTo(*newInstr,
+                              MachineInstr::MICheckType::IgnoreDefs)) {
+        auto tt = instrGroup.find(const_cast<MachineFunction *>
+                                  (newInstr->getMF()));
+        if (tt != instrGroup.end()) {
+          // The equivalent instruction was found in this MF,
+          // remove new instruction and return the existing one.
+          const_cast<llvm::MachineInstr*>(newInstr)->eraseFromParent();
+          return tt->second;
         }
+        // No such instruction in the group, add new instruction.
+        instrGroup[const_cast<MachineFunction *>(newInstr->getMF())] = newInstr;
+        return newInstr;
       }
     }
   }
-  // It's new builtin type, insert it to the map.
-  BuiltinTypeMap[newType->getMF()][newType->getOpcode()].push_back(newType);
-  return newType;
+  // It's new instruction with no existent group, so create a group,
+  // insert the instruction to the group and insert the group to the map.
+  auto *newInstrGroup = new SPIRVInstrGroup;
+  (*newInstrGroup)[const_cast<MachineFunction *>(newInstr->getMF())] = newInstr;
+  instrMap[newInstr->getOpcode()].push_back(*newInstrGroup);
+  return newInstr;
 }
 
 SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
@@ -579,7 +611,7 @@ SPIRVType *SPIRVTypeRegistry::handleSPIRVBuiltin(const StructType *Ty,
   assert(Ty->hasName());
   unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
   auto newTy = generateSPIRVOpaqueType(Ty, MIRBuilder, aq);
-  auto resTy = checkBuiltinTypeMap(newTy);
+  auto resTy = checkSpecialInstrMap(newTy, BuiltinTypeMap);
   if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs() &&
       newTy == resTy)
     buildOpName(getSPIRVTypeID(resTy), Ty->getName(), MIRBuilder);

@@ -42,17 +42,28 @@ class SPIRVTypeRegistry {
 
   DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
+  using SPIRVInstrGroup = DenseMap<MachineFunction *, const MachineInstr *>;
+  using VectorOfSPIRVInstrGroups = SmallVector<SPIRVInstrGroup>;
+  using SpecialInstrMapTy = MapVector<unsigned int, VectorOfSPIRVInstrGroups>;
+
   // Builtin types may be represented in two ways while translating to SPIR-V:
   // in OpenCL form and in SPIR-V form. We have to keep only one type for such
   // pairs so check any builtin type for existance in the map before emitting
   // it to SPIR-V. The map contains a vector of SPIR-V builtin types already
   // emitted for a given type opcode.
-  DenseMap<const MachineFunction *,
-           DenseMap<unsigned int, SmallVector<SPIRVType*>>> BuiltinTypeMap;
+  SpecialInstrMapTy BuiltinTypeMap;
+
+  // Some SPIR-V types and constants have no explicit analogues in LLVM types
+  // and constants. We create and store these special types and constants in
+  // this map to avoid type/const duplicatoin and to hoist the instructions
+  // properly to MB_TypeConstVars in GlobalTypesAndRegNumPass.
+  // Currently it holds OpTypeSampledImage and OpConstantSampler instances.
+  SpecialInstrMapTy SpecialTypesAndConstsMap;
 
   // Look for an equivalent of the newType in the map. Return the equivalent
   // if it's found, otherwise insert newType to the map and return the type.
-  SPIRVType *checkBuiltinTypeMap(SPIRVType *newType);
+  const MachineInstr *checkSpecialInstrMap(const MachineInstr *newInstr,
+                                           SpecialInstrMapTy &instrMap);
 
   // Number of bits pointers and size_t integers require.
   const unsigned int pointerSize;
@@ -62,6 +73,11 @@ class SPIRVTypeRegistry {
                              AQ::AccessQualifier accessQual = AQ::ReadWrite);
 
 public:
+  // This interface is for walking the map in GlobalTypesAndRegNumPass.
+  SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
+    return SpecialTypesAndConstsMap;
+  }
+
   SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT, unsigned int pointerSize);
 
   MachineFunction *CurMF;
@@ -199,6 +215,10 @@ public:
                             SPIRVType *spvType = nullptr);
   Register buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *spvType = nullptr);
+  Register buildConstantSampler(Register res, unsigned int addrMode,
+      unsigned int param, unsigned int filerMode,
+      MachineIRBuilder &MIRBuilder, SPIRVType *spvType);
+
   // convenient helpers for getting types
   // w/ check for duplicates
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
