@@ -464,7 +464,6 @@ static bool genReadImageMSAA(MachineIRBuilder &MIRBuilder, Register resVReg,
   return TR->constrainRegOperands(MIB);
 }
 
-
 static bool genReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                          SPIRVType *retType,
                          const SmallVectorImpl<Register> &OrigArgs,
@@ -1074,6 +1073,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
                                      const SmallVectorImpl<Register> &args,
                                      SPIRVTypeRegistry *TR) {
   LLVM_DEBUG(dbgs() << "Generating OpenCL Builtin: " << demangledName << "\n");
+
   SPIRVType *retTy = nullptr;
   if (OrigRetTy && !OrigRetTy->isVoidTy())
     retTy = TR->assignTypeToVReg(OrigRetTy, OrigRet, MIRBuilder);
