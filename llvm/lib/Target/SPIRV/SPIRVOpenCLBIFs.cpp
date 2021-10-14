@@ -692,6 +692,9 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   assert(TR->isScalarOfType(desired, OpTypeInt));
 
   SPIRVType *spvObjectPtrTy = TR->getSPIRVTypeForVReg(objectPtr);
+  assert(spvObjectPtrTy->getOperand(2).isReg() && "SPIRV type is expected");
+  SPIRVType *spvObjectTy = MRI->getVRegDef(
+      spvObjectPtrTy->getOperand(2).getReg());
   auto storageClass = static_cast<StorageClass::StorageClass>(
       spvObjectPtrTy->getOperand(1).getImm());
   auto memSemStorage = getMemSemanticsForStorageClass(storageClass);
@@ -739,7 +742,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   TR->assignSPIRVTypeToVReg(spvDesiredTy, tmp, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(OpAtomicCompareExchange)
                  .addDef(tmp)
-                 .addUse(TR->getSPIRVTypeID(retType))
+                 .addUse(TR->getSPIRVTypeID(spvObjectTy))
                  .addUse(objectPtr)
                  .addUse(scopeReg)
                  .addUse(memSemEqualReg)
@@ -747,7 +750,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addUse(desired)
                  .addUse(expected);
   if (!isCmpxchg) {
-    MIRBuilder.buildInstr(OpStore).addUse(expected).addUse(tmp);
+    MIRBuilder.buildInstr(OpStore).addUse(expectedArg).addUse(tmp);
     MIRBuilder.buildICmp(CmpInst::ICMP_EQ, resVReg, tmp, expected);
   }
   return TR->constrainRegOperands(MIB);
@@ -762,7 +765,7 @@ static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
   auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
 
   Register scopeReg;
-  auto scope = Scope::Device;
+  auto scope = Scope::Workgroup;
   if (OrigArgs.size() >= 4) {
     assert(OrigArgs.size() == 4 && "Extra args for explicit atomic RMW");
     auto clScope = static_cast<CLMemScope>(getIConstVal(OrigArgs[5], MRI));
@@ -771,13 +774,13 @@ static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
       scopeReg = OrigArgs[5];
   }
   if (!scopeReg.isValid())
-    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+    scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty);
 
   auto ptr = OrigArgs[0];
   auto scSem = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
 
   Register memSemReg;
-  auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
+  unsigned memSem = MemorySemantics::None;
   if (OrigArgs.size() >= 3) {
     auto memOrd = static_cast<CLMemOrder>(getIConstVal(OrigArgs[2], MRI));
     memSem = getSPIRVMemSemantics(memOrd) | scSem;
@@ -785,7 +788,7 @@ static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
       memSemReg = OrigArgs[3];
   }
   if (!memSemReg.isValid())
-    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+    memSemReg = TR->buildConstantInt(memSem, MIRBuilder, I32Ty);
 
   auto MIB = MIRBuilder.buildInstr(RMWOpcode)
                  .addDef(resVReg)
