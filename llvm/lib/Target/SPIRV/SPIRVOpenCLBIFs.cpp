@@ -401,18 +401,21 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                                 SPIRVType *retType,
                                 const SmallVectorImpl<Register> &OrigArgs,
                                 SPIRVTypeRegistry *TR) {
-
+  assert(OrigArgs.size() > 2);
   const auto MRI = MIRBuilder.getMRI();
 
   Register image = OrigArgs[0];
   Register sampler = OrigArgs[1];
 
   if (!TR->isScalarOfType(OrigArgs[1], SPIRV::OpTypeSampler)) {
-    auto sampMask = getLiteralValueForConstant(OrigArgs[1], MRI);
-    Register res;
-    sampler = buildSamplerLiteral(sampMask, res,
-                                  TR->getSPIRVTypeForVReg(sampler),
-                                  MIRBuilder, TR);
+    MachineInstr *samplerInstr = MRI->getVRegDef(sampler);
+    if (samplerInstr->getOperand(1).isCImm()) {
+      auto sampMask = getLiteralValueForConstant(OrigArgs[1], MRI);
+      Register res;
+      sampler = buildSamplerLiteral(sampMask, res,
+                                    TR->getSPIRVTypeForVReg(sampler),
+                                    MIRBuilder, TR);
+    }
   }
 
   Register sampledImage = buildOpSampledImage(image, sampler, MIRBuilder, TR);
@@ -420,14 +423,44 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
   Register coord = OrigArgs[2];
   Register lod = TR->buildConstantFP(APFloat::getZero(APFloat::IEEEsingle()),
                                      MIRBuilder);
+  // OpImageSampleExplicitLod always returns 4-element vector.
+  SPIRVType *tmpType = retType;
+  if (tmpType->getOpcode() != SPIRV::OpTypeVector)
+    tmpType = TR->getOrCreateSPIRVVectorType(retType, 4, MIRBuilder);
+  auto llt = LLT::scalar(TR->getScalarOrVectorBitWidth(tmpType));
+  Register tmpReg = MRI->createGenericVirtualRegister(llt);
+  TR->assignSPIRVTypeToVReg(tmpType, tmpReg, MIRBuilder);
 
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageSampleExplicitLod)
-                 .addDef(resVReg)
-                 .addUse(TR->getSPIRVTypeID(retType))
+                 .addDef(tmpReg)
+                 .addUse(TR->getSPIRVTypeID(tmpType))
                  .addUse(sampledImage)
                  .addUse(coord)
                  .addImm(ImageOperand::Lod)
                  .addUse(lod);
+  TR->constrainRegOperands(MIB);
+
+  MIB = MIRBuilder.buildInstr(SPIRV::OpCompositeExtract)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(retType))
+                 .addUse(tmpReg)
+                 .addImm(0);
+  return  TR->constrainRegOperands(MIB);
+}
+
+static bool genReadImageMSAA(MachineIRBuilder &MIRBuilder, Register resVReg,
+                         SPIRVType *retType,
+                         const SmallVectorImpl<Register> &OrigArgs,
+                         SPIRVTypeRegistry *TR) {
+  Register image = OrigArgs[0];
+  Register coord = OrigArgs[1];
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageRead)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(retType))
+                 .addUse(image)
+                 .addUse(coord)
+                 .addImm(ImageOperand::Sample)
+                 .addUse(OrigArgs[2]);
   return TR->constrainRegOperands(MIB);
 }
 
@@ -509,7 +542,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
                    .addUse(TR->getSPIRVTypeID(sizeVecTy))
                    .addUse(img);
   } else {
-    auto lodReg = buildIConstant(0, I32Ty, MIRBuilder, TR);
+    auto lodReg = TR->buildConstantInt(0, MIRBuilder, I32Ty);
     MIB = MIRBuilder.buildInstr(SPIRV::OpImageQuerySizeLod)
                    .addDef(sizeVec)
                    .addUse(TR->getSPIRVTypeID(sizeVecTy))
@@ -1146,8 +1179,10 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   }
   case 'r':
     if (nameNoArgs.startswith("read_image")) {
-      if (args.size() > 2)
+      if (demangledName.find("ocl_sampler") != StringRef::npos)
         return genSampledReadImage(MIRBuilder, OrigRet, retTy, args, TR);
+      else if (demangledName.find("msaa") != StringRef::npos)
+        return genReadImageMSAA(MIRBuilder, OrigRet, retTy, args, TR);
       else
         return genReadImage(MIRBuilder, OrigRet, retTy, args, TR);
     }

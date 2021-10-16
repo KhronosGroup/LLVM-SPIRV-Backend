@@ -146,6 +146,7 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         case SPIRV::OpImageSparseDrefGather:
         case SPIRV::OpImageSparseRead:
         case SPIRV::OpImageSampleFootprintNV:
+          OS << ' ';
           printImageOperand(MI, firstVariableIndex, OS);
           printRemainingVariableOps(MI, numFixedOps + 1, OS);
           break;
