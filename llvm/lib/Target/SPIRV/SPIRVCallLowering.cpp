@@ -83,6 +83,14 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
+      if (Arg.getType()->isPointerTy()) {
+        uint64_t DerefBytes = Arg.getDereferenceableBytes();
+        if (DerefBytes != 0)
+          MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(VRegs[i][0])
+                   .addImm(Decoration::MaxByteOffset)
+                   .addImm(DerefBytes);
+      }
       ++i;
     }
   }
