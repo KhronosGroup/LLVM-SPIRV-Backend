@@ -625,11 +625,14 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
   assert(Name.startswith("spirv.") && "CL types should start with 'opencl.'");
   auto TypeName = Name.substr(strlen("spirv."));
 
-  if (TypeName.startswith("Image.")) {
+  if (TypeName.startswith("Image.") || TypeName.startswith("SampledImage.")) {
     // Parse SPIRV ImageType which has following format in LLVM:
     // Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
     // e.g. %spirv.Image._void_1_0_0_0_0_0_0
-    auto typeLiteralStr = TypeName.substr(strlen("Image."));
+    // Also support SampledImageType.
+    bool isSampled = TypeName.startswith("SampledImage.");
+    auto typeLiteralStr = TypeName.substr(isSampled ? strlen("SampledImage.")
+                                                    : strlen("Image."));
     SmallVector<StringRef> typeLiterals;
     SplitString(typeLiteralStr, typeLiterals, "_");
     assert (typeLiterals.size() == 8 && "Wrong number of literals in Image type");
@@ -658,15 +661,33 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
         typeLiterals[7].getAsInteger(10, accessQualifier))
       llvm_unreachable("Unable to recognize Image type literals");
 
-    return getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
-                          depth, arrayed, ms, sampled,
-                          ImageFormat::ImageFormat(imageFormat),
-                          AQ::AccessQualifier(accessQualifier));
-  }
+    SPIRVType *imageType = getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
+                                          depth, arrayed, ms, sampled,
+                                          ImageFormat::ImageFormat(imageFormat),
+                                          AQ::AccessQualifier(accessQualifier));
+    return isSampled ? getOrCreateSPIRVSampledImageType(imageType, MIRBuilder)
+                     : imageType;
+  } else if (TypeName.startswith("DeviceEvent"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
+  else if (TypeName.startswith("Sampler"))
+    return getSamplerType(MIRBuilder);
+  else if (TypeName.startswith("Event"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeEvent);
   else if (TypeName.startswith("Queue"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeQueue);
+  else if (TypeName.startswith("Pipe.")) {
+    if (TypeName.endswith("_0"))
+      accessQual = AQ::ReadOnly;
+    else if (TypeName.endswith("_1"))
+      accessQual = AQ::WriteOnly;
+    else if (TypeName.endswith("_2"))
+      accessQual = AQ::ReadWrite;
+    return getOpTypePipe(MIRBuilder, accessQual);
+  }
   else if (TypeName.startswith("PipeStorage"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypePipeStorage);
+  else if (TypeName.startswith("ReserveId"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeReserveId);
 
   report_fatal_error("Cannot generate SPIRV built-in type: " + Name);
 }
