@@ -22,23 +22,23 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK: OpName %[[SI:[0-9]+]] "__spirv_BuiltInSubgroupId"
 ; CHECK: OpName %[[SLII:[0-9]+]] "__spirv_BuiltInSubgroupLocalInvocationId"
 
-; CHECK: OpDecorate %[[NW]] BuiltIn NumWorkgroups
-; CHECK: OpDecorate %[[WS]] BuiltIn WorkgroupSize
-; CHECK: OpDecorate %[[WI]] BuiltIn WorkgroupId
-; CHECK: OpDecorate %[[LLI]] BuiltIn LocalInvocationId
-; CHECK: OpDecorate %[[GII]] BuiltIn GlobalInvocationId
-; CHECK: OpDecorate %[[LLII]] BuiltIn LocalInvocationIndex
-; CHECK: OpDecorate %[[WD]] BuiltIn WorkDim
-; CHECK: OpDecorate %[[GS]] BuiltIn GlobalSize
-; CHECK: OpDecorate %[[EWS]] BuiltIn EnqueuedWorkgroupSize
-; CHECK: OpDecorate %[[GO]] BuiltIn GlobalOffset
-; CHECK: OpDecorate %[[GLI]] BuiltIn GlobalLinearId
-; CHECK: OpDecorate %[[SS]] BuiltIn SubgroupSize
-; CHECK: OpDecorate %[[SMS]] BuiltIn SubgroupMaxSize
-; CHECK: OpDecorate %[[NS]] BuiltIn NumSubgroups
-; CHECK: OpDecorate %[[NES]] BuiltIn NumEnqueuedSubgroups
-; CHECK: OpDecorate %[[SI]] BuiltIn SubgroupId
-; CHECK: OpDecorate %[[SLII]] BuiltIn SubgroupLocalInvocationId
+; CHECK-DAG: OpDecorate %[[NW]] BuiltIn NumWorkgroups
+; CHECK-DAG: OpDecorate %[[WS]] BuiltIn WorkgroupSize
+; CHECK-DAG: OpDecorate %[[WI]] BuiltIn WorkgroupId
+; CHECK-DAG: OpDecorate %[[LLI]] BuiltIn LocalInvocationId
+; CHECK-DAG: OpDecorate %[[GII]] BuiltIn GlobalInvocationId
+; CHECK-DAG: OpDecorate %[[LLII]] BuiltIn LocalInvocationIndex
+; CHECK-DAG: OpDecorate %[[WD]] BuiltIn WorkDim
+; CHECK-DAG: OpDecorate %[[GS]] BuiltIn GlobalSize
+; CHECK-DAG: OpDecorate %[[EWS]] BuiltIn EnqueuedWorkgroupSize
+; CHECK-DAG: OpDecorate %[[GO]] BuiltIn GlobalOffset
+; CHECK-DAG: OpDecorate %[[GLI]] BuiltIn GlobalLinearId
+; CHECK-DAG: OpDecorate %[[SS]] BuiltIn SubgroupSize
+; CHECK-DAG: OpDecorate %[[SMS]] BuiltIn SubgroupMaxSize
+; CHECK-DAG: OpDecorate %[[NS]] BuiltIn NumSubgroups
+; CHECK-DAG: OpDecorate %[[NES]] BuiltIn NumEnqueuedSubgroups
+; CHECK-DAG: OpDecorate %[[SI]] BuiltIn SubgroupId
+; CHECK-DAG: OpDecorate %[[SLII]] BuiltIn SubgroupLocalInvocationId
 @__spirv_BuiltInWorkDim = external addrspace(1) global i32
 @__spirv_BuiltInGlobalSize = external addrspace(1) global <3 x i32>
 @__spirv_BuiltInGlobalInvocationId = external addrspace(1) global <3 x i32>

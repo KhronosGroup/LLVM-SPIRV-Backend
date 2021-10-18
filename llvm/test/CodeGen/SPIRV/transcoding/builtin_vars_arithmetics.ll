@@ -25,18 +25,18 @@
 ; clang++ -fsycl -fsycl-device-only emit-llvm tmp.cpp -o tmp.bc
 ; llvm-spirv tmp.bc -spirv-text -o builtin_vars_arithmetics.ll
 
-; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId:[0-9]+]] BuiltIn GlobalInvocationId
-; CHECK-SPIRV: OpDecorate %[[GlobalSize:[0-9]+]] BuiltIn GlobalSize
-; CHECK-SPIRV: OpDecorate %[[GlobalOffset:[0-9]+]] BuiltIn GlobalOffset
-; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId]] Constant
-; CHECK-SPIRV: OpDecorate %[[GlobalSize]] Constant
-; CHECK-SPIRV: OpDecorate %[[GlobalOffset]] Constant
-; CHECK-SPIRV: OpDecorate %[[GlobalOffset]] LinkageAttributes "__spirv_BuiltInGlobalOffset" Import 
-; CHECK-SPIRV: OpDecorate %[[GlobalSize]] LinkageAttributes "__spirv_BuiltInGlobalSize" Import 
-; CHECK-SPIRV: OpDecorate %[[GlobalInvocationId]] LinkageAttributes "__spirv_BuiltInGlobalInvocationId" Import 
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalInvocationId:[0-9]+]] BuiltIn GlobalInvocationId
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalSize:[0-9]+]] BuiltIn GlobalSize
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalOffset:[0-9]+]] BuiltIn GlobalOffset
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalInvocationId]] Constant
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalSize]] Constant
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalOffset]] Constant
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalOffset]] LinkageAttributes "__spirv_BuiltInGlobalOffset" Import 
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalSize]] LinkageAttributes "__spirv_BuiltInGlobalSize" Import 
+; CHECK-SPIRV-DAG: OpDecorate %[[GlobalInvocationId]] LinkageAttributes "__spirv_BuiltInGlobalInvocationId" Import 
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64"
-target triple = "spirv64-unknown-linux-sycldevice"
+target triple = "spirv64-unknown-linux"
 
 %"class._ZTSN2cl4sycl5rangeILi2EEE.cl::sycl::range" = type { %"class._ZTSN2cl4sycl6detail5arrayILi2EEE.cl::sycl::detail::array" }
 %"class._ZTSN2cl4sycl6detail5arrayILi2EEE.cl::sycl::detail::array" = type { [2 x i64] }

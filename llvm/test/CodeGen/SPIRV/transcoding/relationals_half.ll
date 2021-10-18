@@ -8,7 +8,7 @@
 ; CHECK-SPIRV: OpIsInf %[[BoolTypeID]]
 ; CHECK-SPIRV: OpIsNormal %[[BoolTypeID]]
 ; CHECK-SPIRV: OpSignBitSet %[[BoolTypeID]]
-; CHECK-SPIRV: OpLessOrGreater %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdNotEqual %[[BoolTypeID]]
 ; CHECK-SPIRV: OpOrdered %[[BoolTypeID]]
 ; CHECK-SPIRV: OpUnordered %[[BoolTypeID]]
 
@@ -16,7 +16,7 @@
 ; CHECK-SPIRV: OpIsNan %[[BoolVectorTypeID]]
 ; CHECK-SPIRV: OpIsInf %[[BoolVectorTypeID]]
 ; CHECK-SPIRV: OpIsNormal %[[BoolVectorTypeID]]
-; CHECK-SPIRV: OpLessOrGreater %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdNotEqual %[[BoolVectorTypeID]]
 ; CHECK-SPIRV: OpOrdered %[[BoolVectorTypeID]]
 ; CHECK-SPIRV: OpUnordered %[[BoolVectorTypeID]]
 
