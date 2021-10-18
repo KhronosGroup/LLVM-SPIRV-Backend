@@ -1,11 +1,11 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV: OpDecorate %[[#SC3:]] SpecId 3
-; CHECK-SPIRV: OpDecorate %[[#SC4:]] SpecId 4
-; CHECK-SPIRV: OpDecorate %[[#SC6:]] SpecId 6
-; CHECK-SPIRV: OpDecorate %[[#SC7:]] SpecId 7
-; CHECK-SPIRV: OpDecorate %[[#SC10:]] SpecId 10
-; CHECK-SPIRV: OpDecorate %[[#SC11:]] SpecId 11
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC3:]] SpecId 3
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC4:]] SpecId 4
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC6:]] SpecId 6
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC7:]] SpecId 7
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC10:]] SpecId 10
+; CHECK-SPIRV-DAG: OpDecorate %[[#SC11:]] SpecId 11
 
 ; CHECK-SPIRV-DAG: %[[#Int:]] = OpTypeInt 32
 ; CHECK-SPIRV-DAG: %[[#Float:]] = OpTypeFloat 32
@@ -17,7 +17,7 @@
 
 source_filename = "./SpecConstantComposite.ll"
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64"
-target triple = "spirv64-unknown-unknown-sycldevice"
+target triple = "spirv64-unknown-unknown"
 
 %struct._ZTS3POD.POD = type { [2 x %struct._ZTS1A.A], %"class._ZTSN2cl4sycl3vecIiLi2EEE.cl::sycl::vec" }
 %struct._ZTS1A.A = type { i32, float }

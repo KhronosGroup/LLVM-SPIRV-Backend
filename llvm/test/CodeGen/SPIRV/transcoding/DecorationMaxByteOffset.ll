@@ -3,8 +3,8 @@
 ; CHECK-SPIRV: OpName %[[PTR_ID:[0-9]+]] "ptr"
 ; CHECK-SPIRV: OpName %[[PTR2_ID:[0-9]+]] "ptr2"
 ; FIXME: "MaxByteOffset 12", "123"
-; CHECK-SPIRV: OpDecorate %[[PTR_ID]] MaxByteOffset 12
-; CHECK-SPIRV: OpDecorate %[[PTR2_ID]] MaxByteOffset 123
+; CHECK-SPIRV-DAG: OpDecorate %[[PTR_ID]] MaxByteOffset 12
+; CHECK-SPIRV-DAG: OpDecorate %[[PTR2_ID]] MaxByteOffset 123
 ; CHECK-SPIRV: %[[CHAR_T:[0-9]+]] = OpTypeInt 8 0
 ; CHECK-SPIRV: %[[CHAR_PTR_T:[0-9]+]] = OpTypePointer Workgroup %[[CHAR_T]]
 ; CHECK-SPIRV: %[[PTR_ID]] = OpFunctionParameter %[[CHAR_PTR_T]]

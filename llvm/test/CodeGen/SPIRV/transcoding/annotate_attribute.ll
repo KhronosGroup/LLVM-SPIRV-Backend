@@ -1,18 +1,20 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; FIXME: Re-check these all
-; CHECK-SPIRV: OpDecorate %{{[0-9]+}} UserSemantic "42"
-; CHECK-SPIRV: OpDecorate %{{[0-9]+}} UserSemantic "bar"
-; CHECK-SPIRV: OpDecorate %{{[0-9]+}} UserSemantic "{FOO}"
-; CHECK-SPIRV: OpMemberDecorate %{{[0-9]+}} 1 UserSemantic "128"
-; CHECK-SPIRV: OpMemberDecorate %{{[0-9]+}} 2 UserSemantic "qux"
-; CHECK-SPIRV: OpMemberDecorate %{{[0-9]+}} 0 UserSemantic "{baz}"
+; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "42"
+; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "bar"
+; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "{FOO}"
+; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "my_custom_annotations: 30, 60"
+; CHECK-SPIRV-DAG: OpMemberDecorate %{{[0-9]+}} 1 UserSemantic "128"
+; CHECK-SPIRV-DAG: OpMemberDecorate %{{[0-9]+}} 2 UserSemantic "qux"
+; CHECK-SPIRV-DAG: OpMemberDecorate %{{[0-9]+}} 0 UserSemantic "{baz}"
+; CHECK-SPIRV-DAG: OpMemberDecorate %{{[0-9]+}} 3 UserSemantic "my_custom_annotations: 20, 60, 80"
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-linux"
 
 %class.anon = type { i8 }
-%struct.bar = type { i32, i8, float }
+%struct.bar = type { i32, i8, float, i8 }
 
 @.str = private unnamed_addr constant [3 x i8] c"42\00", section "llvm.metadata"
 @.str.1 = private unnamed_addr constant [23 x i8] c"annotate_attribute.cpp\00", section "llvm.metadata"
@@ -21,6 +23,10 @@ target triple = "spirv64-unknown-linux"
 @.str.4 = private unnamed_addr constant [6 x i8] c"{baz}\00", section "llvm.metadata"
 @.str.5 = private unnamed_addr constant [4 x i8] c"128\00", section "llvm.metadata"
 @.str.6 = private unnamed_addr constant [4 x i8] c"qux\00", section "llvm.metadata"
+@.str.7 = private unnamed_addr constant [22 x i8] c"my_custom_annotations\00", section "llvm.metadata"
+@.args.0 = private unnamed_addr constant { i32, i32 } { i32 30, i32 60 }, section "llvm.metadata"
+@.args.1 = private unnamed_addr constant { i32, i32, i32 } { i32 20, i32 60, i32 80 }, section "llvm.metadata"
+
 
 ; Function Attrs: nounwind
 define spir_kernel void @_ZTSZ4mainE15kernel_function() #0 !kernel_arg_addr_space !4 !kernel_arg_access_qual !4 !kernel_arg_type !4 !kernel_arg_base_type !4 !kernel_arg_type_qual !4 {
@@ -57,6 +63,7 @@ entry:
   %var_one = alloca i32, align 4
   %var_two = alloca i32, align 4
   %var_three = alloca i8, align 1
+  %var_four = alloca i8, align 1
   %0 = bitcast i32* %var_one to i8*
   call void @llvm.lifetime.start.p0i8(i64 4, i8* %0) #4
   %var_one1 = bitcast i32* %var_one to i8*
@@ -68,6 +75,9 @@ entry:
   call void @llvm.lifetime.start.p0i8(i64 1, i8* %var_three) #4
   call void @llvm.var.annotation(i8* %var_three, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str.3, i32 0, i32 0), i8* getelementptr inbounds ([23 x i8], [23 x i8]* @.str.1, i32 0, i32 0), i32 4, i8* undef)
   call void @llvm.lifetime.end.p0i8(i64 1, i8* %var_three) #4
+  call void @llvm.lifetime.start.p0i8(i64 1, i8* %var_four) #4
+  call void @llvm.var.annotation(i8* %var_four, i8* getelementptr inbounds ([22 x i8], [22 x i8]* @.str.7, i32 0, i32 0), i8* getelementptr inbounds ([23 x i8], [23 x i8]* @.str.1, i32 0, i32 0), i32 4, i8* bitcast ({ i32, i32 }* @.args.0 to i8*))
+  call void @llvm.lifetime.end.p0i8(i64 1, i8* %var_four) #4
   %2 = bitcast i32* %var_two to i8*
   call void @llvm.lifetime.end.p0i8(i64 4, i8* %2) #4
   %3 = bitcast i32* %var_one to i8*
@@ -95,8 +105,11 @@ entry:
   %4 = call i8* @llvm.ptr.annotation.p0i8(i8* %3, i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str.6, i32 0, i32 0), i8* getelementptr inbounds ([23 x i8], [23 x i8]* @.str.1, i32 0, i32 0), i32 9, i8* undef)
   %5 = bitcast i8* %4 to float*
   store float 0.000000e+00, float* %5, align 4, !tbaa !14
-  %6 = bitcast %struct.bar* %s1 to i8*
-  call void @llvm.lifetime.end.p0i8(i64 12, i8* %6) #4
+  %f4 = getelementptr inbounds %struct.bar, %struct.bar* %s1, i32 0, i32 3
+  %6 = call i8* @llvm.ptr.annotation.p0i8(i8* %f4, i8* getelementptr inbounds ([22 x i8], [22 x i8]* @.str.7, i32 0, i32 0), i8* getelementptr inbounds ([23 x i8], [23 x i8]* @.str.1, i32 0, i32 0), i32 9, i8* bitcast ({ i32, i32, i32 }* @.args.1 to i8*))
+  store i8 0, i8* %6, align 4, !tbaa !13
+  %7 = bitcast %struct.bar* %s1 to i8*
+  call void @llvm.lifetime.end.p0i8(i64 12, i8* %7) #4
   ret void
 }
 
