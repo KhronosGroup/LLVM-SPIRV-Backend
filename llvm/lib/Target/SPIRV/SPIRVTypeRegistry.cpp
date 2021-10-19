@@ -625,14 +625,11 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
   assert(Name.startswith("spirv.") && "CL types should start with 'opencl.'");
   auto TypeName = Name.substr(strlen("spirv."));
 
-  if (TypeName.startswith("Image.") || TypeName.startswith("SampledImage.")) {
+  if (TypeName.startswith("Image.")) {
     // Parse SPIRV ImageType which has following format in LLVM:
     // Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
     // e.g. %spirv.Image._void_1_0_0_0_0_0_0
-    // Also support SampledImageType.
-    bool isSampled = TypeName.startswith("SampledImage.");
-    auto typeLiteralStr = TypeName.substr(isSampled ? strlen("SampledImage.")
-                                                    : strlen("Image."));
+    auto typeLiteralStr = TypeName.substr(strlen("Image."));
     SmallVector<StringRef> typeLiterals;
     SplitString(typeLiteralStr, typeLiterals, "_");
     assert (typeLiterals.size() == 8 && "Wrong number of literals in Image type");
@@ -661,12 +658,10 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
         typeLiterals[7].getAsInteger(10, accessQualifier))
       llvm_unreachable("Unable to recognize Image type literals");
 
-    SPIRVType *imageType = getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
-                                          depth, arrayed, ms, sampled,
-                                          ImageFormat::ImageFormat(imageFormat),
-                                          AQ::AccessQualifier(accessQualifier));
-    return isSampled ? getOrCreateSPIRVSampledImageType(imageType, MIRBuilder)
-                     : imageType;
+    return getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
+                          depth, arrayed, ms, sampled,
+                          ImageFormat::ImageFormat(imageFormat),
+                          AQ::AccessQualifier(accessQualifier));
   } else if (TypeName.startswith("DeviceEvent"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
   else if (TypeName.startswith("Sampler"))
