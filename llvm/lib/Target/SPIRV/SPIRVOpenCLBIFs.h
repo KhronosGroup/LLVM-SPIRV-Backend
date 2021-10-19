@@ -21,10 +21,47 @@
 namespace AQ = AccessQualifier;
 
 namespace llvm {
+bool handleConvert(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleReadImage(const StringRef demangledName,
+    MachineIRBuilder &MIRBuilder, Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleAtomic(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleBarrier(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleDot(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+bool handleLocal(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleGlobal(const StringRef demangledName, MachineIRBuilder &MIRBuilder,
+    Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleWorkGroup(const StringRef demangledName,
+    MachineIRBuilder &MIRBuilder, Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleImageQuery(const StringRef demangledName,
+    MachineIRBuilder &MIRBuilder, Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
+bool handleSamplerLiteral(const StringRef demangledName,
+    MachineIRBuilder &MIRBuilder, Register OrigRet, const SPIRVType *retTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
+
 bool generateOpenCLBuiltinCall(const StringRef demangledName,
-                               MachineIRBuilder &MIRBuilder, Register OrigRet,
-                               const Type *OrigRetTy,
-                               const SmallVectorImpl<Register> &args,
-                               SPIRVTypeRegistry *TR);
+    MachineIRBuilder &MIRBuilder, Register OrigRet, const Type *OrigRetTy,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR);
 } // end namespace llvm
 #endif

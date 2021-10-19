@@ -52,6 +52,7 @@ enum ActionType {
   GenGICombiner,
   GenX86EVEX2VEXTables,
   GenX86FoldTables,
+  GenSPIRVOpenCLBuiltins,
   GenRegisterBank,
   GenExegesis,
   GenAutomata,
@@ -130,6 +131,7 @@ cl::opt<ActionType> Action(
                    "Generate X86 EVEX to VEX compress tables"),
         clEnumValN(GenX86FoldTables, "gen-x86-fold-tables",
                    "Generate X86 fold tables"),
+        clEnumValN(GenSPIRVOpenCLBuiltins, "gen-spirv-openclbuiltins", "Generate SPIRV instructions from OpenCLBuiltins"),
         clEnumValN(GenRegisterBank, "gen-register-bank",
                    "Generate registers bank descriptions"),
         clEnumValN(GenExegesis, "gen-exegesis",
@@ -259,6 +261,9 @@ bool LLVMTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
     break;
   case GenX86FoldTables:
     EmitX86FoldTables(Records, OS);
+    break;
+  case GenSPIRVOpenCLBuiltins:
+    EmitSPIRVOpenCLBuiltins(Records, OS);
     break;
   case GenExegesis:
     EmitExegesis(Records, OS);

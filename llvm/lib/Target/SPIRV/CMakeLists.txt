@@ -9,7 +9,7 @@ tablegen(LLVM SPIRVGenMCCodeEmitter.inc -gen-emitter)
 tablegen(LLVM SPIRVGenRegisterBank.inc -gen-register-bank)
 tablegen(LLVM SPIRVGenRegisterInfo.inc -gen-register-info)
 tablegen(LLVM SPIRVGenSubtargetInfo.inc -gen-subtarget)
-
+tablegen(LLVM SPIRVGenOpenCLBuiltins.inc -gen-spirv-openclbuiltins)
 add_public_tablegen_target(SPIRVCommonTableGen)
 
 add_llvm_target(SPIRVCodeGen
@@ -31,6 +31,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVLegalizerInfo.cpp
   SPIRVMCInstLower.cpp
   SPIRVOpenCLBIFs.cpp
+  SPIRVOpenCLBIFsPass.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
   SPIRVStrings.cpp
