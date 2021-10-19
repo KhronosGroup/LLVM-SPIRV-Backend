@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InstPrinter/SPIRVInstPrinter.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "SPIRV.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVMCInstLower.h"
@@ -48,14 +49,20 @@ public:
   void emitInstruction(const MachineInstr *MI) override;
 
   // TODO: consider if these are necessary
-  // void emitFunctionHeader() override {}
   void emitFunctionEntryLabel() override {};
+  void emitFunctionHeader() override;
+  void emitFunctionBodyStart() override {};
   void emitBasicBlockStart(const MachineBasicBlock &MBB) override {}
   void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
-  // void emitGlobalVariable(const GlobalVariable *GV) override {}
+  void emitGlobalVariable(const GlobalVariable *GV) override {}
 };
 } // namespace
 
+void SPIRVAsmPrinter::emitFunctionHeader() {
+  const Function &F = MF->getFunction();
+  auto section = getObjFileLowering().SectionForGlobal(&F, TM);
+  MF->setSection(section);
+}
 
 void SPIRVAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
                                    raw_ostream &O) {
