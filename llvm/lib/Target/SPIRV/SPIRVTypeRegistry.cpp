@@ -662,11 +662,27 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
                           depth, arrayed, ms, sampled,
                           ImageFormat::ImageFormat(imageFormat),
                           AQ::AccessQualifier(accessQualifier));
-  }
+  } else if (TypeName.startswith("DeviceEvent"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
+  else if (TypeName.startswith("Sampler"))
+    return getSamplerType(MIRBuilder);
+  else if (TypeName.startswith("Event"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeEvent);
   else if (TypeName.startswith("Queue"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeQueue);
+  else if (TypeName.startswith("Pipe.")) {
+    if (TypeName.endswith("_0"))
+      accessQual = AQ::ReadOnly;
+    else if (TypeName.endswith("_1"))
+      accessQual = AQ::WriteOnly;
+    else if (TypeName.endswith("_2"))
+      accessQual = AQ::ReadWrite;
+    return getOpTypePipe(MIRBuilder, accessQual);
+  }
   else if (TypeName.startswith("PipeStorage"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypePipeStorage);
+  else if (TypeName.startswith("ReserveId"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeReserveId);
 
   report_fatal_error("Cannot generate SPIRV built-in type: " + Name);
 }
