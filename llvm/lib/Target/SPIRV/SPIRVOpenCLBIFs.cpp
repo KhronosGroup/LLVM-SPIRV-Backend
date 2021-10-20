@@ -233,7 +233,8 @@ static uint64_t getLiteralValueForConstant(Register constVReg,
   return constInstr->getOperand(1).getCImm()->getZExtValue();
 }
 
-static Register buildOpSampledImage(Register image, Register sampler,
+static Register buildOpSampledImage(Register res, Register image,
+                                    Register sampler,
                                     MachineIRBuilder &MIRBuilder,
                                     SPIRVTypeRegistry *TR) {
   const auto MRI = MIRBuilder.getMRI();
@@ -241,7 +242,8 @@ static Register buildOpSampledImage(Register image, Register sampler,
   SPIRVType *sampImTy =
       TR->getOrCreateSPIRVSampledImageType(imageType, MIRBuilder);
 
-  Register sampledImage = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  Register sampledImage = res.isValid() ? res
+      : MRI->createVirtualRegister(&SPIRV::IDRegClass);
   auto SampImMIB = MIRBuilder.buildInstr(SPIRV::OpSampledImage)
                        .addDef(sampledImage)
                        .addUse(TR->getSPIRVTypeID(sampImTy))
@@ -417,8 +419,9 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                                     MIRBuilder, TR);
     }
   }
-
-  Register sampledImage = buildOpSampledImage(image, sampler, MIRBuilder, TR);
+  Register reg;
+  Register sampledImage = buildOpSampledImage(reg, image, sampler,
+                                              MIRBuilder, TR);
 
   Register coord = OrigArgs[2];
   Register lod = TR->buildConstantFP(APFloat::getZero(APFloat::IEEEsingle()),
@@ -485,6 +488,22 @@ static bool genWriteImage(MachineIRBuilder &MIRBuilder,
                  .addUse(OrigArgs[0])  // Image
                  .addUse(OrigArgs[1])  // Coord vec2
                  .addUse(OrigArgs[2]); // Texel to write vec4
+  return TR->constrainRegOperands(MIB);
+}
+
+static bool buildOpImageSampleExplicitLod(MachineIRBuilder &MIRBuilder,
+    Register resVReg, const StringRef typeStr,
+    const SmallVectorImpl<Register> &args, SPIRVTypeRegistry *TR) {
+  auto spvTy = TR->getOrCreateSPIRVTypeByName(typeStr, MIRBuilder);
+  Register image = args[0];
+  Register coord = args[1];
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageSampleExplicitLod)
+                 .addDef(resVReg)
+                 .addUse(TR->getSPIRVTypeID(spvTy))
+                 .addUse(image)
+                 .addUse(coord)
+                 .addImm(ImageOperand::Lod)
+                 .addUse(args[3]);
   return TR->constrainRegOperands(MIB);
 }
 
@@ -1125,7 +1144,15 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
       return genOpenCLExtInst(extInstId, MIRBuilder, OrigRet, retTy, args, TR);
     }
   }
-
+  // If the name is instantiated template, separate the name of the builtin and
+  // the return type.
+  StringRef returnTypeStr = "";
+  if (nameNoArgs.find('<') && nameNoArgs.endswith(">")) {
+    auto tmpStr = nameNoArgs.split('<');
+    tmpStr = tmpStr.first.rsplit(' ');
+    nameNoArgs = tmpStr.second;
+    returnTypeStr = tmpStr.first;
+  }
   char firstChar = nameNoArgs[0];
   switch (firstChar) {
   case 'a':
@@ -1197,6 +1224,17 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     if (nameNoArgs.startswith("__translate_sampler_initializer")) {
       uint64_t bitMask = getLiteralValueForConstant(args[0], MIRBuilder.getMRI());
       return buildSamplerLiteral(bitMask, OrigRet, retTy, MIRBuilder, TR);
+    } else if (nameNoArgs.startswith("__spirv_SampledImage")) {
+      return buildOpSampledImage(OrigRet, args[0], args[1], MIRBuilder, TR);
+    } else if (nameNoArgs.startswith("__spirv_ImageSampleExplicitLod")) {
+      auto rStr = nameNoArgs.substr(strlen("__spirv_ImageSampleExplicitLod"));
+      // Separate return type string from "_RtypeN" suffix or instantiated
+      // template name <type>.
+      if (rStr.startswith("_R"))
+        rStr = rStr.substr(strlen("_R"));
+      else
+        rStr = returnTypeStr;
+      return buildOpImageSampleExplicitLod(MIRBuilder, OrigRet, rStr, args, TR);
     }
     break;
   default:

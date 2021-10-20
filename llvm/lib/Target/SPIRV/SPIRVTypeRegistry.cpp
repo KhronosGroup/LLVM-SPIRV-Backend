@@ -373,12 +373,14 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
   } else if (const auto &ptype = dyn_cast<PointerType>(Ty)) {
     Type *elemType = ptype->getPointerElementType();
 
-    // Some OpenCL builtins like image2d_t are passed in as pointers, but
-    // should be treated as custom types like OpTypeImage
-    if (auto stype = dyn_cast<StructType>(elemType))
+    // Some OpenCL and SPIRV builtins like image2d_t are passed in as pointers,
+    // but should be treated as custom types like OpTypeImage
+    if (auto stype = dyn_cast<StructType>(elemType)) {
       if (isOpenCLBuiltinType(stype))
         return handleOpenCLBuiltin(stype, MIRBuilder, aq);
-
+      if (isSPIRVBuiltinType(stype))
+        return handleSPIRVBuiltin(stype, MIRBuilder, aq);
+    }
 
     // Otherwise, treat it as a regular pointer type
     auto sc = addressSpaceToStorageClass(ptype->getAddressSpace());
@@ -605,6 +607,40 @@ SPIRVType *SPIRVTypeRegistry::generateOpenCLOpaqueType(const StructType *Ty,
   report_fatal_error("Cannot generate OpenCL type: " + Name);
 }
 
+SPIRVType *SPIRVTypeRegistry::getOrCreateSPIRVTypeByName(StringRef typeStr,
+    MachineIRBuilder &MIRBuilder) {
+  unsigned vecElts = 0;
+  auto &ctx = MIRBuilder.getMF().getFunction().getContext();
+
+  // Parse type name in either "typeN" or "type vector[N]" format, where
+  // N is the number of elements of the vector.
+  Type* type;
+  if (typeStr.startswith("void")) {
+    type = Type::getVoidTy(ctx);
+    typeStr = typeStr.substr(strlen("void"));
+  } else if (typeStr.startswith("int") || typeStr.startswith("uint")) {
+    type = Type::getInt32Ty(ctx);
+    typeStr = typeStr.startswith("int") ? typeStr.substr(strlen("int"))
+                                        : typeStr.substr(strlen("uint"));
+  } else if (typeStr.startswith("float")) {
+    type = Type::getFloatTy(ctx);
+    typeStr = typeStr.substr(strlen("float"));
+  } else if (typeStr.startswith("half")) {
+    type = Type::getHalfTy(ctx);
+    typeStr = typeStr.substr(strlen("half"));
+  } else
+    llvm_unreachable("Unable to recognize SPIRV type name.");
+  if (typeStr.startswith(" vector[")) {
+    typeStr = typeStr.substr(strlen(" vector["));
+    typeStr = typeStr.substr(0, typeStr.find(']'));
+  }
+  typeStr.getAsInteger(10, vecElts);
+  auto spirvTy = getOrCreateSPIRVType(type, MIRBuilder);
+  if (vecElts > 0)
+    spirvTy = getOrCreateSPIRVVectorType(spirvTy, vecElts, MIRBuilder);
+  return spirvTy;
+}
+
 SPIRVType *SPIRVTypeRegistry::handleSPIRVBuiltin(const StructType *Ty,
                                                   MachineIRBuilder &MIRBuilder,
                                                   AQ::AccessQualifier aq) {
@@ -633,19 +669,7 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
     SmallVector<StringRef> typeLiterals;
     SplitString(typeLiteralStr, typeLiterals, "_");
     assert (typeLiterals.size() == 8 && "Wrong number of literals in Image type");
-    Type* type;
-    auto &ctx = MIRBuilder.getMF().getFunction().getContext();
-    if (typeLiterals[0] == "void")
-      type = Type::getVoidTy(ctx);
-    else if (typeLiterals[0] == "int" || typeLiterals[0] == "uint")
-      type = Type::getInt32Ty(ctx);
-    else if (typeLiterals[0] == "float")
-      type = Type::getFloatTy(ctx);
-    else if (typeLiterals[0] == "half")
-      type = Type::getHalfTy(ctx);
-    else
-      llvm_unreachable("Unable to recognize SampledType");
-    auto *spirvType = getOrCreateSPIRVType(type, MIRBuilder);
+    auto *spirvType = getOrCreateSPIRVTypeByName(typeLiterals[0], MIRBuilder);
 
     unsigned ddim = 0, depth = 0, arrayed = 0, ms = 0, sampled = 0;
     unsigned imageFormat = 0, accessQualifier = 0;
@@ -657,11 +681,18 @@ SPIRVType *SPIRVTypeRegistry::generateSPIRVOpaqueType(const StructType *Ty,
         typeLiterals[6].getAsInteger(10, imageFormat) ||
         typeLiterals[7].getAsInteger(10, accessQualifier))
       llvm_unreachable("Unable to recognize Image type literals");
-
     return getOpTypeImage(MIRBuilder, spirvType, Dim::Dim(ddim),
                           depth, arrayed, ms, sampled,
                           ImageFormat::ImageFormat(imageFormat),
                           AQ::AccessQualifier(accessQualifier));
+  } else if (TypeName.startswith("SampledImage.")) {
+    // Find corresponding Image type.
+    auto literals = TypeName.substr(strlen("SampledImage."));
+    auto &ctx = MIRBuilder.getMF().getFunction().getContext();
+    Type* imgTy = StructType::getTypeByName(ctx, "spirv.Image."
+                                                 + literals.str());
+    SPIRVType *spirvImageType = getOrCreateSPIRVType(imgTy, MIRBuilder);
+    return getOrCreateSPIRVSampledImageType(spirvImageType, MIRBuilder);
   } else if (TypeName.startswith("DeviceEvent"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
   else if (TypeName.startswith("Sampler"))

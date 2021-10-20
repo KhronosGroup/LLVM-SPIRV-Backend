@@ -107,6 +107,11 @@ public:
     return Res->second;
   }
 
+  // Either generate a new OpTypeXXX instruction or return an existing one
+  // corresponding to the given string containing the name of the builtin type.
+  SPIRVType *
+  getOrCreateSPIRVTypeByName(StringRef typeStr, MachineIRBuilder &MIRBuilder);
+
   // Return the SPIR-V type instruction corresponding to the given VReg, or
   // nullptr if no such type instruction exists.
   SPIRVType *getSPIRVTypeForVReg(Register VReg) const;
