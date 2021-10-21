@@ -1136,7 +1136,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     else if (typeChar == 'c' || typeChar == 's' || typeChar == 'i' ||
              typeChar == 'l')
       idx = 1;
-    else if (typeChar == 'f' || typeChar == 'd')
+    else if (typeChar == 'f' || typeChar == 'd' || typeChar == 'h')
       idx = 2;
     if (idx != -1) {
       assert(unsigned(idx) < extInstMatch->second.size());
