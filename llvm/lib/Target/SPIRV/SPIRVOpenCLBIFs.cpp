@@ -19,6 +19,7 @@
 #include "SPIRVStrings.h"
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 #include <map>
@@ -63,6 +64,27 @@ enum CLMemFenceFlags {
   CLK_GLOBAL_MEM_FENCE = 0x2,
   CLK_IMAGE_MEM_FENCE = 0x4
 };
+
+static StringMap<unsigned> OpenCLBIMap({
+#define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
+  _SPIRV_OP(isequal, FOrdEqual)
+  _SPIRV_OP(isnotequal, FUnordNotEqual)
+  _SPIRV_OP(isgreater, FOrdGreaterThan)
+  _SPIRV_OP(isgreaterequal, FOrdGreaterThanEqual)
+  _SPIRV_OP(isless, FOrdLessThan)
+  _SPIRV_OP(islessequal, FOrdLessThanEqual)
+  _SPIRV_OP(islessgreater, FOrdNotEqual)
+  _SPIRV_OP(isordered, Ordered)
+  _SPIRV_OP(isunordered, Unordered)
+  _SPIRV_OP(isfinite, IsFinite)
+  _SPIRV_OP(isinf, IsInf)
+  _SPIRV_OP(isnan, IsNan)
+  _SPIRV_OP(isnormal, IsNormal)
+  _SPIRV_OP(signbit, SignBitSet)
+  _SPIRV_OP(any, Any)
+  _SPIRV_OP(all, All)
+#undef _SPIRV_OP
+});
 
 static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
     const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR);
@@ -1054,12 +1076,9 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
   unsigned OpCode;
 
   if (TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() ==
-          SPIRV::OpTypeVector &&
-      TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() ==
-          SPIRV::OpTypeVector) {
+      SPIRV::OpTypeVector) {
     // Use OpDot only in case of vector args.
     OpCode = OpDot;
-
   } else {
     // Use OpFMul in case of scalar args.
     OpCode = OpFMulS;
@@ -1071,6 +1090,47 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
                  .addUse(OrigArgs[0])
                  .addUse(OrigArgs[1]);
   return TR->constrainRegOperands(MIB);
+}
+
+static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
+    unsigned opcode, Register resVReg, const SPIRVType *resType,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
+  auto relTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
+  bool isVectorRes = resType->getOpcode() == SPIRV::OpTypeVector;
+  LLT lltTy;
+  if (isVectorRes) {
+    unsigned vecElts = resType->getOperand(2).getImm();
+    relTy = TR->getOrCreateSPIRVVectorType(relTy, vecElts, MIRBuilder);
+    auto LLVMVecTy = cast<FixedVectorType>(TR->getTypeForSPIRVType(relTy));
+    lltTy = LLT::vector(LLVMVecTy->getElementCount(), 1);
+  } else {
+    lltTy = LLT::scalar(1);
+  }
+  const auto MRI = MIRBuilder.getMRI();
+  auto cmpReg = MRI->createGenericVirtualRegister(lltTy);
+  // Build relational instruction
+  TR->assignSPIRVTypeToVReg(relTy, cmpReg, MIRBuilder);
+  auto MIB = MIRBuilder.buildInstr(opcode)
+                 .addDef(cmpReg)
+                 .addUse(TR->getSPIRVTypeID(relTy));
+  for (auto arg : OrigArgs) {
+     MIB.addUse(arg);
+  }
+  TR->constrainRegOperands(MIB);
+  // Build select instruction
+  Register trueConst;
+  Register falseConst;
+  auto bits = TR->getScalarOrVectorBitWidth(resType);
+  if (isVectorRes) {
+     auto ones = APInt::getAllOnesValue(bits).getZExtValue();
+     trueConst = TR->buildConstantIntVector(ones, MIRBuilder, resType);
+     falseConst = TR->buildConstantIntVector(0, MIRBuilder, resType);
+  } else {
+     trueConst = TR->buildConstantInt(1, MIRBuilder, resType);
+     falseConst = TR->buildConstantInt(0, MIRBuilder, resType);
+  }
+  MIRBuilder.buildSelect(resVReg, cmpReg, trueConst, falseConst);
+  return true;
 }
 
 static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
@@ -1153,6 +1213,31 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     nameNoArgs = tmpStr.second;
     returnTypeStr = tmpStr.first;
   }
+
+  using namespace SPIRV;
+  const unsigned opcode = OpenCLBIMap.lookup(nameNoArgs);
+  switch (opcode) {
+  case OpFOrdEqual:
+  case OpFUnordNotEqual:
+  case OpFOrdGreaterThan:
+  case OpFOrdGreaterThanEqual:
+  case OpFOrdLessThan:
+  case OpFOrdLessThanEqual:
+  case OpFOrdNotEqual:
+  case OpOrdered:
+  case OpUnordered:
+  case OpIsFinite:
+  case OpIsInf:
+  case OpIsNan:
+  case OpIsNormal:
+  case OpSignBitSet:
+  case OpAny:
+  case OpAll:
+    return genOpenCLRelational(MIRBuilder, opcode, OrigRet, retTy, args, TR);
+  default:
+    break;
+  }
+
   char firstChar = nameNoArgs[0];
   switch (firstChar) {
   case 'a':

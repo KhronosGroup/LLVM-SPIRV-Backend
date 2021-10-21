@@ -522,8 +522,10 @@ def OpBitCount: Op<205, (outs ID:$r), (ins TYPE:$ty, ID:$b), "$r = OpBitCount $t
 
 //3.32.15 Relational and Logical Instructions
 
-def OpAny: Op<154, (outs ID:$res), (ins ID:$vec), "$res = OpAny $vec">;
-def OpAll: Op<155, (outs ID:$res), (ins ID:$vec), "$res = OpAll $vec">;
+def OpAny: Op<154, (outs ID:$res), (ins TYPE:$ty, ID:$vec),
+                  "$res = OpAny $ty $vec">;
+def OpAll: Op<155, (outs ID:$res), (ins TYPE:$ty, ID:$vec),
+                  "$res = OpAll $ty $vec">;
 
 def OpIsNan: UnOp<"OpIsNan", 156>;
 def OpIsInf: UnOp<"OpIsInf", 157>;

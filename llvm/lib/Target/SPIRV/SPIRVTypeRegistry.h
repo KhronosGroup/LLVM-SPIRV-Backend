@@ -220,6 +220,8 @@ public:
                             SPIRVType *spvType = nullptr);
   Register buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *spvType = nullptr);
+  Register buildConstantIntVector(uint64_t val, MachineIRBuilder &MIRBuilder,
+                           SPIRVType *spvType);
   Register buildConstantSampler(Register res, unsigned int addrMode,
       unsigned int param, unsigned int filerMode,
       MachineIRBuilder &MIRBuilder, SPIRVType *spvType);

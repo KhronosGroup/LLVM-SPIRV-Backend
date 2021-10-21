@@ -118,6 +118,10 @@ private:
                         const MachineInstr &I,
                         MachineIRBuilder &MIRBuilder) const;
 
+  bool selectConstVector(Register resVReg, const SPIRVType *resType,
+                         const MachineInstr &I,
+                         MachineIRBuilder &MIRBuilder) const;
+
   bool selectCmp(Register resVReg, const SPIRVType *resType,
                  unsigned scalarTypeOpcode, unsigned comparisonOpcode,
                  const MachineInstr &I, MachineIRBuilder &MIRBuilder,
@@ -282,6 +286,9 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
 #endif
   case TargetOpcode::G_BITREVERSE:
     return selectBitreverse(resVReg, resType, I, MIRBuilder);
+
+  case TargetOpcode::G_BUILD_VECTOR:
+    return selectConstVector(resVReg, resType, I, MIRBuilder);
 
   case TargetOpcode::G_ICMP:
     return selectICmp(resVReg, resType, I, MIRBuilder);
@@ -947,6 +954,20 @@ bool SPIRVInstructionSelector::selectBitreverse(Register resVReg,
       .constrainAllUses(TII, TRI, RBI);
 }
 
+bool SPIRVInstructionSelector::selectConstVector(Register resVReg,
+                                          const SPIRVType *resType,
+                                          const MachineInstr &I,
+                                          MachineIRBuilder &MIRBuilder) const {
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantComposite)
+      .addDef(resVReg)
+      .addUse(TR.getSPIRVTypeID(resType));
+  const unsigned int numOps = I.getNumOperands();
+  for (unsigned int i = 1; i < numOps; i++) {
+    MIB.addUse(I.getOperand(i).getReg());
+  }
+  return MIB.constrainAllUses(TII, TRI, RBI);
+}
+
 bool SPIRVInstructionSelector::selectCmp(Register resVReg,
                                          const SPIRVType *resType,
                                          unsigned scalarTyOpc, unsigned cmpOpc,
@@ -1121,9 +1142,9 @@ bool SPIRVInstructionSelector::selectExt(Register resVReg,
                         : OpSelectSIVCond)
         .addDef(resVReg)
         .addUse(TR.getSPIRVTypeID(resType))
+        .addUse(I.getOperand(1).getReg())
         .addUse(oneReg)
         .addUse(zeroReg)
-        .addUse(I.getOperand(1).getReg())
         .constrainAllUses(TII, TRI, RBI);
   } else {
     return selectUnOp(resVReg, resType, I, MIRBuilder,
