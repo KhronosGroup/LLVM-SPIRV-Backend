@@ -233,8 +233,8 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
   ToRemove.push_back(ToHoist);
 
   if (!MetaBuilder.getMRI()->getVRegDef(MetaReg)) {
-  auto MIB = MetaBuilder.buildInstr(ToHoist->getOpcode());
-  MIB.addDef(MetaReg);
+    auto MIB = MetaBuilder.buildInstr(ToHoist->getOpcode());
+    MIB.addDef(MetaReg);
 
     for (unsigned int i = ToHoist->getNumExplicitDefs();
          i < ToHoist->getNumOperands(); ++i) {
@@ -644,10 +644,9 @@ static void numberRegistersInMBB(MachineBasicBlock &MBB,
       if (op.isReg()) {
         Register newReg;
         auto VR = localToMetaVRegAliasMap.find(op.getReg());
+        // Stops setReg crashing if reg index > max regs in func
+        addDummyVRegsUpToIndex(RegBaseIndex, MRI);
         if (VR == localToMetaVRegAliasMap.end()) {
-          // Stops setReg crashing if reg index > max regs in func
-          addDummyVRegsUpToIndex(RegBaseIndex, MRI);
-
           newReg = Register::index2VirtReg(RegBaseIndex);
           ++RegBaseIndex;
           localToMetaVRegAliasMap.insert({op.getReg(), newReg});

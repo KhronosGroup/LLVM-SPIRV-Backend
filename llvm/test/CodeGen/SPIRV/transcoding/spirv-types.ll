@@ -2,18 +2,17 @@
 ;;
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV: OpCapability Float16
-; CHECK-SPIRV: OpCapability ImageBasic
-; CHECK-SPIRV: OpCapability ImageReadWrite
-; CHECK-SPIRV: OpCapability Pipes
-; CHECK-SPIRV: OpCapability DeviceEnqueue
+; CHECK-SPIRV-DAG: OpCapability Float16
+; CHECK-SPIRV-DAG: OpCapability ImageReadWrite
+; CHECK-SPIRV-DAG: OpCapability Pipes
+; CHECK-SPIRV-DAG: OpCapability DeviceEnqueue
 
 ; CHECK-SPIRV-DAG: %[[VOID:[0-9]+]] = OpTypeVoid
 ; CHECK-SPIRV-DAG: %[[INT:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-SPIRV-DAG: %[[HALF:[0-9]+]] = OpTypeFloat 16
 ; CHECK-SPIRV-DAG: %[[FLOAT:[0-9]+]] = OpTypeFloat 32
-; CHECK-SPIRV-DAG: %[[PIPE_RD:[0-9]+]] = OpTypePipe 0
-; CHECK-SPIRV-DAG: %[[PIPE_WR:[0-9]+]] = OpTypePipe 1
+; CHECK-SPIRV-DAG: %[[PIPE_RD:[0-9]+]] = OpTypePipe ReadOnly
+; CHECK-SPIRV-DAG: %[[PIPE_WR:[0-9]+]] = OpTypePipe WriteOnly
 ; CHECK-SPIRV-DAG: %[[IMG1D_RD:[0-9]+]] = OpTypeImage %[[VOID]] 1D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %[[IMG2D_RD:[0-9]+]] = OpTypeImage %[[INT]] 2D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %[[IMG3D_RD:[0-9]+]] = OpTypeImage %[[INT]] 3D 0 0 0 0 Unknown ReadOnly
