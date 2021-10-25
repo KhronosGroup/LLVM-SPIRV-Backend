@@ -220,6 +220,33 @@ SPIRVTypeRegistry::buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
 }
 
 Register
+SPIRVTypeRegistry::buildConstantIntVector(uint64_t val,
+    MachineIRBuilder &MIRBuilder, SPIRVType *spvType) {
+  const Type* LLVMTy = getTypeForSPIRVType(spvType);
+  assert(LLVMTy->isVectorTy());
+  const FixedVectorType *LLVMVecTy = cast<FixedVectorType>(LLVMTy);
+  Type *LLVMBaseTy = LLVMVecTy->getElementType();
+  // Find a constant vector in DT or build a new one.
+  const auto ConstInt = ConstantInt::get(LLVMBaseTy, val);
+  auto ConstVec = ConstantVector::getSplat(LLVMVecTy->getElementCount(),
+                                           ConstInt);
+  Register res;
+  if (DT.find(ConstVec, &MIRBuilder.getMF(), res) == false) {
+    unsigned BitWidth = getScalarOrVectorBitWidth(spvType);
+    LLT lltTy = LLT::vector(LLVMVecTy->getElementCount(), BitWidth);
+    Register spvVecConst = MIRBuilder.getMF().getRegInfo()
+        .createGenericVirtualRegister(lltTy);
+    assignTypeToVReg(LLVMVecTy, spvVecConst, MIRBuilder);
+    DT.add(ConstVec, &MIRBuilder.getMF(), spvVecConst);
+    SPIRVType *spvBaseType = getOrCreateSPIRVType(LLVMBaseTy, MIRBuilder);
+    auto spvScalConst = buildConstantInt(val, MIRBuilder, spvBaseType);
+    MIRBuilder.buildSplatVector(spvVecConst, spvScalConst);
+    return spvVecConst;
+  }
+  return res;
+}
+
+Register
 SPIRVTypeRegistry::buildConstantSampler(Register resReg, unsigned int addrMode,
     unsigned int param, unsigned int filerMode, MachineIRBuilder &MIRBuilder,
     SPIRVType *spvType) {

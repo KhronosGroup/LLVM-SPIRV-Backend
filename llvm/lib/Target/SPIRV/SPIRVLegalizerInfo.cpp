@@ -189,6 +189,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   //                  LegalityPredicate(([=](const LegalityQuery &Query) {
   //                    return Query.Types[1].getElementType() == Query.Types[0];
   //                  }))));
+  getActionDefinitionsBuilder(G_BUILD_VECTOR)
+      .legalForCartesianProduct(allVectors, {s16, s32, s64});
 
   getActionDefinitionsBuilder(G_IMPLICIT_DEF).alwaysLegal();
 
