@@ -253,7 +253,6 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
           llvm_unreachable("Generate WRONG type!\n");
         }
       } else {
-        errs() << *ToHoist << "\n";
         llvm_unreachable(
           "Unexpected operand type when copying spirv meta instr");
       }

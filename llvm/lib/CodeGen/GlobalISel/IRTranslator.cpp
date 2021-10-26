@@ -2383,9 +2383,16 @@ bool IRTranslator::translateCall(const User &U, MachineIRBuilder &MIRBuilder) {
         MIB.addFPImm(cast<ConstantFP>(Arg.value()));
       }
     } else if (auto MD = dyn_cast<MetadataAsValue>(Arg.value())) {
-      auto *MDN = dyn_cast<MDNode>(MD->getMetadata());
-      if (!MDN) // This was probably an MDString.
-        return false;
+      auto *MD0 = MD->getMetadata();
+      auto *MDN = dyn_cast<MDNode>(MD0);
+      if (!MDN) { // This was probably an MDString.
+        if (auto *ConstMD = dyn_cast<ConstantAsMetadata>(MD0)) {
+          MDN = MDNode::get(MF->getFunction().getContext(), ConstMD);
+        } else {
+          errs() << "MD error\n";
+          return false;
+        }
+      }
       MIB.addMetadata(MDN);
     } else {
       ArrayRef<Register> VRegs = getOrCreateVRegs(*Arg.value());

@@ -76,9 +76,11 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     unsigned int i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-      SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
-      if (!spirvTy)
-        spirvTy = TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
+      // auto *spirvTy = TR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
+      // SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
+      // if (!spirvTy)
+      auto *spirvTy =
+          TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
       argTypeVRegs.push_back(TR->getSPIRVTypeID(spirvTy));
 
       if (Arg.hasName())
@@ -101,11 +103,49 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   if (F.isDeclaration())
     DT->add(&F, &MIRBuilder.getMF(), funcVReg);
   MRI->setRegClass(funcVReg, &SPIRV::IDRegClass);
-  auto funcTy = TR->assignTypeToVReg(F.getFunctionType(), funcVReg, MIRBuilder);
+
+  auto *FTy = F.getFunctionType();
+
+  // this code restores function args/retvalue types
+  // for composite cases because the final types should still be aggregate
+  // whereas they're i32 during the translation to cope with
+  // aggregates flattenning etc
+  auto *NamedMD = F.getParent()->getNamedMetadata("spv.cloned_funcs");
+  if (NamedMD) {
+    Type *RetTy = F.getFunctionType()->getReturnType();
+    SmallVector<Type *, 4> ArgTypes;
+    auto ThisFuncMDIt =
+        std::find_if(NamedMD->op_begin(), NamedMD->op_end(), [&F](MDNode *N) {
+          return isa<MDString>(N->getOperand(0)) &&
+                 cast<MDString>(N->getOperand(0))->getString() == F.getName();
+        });
+
+    if (ThisFuncMDIt != NamedMD->op_end()) {
+      auto *ThisFuncMD = *ThisFuncMDIt;
+      if (cast<ConstantInt>(
+              cast<ConstantAsMetadata>(
+                  cast<MDNode>(ThisFuncMD->getOperand(1))->getOperand(0))
+                  ->getValue())
+              // TODO: currently -1 indicates return value, support this types
+              // renaming for arguments as well
+              ->getSExtValue() == -1)
+        RetTy = cast<ConstantAsMetadata>(
+                    cast<MDNode>(ThisFuncMD->getOperand(1))->getOperand(1))
+                    ->getType();
+    }
+
+    for (auto &Arg : F.args())
+      ArgTypes.push_back(Arg.getType());
+
+    FTy = FunctionType::get(RetTy, ArgTypes, F.isVarArg());
+  }
+
+  auto funcTy = TR->assignTypeToVReg(FTy, funcVReg, MIRBuilder);
 
   // Build the OpTypeFunction declaring it
   Register returnTypeID = funcTy->getOperand(1).getReg();
   uint32_t funcControl = getFunctionControl(F);
+
   MIRBuilder.buildInstr(SPIRV::OpFunction)
       .addDef(funcVReg)
       .addUse(returnTypeID)
@@ -116,6 +156,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   const unsigned int numArgs = argTypeVRegs.size();
   for (unsigned int i = 0; i < numArgs; ++i) {
     assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
+    MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
     MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
         .addDef(VRegs[i][0])
         .addUse(argTypeVRegs[i]);

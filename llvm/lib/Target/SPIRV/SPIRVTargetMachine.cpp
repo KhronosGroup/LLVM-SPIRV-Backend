@@ -18,14 +18,15 @@
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVRegisterBankInfo.h"
 #include "SPIRVTargetObjectFile.h"
+#include "SPIRVTargetTransformInfo.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
@@ -96,7 +97,7 @@ SPIRVTargetMachine::SPIRVTargetMachine(const Target &T, const Triple &TT,
       Subtarget(TT, CPU.str(), FS.str(), *this) {
   initAsmInfo();
   setGlobalISel(true);
-  setGlobalISelAbort(GlobalISelAbortMode::Enable);
+  // setGlobalISelAbort(GlobalISelAbortMode::Disable);
   setFastISel(false);
   setO0WantsFastISel(false);
   setRequiresStructuredCFG(TT.isVulkanEnvironment());
@@ -112,6 +113,7 @@ public:
   SPIRVTargetMachine &getSPIRVTargetMachine() const {
     return getTM<SPIRVTargetMachine>();
   }
+  void addIRPasses() override;
   void addISelPrepare() override;
 
   bool addIRTranslator() override;
@@ -155,8 +157,21 @@ void SPIRVPassConfig::addPostRegAlloc() {
   TargetPassConfig::addPostRegAlloc();
 }
 
+TargetTransformInfo
+SPIRVTargetMachine::getTargetTransformInfo(const Function &F) {
+  return TargetTransformInfo(SPIRVTTIImpl(this, F));
+}
+
 TargetPassConfig *SPIRVTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new SPIRVPassConfig(*this, PM);
+}
+
+void SPIRVPassConfig::addIRPasses() {
+  TargetPassConfig::addIRPasses();
+  auto *TM = &getTM<SPIRVTargetMachine>();
+  addPass(createSPIRVLowerConstExprLegacyPass());
+  addPass(createSPIRVOCLRegularizerPass());
+  addPass(createSPIRVPreTranslationLegalizerPass(TM));
 }
 
 void SPIRVPassConfig::addISelPrepare() {

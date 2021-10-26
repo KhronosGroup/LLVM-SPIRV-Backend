@@ -2,8 +2,8 @@
 
 ; CHECK-SPIRV: %[[IntTypeID:[0-9]+]] = OpTypeInt 32 {{[0-9]+}}
 ; CHECK-SPIRV: %[[Int2TypeID:[0-9]+]] = OpTypeVector %[[IntTypeID]] 2
-; ;HECK-SPIRV: %[[CompositeID:[0-9]+]] = OpCompositeInsert %[[Int2TypeID]] %{{[0-9]+}} %{{[0-9]+}} {{[0-9]+}}
-; ;HECK-SPIRV: %[[ShuffleID:[0-9]+]] = OpVectorShuffle %[[Int2TypeID]] %[[CompositeID]] %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV: %[[CompositeID:[0-9]+]] = OpCompositeInsert %[[Int2TypeID]] %{{[0-9]+}} %{{[0-9]+}} {{[0-9]+}}
+; CHECK-SPIRV: %[[ShuffleID:[0-9]+]] = OpVectorShuffle %[[Int2TypeID]] %[[CompositeID]] %{{[0-9]+}} {{[0-9]+}} {{[0-9]+}}
 ; CHECK-SPIRV: %{{[0-9]+}} = OpExtInst %[[Int2TypeID]] %1 s_min %{{[0-9]+}} %{{[0-9]+}}
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

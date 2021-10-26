@@ -29,13 +29,16 @@ add_llvm_target(SPIRVCodeGen
   SPIRVInstructionSelector.cpp
   SPIRVIRTranslator.cpp
   SPIRVLegalizerInfo.cpp
+  SPIRVLowerConstExpr.cpp
   SPIRVMCInstLower.cpp
+  SPIRVOCLRegularizer.cpp
   SPIRVOpenCLBIFs.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
   SPIRVStrings.cpp
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
+  SPIRVPreTranslationLegalizer.cpp
   SPIRVTypeRegistry.cpp
 
   LINK_COMPONENTS

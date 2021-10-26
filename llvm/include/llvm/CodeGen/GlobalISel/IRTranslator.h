@@ -194,14 +194,14 @@ protected:
   /// 3. Create the generic instruction.
   ///
   /// \return true if the translation succeeded.
-  virtual bool translate(const Instruction &Inst);
+  bool translate(const Instruction &Inst);
 
   /// Materialize \p C into virtual-register \p Reg. The generic instructions
   /// performing this materialization will be inserted into the entry block of
   /// the function.
   ///
   /// \return true if the materialization succeeded.
-  virtual bool translate(const Constant &C, Register Reg);
+  bool translate(const Constant &C, Register Reg);
 
   // Translate U as a copy of V.
   bool translateCopy(const User &U, const Value &V,
@@ -621,7 +621,7 @@ protected:
   /// Non-aggregate types have just one corresponding VReg and the list can be
   /// used as a single "unsigned". Aggregates get flattened. If such VRegs do
   /// not exist, they are created.
-  virtual ArrayRef<Register> getOrCreateVRegs(const Value &Val);
+  ArrayRef<Register> getOrCreateVRegs(const Value &Val);
 
   Register getOrCreateVReg(const Value &Val) {
     auto Regs = getOrCreateVRegs(Val);

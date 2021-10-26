@@ -127,6 +127,13 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   for (auto Opc: getTypeFoldingSupportingOpcs())
     getActionDefinitionsBuilder(Opc).custom();
 
+  getActionDefinitionsBuilder(G_GLOBAL_VALUE).alwaysLegal();
+
+  // TODO: add proper rules for vectors legalization
+  getActionDefinitionsBuilder(
+      {G_BUILD_VECTOR, G_SHUFFLE_VECTOR, G_INSERT_VECTOR_ELT})
+      .alwaysLegal();
+
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 
@@ -189,8 +196,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   //                  LegalityPredicate(([=](const LegalityQuery &Query) {
   //                    return Query.Types[1].getElementType() == Query.Types[0];
   //                  }))));
-  getActionDefinitionsBuilder(G_BUILD_VECTOR)
-      .legalForCartesianProduct(allVectors, {s16, s32, s64});
+  // getActionDefinitionsBuilder(G_BUILD_VECTOR)
+  //     .legalForCartesianProduct(allVectors, {s16, s32, s64});
 
   getActionDefinitionsBuilder(G_IMPLICIT_DEF).alwaysLegal();
 
@@ -198,6 +205,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
       .legalForCartesianProduct(allPtrs, allIntScalars);
   getActionDefinitionsBuilder(G_PTRTOINT)
       .legalForCartesianProduct(allIntScalars, allPtrs);
+  getActionDefinitionsBuilder(G_PTR_ADD).legalForCartesianProduct(
+      allPtrs, allIntScalars);
 
   // Constants
   // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
@@ -361,8 +370,12 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
   }
   auto &MRI = MI.getMF()->getRegInfo();
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
+  MachineInstr &AssignTypeInst =
+      *(MRI.use_instr_begin(MI.getOperand(0).getReg()));
   auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *TR).first;
-  MRI.use_instr_begin(MI.getOperand(0).getReg())->getOperand(1).setReg(NewReg);
+  AssignTypeInst.getOperand(1).setReg(NewReg);
+  // MRI.setRegClass(AssignTypeInst.getOperand(0).getReg(),
+  // MRI.getRegClass(NewReg));
   MI.getOperand(0).setReg(NewReg);
   for (auto &Op : MI.operands()) {
     if (!Op.isReg() || Op.isDef())

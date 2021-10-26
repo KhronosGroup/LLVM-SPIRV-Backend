@@ -37,5 +37,5 @@ attributes #0 = { nounwind readnone }
 !7 = !{i32 2, i32 0}
 !8 = !{}
 !9 = !{!"cl_doubles", !"cl_images"}
-; CHECK-SPIRV: OpCapability Float64
-; CHECK-SPIRV: OpCapability ImageBasic
+; CHECK-SPIRV-DAG: OpCapability Float64
+; CHECK-SPIRV-DAG: OpCapability ImageBasic
