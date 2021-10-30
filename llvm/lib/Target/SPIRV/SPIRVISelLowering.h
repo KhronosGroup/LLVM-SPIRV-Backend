@@ -53,11 +53,12 @@ public:
   MVT getRegisterTypeForCallingConv(LLVMContext &Context,
                                     CallingConv::ID CC,
                                     EVT VT) const override {
-    if (VT.isVector() && VT.getVectorNumElements() == 3)
+    if (VT.isVector() && VT.getVectorNumElements() == 3) {
       if (VT.getVectorElementType() == MVT::i1)
         return MVT::v4i1;
       else if (VT.getVectorElementType() == MVT::i8)
         return MVT::v4i8;
+    }
     return getRegisterType(Context, VT);
   }
 };
