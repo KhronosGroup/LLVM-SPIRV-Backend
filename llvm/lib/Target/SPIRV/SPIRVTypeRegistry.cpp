@@ -472,6 +472,8 @@ unsigned SPIRVTypeRegistry::getScalarOrVectorBitWidth(const SPIRVType *type) con
   if (type && (type->getOpcode() == SPIRV::OpTypeInt ||
                type->getOpcode() == SPIRV::OpTypeFloat)) {
     return type->getOperand(1).getImm();
+  } else if (type && type->getOpcode() == SPIRV::OpTypeBool) {
+    return 1;
   }
   llvm_unreachable("Attempting to get bit width of non-integer/float type.");
 }

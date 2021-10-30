@@ -333,6 +333,81 @@ void addInstrRequirements(const MachineInstr &MI,
     }
     break;
   }
+  case SPIRV::OpGroupNonUniformIAdd:
+  case SPIRV::OpGroupNonUniformFAdd:
+  case SPIRV::OpGroupNonUniformIMul:
+  case SPIRV::OpGroupNonUniformFMul:
+  case SPIRV::OpGroupNonUniformSMin:
+  case SPIRV::OpGroupNonUniformUMin:
+  case SPIRV::OpGroupNonUniformFMin:
+  case SPIRV::OpGroupNonUniformSMax:
+  case SPIRV::OpGroupNonUniformUMax:
+  case SPIRV::OpGroupNonUniformFMax:
+  case SPIRV::OpGroupNonUniformBitwiseAnd:
+  case SPIRV::OpGroupNonUniformBitwiseOr:
+  case SPIRV::OpGroupNonUniformBitwiseXor:
+  case SPIRV::OpGroupNonUniformLogicalAnd:
+  case SPIRV::OpGroupNonUniformLogicalOr:
+  case SPIRV::OpGroupNonUniformLogicalXor: {
+    auto groupOp = MI.getOperand(3).getImm();
+    switch(groupOp) {
+    case GroupOperation::Reduce:
+    case GroupOperation::InclusiveScan:
+    case GroupOperation::ExclusiveScan:
+      reqs.addCapability(Kernel);
+      reqs.addCapability(GroupNonUniformArithmetic);
+      reqs.addCapability(GroupNonUniformBallot);
+      break;
+    case GroupOperation::ClusteredReduce:
+      reqs.addCapability(GroupNonUniformClustered);
+      break;
+    case GroupOperation::PartitionedReduceNV:
+    case GroupOperation::PartitionedInclusiveScanNV:
+    case GroupOperation::PartitionedExclusiveScanNV:
+      reqs.addCapability(GroupNonUniformPartitionedNV);
+      break;
+    }
+    break;
+  }
+  case SPIRV::OpGroupNonUniformShuffle:
+  case SPIRV::OpGroupNonUniformShuffleXor:
+    reqs.addCapability(GroupNonUniformShuffle);
+    break;
+  case SPIRV::OpGroupNonUniformShuffleUp:
+  case SPIRV::OpGroupNonUniformShuffleDown:
+    reqs.addCapability(GroupNonUniformShuffleRelative);
+    break;
+  case SPIRV::OpGroupAll:
+  case SPIRV::OpGroupAny:
+  case SPIRV::OpGroupBroadcast:
+  case SPIRV::OpGroupIAdd:
+  case SPIRV::OpGroupFAdd:
+  case SPIRV::OpGroupFMin:
+  case SPIRV::OpGroupUMin:
+  case SPIRV::OpGroupSMin:
+  case SPIRV::OpGroupFMax:
+  case SPIRV::OpGroupUMax:
+  case SPIRV::OpGroupSMax:
+    reqs.addCapability(Groups);
+    break;
+  case SPIRV::OpGroupNonUniformElect:
+    reqs.addCapability(GroupNonUniform);
+    break;
+  case SPIRV::OpGroupNonUniformAll:
+  case SPIRV::OpGroupNonUniformAny:
+  case SPIRV::OpGroupNonUniformAllEqual:
+    reqs.addCapability(GroupNonUniformVote);
+    break;
+  case SPIRV::OpGroupNonUniformBroadcast:
+  case SPIRV::OpGroupNonUniformBroadcastFirst:
+  case SPIRV::OpGroupNonUniformBallot:
+  case SPIRV::OpGroupNonUniformInverseBallot:
+  case SPIRV::OpGroupNonUniformBallotBitExtract:
+  case SPIRV::OpGroupNonUniformBallotBitCount:
+  case SPIRV::OpGroupNonUniformBallotFindLSB:
+  case SPIRV::OpGroupNonUniformBallotFindMSB:
+    reqs.addCapability(GroupNonUniformBallot);
+    break;
   default:
     break;
   }

@@ -68,7 +68,6 @@ source_filename = "sub_group_non_uniform_vote.cl"
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"
 
-; CHECK-SPIRV-DAG: OpCapability GroupNonUniform
 ; CHECK-SPIRV-DAG: OpCapability GroupNonUniformVote
 
 ; CHECK-SPIRV-DAG: %[[bool:[0-9]+]] = OpTypeBool
@@ -90,7 +89,7 @@ target triple = "spirv64-unknown-unknown"
 ; CHECK-SPIRV-DAG: %[[float_0:[0-9]+]] = OpConstant %[[float]] 0
 ; CHECK-SPIRV-DAG: %[[double_0:[0-9]+]] = OpConstant %[[double]] 0
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformElect %[[bool]] %[[ScopeSubgroup]]
 ; CHECK-SPIRV: OpFunctionEnd
 
@@ -104,7 +103,7 @@ define dso_local spir_kernel void @testSubGroupElect(i32 addrspace(1)* nocapture
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z15sub_group_electv() local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformAll %[[bool]] %[[ScopeSubgroup]] %[[false]]
 ; CHECK-SPIRV: OpFunctionEnd
 
@@ -118,7 +117,7 @@ define dso_local spir_kernel void @testSubGroupNonUniformAll(i32 addrspace(1)* n
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z25sub_group_non_uniform_alli(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformAny %[[bool]] %[[ScopeSubgroup]] %[[false]]
 ; CHECK-SPIRV: OpFunctionEnd
 
@@ -132,7 +131,7 @@ define dso_local spir_kernel void @testSubGroupNonUniformAny(i32 addrspace(1)* n
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z25sub_group_non_uniform_anyi(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformAllEqual %[[bool]] %[[ScopeSubgroup]] %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformAllEqual %[[bool]] %[[ScopeSubgroup]] %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformAllEqual %[[bool]] %[[ScopeSubgroup]] %[[short_0]]

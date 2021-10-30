@@ -336,7 +336,7 @@ source_filename = "sub_group_non_uniform_arithmetic.cl"
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
@@ -427,7 +427,7 @@ declare dso_local spir_func signext i8 @_Z40sub_group_non_uniform_scan_exclusive
 ; Function Attrs: convergent
 declare dso_local spir_func signext i8 @_Z40sub_group_non_uniform_scan_exclusive_maxc(i8 signext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
@@ -518,7 +518,7 @@ declare dso_local spir_func zeroext i8 @_Z40sub_group_non_uniform_scan_exclusive
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i8 @_Z40sub_group_non_uniform_scan_exclusive_maxh(i8 zeroext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
@@ -609,7 +609,7 @@ declare dso_local spir_func signext i16 @_Z40sub_group_non_uniform_scan_exclusiv
 ; Function Attrs: convergent
 declare dso_local spir_func signext i16 @_Z40sub_group_non_uniform_scan_exclusive_maxs(i16 signext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
@@ -700,7 +700,7 @@ declare dso_local spir_func zeroext i16 @_Z40sub_group_non_uniform_scan_exclusiv
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i16 @_Z40sub_group_non_uniform_scan_exclusive_maxt(i16 zeroext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
@@ -791,7 +791,7 @@ declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_mini(i
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_maxi(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
@@ -882,7 +882,7 @@ declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_minj(i
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_maxj(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
@@ -973,7 +973,7 @@ declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_minl(i
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_maxl(i64) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
@@ -1064,7 +1064,7 @@ declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_minm(i
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_maxm(i64) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[float]] %[[ScopeSubgroup]] Reduce %[[float_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[float]] %[[ScopeSubgroup]] Reduce %[[float_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[float]] %[[ScopeSubgroup]] Reduce %[[float_0]]
@@ -1155,7 +1155,7 @@ declare dso_local spir_func float @_Z40sub_group_non_uniform_scan_exclusive_minf
 ; Function Attrs: convergent
 declare dso_local spir_func float @_Z40sub_group_non_uniform_scan_exclusive_maxf(float) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[half]] %[[ScopeSubgroup]] Reduce %[[half_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[half]] %[[ScopeSubgroup]] Reduce %[[half_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[half]] %[[ScopeSubgroup]] Reduce %[[half_0]]
@@ -1246,7 +1246,7 @@ declare dso_local spir_func half @_Z40sub_group_non_uniform_scan_exclusive_minDh
 ; Function Attrs: convergent
 declare dso_local spir_func half @_Z40sub_group_non_uniform_scan_exclusive_maxDh(half) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[double]] %[[ScopeSubgroup]] Reduce %[[double_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[double]] %[[ScopeSubgroup]] Reduce %[[double_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[double]] %[[ScopeSubgroup]] Reduce %[[double_0]]
@@ -1337,7 +1337,7 @@ declare dso_local spir_func double @_Z40sub_group_non_uniform_scan_exclusive_min
 ; Function Attrs: convergent
 declare dso_local spir_func double @_Z40sub_group_non_uniform_scan_exclusive_maxd(double) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
@@ -1407,7 +1407,7 @@ declare dso_local spir_func signext i8 @_Z39sub_group_non_uniform_scan_exclusive
 ; Function Attrs: convergent
 declare dso_local spir_func signext i8 @_Z40sub_group_non_uniform_scan_exclusive_xorc(i8 signext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[char]] %[[ScopeSubgroup]] Reduce %[[char_0]]
@@ -1477,7 +1477,7 @@ declare dso_local spir_func zeroext i8 @_Z39sub_group_non_uniform_scan_exclusive
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i8 @_Z40sub_group_non_uniform_scan_exclusive_xorh(i8 zeroext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
@@ -1547,7 +1547,7 @@ declare dso_local spir_func signext i16 @_Z39sub_group_non_uniform_scan_exclusiv
 ; Function Attrs: convergent
 declare dso_local spir_func signext i16 @_Z40sub_group_non_uniform_scan_exclusive_xors(i16 signext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[short]] %[[ScopeSubgroup]] Reduce %[[short_0]]
@@ -1617,7 +1617,7 @@ declare dso_local spir_func zeroext i16 @_Z39sub_group_non_uniform_scan_exclusiv
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i16 @_Z40sub_group_non_uniform_scan_exclusive_xort(i16 zeroext) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
@@ -1687,7 +1687,7 @@ declare dso_local spir_func i32 @_Z39sub_group_non_uniform_scan_exclusive_ori(i3
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_xori(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[int]] %[[ScopeSubgroup]] Reduce %[[int_0]]
@@ -1757,7 +1757,7 @@ declare dso_local spir_func i32 @_Z39sub_group_non_uniform_scan_exclusive_orj(i3
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z40sub_group_non_uniform_scan_exclusive_xorj(i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
@@ -1827,7 +1827,7 @@ declare dso_local spir_func i64 @_Z39sub_group_non_uniform_scan_exclusive_orl(i6
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_xorl(i64) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[long]] %[[ScopeSubgroup]] Reduce %[[long_0]]
@@ -1897,7 +1897,7 @@ declare dso_local spir_func i64 @_Z39sub_group_non_uniform_scan_exclusive_orm(i6
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z40sub_group_non_uniform_scan_exclusive_xorm(i64) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalAnd %[[bool]] %[[ScopeSubgroup]] Reduce %[[false]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalOr  %[[bool]] %[[ScopeSubgroup]] Reduce %[[false]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalXor %[[bool]] %[[ScopeSubgroup]] Reduce %[[false]]
