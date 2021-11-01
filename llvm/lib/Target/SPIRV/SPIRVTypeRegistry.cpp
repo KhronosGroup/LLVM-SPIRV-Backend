@@ -354,7 +354,10 @@ SPIRVTypeRegistry::buildConstantIntVector(uint64_t val,
     Register spvVecConst = MIRBuilder.getMF().getRegInfo()
         .createGenericVirtualRegister(lltTy);
     assignTypeToVReg(LLVMVecTy, spvVecConst, MIRBuilder);
-    DT.add(ConstVec, &MIRBuilder.getMF(), spvVecConst);
+    // NOTE: due to the current selection scheme splat vectors
+    // i.e. G_BUILD_VECTOR is selected into insert+shuffle hence
+    // no vector constant hoisting is necessary (elements are handled in
+    // buildConstantInt)
     SPIRVType *spvBaseType = getOrCreateSPIRVType(LLVMBaseTy, MIRBuilder);
     auto spvScalConst = buildConstantInt(val, MIRBuilder, spvBaseType);
     MIRBuilder.buildSplatVector(spvVecConst, spvScalConst);
