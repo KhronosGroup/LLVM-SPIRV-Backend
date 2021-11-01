@@ -37,7 +37,7 @@ entry:
 ; CHECK-SPIRV-LABEL:  OpFunction
 ; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV:        %{{[0-9]+}} = OpInBoundsPtrAccessChain %{{[0-9]+}} %[[object]] %{{[0-9]+}} %{{[0-9]+}}
-; CHECK-SPIRV:        %[[extracted_struct:[0-9]+]] = OpLoad %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} 4
+; CHECK-SPIRV:        %[[extracted_struct:[0-9]+]] = OpLoad %{{[0-9]+}} %{{[0-9]+}} Aligned 4
 ; CHECK-SPIRV:        %[[elem:[0-9]+]] = OpCompositeExtract %{{[0-9]+}} %[[extracted_struct]] 0
 ; CHECK-SPIRV:        %[[add:[0-9]+]] = OpFAdd %{{[0-9]+}} %[[elem]] %{{[0-9]+}}
 ; CHECK-SPIRV:        %[[inserted_struct:[0-9]+]] = OpCompositeInsert %{{[0-9]+}} %[[add]] %[[extracted_struct]] 0

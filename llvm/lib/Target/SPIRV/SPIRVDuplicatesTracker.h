@@ -36,7 +36,11 @@ public:
   SPIRVDuplicatesTracker() {}
 
   void add(const T *V, MachineFunction *MF, Register R) {
-    assert (find(V, MF, R) == false && "DT: record already exists");
+    Register OldReg;
+    if (find(V, MF, OldReg)) {
+      assert(OldReg == R);
+      return;
+    }
     Storage[V][MF] = R;
   }
 

@@ -31,6 +31,11 @@ define i32 @getGlobal3() {
 ; CHECK-DAG: [[CST_AS2:%.+]] = OpConstant [[INT]] 2
 ; CHECK-DAG: [[CST_AS3:%.+]] = OpConstant [[INT]] 3
 
-; CHECK-DAG: OpVariable [[PTR_TO_INT_AS1]] CrossWorkgroup [[CST_AS1]]
-; CHECK-DAG: OpVariable [[PTR_TO_INT_AS2]] UniformConstant [[CST_AS2]]
-; CHECK-DAG: OpVariable [[PTR_TO_INT_AS3]] Workgroup [[CST_AS3]]
+; CHECK-DAG: [[GV1:%.+]] = OpVariable [[PTR_TO_INT_AS1]] CrossWorkgroup [[CST_AS1]]
+; CHECK-DAG: [[GV2:%.+]] = OpVariable [[PTR_TO_INT_AS2]] UniformConstant [[CST_AS2]]
+; CHECK-DAG: [[GV3:%.+]] = OpVariable [[PTR_TO_INT_AS3]] Workgroup [[CST_AS3]]
+
+; CHECK: OpLoad [[INT]] [[GV1]]
+; CHECK: OpLoad [[INT]] [[GV2]]
+; CHECK: OpLoad [[INT]] [[GV3]]
+

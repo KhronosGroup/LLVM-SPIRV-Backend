@@ -41,6 +41,26 @@ void addStringImm(const StringRef &str, MachineInstrBuilder &MIB) {
   }
 }
 
+void addStringImm(const StringRef &str, IRBuilder<> &B,
+                  std::vector<Value *> &Args) {
+  // Get length including padding and null terminator
+  const size_t len = str.size() + 1;
+  const size_t paddedLen = (len % 4 == 0) ? len : len + (4 - (len % 4));
+  for (unsigned i = 0; i < paddedLen; i += 4) {
+    uint32_t word = 0u; // Build up this 32-bit word from 4 8-bit chars
+    for (unsigned wordIndex = 0; wordIndex < 4; ++wordIndex) {
+      unsigned strIndex = i + wordIndex;
+      uint8_t charToAdd = 0;      // Initilize char as padding/null
+      if (strIndex < (len - 1)) { // If it's within the string, get a real char
+        charToAdd = str[strIndex];
+      }
+      word |= (charToAdd << (wordIndex * 8));
+    }
+    Args.push_back(
+        B.getInt32(word)); // Add an operand for the 32-bits of chars or padding
+  }
+}
+
 // Read the series of integer operands back as a null-terminated string using
 // the reverse of the logic in addStringImm
 std::string getStringImm(const MachineInstr &MI, unsigned int startIndex) {

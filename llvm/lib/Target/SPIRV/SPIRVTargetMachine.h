@@ -32,6 +32,8 @@ public:
     return &Subtarget;
   }
 
+  TargetTransformInfo getTargetTransformInfo(const Function &F) override;
+
   TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
   bool usesPhysRegsForValues() const override { return false; }
 

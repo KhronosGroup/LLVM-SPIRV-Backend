@@ -218,6 +218,7 @@ def PseudoConstI: IntImmLeaf<i32, [{ return true; }], imm_to_i32>;
 def PseudoConstF: FPImmLeaf<f32, [{ return true; }], fimm_to_i32>;
 def ConstPseudoTrue: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 1; }]>;
 def ConstPseudoFalse: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 0; }]>;
+def ConstPseudoNull: IntImmLeaf<i64, [{ return Imm.isNullValue(); }]>;
 
 multiclass IntFPImm<bits<16> opCode, string name> {
   def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
@@ -238,7 +239,9 @@ def OpConstantComposite: Op<44, (outs ID:$res), (ins TYPE:$type, variable_ops),
 def OpConstantSampler: Op<45, (outs ID:$res),
                   (ins TYPE:$t, SamplerAddressingMode:$s, i32imm:$p, SamplerFilterMode:$f),
                   "$res = OpConstantSampler $t $s $p $f">;
-def OpConstantNull: Op<46, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantNull $ty">;
+def OpConstantNull: Op<46, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantNull $src_ty",
+                      [(set ID:$dst, (assigntype ConstPseudoNull, TYPE:$src_ty))]>;
+//def OpConstantNull: Op<46, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantNull $ty">;
 
 def OpSpecConstantTrue: Op<48, (outs ID:$r), (ins TYPE:$t), "$r= OpSpecConstantTrue $t">;
 def OpSpecConstantFalse: Op<49, (outs ID:$r), (ins TYPE:$t), "$r= OpSpecConstantFalse $t">;
@@ -436,10 +439,12 @@ def OpVectorExtractDynamicI: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, I
 def OpVectorExtractDynamicF: Op<77, (outs ID:$res), (ins TYPE:$type, vfID:$vec, ID:$idx),
                   "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vfID:$vec, ID:$idx), TYPE:$type))]>;
 
-def OpVectorInsertDynamicI: Op<78, (outs ID:$res), (ins TYPE:$ty, vID:$vec, ID:$comp, ID:$idx),
-                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vID:$vec, ID:$comp, ID:$idx), TYPE:$ty))]>;
-def OpVectorInsertDynamicF: Op<78, (outs ID:$res), (ins TYPE:$ty, vfID:$vec, fID:$comp, ID:$idx),
-                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vfID:$vec, fID:$comp, ID:$idx), TYPE:$ty))]>;
+def OpVectorInsertDynamic: Op<78, (outs ID:$res), (ins TYPE:$ty, ID:$vec, ID:$comp, ID:$idx),
+                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx">;
+//def OpVectorInsertDynamicI: Op<78, (outs ID:$res), (ins TYPE:$ty, vID:$vec, ID:$comp, ID:$idx),
+//                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vID:$vec, ID:$comp, ID:$idx), TYPE:$ty))]>;
+//def OpVectorInsertDynamicF: Op<78, (outs ID:$res), (ins TYPE:$ty, vfID:$vec, fID:$comp, ID:$idx),
+//                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vfID:$vec, fID:$comp, ID:$idx), TYPE:$ty))]>;
 
 def OpVectorShuffle: Op<79, (outs ID:$res), (ins TYPE:$ty, ID:$v1, ID:$v2, variable_ops),
                   "$res = OpVectorShuffle $ty $v1 $v2">;

@@ -19,13 +19,17 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/IR/IRBuilder.h"
 #include <string>
 
 // Add the given string as a series of integer operand, inserting null
 // terminators and padding to make sure the operands all have 32-bit
 // little-endian words
 void addStringImm(const llvm::StringRef &str, llvm::MachineInstrBuilder &MIB);
+void addStringImm(const llvm::StringRef &str, llvm::IRBuilder<> &B,
+                  std::vector<llvm::Value *> &Args);
 
 // Read the series of integer operands back as a null-terminated string using
 // the reverse of the logic in addStringImm

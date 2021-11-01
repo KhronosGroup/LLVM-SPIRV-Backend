@@ -18,6 +18,8 @@
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVStrings.h"
 
+#include "llvm/IR/IntrinsicsSPIRV.h"
+
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
@@ -441,6 +443,11 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
   const auto MRI = MIRBuilder.getMRI();
   auto idxInstr = MRI->getVRegDef(idxVReg);
+  if (idxInstr->getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+      idxInstr->getIntrinsicID() == Intrinsic::spv_track_constant) {
+    idxVReg = idxInstr->getOperand(2).getReg();
+    idxInstr = MRI->getVRegDef(idxVReg);
+  }
 
   // Set up the final register to do truncation or extension on at the end.
   Register toTruncate = resVReg;
