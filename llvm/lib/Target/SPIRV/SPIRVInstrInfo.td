@@ -672,9 +672,77 @@ def OpMemoryNamedBarrier: Op<329, (outs), (ins ID:$barr, ID:$mem, ID:$sem),
                   "OpMemoryNamedBarrier $barr $mem $sem">;
 
 // TODO Complete this list, or auto-generate it, to include later sections such as
-// 3.32.21. Group and Subgroup Instructions,
+// 3.37.21. Group and Subgroup Instructions
+
+def OpGroupAll: Op<261, (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pr),
+                  "$res = OpGroupAll $ty $scope $pr">;
+def OpGroupAny: Op<262, (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pr),
+                  "$res = OpGroupAny $ty $scope $pr">;
+def OpGroupBroadcast: Op<263, (outs ID:$res), (ins TYPE:$ty, ID:$scope,
+                               ID:$val, ID:$id),
+                  "$res = OpGroupBroadcast $ty $scope $val $id">;
+class OpGroup<string name, bits<16> opCode>: Op<opCode, (outs ID:$res),
+                  (ins TYPE:$ty, ID:$scope, GroupOperation:$groupOp, ID:$x),
+                  "$res = OpGroup"#name#" $ty $scope $groupOp $x">;
+def OpGroupIAdd: OpGroup<"IAdd", 264>;
+def OpGroupFAdd: OpGroup<"FAdd", 265>;
+def OpGroupFMin: OpGroup<"FMin", 266>;
+def OpGroupUMin: OpGroup<"UMin", 267>;
+def OpGroupSMin: OpGroup<"SMin", 268>;
+def OpGroupFMax: OpGroup<"FMax", 269>;
+def OpGroupUMax: OpGroup<"UMax", 270>;
+def OpGroupSMax: OpGroup<"SMax", 271>;
+
+
 // 3.32.22. Device-Side Enqueue Instructions,
 // 3.32.23. Pipe Instructions,
-// 3.32.24. Non-Uniform Instructions,
-// and possibly 3.32.25. Reserved Instructions.
 
+// 3.37.24. Non-Uniform Instructions
+def OpGroupNonUniformElect: Op<333, (outs ID:$res), (ins TYPE:$ty, ID:$scope),
+                  "$res = OpGroupNonUniformElect $ty $scope">;
+class OpGroupNU3<string name, bits<16> opCode>: Op<opCode,
+                  (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pred),
+                  "$res = OpGroupNonUniform"#name#" $ty $scope $pred">;
+class OpGroupNU4<string name, bits<16> opCode>: Op<opCode,
+                  (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$val, ID:$id),
+                  "$res = OpGroupNonUniform"#name#" $ty $scope $val $id">;
+def OpGroupNonUniformAll: OpGroupNU3<"All", 334>;
+def OpGroupNonUniformAny: OpGroupNU3<"Any", 335>;
+def OpGroupNonUniformAllEqual: OpGroupNU3<"AllEqual", 336>;
+def OpGroupNonUniformBroadcast: OpGroupNU4<"Broadcast", 337>;
+def OpGroupNonUniformBroadcastFirst: OpGroupNU3<"BroadcastFirst", 338>;
+def OpGroupNonUniformBallot: OpGroupNU3<"Ballot", 339>;
+def OpGroupNonUniformInverseBallot: OpGroupNU3<"InverseBallot", 340>;
+def OpGroupNonUniformBallotBitExtract: OpGroupNU4<"BallotBitExtract", 341>;
+def OpGroupNonUniformBallotBitCount: Op<342, (outs ID:$res),
+                  (ins TYPE:$ty, ID:$scope, GroupOperation:$groupOp, ID:$val),
+                  "$res = OpGroupNonUniformBallotBitCount "
+                          "$ty $scope $groupOp $val">;
+def OpGroupNonUniformBallotFindLSB: OpGroupNU3<"BallotFindLSB", 343>;
+def OpGroupNonUniformBallotFindMSB: OpGroupNU3<"BallotFindMSB", 344>;
+def OpGroupNonUniformShuffle: OpGroupNU4<"Shuffle", 345>;
+def OpGroupNonUniformShuffleXor: OpGroupNU4<"ShuffleXor", 346>;
+def OpGroupNonUniformShuffleUp: OpGroupNU4<"ShuffleUp", 347>;
+def OpGroupNonUniformShuffleDown: OpGroupNU4<"ShuffleDown", 348>;
+class OpGroupNUGroup<string name, bits<16> opCode>: Op<opCode, (outs ID:$res),
+                  (ins TYPE:$ty, ID:$scope, GroupOperation:$groupOp,
+                   ID:$val, variable_ops),
+                  "$res = OpGroupNonUniform"#name#" $ty $scope $groupOp $val">;
+def OpGroupNonUniformIAdd: OpGroupNUGroup<"IAdd", 349>;
+def OpGroupNonUniformFAdd: OpGroupNUGroup<"FAdd", 350>;
+def OpGroupNonUniformIMul: OpGroupNUGroup<"IMul", 351>;
+def OpGroupNonUniformFMul: OpGroupNUGroup<"FMul", 352>;
+def OpGroupNonUniformSMin: OpGroupNUGroup<"SMin", 353>;
+def OpGroupNonUniformUMin: OpGroupNUGroup<"UMin", 354>;
+def OpGroupNonUniformFMin: OpGroupNUGroup<"FMin", 355>;
+def OpGroupNonUniformSMax: OpGroupNUGroup<"SMax", 356>;
+def OpGroupNonUniformUMax: OpGroupNUGroup<"UMax", 357>;
+def OpGroupNonUniformFMax: OpGroupNUGroup<"FMax", 358>;
+def OpGroupNonUniformBitwiseAnd: OpGroupNUGroup<"BitwiseAnd", 359>;
+def OpGroupNonUniformBitwiseOr: OpGroupNUGroup<"BitwiseOr", 360>;
+def OpGroupNonUniformBitwiseXor: OpGroupNUGroup<"BitwiseXor", 361>;
+def OpGroupNonUniformLogicalAnd: OpGroupNUGroup<"LogicalAnd", 362>;
+def OpGroupNonUniformLogicalOr: OpGroupNUGroup<"LogicalOr", 363>;
+def OpGroupNonUniformLogicalXor: OpGroupNUGroup<"LogicalXor", 364>;
+
+// and possibly 3.32.25. Reserved Instructions.

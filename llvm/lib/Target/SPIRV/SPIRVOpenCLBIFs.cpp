@@ -65,7 +65,7 @@ enum CLMemFenceFlags {
   CLK_IMAGE_MEM_FENCE = 0x4
 };
 
-static StringMap<unsigned> OpenCLBIMap({
+static StringMap<unsigned> OpenCLBIToOperationMap({
 #define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
   _SPIRV_OP(isequal, FOrdEqual)
   _SPIRV_OP(isnotequal, FUnordNotEqual)
@@ -83,6 +83,87 @@ static StringMap<unsigned> OpenCLBIMap({
   _SPIRV_OP(signbit, SignBitSet)
   _SPIRV_OP(any, Any)
   _SPIRV_OP(all, All)
+  // CL 2.0 workgroup builtins
+  _SPIRV_OP(group_all, GroupAll)
+  _SPIRV_OP(group_any, GroupAny)
+  _SPIRV_OP(group_broadcast, GroupBroadcast)
+  _SPIRV_OP(group_iadd, GroupIAdd)
+  _SPIRV_OP(group_fadd, GroupFAdd)
+  _SPIRV_OP(group_fmin, GroupFMin)
+  _SPIRV_OP(group_umin, GroupUMin)
+  _SPIRV_OP(group_smin, GroupSMin)
+  _SPIRV_OP(group_fmax, GroupFMax)
+  _SPIRV_OP(group_umax, GroupUMax)
+  _SPIRV_OP(group_smax, GroupSMax)
+  // cl_khr_subgroup_non_uniform_vote
+  _SPIRV_OP(group_elect, GroupNonUniformElect)
+  _SPIRV_OP(group_non_uniform_all, GroupNonUniformAll)
+  _SPIRV_OP(group_non_uniform_any, GroupNonUniformAny)
+  _SPIRV_OP(group_non_uniform_all_equal, GroupNonUniformAllEqual)
+  // cl_khr_subgroup_ballot
+  _SPIRV_OP(group_non_uniform_broadcast, GroupNonUniformBroadcast)
+  _SPIRV_OP(group_broadcast_first, GroupNonUniformBroadcastFirst)
+  _SPIRV_OP(group_ballot, GroupNonUniformBallot)
+  _SPIRV_OP(group_inverse_ballot, GroupNonUniformInverseBallot)
+  _SPIRV_OP(group_ballot_bit_extract, GroupNonUniformBallotBitExtract)
+  _SPIRV_OP(group_ballot_bit_count, GroupNonUniformBallotBitCount)
+  _SPIRV_OP(group_ballot_inclusive_scan, GroupNonUniformBallotBitCount)
+  _SPIRV_OP(group_ballot_exclusive_scan, GroupNonUniformBallotBitCount)
+  _SPIRV_OP(group_ballot_find_lsb, GroupNonUniformBallotFindLSB)
+  _SPIRV_OP(group_ballot_find_msb, GroupNonUniformBallotFindMSB)
+  // cl_khr_subgroup_non_uniform_arithmetic
+  _SPIRV_OP(group_non_uniform_iadd, GroupNonUniformIAdd)
+  _SPIRV_OP(group_non_uniform_fadd, GroupNonUniformFAdd)
+  _SPIRV_OP(group_non_uniform_imul, GroupNonUniformIMul)
+  _SPIRV_OP(group_non_uniform_fmul, GroupNonUniformFMul)
+  _SPIRV_OP(group_non_uniform_smin, GroupNonUniformSMin)
+  _SPIRV_OP(group_non_uniform_umin, GroupNonUniformUMin)
+  _SPIRV_OP(group_non_uniform_fmin, GroupNonUniformFMin)
+  _SPIRV_OP(group_non_uniform_smax, GroupNonUniformSMax)
+  _SPIRV_OP(group_non_uniform_umax, GroupNonUniformUMax)
+  _SPIRV_OP(group_non_uniform_fmax, GroupNonUniformFMax)
+  _SPIRV_OP(group_non_uniform_iand, GroupNonUniformBitwiseAnd)
+  _SPIRV_OP(group_non_uniform_ior, GroupNonUniformBitwiseOr)
+  _SPIRV_OP(group_non_uniform_ixor, GroupNonUniformBitwiseXor)
+  _SPIRV_OP(group_non_uniform_logical_iand, GroupNonUniformLogicalAnd)
+  _SPIRV_OP(group_non_uniform_logical_ior, GroupNonUniformLogicalOr)
+  _SPIRV_OP(group_non_uniform_logical_ixor, GroupNonUniformLogicalXor)
+  // cl_khr_subgroup_shuffle
+  _SPIRV_OP(group_shuffle, GroupNonUniformShuffle)
+  _SPIRV_OP(group_shuffle_xor, GroupNonUniformShuffleXor)
+  // cl_khr_subgroup_shuffle_relative
+  _SPIRV_OP(group_shuffle_up, GroupNonUniformShuffleUp)
+  _SPIRV_OP(group_shuffle_down, GroupNonUniformShuffleDown)
+#undef _SPIRV_OP
+});
+
+static StringMap<BuiltIn::BuiltIn> OpenCLBIToBuiltInVarMap({
+#define _SPIRV_OP(x, y) {#x, BuiltIn::y},
+  // cl_khr_subgroup_ballot
+  _SPIRV_OP(get_sub_group_eq_mask, SubgroupEqMask)
+  _SPIRV_OP(get_sub_group_ge_mask, SubgroupGeMask)
+  _SPIRV_OP(get_sub_group_gt_mask, SubgroupGtMask)
+  _SPIRV_OP(get_sub_group_le_mask, SubgroupLeMask)
+  _SPIRV_OP(get_sub_group_lt_mask, SubgroupLtMask)
+#undef _SPIRV_OP
+});
+
+static StringMap<GroupOperation::GroupOperation> GroupOperationMap({
+#define _SPIRV_OP(x, y) {#x, GroupOperation::y},
+  _SPIRV_OP(reduce, Reduce)
+  _SPIRV_OP(scan_inclusive, InclusiveScan)
+  _SPIRV_OP(scan_exclusive, ExclusiveScan)
+  _SPIRV_OP(ballot_bit_count, Reduce)
+  _SPIRV_OP(ballot_inclusive_scan, InclusiveScan)
+  _SPIRV_OP(ballot_exclusive_scan, ExclusiveScan)
+  _SPIRV_OP(non_uniform_reduce, Reduce)
+  _SPIRV_OP(non_uniform_scan_inclusive, InclusiveScan)
+  _SPIRV_OP(non_uniform_scan_exclusive, ExclusiveScan)
+  _SPIRV_OP(non_uniform_reduce_logical, Reduce)
+  _SPIRV_OP(non_uniform_scan_inclusive_logical, InclusiveScan)
+  _SPIRV_OP(non_uniform_scan_exclusive_logical, ExclusiveScan)
+  _SPIRV_OP(clustered_reduce, ClusteredReduce)
+  _SPIRV_OP(clustered_reduce_logical, ClusteredReduce)
 #undef _SPIRV_OP
 });
 
@@ -236,17 +317,20 @@ static Register buildOpVariable(SPIRVType *BaseType,
 }
 
 static Register buildLoad(SPIRVType *BaseType, Register PtrVReg,
-                          MachineIRBuilder &MIRBuilder, SPIRVTypeRegistry *TR) {
+                          MachineIRBuilder &MIRBuilder, SPIRVTypeRegistry *TR,
+                          LLT llt, Register dstReg = Register(0)) {
   const auto MRI = MIRBuilder.getMRI();
-  Register Reg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-  MRI->setType(Reg, LLT::scalar(32));
-  TR->assignSPIRVTypeToVReg(BaseType, Reg, MIRBuilder);
+  if (!dstReg.isValid()) {
+    dstReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+    MRI->setType(dstReg, LLT::scalar(32));
+    TR->assignSPIRVTypeToVReg(BaseType, dstReg, MIRBuilder);
+  }
 
   // TODO: consider using correct address space and alignment
   // p0 is canonical type for selection though
   auto PtrInfo = MachinePointerInfo();
-  MIRBuilder.buildLoad(Reg, PtrVReg, PtrInfo, Align());
-  return Reg;
+  MIRBuilder.buildLoad(dstReg, PtrVReg, PtrInfo, Align());
+  return dstReg;
 }
 
 static uint64_t getLiteralValueForConstant(Register constVReg,
@@ -299,6 +383,21 @@ static Register buildIConstant(uint64_t Val, SPIRVType *type,
   auto Reg = MIRBuilder.getMRI()->createGenericVirtualRegister(llt);
   buildIConstant(Reg, Val, type, MIRBuilder, TR);
   return Reg;
+}
+
+static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
+                              SPIRVType *varType,
+                              SPIRVTypeRegistry *TR, BuiltIn::BuiltIn builtIn,
+                              LLT llt, Register Reg = Register(0)) {
+  // Set up the global OpVariable with the necessary builtin decorations
+  Register var = buildOpVariable(varType, StorageClass::Input, MIRBuilder, TR);
+  decorateBuiltIn(var, builtIn, MIRBuilder, TR);
+  decorateConstant(var, MIRBuilder, TR);
+
+  // Load the value from the global variable
+  Register loadedReg = buildLoad(varType, var, MIRBuilder, TR, llt, Reg);
+  MIRBuilder.getMRI()->setType(loadedReg, llt);
+  return loadedReg;
 }
 
 // These queries ask for a single size_t result for a given dimension index, e.g
@@ -362,16 +461,8 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   } else { // If it could be in range, we need to load from the given builtin
 
     auto Vec3Ty = TR->getOrCreateSPIRVVectorType(PtrSizeTy, 3, MIRBuilder);
-
-    // Set up the global OpVariable with the necessary builtin decorations
-    Register globVar = buildOpVariable(Vec3Ty, StorageClass::Input, MIRBuilder, TR);
-    decorateBuiltIn(globVar, builtIn, MIRBuilder, TR);
-    decorateConstant(globVar, MIRBuilder, TR);
-
-    // Load the Vec3 from the global variable
-    Register loadedVector =
-        buildLoad(Vec3Ty, globVar, MIRBuilder, TR);
-    MRI->setType(loadedVector, LLT::fixed_vector(3, ptrSize));
+    Register loadedVector = buildBuiltInLoad(MIRBuilder, Vec3Ty, TR, builtIn,
+                                             LLT::fixed_vector(3, ptrSize));
 
     // Set up the vreg to extract the result to (possibly a new temporary one)
     Register extr = resVReg;
@@ -809,7 +900,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
     scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty);
 
   Register expected = isCmpxchg ? expectedArg :
-      buildLoad(spvDesiredTy, expectedArg, MIRBuilder, TR);
+      buildLoad(spvDesiredTy, expectedArg, MIRBuilder, TR, LLT::scalar(32));
   MRI->setType(expected, desiredLLT);
   Register tmp = !isCmpxchg ? MRI->createGenericVirtualRegister(desiredLLT) :
                               resVReg;
@@ -1084,7 +1175,7 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
     OpCode = OpFMulS;
   }
 
- auto MIB = MIRBuilder.buildInstr(OpCode)
+  auto MIB = MIRBuilder.buildInstr(OpCode)
                  .addDef(resVReg)
                  .addUse(TR->getSPIRVTypeID(resType))
                  .addUse(OrigArgs[0])
@@ -1092,24 +1183,47 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
   return TR->constrainRegOperands(MIB);
 }
 
-static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
-    unsigned opcode, Register resVReg, const SPIRVType *resType,
-    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
-  auto relTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
-  bool isVectorRes = resType->getOpcode() == SPIRV::OpTypeVector;
+static Register buildScalarOrVectorBoolReg(MachineIRBuilder &MIRBuilder,
+    SPIRVType *&boolTy, const SPIRVType *resType, SPIRVTypeRegistry *TR) {
   LLT lltTy;
-  if (isVectorRes) {
+  boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
+  if (resType->getOpcode() == SPIRV::OpTypeVector) {
     unsigned vecElts = resType->getOperand(2).getImm();
-    relTy = TR->getOrCreateSPIRVVectorType(relTy, vecElts, MIRBuilder);
-    auto LLVMVecTy = cast<FixedVectorType>(TR->getTypeForSPIRVType(relTy));
+    boolTy = TR->getOrCreateSPIRVVectorType(boolTy, vecElts, MIRBuilder);
+    auto LLVMVecTy = cast<FixedVectorType>(TR->getTypeForSPIRVType(boolTy));
     lltTy = LLT::vector(LLVMVecTy->getElementCount(), 1);
   } else {
     lltTy = LLT::scalar(1);
   }
   const auto MRI = MIRBuilder.getMRI();
-  auto cmpReg = MRI->createGenericVirtualRegister(lltTy);
+  auto resReg = MRI->createGenericVirtualRegister(lltTy);
+  TR->assignSPIRVTypeToVReg(boolTy, resReg, MIRBuilder);
+  return resReg;
+}
+
+static bool buildScalarOrVectorSelect(MachineIRBuilder &MIRBuilder,
+    Register resReg, Register srcReg, const SPIRVType *resType,
+    SPIRVTypeRegistry *TR) {
+  Register trueConst;
+  Register falseConst;
+  auto bits = TR->getScalarOrVectorBitWidth(resType);
+  if (resType->getOpcode() == SPIRV::OpTypeVector) {
+     auto ones = APInt::getAllOnesValue(bits).getZExtValue();
+     trueConst = TR->buildConstantIntVector(ones, MIRBuilder, resType);
+     falseConst = TR->buildConstantIntVector(0, MIRBuilder, resType);
+  } else {
+     trueConst = TR->buildConstantInt(1, MIRBuilder, resType);
+     falseConst = TR->buildConstantInt(0, MIRBuilder, resType);
+  }
+  return MIRBuilder.buildSelect(resReg, srcReg, trueConst, falseConst);
+}
+
+static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
+    unsigned opcode, Register resVReg, const SPIRVType *resType,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
+  SPIRVType *relTy;
+  auto cmpReg = buildScalarOrVectorBoolReg(MIRBuilder, relTy, resType, TR);
   // Build relational instruction
-  TR->assignSPIRVTypeToVReg(relTy, cmpReg, MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(opcode)
                  .addDef(cmpReg)
                  .addUse(TR->getSPIRVTypeID(relTy));
@@ -1118,18 +1232,84 @@ static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
   }
   TR->constrainRegOperands(MIB);
   // Build select instruction
-  Register trueConst;
-  Register falseConst;
-  auto bits = TR->getScalarOrVectorBitWidth(resType);
-  if (isVectorRes) {
-     auto ones = APInt::getAllOnesValue(bits).getZExtValue();
-     trueConst = TR->buildConstantIntVector(ones, MIRBuilder, resType);
-     falseConst = TR->buildConstantIntVector(0, MIRBuilder, resType);
-  } else {
-     trueConst = TR->buildConstantInt(1, MIRBuilder, resType);
-     falseConst = TR->buildConstantInt(0, MIRBuilder, resType);
+  return buildScalarOrVectorSelect(MIRBuilder, resVReg, cmpReg, resType, TR);
+}
+
+static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
+    unsigned opcode, Register resVReg, const SPIRVType *resType,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
+  using namespace SPIRV;
+  const bool isElect = opcode == OpGroupNonUniformElect;
+  const bool isAllOrAny = opcode == OpGroupAll || opcode == OpGroupAny
+                          || opcode == OpGroupNonUniformAll
+                          || opcode == OpGroupNonUniformAny;
+  const bool isAllEqual = opcode == OpGroupNonUniformAllEqual;
+  const bool isBallot = opcode == OpGroupNonUniformBallot;
+  const bool isInverseBallot = opcode == OpGroupNonUniformInverseBallot;
+  const bool isBallotBitExtract = opcode == OpGroupNonUniformBallotBitExtract;
+  const bool isBallotFindBit = opcode == OpGroupNonUniformBallotFindLSB
+                               || opcode == OpGroupNonUniformBallotFindMSB;
+  const bool isLogical = opcode == OpGroupNonUniformLogicalAnd
+                         || opcode == OpGroupNonUniformLogicalOr
+                         || opcode == OpGroupNonUniformLogicalXor;
+  const bool noGroupOperation = isElect || isAllOrAny || isAllEqual
+                                || isBallot || isInverseBallot
+                                || isBallotBitExtract || isBallotFindBit
+                                || opcode == OpGroupNonUniformShuffle
+                                || opcode == OpGroupNonUniformShuffleXor
+                                || opcode == OpGroupNonUniformShuffleUp
+                                || opcode == OpGroupNonUniformShuffleDown
+                                || opcode == OpGroupBroadcast
+                                || opcode == OpGroupNonUniformBroadcast
+                                || opcode == OpGroupNonUniformBroadcastFirst;
+  const bool hasBoolArg = (isAllOrAny && !isAllEqual) || isBallot || isLogical;
+  const auto MRI = MIRBuilder.getMRI();
+  Register arg0;
+  if (hasBoolArg) {
+    auto argInstr = MRI->getVRegDef(OrigArgs[0]);
+    // TODO: support non-constant bool values
+    assert(argInstr->getOpcode() == TargetOpcode::G_CONSTANT
+           && "Only constant bool value args are supported");
+    if (TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() != OpTypeBool) {
+      auto boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
+      arg0 = TR->buildConstantInt(getLiteralValueForConstant(OrigArgs[0], MRI),
+                                  MIRBuilder, boolTy);
+    }
   }
-  MIRBuilder.buildSelect(resVReg, cmpReg, trueConst, falseConst);
+  Register groupReg = resVReg;
+  SPIRVType* groupTy = resType;
+  // TODO: maybe we need to check whether the result type is already boolean
+  // and in this case do not insert select instruction.
+  const bool hasBoolReturnTy = isElect || isAllOrAny || isAllEqual || isLogical
+                               || isInverseBallot || isBallotBitExtract;
+  if (hasBoolReturnTy)
+    groupReg = buildScalarOrVectorBoolReg(MIRBuilder, groupTy, resType, TR);
+  const auto I32Ty = TR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
+  auto scope = name.startswith("sub_group") ? Scope::Subgroup
+                                            : Scope::Workgroup;
+  Register scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty);
+  // Build OpGroup* instruction
+  auto MIB = MIRBuilder.buildInstr(opcode)
+                 .addDef(groupReg)
+                 .addUse(TR->getSPIRVTypeID(groupTy))
+                 .addUse(scopeReg);
+  if (!noGroupOperation) {
+    auto start = name.find("group_") + strlen("group_");
+    auto end = opcode == OpGroupNonUniformBallotBitCount
+               ? StringRef::npos : name.rfind('_');
+    auto groupOp = GroupOperationMap.lookup(name.slice(start, end));
+    MIB.addImm(groupOp);
+  }
+  if (OrigArgs.size() > 0) {
+    MIB.addUse(arg0.isValid() ? arg0 : OrigArgs[0]);
+    for (unsigned i = 1; i < OrigArgs.size(); i++) {
+      MIB.addUse(OrigArgs[i]);
+    }
+  }
+  TR->constrainRegOperands(MIB);
+  // Build select instruction
+  if (hasBoolReturnTy)
+    buildScalarOrVectorSelect(MIRBuilder, resVReg, groupReg, resType, TR);
   return true;
 }
 
@@ -1147,6 +1327,50 @@ static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
     MIB.addUse(arg);
   }
   return TR->constrainRegOperands(MIB);
+}
+
+static std::string modifyBINameForLookup(StringRef nameNoArgs, SPIRVType *retTy,
+    char firstArgC) {
+  std::string modifiedName = nameNoArgs.str();
+  if (nameNoArgs.startswith("sub_group_")
+      || nameNoArgs.startswith("work_group_")) {
+    if (nameNoArgs.contains("group_all")
+        || nameNoArgs.contains("group_any")
+        || nameNoArgs.startswith("sub_group_shuffle")
+        || nameNoArgs.contains("group_broadcast")
+        || nameNoArgs.startswith("sub_group_elect")
+        || nameNoArgs.startswith("sub_group_non_uniform_all") // includes _equal
+        || nameNoArgs.startswith("sub_group_non_uniform_any")
+        || nameNoArgs.startswith("sub_group_non_uniform_broadcast")
+        || nameNoArgs.startswith("sub_group_broadcast_first")
+        || nameNoArgs.startswith("sub_group_ballot") // includes all ballot_*
+        || nameNoArgs.startswith("sub_group_inverse_ballot")) {
+      modifiedName = nameNoArgs.substr(nameNoArgs.find("group")).str();
+    } else {
+      // This mainly implements non-uniform arithmetic builtins.
+      auto logicalOp = nameNoArgs.contains("logical_") ? "logical_" : "";
+      auto nameSuffix = nameNoArgs.substr(nameNoArgs.rfind('_') + 1).str();
+      auto nonUniform = nameNoArgs.contains("clustered_")
+                        || nameNoArgs.contains("non_uniform_") ? "non_uniform_"
+                                                               : "";
+      char OpTyC = 0;
+      if (retTy->getOpcode() == SPIRV::OpTypeFloat)
+        OpTyC = 'f';
+      else if (retTy->getOpcode() == SPIRV::OpTypeInt) {
+        if (nameSuffix == "max" || nameSuffix == "min") {
+          // Get signedness from "unsigned" argument type of the demangled name.
+          OpTyC = firstArgC;
+          if (OpTyC != 'u')
+            OpTyC = 's';
+        } else
+          OpTyC = 'i';
+      } else
+        llvm_unreachable("Invalid OpenCL group builtin argument type");
+      modifiedName = "group_" + std::string(nonUniform)
+                     + std::string(logicalOp) + OpTyC + nameSuffix;
+    }
+  }
+  return modifiedName;
 }
 
 bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
@@ -1213,9 +1437,11 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     nameNoArgs = tmpStr.second;
     returnTypeStr = tmpStr.first;
   }
-
+  // Modify the names of builtins to use smaller map of opcodes.
+  auto modifiedName = modifyBINameForLookup(nameNoArgs, retTy,
+                                            demangledName[firstBraceIdx + 1]);
   using namespace SPIRV;
-  const unsigned opcode = OpenCLBIMap.lookup(nameNoArgs);
+  const unsigned opcode = OpenCLBIToOperationMap.lookup(modifiedName);
   switch (opcode) {
   case OpFOrdEqual:
   case OpFUnordNotEqual:
@@ -1234,6 +1460,70 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   case OpAny:
   case OpAll:
     return genOpenCLRelational(MIRBuilder, opcode, OrigRet, retTy, args, TR);
+  case OpGroupAll:
+  case OpGroupAny:
+  case OpGroupBroadcast:
+  case OpGroupIAdd:
+  case OpGroupFAdd:
+  case OpGroupFMin:
+  case OpGroupUMin:
+  case OpGroupSMin:
+  case OpGroupFMax:
+  case OpGroupUMax:
+  case OpGroupSMax:
+  case OpGroupNonUniformElect:
+  case OpGroupNonUniformAll:
+  case OpGroupNonUniformAny:
+  case OpGroupNonUniformAllEqual:
+  case OpGroupNonUniformBroadcast:
+  case OpGroupNonUniformBroadcastFirst:
+  case OpGroupNonUniformBallot:
+  case OpGroupNonUniformInverseBallot:
+  case OpGroupNonUniformBallotBitExtract:
+  case OpGroupNonUniformBallotBitCount:
+  case OpGroupNonUniformBallotFindLSB:
+  case OpGroupNonUniformBallotFindMSB:
+  case OpGroupNonUniformShuffle:
+  case OpGroupNonUniformShuffleXor:
+  case OpGroupNonUniformShuffleUp:
+  case OpGroupNonUniformShuffleDown:
+  case OpGroupNonUniformIAdd:
+  case OpGroupNonUniformFAdd:
+  case OpGroupNonUniformIMul:
+  case OpGroupNonUniformFMul:
+  case OpGroupNonUniformSMin:
+  case OpGroupNonUniformUMin:
+  case OpGroupNonUniformFMin:
+  case OpGroupNonUniformSMax:
+  case OpGroupNonUniformUMax:
+  case OpGroupNonUniformFMax:
+  case OpGroupNonUniformBitwiseAnd:
+  case OpGroupNonUniformBitwiseOr:
+  case OpGroupNonUniformBitwiseXor:
+  case OpGroupNonUniformLogicalAnd:
+  case OpGroupNonUniformLogicalOr:
+  case OpGroupNonUniformLogicalXor:
+    return genOpenCLOpGroup(MIRBuilder, nameNoArgs, opcode, OrigRet, retTy,
+                            args, TR);
+  default:
+    break;
+  }
+
+  const BuiltIn::BuiltIn builtInVar = OpenCLBIToBuiltInVarMap.lookup(nameNoArgs);
+  switch (builtInVar) {
+  case BuiltIn::SubgroupEqMask:
+  case BuiltIn::SubgroupGeMask:
+  case BuiltIn::SubgroupGtMask:
+  case BuiltIn::SubgroupLeMask:
+  case BuiltIn::SubgroupLtMask: {
+    unsigned BitWidth = TR->getScalarOrVectorBitWidth(retTy);
+    LLT llt;
+    if (retTy->getOpcode() == SPIRV::OpTypeVector)
+      llt = LLT::fixed_vector(retTy->getOperand(2).getImm(), BitWidth);
+    else
+      llt = LLT::scalar(BitWidth);
+    return buildBuiltInLoad(MIRBuilder, retTy, TR, builtInVar, llt, OrigRet);
+  }
   default:
     break;
   }

@@ -105,7 +105,7 @@ source_filename = "sub_group_shuffle_relative.cl"
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[char]] %[[ScopeSubgroup]] %[[char_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[char]] %[[ScopeSubgroup]] %[[char_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -126,7 +126,7 @@ declare dso_local spir_func signext i8 @_Z20sub_group_shuffle_upcj(i8 signext, i
 ; Function Attrs: convergent
 declare dso_local spir_func signext i8 @_Z22sub_group_shuffle_downcj(i8 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[char]] %[[ScopeSubgroup]] %[[char_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[char]] %[[ScopeSubgroup]] %[[char_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -147,7 +147,7 @@ declare dso_local spir_func zeroext i8 @_Z20sub_group_shuffle_uphj(i8 zeroext, i
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i8 @_Z22sub_group_shuffle_downhj(i8 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[short]] %[[ScopeSubgroup]] %[[short_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[short]] %[[ScopeSubgroup]] %[[short_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -168,7 +168,7 @@ declare dso_local spir_func signext i16 @_Z20sub_group_shuffle_upsj(i16 signext,
 ; Function Attrs: convergent
 declare dso_local spir_func signext i16 @_Z22sub_group_shuffle_downsj(i16 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[short]] %[[ScopeSubgroup]] %[[short_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[short]] %[[ScopeSubgroup]] %[[short_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -189,7 +189,7 @@ declare dso_local spir_func zeroext i16 @_Z20sub_group_shuffle_uptj(i16 zeroext,
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i16 @_Z22sub_group_shuffle_downtj(i16 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[int]] %[[ScopeSubgroup]] %[[int_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[int]] %[[ScopeSubgroup]] %[[int_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -210,7 +210,7 @@ declare dso_local spir_func i32 @_Z20sub_group_shuffle_upij(i32, i32) local_unna
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z22sub_group_shuffle_downij(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[int]] %[[ScopeSubgroup]] %[[int_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[int]] %[[ScopeSubgroup]] %[[int_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -231,7 +231,7 @@ declare dso_local spir_func i32 @_Z20sub_group_shuffle_upjj(i32, i32) local_unna
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z22sub_group_shuffle_downjj(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[long]] %[[ScopeSubgroup]] %[[long_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[long]] %[[ScopeSubgroup]] %[[long_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -252,7 +252,7 @@ declare dso_local spir_func i64 @_Z20sub_group_shuffle_uplj(i64, i32) local_unna
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z22sub_group_shuffle_downlj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[long]] %[[ScopeSubgroup]] %[[long_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[long]] %[[ScopeSubgroup]] %[[long_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -273,7 +273,7 @@ declare dso_local spir_func i64 @_Z20sub_group_shuffle_upmj(i64, i32) local_unna
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z22sub_group_shuffle_downmj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[float]] %[[ScopeSubgroup]] %[[float_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[float]] %[[ScopeSubgroup]] %[[float_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -294,7 +294,7 @@ declare dso_local spir_func float @_Z20sub_group_shuffle_upfj(float, i32) local_
 ; Function Attrs: convergent
 declare dso_local spir_func float @_Z22sub_group_shuffle_downfj(float, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[half]] %[[ScopeSubgroup]] %[[half_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[half]] %[[ScopeSubgroup]] %[[half_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd
@@ -315,7 +315,7 @@ declare dso_local spir_func half @_Z20sub_group_shuffle_upDhj(half, i32) local_u
 ; Function Attrs: convergent
 declare dso_local spir_func half @_Z22sub_group_shuffle_downDhj(half, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleUp %[[double]] %[[ScopeSubgroup]] %[[double_0]] %[[int_0]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformShuffleDown %[[double]] %[[ScopeSubgroup]] %[[double_0]] %[[int_0]]
 ; CHECK-SPIRV: OpFunctionEnd

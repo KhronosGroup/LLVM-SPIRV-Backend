@@ -171,7 +171,8 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
   } else {
     // Add the min requirements for different OpenCL and SPIR-V versions
     addCaps(availableCaps,
-            {Addresses, Float16Buffer, Int16, Int8, Kernel, Linkage, Vector16});
+            {Addresses, Float16Buffer, Int16, Int8, Kernel, Linkage, Vector16,
+             Groups});
     if (openCLFullProfile) {
       addCaps(availableCaps, {Int64, Int64Atomics});
     }
@@ -185,6 +186,12 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
     if (isAtLeastVer(targetSPIRVVersion, 11) &&
         isAtLeastVer(targetOpenCLVersion, 22)) {
       addCaps(availableCaps, {SubgroupDispatch, PipeStorage});
+    }
+    if (isAtLeastVer(targetSPIRVVersion, 13)) {
+      addCaps(availableCaps, {GroupNonUniform, GroupNonUniformVote,
+                              GroupNonUniformArithmetic, GroupNonUniformBallot,
+                              GroupNonUniformClustered, GroupNonUniformShuffle,
+                              GroupNonUniformShuffleRelative});
     }
 
     // TODO Remove this - it's only here because the tests assume it's supported

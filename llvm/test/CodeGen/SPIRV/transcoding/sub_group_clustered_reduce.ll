@@ -202,7 +202,7 @@ source_filename = "sub_group_clustered_reduce.cl"
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
@@ -237,7 +237,7 @@ declare dso_local spir_func signext i8 @_Z30sub_group_clustered_reduce_mincj(i8 
 ; Function Attrs: convergent
 declare dso_local spir_func signext i8 @_Z30sub_group_clustered_reduce_maxcj(i8 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
@@ -272,7 +272,7 @@ declare dso_local spir_func zeroext i8 @_Z30sub_group_clustered_reduce_minhj(i8 
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i8 @_Z30sub_group_clustered_reduce_maxhj(i8 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
@@ -307,7 +307,7 @@ declare dso_local spir_func signext i16 @_Z30sub_group_clustered_reduce_minsj(i1
 ; Function Attrs: convergent
 declare dso_local spir_func signext i16 @_Z30sub_group_clustered_reduce_maxsj(i16 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
@@ -342,7 +342,7 @@ declare dso_local spir_func zeroext i16 @_Z30sub_group_clustered_reduce_mintj(i1
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i16 @_Z30sub_group_clustered_reduce_maxtj(i16 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
@@ -377,7 +377,7 @@ declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_minij(i32, i32) 
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_maxij(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
@@ -412,7 +412,7 @@ declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_minjj(i32, i32) 
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_maxjj(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformSMin %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
@@ -447,7 +447,7 @@ declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_minlj(i64, i32) 
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_maxlj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIAdd %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformIMul %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformUMin %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
@@ -482,7 +482,7 @@ declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_minmj(i64, i32) 
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_maxmj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[float]] %[[ScopeSubgroup]] ClusteredReduce %[[float_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[float]] %[[ScopeSubgroup]] ClusteredReduce %[[float_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[float]] %[[ScopeSubgroup]] ClusteredReduce %[[float_0]] %[[int_2]]
@@ -517,7 +517,7 @@ declare dso_local spir_func float @_Z30sub_group_clustered_reduce_minfj(float, i
 ; Function Attrs: convergent
 declare dso_local spir_func float @_Z30sub_group_clustered_reduce_maxfj(float, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[half]] %[[ScopeSubgroup]] ClusteredReduce %[[half_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[half]] %[[ScopeSubgroup]] ClusteredReduce %[[half_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[half]] %[[ScopeSubgroup]] ClusteredReduce %[[half_0]] %[[int_2]]
@@ -552,7 +552,7 @@ declare dso_local spir_func half @_Z30sub_group_clustered_reduce_minDhj(half, i3
 ; Function Attrs: convergent
 declare dso_local spir_func half @_Z30sub_group_clustered_reduce_maxDhj(half, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFAdd %[[double]] %[[ScopeSubgroup]] ClusteredReduce %[[double_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMul %[[double]] %[[ScopeSubgroup]] ClusteredReduce %[[double_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformFMin %[[double]] %[[ScopeSubgroup]] ClusteredReduce %[[double_0]] %[[int_2]]
@@ -587,7 +587,7 @@ declare dso_local spir_func double @_Z30sub_group_clustered_reduce_mindj(double,
 ; Function Attrs: convergent
 declare dso_local spir_func double @_Z30sub_group_clustered_reduce_maxdj(double, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
@@ -615,7 +615,7 @@ declare dso_local spir_func signext i8 @_Z29sub_group_clustered_reduce_orcj(i8 s
 ; Function Attrs: convergent
 declare dso_local spir_func signext i8 @_Z30sub_group_clustered_reduce_xorcj(i8 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[char]] %[[ScopeSubgroup]] ClusteredReduce %[[char_0]] %[[int_2]]
@@ -643,7 +643,7 @@ declare dso_local spir_func zeroext i8 @_Z29sub_group_clustered_reduce_orhj(i8 z
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i8 @_Z30sub_group_clustered_reduce_xorhj(i8 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
@@ -671,7 +671,7 @@ declare dso_local spir_func signext i16 @_Z29sub_group_clustered_reduce_orsj(i16
 ; Function Attrs: convergent
 declare dso_local spir_func signext i16 @_Z30sub_group_clustered_reduce_xorsj(i16 signext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[short]] %[[ScopeSubgroup]] ClusteredReduce %[[short_0]] %[[int_2]]
@@ -699,7 +699,7 @@ declare dso_local spir_func zeroext i16 @_Z29sub_group_clustered_reduce_ortj(i16
 ; Function Attrs: convergent
 declare dso_local spir_func zeroext i16 @_Z30sub_group_clustered_reduce_xortj(i16 zeroext, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
@@ -727,7 +727,7 @@ declare dso_local spir_func i32 @_Z29sub_group_clustered_reduce_orij(i32, i32) l
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_xorij(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[int]] %[[ScopeSubgroup]] ClusteredReduce %[[int_0]] %[[int_2]]
@@ -755,7 +755,7 @@ declare dso_local spir_func i32 @_Z29sub_group_clustered_reduce_orjj(i32, i32) l
 ; Function Attrs: convergent
 declare dso_local spir_func i32 @_Z30sub_group_clustered_reduce_xorjj(i32, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
@@ -783,7 +783,7 @@ declare dso_local spir_func i64 @_Z29sub_group_clustered_reduce_orlj(i64, i32) l
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_xorlj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseAnd %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseOr  %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBitwiseXor %[[long]] %[[ScopeSubgroup]] ClusteredReduce %[[long_0]] %[[int_2]]
@@ -811,7 +811,7 @@ declare dso_local spir_func i64 @_Z29sub_group_clustered_reduce_ormj(i64, i32) l
 ; Function Attrs: convergent
 declare dso_local spir_func i64 @_Z30sub_group_clustered_reduce_xormj(i64, i32) local_unnamed_addr #1
 
-; CHECK-SPIRV-LABEL: OpFunction
+; CHECK-SPIRV: OpFunction
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalAnd %[[bool]] %[[ScopeSubgroup]] ClusteredReduce %[[false]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalOr  %[[bool]] %[[ScopeSubgroup]] ClusteredReduce %[[false]] %[[int_2]]
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformLogicalXor %[[bool]] %[[ScopeSubgroup]] ClusteredReduce %[[false]] %[[int_2]]

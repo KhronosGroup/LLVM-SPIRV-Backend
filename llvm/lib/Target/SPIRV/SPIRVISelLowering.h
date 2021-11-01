@@ -42,19 +42,23 @@ public:
   unsigned getNumRegistersForCallingConv(LLVMContext &Context,
                                          CallingConv::ID CC,
                                          EVT VT) const override {
-    if(VT.isVector() && VT.getVectorElementType() == MVT::i1
-       && VT.getVectorNumElements() == 3)
+    if (VT.isVector() && VT.getVectorNumElements() == 3
+        && (VT.getVectorElementType() == MVT::i1
+            || VT.getVectorElementType() == MVT::i8))
       return 1;
-    return getNumRegisters(Context, VT);;
+    return getNumRegisters(Context, VT);
   }
 
   // Avoid fail on v3i1 argument. Maybe we need to return i32 for all types.
   MVT getRegisterTypeForCallingConv(LLVMContext &Context,
                                     CallingConv::ID CC,
                                     EVT VT) const override {
-    if(VT.isVector() && VT.getVectorElementType() == MVT::i1
-       && VT.getVectorNumElements() == 3)
-      return MVT::v4i1;
+    if (VT.isVector() && VT.getVectorNumElements() == 3) {
+      if (VT.getVectorElementType() == MVT::i1)
+        return MVT::v4i1;
+      else if (VT.getVectorElementType() == MVT::i8)
+        return MVT::v4i8;
+    }
     return getRegisterType(Context, VT);
   }
 };
