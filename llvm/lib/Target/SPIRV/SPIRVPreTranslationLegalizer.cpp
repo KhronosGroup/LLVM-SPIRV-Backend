@@ -269,7 +269,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
   for (auto *I : Worklist) {
     bool TrackConstants = true;
     if (!I->getType()->isVoidTy() || isa<StoreInst>(I))
-      setInsertPointSkippingPhis(B, I->getNextNode());
+      B.SetInsertPoint(I->getNextNode());
     Instruction *NewIntr = nullptr;
     if (auto *Gep = dyn_cast<GetElementPtrInst>(I)) {
       auto *IntrFn = Intrinsic::getDeclaration(
@@ -363,7 +363,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       if (II->getIntrinsicID() == Intrinsic::spv_const_composite) {
         if (TrackConstants) {
           auto *Const = AggrConsts.at(I);
-          setInsertPointSkippingPhis(B, I->getNextNode());
+          B.SetInsertPoint(I->getNextNode());
           auto *CTyFn = Intrinsic::getDeclaration(
               F->getParent(), Intrinsic::spv_track_constant,
               {B.getInt32Ty(), B.getInt32Ty()});
