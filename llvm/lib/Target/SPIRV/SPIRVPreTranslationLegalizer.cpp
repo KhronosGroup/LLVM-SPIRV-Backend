@@ -164,9 +164,9 @@ static bool isAggrToReplace(const Value *V) {
          || (isa<ConstantAggregateZero>(V) && !V->getType()->isVectorTy());
 }
 
-static void setInsertPointAfterPhi(IRBuilder<> &B, Instruction *I) {
-  while (dyn_cast<PHINode>(I))
-    I = I->getNextNonDebugInstruction();
+static void setInsertPointSkippingPhis(IRBuilder<> &B, Instruction *I) {
+  while (isa<PHINode>(I))
+    I = I->getNextNode();
   B.SetInsertPoint(I);
 }
 
@@ -186,7 +186,7 @@ void SPIRVPreTranslationLegalizer::preprocessCompositeConstants(IRBuilder<> &B,
                                             std::vector<Value *> &Args) {
         auto *IntrFn = Intrinsic::getDeclaration(
             I->getFunction()->getParent(), Intrinsic::spv_const_composite, {});
-        setInsertPointAfterPhi(B, I);
+        B.SetInsertPoint(I);
         auto *ConstCompI = B.CreateCall(IntrFn, {Args});
         Worklist.push(ConstCompI);
 
@@ -269,7 +269,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
   for (auto *I : Worklist) {
     bool TrackConstants = true;
     if (!I->getType()->isVoidTy() || isa<StoreInst>(I))
-      setInsertPointAfterPhi(B, I->getNextNode());
+      setInsertPointSkippingPhis(B, I->getNextNode());
     Instruction *NewIntr = nullptr;
     if (auto *Gep = dyn_cast<GetElementPtrInst>(I)) {
       auto *IntrFn = Intrinsic::getDeclaration(
@@ -345,7 +345,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
 
     auto *Ty = I->getType();
     if (!Ty->isVoidTy()) {
-      setInsertPointAfterPhi(B, I->getNextNode());
+      setInsertPointSkippingPhis(B, I->getNextNode());
       auto *TyFn = Intrinsic::getDeclaration(F->getParent(),
                                              Intrinsic::spv_assign_type, {Ty});
       auto *TypeToAssign = Ty;
@@ -363,7 +363,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       if (II->getIntrinsicID() == Intrinsic::spv_const_composite) {
         if (TrackConstants) {
           auto *Const = AggrConsts.at(I);
-          setInsertPointAfterPhi(B, I->getNextNode());
+          setInsertPointSkippingPhis(B, I->getNextNode());
           auto *CTyFn = Intrinsic::getDeclaration(
               F->getParent(), Intrinsic::spv_track_constant,
               {B.getInt32Ty(), B.getInt32Ty()});
@@ -378,7 +378,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
     }
     for (const auto &Op : I->operands()) {
       if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op)) {
-        setInsertPointAfterPhi(B, I);
+        B.SetInsertPoint(I);
         auto *CTy = Op->getType();
         auto *CTyFn = Intrinsic::getDeclaration(
             F->getParent(), Intrinsic::spv_assign_type, {CTy});
@@ -388,16 +388,16 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
         B.CreateCall(CTyFn, {Op, CVMD});
       }
       if ((isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy()) ||
-           dyn_cast<PHINode>(I))
+           isa<PHINode>(I))
         TrackConstants = false;
       if (isa<ConstantData>(Op) && TrackConstants) {
-        auto opNo = Op.getOperandNo();
+        auto OpNo = Op.getOperandNo();
         if (isa<IntrinsicInst>(I) &&
             ((cast<IntrinsicInst>(I)->getIntrinsicID() == Intrinsic::spv_gep &&
-              opNo == 0) ||
-             cast<CallBase>(I)->paramHasAttr(opNo, Attribute::ImmArg)))
+              OpNo == 0) ||
+             cast<CallBase>(I)->paramHasAttr(OpNo, Attribute::ImmArg)))
           continue;
-        setInsertPointAfterPhi(B, I);
+        B.SetInsertPoint(I);
         auto *CTy = Op->getType();
         auto *CTyFn = Intrinsic::getDeclaration(
             F->getParent(), Intrinsic::spv_track_constant, {CTy, CTy});
@@ -405,11 +405,11 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
             MDNode::get(F->getContext(), ValueAsMetadata::getConstant(Op));
         auto *CVMD = MetadataAsValue::get(F->getContext(), CTyMD);
         auto *NewOp = B.CreateCall(CTyFn, {Op, CVMD});
-        I->setOperand(opNo, NewOp);
+        I->setOperand(OpNo, NewOp);
       }
     }
     if (I->hasName()) {
-      setInsertPointAfterPhi(B, I->getNextNode());
+      setInsertPointSkippingPhis(B, I->getNextNode());
       auto *NameFn = Intrinsic::getDeclaration(
           F->getParent(), Intrinsic::spv_assign_name, {Ty});
       std::vector<Value *> Args = {I};
