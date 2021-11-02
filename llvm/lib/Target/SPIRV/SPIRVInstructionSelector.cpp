@@ -322,33 +322,8 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   case TargetOpcode::G_BITREVERSE:
     return selectBitreverse(resVReg, resType, I, MIRBuilder);
 
-  case TargetOpcode::G_BUILD_VECTOR: {
-    if (std::all_of(I.operands_begin(), I.operands_end(),
-                    [&I](const MachineOperand &MO) {
-                      return MO.isDef() ||
-                             (MO.isReg() && I.getOperand(1).isReg() &&
-                              MO.getReg() == I.getOperand(1).getReg());
-                    })) {
-      // splat case
-      auto RegUndef = MIRBuilder.getMRI()->createVirtualRegister(&IDRegClass);
-      auto RegTmp = MIRBuilder.getMRI()->createVirtualRegister(&IDRegClass);
-      bool Res = selectOpUndef(RegUndef, resType, MIRBuilder);
-      Res &= MIRBuilder.buildInstr(SPIRV::OpCompositeInsert)
-                 .addDef(RegTmp)
-                 .addUse(TR.getSPIRVTypeID(resType))
-                 .addUse(RegUndef)
-                 .addUse(I.getOperand(1).getReg())
-                 .constrainAllUses(TII, TRI, RBI);
-      return Res & MIRBuilder.buildInstr(SPIRV::OpVectorShuffle)
-                       .addDef(resVReg)
-                       .addUse(TR.getSPIRVTypeID(resType))
-                       .addUse(RegTmp)
-                       .addUse(RegUndef)
-                       .addImm(0)
-                       .constrainAllUses(TII, TRI, RBI);
-    } else
-      return selectConstVector(resVReg, resType, I, MIRBuilder);
-  }
+  case TargetOpcode::G_BUILD_VECTOR:
+    return selectConstVector(resVReg, resType, I, MIRBuilder);
 
   case TargetOpcode::G_SHUFFLE_VECTOR: {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpVectorShuffle)
