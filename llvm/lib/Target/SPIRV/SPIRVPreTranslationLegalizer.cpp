@@ -164,6 +164,12 @@ static bool isAggrToReplace(const Value *V) {
          || (isa<ConstantAggregateZero>(V) && !V->getType()->isVectorTy());
 }
 
+static void setInsertPointSkippingPhis(IRBuilder<> &B, Instruction *I) {
+  while (isa<PHINode>(I))
+    I = I->getNextNode();
+  B.SetInsertPoint(I);
+}
+
 void SPIRVPreTranslationLegalizer::preprocessCompositeConstants(IRBuilder<> &B,
                                                                 Function *F) {
   std::queue<Instruction *> Worklist;
@@ -262,7 +268,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
 
   for (auto *I : Worklist) {
     bool TrackConstants = true;
-    if (!I->getType()->isVoidTy())
+    if (!I->getType()->isVoidTy() || isa<StoreInst>(I))
       B.SetInsertPoint(I->getNextNode());
     Instruction *NewIntr = nullptr;
     if (auto *Gep = dyn_cast<GetElementPtrInst>(I)) {
@@ -339,7 +345,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
 
     auto *Ty = I->getType();
     if (!Ty->isVoidTy()) {
-      B.SetInsertPoint(I->getNextNode());
+      setInsertPointSkippingPhis(B, I->getNextNode());
       auto *TyFn = Intrinsic::getDeclaration(F->getParent(),
                                              Intrinsic::spv_assign_type, {Ty});
       auto *TypeToAssign = Ty;
@@ -358,7 +364,6 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
         if (TrackConstants) {
           auto *Const = AggrConsts.at(I);
           B.SetInsertPoint(I->getNextNode());
-          auto *CTy = Const->getType();
           auto *CTyFn = Intrinsic::getDeclaration(
               F->getParent(), Intrinsic::spv_track_constant,
               {B.getInt32Ty(), B.getInt32Ty()});
@@ -382,12 +387,15 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
         auto *CVMD = MetadataAsValue::get(F->getContext(), CTyMD);
         B.CreateCall(CTyFn, {Op, CVMD});
       }
-      if (isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy())
+      if ((isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy()) ||
+           isa<PHINode>(I))
         TrackConstants = false;
       if (isa<ConstantData>(Op) && TrackConstants) {
+        auto OpNo = Op.getOperandNo();
         if (isa<IntrinsicInst>(I) &&
-            cast<IntrinsicInst>(I)->getIntrinsicID() == Intrinsic::spv_gep &&
-            Op.getOperandNo() == 0)
+            ((cast<IntrinsicInst>(I)->getIntrinsicID() == Intrinsic::spv_gep &&
+              OpNo == 0) ||
+             cast<CallBase>(I)->paramHasAttr(OpNo, Attribute::ImmArg)))
           continue;
         B.SetInsertPoint(I);
         auto *CTy = Op->getType();
@@ -397,11 +405,11 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
             MDNode::get(F->getContext(), ValueAsMetadata::getConstant(Op));
         auto *CVMD = MetadataAsValue::get(F->getContext(), CTyMD);
         auto *NewOp = B.CreateCall(CTyFn, {Op, CVMD});
-        I->setOperand(Op.getOperandNo(), NewOp);
+        I->setOperand(OpNo, NewOp);
       }
     }
     if (I->hasName()) {
-      B.SetInsertPoint(I->getNextNode());
+      setInsertPointSkippingPhis(B, I->getNextNode());
       auto *NameFn = Intrinsic::getDeclaration(
           F->getParent(), Intrinsic::spv_assign_name, {Ty});
       std::vector<Value *> Args = {I};
