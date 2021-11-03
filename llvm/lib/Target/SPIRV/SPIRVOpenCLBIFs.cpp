@@ -335,12 +335,6 @@ static Register buildLoad(SPIRVType *BaseType, Register PtrVReg,
   return dstReg;
 }
 
-static uint64_t getLiteralValueForConstant(Register constVReg,
-                                           const MachineRegisterInfo *MRI) {
-  MachineInstr *constInstr = MRI->getVRegDef(constVReg);
-  return constInstr->getOperand(1).getCImm()->getZExtValue();
-}
-
 static Register buildOpSampledImage(Register res, Register image,
                                     Register sampler,
                                     MachineIRBuilder &MIRBuilder,
@@ -361,9 +355,20 @@ static Register buildOpSampledImage(Register res, Register image,
   return sampledImage;
 }
 
+static MachineInstr *getDefInstrMaybeConstant(Register &constVReg,
+                                      const MachineRegisterInfo *MRI) {
+  MachineInstr *constInstr = MRI->getVRegDef(constVReg);
+  if (constInstr->getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+      constInstr->getIntrinsicID() == Intrinsic::spv_track_constant) {
+    constVReg = constInstr->getOperand(2).getReg();
+    constInstr = MRI->getVRegDef(constVReg);
+  }
+  return constInstr;
+}
+
 static uint64_t getIConstVal(Register constReg,
                              const MachineRegisterInfo *MRI) {
-  const auto c = MRI->getVRegDef(constReg);
+  const auto c = getDefInstrMaybeConstant(constReg, MRI);
   assert(c && c->getOpcode() == TargetOpcode::G_CONSTANT);
   return c->getOperand(1).getCImm()->getValue().getZExtValue();
 }
@@ -442,12 +447,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   const auto PtrSizeTy = TR->getOrCreateSPIRVIntegerType(ptrSize, MIRBuilder);
 
   const auto MRI = MIRBuilder.getMRI();
-  auto idxInstr = MRI->getVRegDef(idxVReg);
-  if (idxInstr->getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-      idxInstr->getIntrinsicID() == Intrinsic::spv_track_constant) {
-    idxVReg = idxInstr->getOperand(2).getReg();
-    idxInstr = MRI->getVRegDef(idxVReg);
-  }
+  auto idxInstr = getDefInstrMaybeConstant(idxVReg, MRI);
 
   // Set up the final register to do truncation or extension on at the end.
   Register toTruncate = resVReg;
@@ -457,7 +457,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
   // If it's out of range (max dimension is 3), we can just return the constant
   // default value(0 or 1 depending on which query function)
-  if (isConstantIndex && getLiteralValueForConstant(idxVReg, MRI) >= 3) {
+  if (isConstantIndex && getIConstVal(idxVReg, MRI) >= 3) {
     Register defaultReg = resVReg;
     if (ptrSize != resWidth) {
       defaultReg = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
@@ -532,7 +532,7 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
   if (!TR->isScalarOfType(OrigArgs[1], SPIRV::OpTypeSampler)) {
     MachineInstr *samplerInstr = MRI->getVRegDef(sampler);
     if (samplerInstr->getOperand(1).isCImm()) {
-      auto sampMask = getLiteralValueForConstant(OrigArgs[1], MRI);
+      auto sampMask = getIConstVal(OrigArgs[1], MRI);
       Register res;
       sampler = buildSamplerLiteral(sampMask, res,
                                     TR->getSPIRVTypeForVReg(sampler),
@@ -1273,13 +1273,14 @@ static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
   const auto MRI = MIRBuilder.getMRI();
   Register arg0;
   if (hasBoolArg) {
-    auto argInstr = MRI->getVRegDef(OrigArgs[0]);
+    Register constReg = OrigArgs[0];
+    auto argInstr = getDefInstrMaybeConstant(constReg, MRI);
     // TODO: support non-constant bool values
     assert(argInstr->getOpcode() == TargetOpcode::G_CONSTANT
            && "Only constant bool value args are supported");
     if (TR->getSPIRVTypeForVReg(OrigArgs[0])->getOpcode() != OpTypeBool) {
       auto boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
-      arg0 = TR->buildConstantInt(getLiteralValueForConstant(OrigArgs[0], MRI),
+      arg0 = TR->buildConstantInt(getIConstVal(constReg, MRI),
                                   MIRBuilder, boolTy);
     }
   }
@@ -1604,7 +1605,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     break;
   case '_':
     if (nameNoArgs.startswith("__translate_sampler_initializer")) {
-      uint64_t bitMask = getLiteralValueForConstant(args[0], MIRBuilder.getMRI());
+      uint64_t bitMask = getIConstVal(args[0], MIRBuilder.getMRI());
       return buildSamplerLiteral(bitMask, OrigRet, retTy, MIRBuilder, TR);
     } else if (nameNoArgs.startswith("__spirv_SampledImage")) {
       return buildOpSampledImage(OrigRet, args[0], args[1], MIRBuilder, TR);
