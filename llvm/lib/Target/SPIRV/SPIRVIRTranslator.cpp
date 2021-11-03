@@ -251,6 +251,7 @@ using namespace llvm;
 static void addConstantsToTrack(MachineFunction &MF,
                                 SPIRVGeneralDuplicatesTracker *DT) {
   auto &MRI = MF.getRegInfo();
+  DenseMap<MachineInstr *, Register> RegsAlreadyAddedToDT;
   std::vector<MachineInstr *> ToErase;
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
@@ -261,24 +262,34 @@ static void addConstantsToTrack(MachineFunction &MF,
             cast<Constant>(cast<ConstantAsMetadata>(
                                MI.getOperand(3).getMetadata()->getOperand(0))
                                ->getValue());
-        if (auto *GV = dyn_cast<GlobalValue>(Const))
-          DT->add(GV, &MF, MI.getOperand(2).getReg());
-        else {
-          DT->add(Const, &MF, MI.getOperand(2).getReg());
-          if (auto *ConstVec = dyn_cast<ConstantDataVector>(Const)) {
-            auto *BuildVec = MRI.getVRegDef(MI.getOperand(2).getReg());
-            assert(BuildVec &&
-                   BuildVec->getOpcode() == TargetOpcode::G_BUILD_VECTOR);
-            for (unsigned i = 0; i < ConstVec->getNumElements(); ++i)
-              DT->add(ConstVec->getElementAsConstant(i), &MF,
-                      BuildVec->getOperand(1 + i).getReg());
-          }
+        Register Reg;
+        if (auto *GV = dyn_cast<GlobalValue>(Const)) {
+          if (DT->find(GV, &MF, Reg) == false) {
+            DT->add(GV, &MF, MI.getOperand(2).getReg());
+          } else
+            RegsAlreadyAddedToDT[&MI] = Reg;
+        } else {
+          if (DT->find(Const, &MF, Reg) == false) {
+            DT->add(Const, &MF, MI.getOperand(2).getReg());
+            if (auto *ConstVec = dyn_cast<ConstantDataVector>(Const)) {
+              auto *BuildVec = MRI.getVRegDef(MI.getOperand(2).getReg());
+              assert(BuildVec &&
+                     BuildVec->getOpcode() == TargetOpcode::G_BUILD_VECTOR);
+              for (unsigned i = 0; i < ConstVec->getNumElements(); ++i)
+                DT->add(ConstVec->getElementAsConstant(i), &MF,
+                        BuildVec->getOperand(1 + i).getReg());
+            }
+          } else
+            RegsAlreadyAddedToDT[&MI] = Reg;
         }
       }
     }
   }
   for (auto *MI : ToErase) {
-    MRI.replaceRegWith(MI->getOperand(0).getReg(), MI->getOperand(2).getReg());
+    Register Reg = MI->getOperand(2).getReg();
+    if (RegsAlreadyAddedToDT.find(MI) != RegsAlreadyAddedToDT.end())
+      Reg = RegsAlreadyAddedToDT[MI];
+    MRI.replaceRegWith(MI->getOperand(0).getReg(), Reg);
     MI->eraseFromParent();
   }
 }
