@@ -829,49 +829,6 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
   // constants, OpNames, OpVariables and OpDecorates.
   TR->setCurrentFunc(MF);
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
-  for (GlobalVariable *GV : GlobalVarList) {
-    auto addrSpace = GV->getAddressSpace();
-    auto storage = TR->addressSpaceToStorageClass(addrSpace);
-
-    Register Reg;
-    if (storage != StorageClass::Function &&
-        DT->find(GV, &MF, Reg) == false) {
-      auto LLVMTy = GV->getType();
-      Reg = MIRBuilder.getMRI()->createGenericVirtualRegister(LLT::scalar(32));
-      SPIRVType *spvTy = TR->assignTypeToVReg(LLVMTy, Reg, MIRBuilder);
-      DT->add(GV, &MF, Reg);
-
-      Register initVReg = 0;
-      if (GV->hasInitializer()) {
-        Constant *InitVal = GV->getInitializer();
-        SPIRVType *initTy = TR->getOrCreateSPIRVType(InitVal->getType(),
-                                                     MIRBuilder);
-        if (const ConstantInt *CI = dyn_cast<ConstantInt>(InitVal))
-          initVReg = TR->buildConstantInt(CI->getValue().getZExtValue(),
-                                          MIRBuilder,  initTy);
-        else if (const ConstantFP *CF = dyn_cast<ConstantFP>(InitVal))
-          initVReg = TR->buildConstantFP(CF->getValue(),
-                                         MIRBuilder, initTy);
-      }
-
-      if (GV->getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage) {
-        auto globalIdent = GV->getGlobalIdentifier();
-        auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(Reg)
-                   .addImm(Decoration::LinkageAttributes);
-        addStringImm(globalIdent, MIB);
-        MIB.addImm(LinkageType::Export);
-      }
-
-      auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
-               .addDef(Reg)
-               .addUse(TR->getSPIRVTypeID(spvTy))
-               .addImm(storage);
-      if (initVReg)
-        MIB.addReg(initVReg);
-      TR->constrainRegOperands(MIB);
-    }
-  }
 
   // Walk over all created instructions and add requirement. Also convert all
   // G_CONSTANTs (TR creates them) to OpConstantI.

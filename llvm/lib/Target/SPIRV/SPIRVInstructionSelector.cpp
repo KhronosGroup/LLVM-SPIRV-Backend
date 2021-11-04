@@ -1376,9 +1376,10 @@ bool SPIRVInstructionSelector::selectIntrinsic(
   case Intrinsic::spv_gep:
     return selectGEP(resVReg, resType, I, MIRBuilder);
     break;
+  case Intrinsic::spv_unref_global:
   case Intrinsic::spv_init_global: {
     auto *MI = MIRBuilder.getMRI()->getVRegDef(I.getOperand(1).getReg());
-    auto *Init = MIRBuilder.getMRI()->getVRegDef(I.getOperand(2).getReg());
+    MachineInstr *Init = I.getNumExplicitOperands() > 2 ? MIRBuilder.getMRI()->getVRegDef(I.getOperand(2).getReg()) : nullptr;
     assert(MI);
     return selectGlobalValue(MI->getOperand(0).getReg(), *MI, MIRBuilder, Init);
   } break;
@@ -1537,7 +1538,8 @@ bool SPIRVInstructionSelector::selectGlobalValue(
     Register resVReg, const MachineInstr &I, MachineIRBuilder &MIRBuilder,
     const MachineInstr *Init) const {
   auto *GV = I.getOperand(1).getGlobal();
-  SPIRVType *resType = TR.getOrCreateSPIRVType(GV->getType(), MIRBuilder);
+  SPIRVType *resType =
+      TR.getOrCreateSPIRVType(GV->getType(), MIRBuilder, AQ::ReadWrite, false);
 
   auto globalIdent = GV->getGlobalIdentifier();
   auto globalVar = GV->getParent()->getGlobalVariable(globalIdent);

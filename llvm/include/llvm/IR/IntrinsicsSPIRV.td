@@ -16,6 +16,7 @@ let TargetPrefix = "spv" in {
 
   def int_spv_track_constant : Intrinsic<[llvm_any_ty], [llvm_any_ty, llvm_metadata_ty]>;
   def int_spv_init_global : Intrinsic<[], [llvm_any_ty, llvm_any_ty]>;
+  def int_spv_unref_global : Intrinsic<[], [llvm_any_ty]>;
 
   def int_spv_gep : Intrinsic<[llvm_anyptr_ty], [llvm_i1_ty, llvm_any_ty, llvm_vararg_ty], [ImmArg<ArgIndex<0>>]>;
   def int_spv_load : Intrinsic<[llvm_i32_ty], [llvm_anyptr_ty, llvm_i16_ty, llvm_i8_ty], [ImmArg<ArgIndex<1>>, ImmArg<ArgIndex<2>>]>;
