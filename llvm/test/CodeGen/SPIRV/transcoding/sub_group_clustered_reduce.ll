@@ -192,7 +192,7 @@
 ; CHECK-SPIRV-DAG: %[[short_0:[0-9]+]] = OpConstant %[[short]] 0
 ; CHECK-SPIRV-DAG: %[[int_0:[0-9]+]] = OpConstant %[[int]] 0
 ; CHECK-SPIRV-DAG: %[[int_2:[0-9]+]] = OpConstant %[[int]] 2
-; CHECK-SPIRV-DAG: %[[long_0:[0-9]+]] = OpConstant %[[long]] 0
+; CHECK-SPIRV-DAG: %[[long_0:[0-9]+]] = OpConstant %[[long]] 0 0
 ; CHECK-SPIRV-DAG: %[[half_0:[0-9]+]] = OpConstant %[[half]] 0
 ; CHECK-SPIRV-DAG: %[[float_0:[0-9]+]] = OpConstant %[[float]] 0
 ; CHECK-SPIRV-DAG: %[[double_0:[0-9]+]] = OpConstant %[[double]] 0

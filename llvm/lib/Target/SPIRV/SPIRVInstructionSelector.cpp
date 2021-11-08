@@ -146,8 +146,6 @@ private:
 
   bool selectConst(Register resVReg, const SPIRVType *resType, const APInt &imm,
                    MachineIRBuilder &MIRBuilder) const;
-  bool selectConstNull(Register resVReg, const SPIRVType *resType,
-                       MachineIRBuilder &MIRBuilder) const;
 
   bool selectExt(Register resVReg, const SPIRVType *resType,
                  const MachineInstr &I, bool isSigned,
@@ -302,7 +300,8 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
   const unsigned Opcode = I.getOpcode();
   switch (Opcode) {
   case TargetOpcode::G_CONSTANT:
-    return selectConstNull(resVReg, resType, MIRBuilder);
+    return selectConst(resVReg, resType, I.getOperand(1).getCImm()->getValue(),
+                       MIRBuilder);
   case TargetOpcode::G_GLOBAL_VALUE:
     return selectGlobalValue(resVReg, I, MIRBuilder);
   case TargetOpcode::G_IMPLICIT_DEF:
@@ -1108,7 +1107,7 @@ bool SPIRVInstructionSelector::selectICmp(Register resVReg,
   return selectCmp(resVReg, resType, typeOpc, cmpOpc, I, MIRBuilder, ptrToUInt);
 }
 
-static void transformConst(const APInt &imm, MachineInstrBuilder &MIB) {
+static void transformConst(const APInt &imm, MachineInstrBuilder &MIB, bool IsFloat = false) {
   const auto bitwidth = imm.getBitWidth();
   switch (bitwidth) {
   case 1:
@@ -1116,18 +1115,18 @@ static void transformConst(const APInt &imm, MachineInstrBuilder &MIB) {
   case 8:
   case 16:
   case 32:
-  case 64:
     MIB.addImm(imm.getZExtValue());
     break;
-  // TODO: think how to implement this properly
-  // (it's impossible to add 2 imms to G_*CONSTANT)
-  // case 64: {
-  //   uint64_t fullImm = imm.getZExtValue();
-  //   uint32_t lowBits = fullImm & 0xffffffff;
-  //   uint32_t highBits = (fullImm >> 32) & 0xffffffff;
-  //   MIB.addImm(lowBits).addImm(highBits);
-  //   break;
-  // }
+  case 64: {
+    if (!IsFloat) {
+      uint64_t fullImm = imm.getZExtValue();
+      uint32_t lowBits = fullImm & 0xffffffff;
+      uint32_t highBits = (fullImm >> 32) & 0xffffffff;
+      MIB.addImm(lowBits).addImm(highBits);
+    } else
+      MIB.addImm(imm.getZExtValue());
+    break;
+  }
   default:
     report_fatal_error("Unsupported constant bitwidth");
   }
@@ -1139,7 +1138,7 @@ void SPIRVInstructionSelector::renderFImm32(MachineInstrBuilder &MIB,
   assert(I.getOpcode() == TargetOpcode::G_FCONSTANT && OpIdx == -1 &&
          "Expected G_FCONSTANT");
   const ConstantFP *FPImm = I.getOperand(1).getFPImm();
-  transformConst(FPImm->getValueAPF().bitcastToAPInt(), MIB);
+  transformConst(FPImm->getValueAPF().bitcastToAPInt(), MIB, true);
 }
 
 void SPIRVInstructionSelector::renderImm32(
@@ -1147,18 +1146,6 @@ void SPIRVInstructionSelector::renderImm32(
   assert(I.getOpcode() == TargetOpcode::G_CONSTANT && OpIdx == -1 &&
          "Expected G_CONSTANT");
   transformConst(I.getOperand(1).getCImm()->getValue(), MIB);
-}
-
-bool SPIRVInstructionSelector::selectConst(Register res, const SPIRVType *resTy,
-                                           const APInt &imm,
-                                           MachineIRBuilder &MIRBuilder) const {
-  if (imm.isNullValue())
-    return selectConstNull(res, resTy, MIRBuilder);
-  unsigned int OpCode = SPIRV::OpConstantI;
-  auto MIB = MIRBuilder.buildInstr(OpCode).addDef(res).addUse(
-      TR.getSPIRVTypeID(resTy));
-  transformConst(imm, MIB);
-  return constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
 }
 
 Register
@@ -1281,16 +1268,23 @@ bool SPIRVInstructionSelector::selectTrunc(Register resVReg,
   }
 }
 
-bool SPIRVInstructionSelector::selectConstNull(
-    Register resVReg, const SPIRVType *resType,
-    MachineIRBuilder &MIRBuilder) const {
-  assert(resType->getOpcode() == SPIRV::OpTypePointer);
-  auto *Def = MIRBuilder.getMRI()->getVRegDef(resVReg);
-  assert(Def->getOperand(1).getCImm()->isNullValue());
-  return MIRBuilder.buildInstr(SPIRV::OpConstantNull)
-      .addDef(resVReg)
-      .addUse(TR.getSPIRVTypeID(resType))
-      .constrainAllUses(TII, TRI, RBI);
+bool SPIRVInstructionSelector::selectConst(Register resVReg,
+                                           const SPIRVType *resType,
+                                           const APInt &imm,
+                                           MachineIRBuilder &MIRBuilder) const {
+  assert(resType->getOpcode() != SPIRV::OpTypePointer || imm.isNullValue());
+  if (resType->getOpcode() == SPIRV::OpTypePointer && imm.isNullValue())
+    return MIRBuilder.buildInstr(SPIRV::OpConstantNull)
+        .addDef(resVReg)
+        .addUse(TR.getSPIRVTypeID(resType))
+        .constrainAllUses(TII, TRI, RBI);
+  else {
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI).addDef(resVReg).addUse(TR.getSPIRVTypeID(resType));
+    // <=32-bit integers should be caught by the sdag pattern
+    assert(imm.getBitWidth() > 32);
+    transformConst(imm, MIB);
+    return MIB.constrainAllUses(TII, TRI, RBI);
+  }
 }
 
 bool SPIRVInstructionSelector::selectOpUndef(
