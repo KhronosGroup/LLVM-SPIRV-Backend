@@ -70,7 +70,8 @@ class SPIRVTypeRegistry {
 
   // Add a new OpTypeXXX instruction without checking for duplicates
   SPIRVType *createSPIRVType(const Type *type, MachineIRBuilder &MIRBuilder,
-                             AQ::AccessQualifier accessQual = AQ::ReadWrite);
+                             AQ::AccessQualifier accessQual = AQ::ReadWrite,
+                             bool EmitIR = true);
 
 public:
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
@@ -97,9 +98,13 @@ public:
 
   // Either generate a new OpTypeXXX instruction or return an existing one
   // corresponding to the given LLVM IR type.
+  // EmitIR controls if we emit GMIR or SPV constants (e.g. for array sizes)
+  // because this method may be called from InstructionSelector and we don't
+  // want to emit extra IR instructions there
   SPIRVType *
   getOrCreateSPIRVType(const Type *type, MachineIRBuilder &MIRBuilder,
-                       AQ::AccessQualifier accessQual = AQ ::ReadWrite);
+                       AQ::AccessQualifier accessQual = AQ ::ReadWrite,
+                       bool EmitIR = true);
 
   const Type *getTypeForSPIRVType(const SPIRVType *Ty) const {
     auto Res = SPIRVToLLVMType.find(Ty);
@@ -171,13 +176,14 @@ private:
                              MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypeArray(uint32_t numElems, SPIRVType *elemType,
-                            MachineIRBuilder &MIRBuilder);
+                            MachineIRBuilder &MIRBuilder,
+                            bool EmitIR = true);
 
   SPIRVType *getOpTypeOpaque(const StructType *Ty,
                              MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypeStruct(const StructType *Ty,
-                             MachineIRBuilder &MIRBuilder);
+                             MachineIRBuilder &MIRBuilder, bool EmitIR = true);
 
   SPIRVType *getOpTypePointer(StorageClass::StorageClass sc,
                               SPIRVType *elemType,
@@ -217,7 +223,8 @@ private:
                                      AQ::AccessQualifier aq = AQ::ReadWrite);
 public:
   Register buildConstantInt(uint64_t val, MachineIRBuilder &MIRBuilder,
-                            SPIRVType *spvType = nullptr);
+                            SPIRVType *spvType = nullptr,
+                            bool EmitIR = true);
   Register buildConstantFP(APFloat val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *spvType = nullptr);
   Register buildConstantIntVector(uint64_t val, MachineIRBuilder &MIRBuilder,

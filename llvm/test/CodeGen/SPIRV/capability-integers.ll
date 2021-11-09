@@ -15,6 +15,10 @@ target triple = "spirv32-unknown-unknown"
 @b = addrspace(1) global i16 0, align 2
 @c = addrspace(1) global i64 0, align 8
 
+define spir_kernel void @test_atomic_fn() #0 {
+  ret void
+}
+
 !opencl.enable.FP_CONTRACT = !{}
 !opencl.ocl.version = !{!0}
 !opencl.spir.version = !{!0}

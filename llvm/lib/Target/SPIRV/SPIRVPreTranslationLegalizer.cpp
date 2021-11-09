@@ -259,6 +259,12 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       InitInst->setArgOperand(1, Init);
       InitConsts.insert(Init);
     }
+    if ((!GV.hasInitializer() || isa<UndefValue>(GV.getInitializer())) &&
+        GV.getNumUses() == 0) {
+      auto *CTyFn = Intrinsic::getDeclaration(
+          F->getParent(), Intrinsic::spv_unref_global, GV.getType());
+      B.CreateCall(CTyFn, &GV);
+    }
   }
 
   std::vector<Instruction *> Worklist;

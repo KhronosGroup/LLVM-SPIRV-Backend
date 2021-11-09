@@ -288,7 +288,7 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeVector(uint32_t numElems,
 
 Register
 SPIRVTypeRegistry::buildConstantInt(uint64_t val, MachineIRBuilder &MIRBuilder,
-                                    SPIRVType *spvType) {
+                                    SPIRVType *spvType, bool EmitIR) {
   auto &MF = MIRBuilder.getMF();
   Register res;
   IntegerType *LLVMIntTy;
@@ -306,7 +306,10 @@ SPIRVTypeRegistry::buildConstantInt(uint64_t val, MachineIRBuilder &MIRBuilder,
     res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
     assignTypeToVReg(LLVMIntTy, res, MIRBuilder);
     DT.add(ConstInt, &MIRBuilder.getMF(), res);
-    MIRBuilder.buildConstant(res, *ConstInt);
+    if (EmitIR)
+      MIRBuilder.buildConstant(res, *ConstInt);
+    else
+      MIRBuilder.buildInstr(SPIRV::OpConstantI).addDef(res).addImm(ConstInt->getSExtValue());
   }
   return res;
 }
@@ -385,15 +388,17 @@ SPIRVTypeRegistry::buildConstantSampler(Register resReg, unsigned int addrMode,
 
 SPIRVType *SPIRVTypeRegistry::getOpTypeArray(uint32_t numElems,
                                              SPIRVType *elemType,
-                                             MachineIRBuilder &MIRBuilder) {
+                                             MachineIRBuilder &MIRBuilder,
+                                             bool EmitIR) {
   if (elemType->getOpcode() == SPIRV::OpTypeVoid)
     report_fatal_error("Invalid array element type");
-
-  Register numElementsVReg = buildConstantInt(numElems, MIRBuilder);
+  Register numElementsVReg =
+      buildConstantInt(numElems, MIRBuilder, nullptr, EmitIR);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeArray)
                  .addDef(createTypeVReg(MIRBuilder))
                  .addUse(getSPIRVTypeID(elemType))
                  .addUse(numElementsVReg);
+  assert(constrainRegOperands(MIB, CurMF));
   return MIB;
 }
 
@@ -410,11 +415,12 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeOpaque(const StructType *Ty,
 
 SPIRVType *
 SPIRVTypeRegistry::getOpTypeStruct(const StructType *Ty,
-                                   MachineIRBuilder &MIRBuilder) {
+                                   MachineIRBuilder &MIRBuilder,
+                                   bool EmitIR) {
   Register ResVReg = createTypeVReg(MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeStruct).addDef(ResVReg);
   for (const auto &Elem : Ty->elements()) {
-    auto ElemTy = getOrCreateSPIRVType(Elem, MIRBuilder);
+    auto ElemTy = getOrCreateSPIRVType(Elem, MIRBuilder, AQ::ReadWrite, EmitIR);
     if (ElemTy->getOpcode() == SPIRV::OpTypeVoid)
       report_fatal_error("Invalid struct element type");
     MIB.addUse(getSPIRVTypeID(ElemTy));
@@ -470,7 +476,8 @@ SPIRVType *SPIRVTypeRegistry::getOpTypeFunction(
 
 SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
                                               MachineIRBuilder &MIRBuilder,
-                                              AQ::AccessQualifier aq) {
+                                              AQ::AccessQualifier aq,
+                                              bool EmitIR) {
   auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
   auto t = TypeToSPIRVTypeMap.find(Ty);
   if (t != TypeToSPIRVTypeMap.end()) {
@@ -494,7 +501,7 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
                            MIRBuilder);
   } else if (Ty->isArrayTy()) {
     auto *el = getOrCreateSPIRVType(Ty->getArrayElementType(), MIRBuilder);
-    return getOpTypeArray(Ty->getArrayNumElements(), el, MIRBuilder);
+    return getOpTypeArray(Ty->getArrayNumElements(), el, MIRBuilder, EmitIR);
   } else if (auto stype = dyn_cast<StructType>(Ty)) {
     if (isOpenCLBuiltinType(stype))
       return handleOpenCLBuiltin(stype, MIRBuilder, aq);
@@ -503,7 +510,7 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
     else if (stype->isOpaque())
       return getOpTypeOpaque(stype, MIRBuilder);
     else
-      return getOpTypeStruct(stype, MIRBuilder);
+      return getOpTypeStruct(stype, MIRBuilder, EmitIR);
   } else if (auto ftype = dyn_cast<FunctionType>(Ty)) {
     SPIRVType *retTy = getOrCreateSPIRVType(ftype->getReturnType(), MIRBuilder);
     SmallVector<SPIRVType *, 4> paramTypes;
@@ -525,7 +532,8 @@ SPIRVType *SPIRVTypeRegistry::createSPIRVType(const Type *Ty,
 
     // Otherwise, treat it as a regular pointer type
     auto sc = addressSpaceToStorageClass(ptype->getAddressSpace());
-    SPIRVType *spvElementType = getOrCreateSPIRVType(elemType, MIRBuilder);
+    SPIRVType *spvElementType =
+        getOrCreateSPIRVType(elemType, MIRBuilder, AQ::ReadWrite, EmitIR);
     return getOpTypePointer(sc, spvElementType, MIRBuilder);
   } else
     llvm_unreachable("Unable to convert LLVM type to SPIRVType");
@@ -544,12 +552,13 @@ SPIRVType *SPIRVTypeRegistry::getSPIRVTypeForVReg(Register VReg) const {
 SPIRVType *
 SPIRVTypeRegistry::getOrCreateSPIRVType(const Type *type,
                                         MachineIRBuilder &MIRBuilder,
-                                        AQ::AccessQualifier accessQual) {
+                                        AQ::AccessQualifier accessQual,
+                                        bool EmitIR) {
   Register reg;
   if (DT.find(type, &MIRBuilder.getMF(), reg)) {
     return getSPIRVTypeForVReg(reg);
   }
-  SPIRVType *spirvType = createSPIRVType(type, MIRBuilder, accessQual);
+  SPIRVType *spirvType = createSPIRVType(type, MIRBuilder, accessQual, EmitIR);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(spirvType)] = spirvType;
   SPIRVToLLVMType[spirvType] = type;
   DT.add(type, &MIRBuilder.getMF(), getSPIRVTypeID(spirvType));
