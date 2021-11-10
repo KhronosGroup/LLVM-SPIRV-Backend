@@ -26,8 +26,13 @@ namespace llvm {
 template <typename T> class SPIRVDuplicatesTracker {
   using StorageKeyTy = const T *;
   using StorageValueTy = Register;
+  // TODO: consider replacing MapVector with DenseMap which
+  // requires topological sorting of the storage contents
+  // (e.g. to handle dependencies of const composites to its
+  // elements)
+  // Currently we rely on the order of insertion to be correct
   using StorageTy =
-      MapVector<StorageKeyTy, DenseMap<MachineFunction *, StorageValueTy>>;
+      MapVector<StorageKeyTy, MapVector<MachineFunction *, StorageValueTy>>;
 
 protected:
   StorageTy Storage;

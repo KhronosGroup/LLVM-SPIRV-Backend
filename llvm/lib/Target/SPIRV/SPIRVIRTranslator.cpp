@@ -270,7 +270,6 @@ static void addConstantsToTrack(MachineFunction &MF,
             RegsAlreadyAddedToDT[&MI] = Reg;
         } else {
           if (DT->find(Const, &MF, Reg) == false) {
-            DT->add(Const, &MF, MI.getOperand(2).getReg());
             if (auto *ConstVec = dyn_cast<ConstantDataVector>(Const)) {
               auto *BuildVec = MRI.getVRegDef(MI.getOperand(2).getReg());
               assert(BuildVec &&
@@ -279,6 +278,7 @@ static void addConstantsToTrack(MachineFunction &MF,
                 DT->add(ConstVec->getElementAsConstant(i), &MF,
                         BuildVec->getOperand(1 + i).getReg());
             }
+            DT->add(Const, &MF, MI.getOperand(2).getReg());
           } else
             RegsAlreadyAddedToDT[&MI] = Reg;
         }

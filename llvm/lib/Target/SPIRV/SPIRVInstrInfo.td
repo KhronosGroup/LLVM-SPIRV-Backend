@@ -214,14 +214,14 @@ def gi_bitcast_fimm_to_i32 : GICustomOperandRenderer<"renderFImm32">,
 def gi_bitcast_imm_to_i32 : GICustomOperandRenderer<"renderImm32">,
   GISDNodeXFormEquiv<imm_to_i32>;
 
-def PseudoConstI: IntImmLeaf<i32, [{ return true; }], imm_to_i32>;
-def PseudoConstF: FPImmLeaf<f32, [{ return true; }], fimm_to_i32>;
+def PseudoConstI: IntImmLeaf<i32, [{ return Imm.getBitWidth() <= 32; }], imm_to_i32>;
+def PseudoConstF: FPImmLeaf<f32, [{  return true; }], fimm_to_i32>;
 def ConstPseudoTrue: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 1; }]>;
 def ConstPseudoFalse: IntImmLeaf<i32, [{ return Imm.getBitWidth() == 1 && Imm.getZExtValue() == 0; }]>;
 def ConstPseudoNull: IntImmLeaf<i64, [{ return Imm.isNullValue(); }]>;
 
 multiclass IntFPImm<bits<16> opCode, string name> {
-  def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src),
+  def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src, variable_ops),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstI:$src, TYPE:$type))]>;
   def F: Op<opCode, (outs ID:$dst), (ins TYPE:$type, fID:$src),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
