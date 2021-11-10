@@ -159,7 +159,7 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(
 }
 
 static bool isAggrToReplace(const Value *V) {
-  return isa<ConstantAggregate>(V)
+  return isa<ConstantAggregate>(V) || isa<ConstantDataArray>(V)
          // || isa<ConstantDataVector>(V)
          || (isa<ConstantAggregateZero>(V) && !V->getType()->isVectorTy());
 }
@@ -205,6 +205,11 @@ void SPIRVPreTranslationLegalizer::preprocessCompositeConstants(IRBuilder<> &B,
         //   for (int i = 0; i < AggrC->getNumElements(); ++i)
         //     Args.push_back(AggrC->getElementAsConstant(i));
         //   BuildCompositeIntrinsic(AggrC, Args);
+      } else if (auto *AggrC = dyn_cast<ConstantDataArray>(Op)) {
+        std::vector<Value *> Args;
+        for (unsigned i = 0; i < AggrC->getNumElements(); ++i)
+          Args.push_back(AggrC->getElementAsConstant(i));
+        BuildCompositeIntrinsic(AggrC, Args);
       } else if (isa<ConstantAggregateZero>(Op) &&
                  !Op->getType()->isVectorTy()) {
         auto *AggrC = cast<ConstantAggregateZero>(Op);
