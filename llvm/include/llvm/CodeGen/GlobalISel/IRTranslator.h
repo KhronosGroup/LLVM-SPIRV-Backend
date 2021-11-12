@@ -63,7 +63,7 @@ class IRTranslator : public MachineFunctionPass {
 public:
   static char ID;
 
-protected:
+private:
   /// Interface used to lower the everything related to calls.
   const CallLowering *CLI;
 
