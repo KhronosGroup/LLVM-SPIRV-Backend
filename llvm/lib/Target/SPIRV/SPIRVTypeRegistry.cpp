@@ -204,6 +204,12 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
         assignSPIRVTypeToVReg(spvTy, Reg, MIB);
         Def->getOperand(0).setReg(NewReg);
         constrainRegOperands(NewMI, &MF);
+      } else if (MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE) {
+        auto Reg = MI.getOperand(0).getReg();
+        MIB.setInsertPt(*MI.getParent(), MI);
+        Type *Ty = MI.getOperand(1).getGlobal()->getType();
+        SPIRVType *spvTy = getOrCreateSPIRVType(Ty, MIB);
+        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
       }
 
       if (MII == Begin)

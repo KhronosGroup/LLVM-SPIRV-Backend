@@ -1,17 +1,19 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
-; CHECK-DAG: %[[Scope_Device:[0-9]+]] = OpConstant %[[Int]] 1{{$}}
+; CHECK-DAG: %[[Scope_Device:[0-9]+]] = OpConstant %[[Int]] 1 {{$}}
 ; CHECK-DAG: %[[MemSem_Relaxed:[0-9]+]] = OpConstant %[[Int]] 0
 ; CHECK-DAG: %[[MemSem_Acquire:[0-9]+]] = OpConstant %[[Int]] 2
 ; CHECK-DAG: %[[MemSem_Release:[0-9]+]] = OpConstant %[[Int]] 4 {{$}}
 ; CHECK-DAG: %[[MemSem_AcquireRelease:[0-9]+]] = OpConstant %[[Int]] 8
 ; CHECK-DAG: %[[MemSem_SequentiallyConsistent:[0-9]+]] = OpConstant %[[Int]] 16
 ; CHECK-DAG: %[[Value:[0-9]+]] = OpConstant %[[Int]] 42
-; CHECK: %[[Float:[0-9]+]] = OpTypeFloat 32
-; CHECK: %[[Pointer:[0-9]+]] = OpVariable %{{[0-9]+}}
-; CHECK: %[[FPPointer:[0-9]+]] = OpVariable %{{[0-9]+}}
-; CHECK: %[[FPValue:[0-9]+]] = OpConstant %[[Float]] 1109917696
+; CHECK-DAG: %[[Float:[0-9]+]] = OpTypeFloat 32
+; CHECK-DAG: %[[PointerType:[0-9]+]] = OpTypePointer CrossWorkgroup %[[Int]]
+; CHECK-DAG: %[[FPPointerType:[0-9]+]] = OpTypePointer CrossWorkgroup %[[Float]]
+; CHECK-DAG: %[[Pointer:[0-9]+]] = OpVariable %[[PointerType]] CrossWorkgroup
+; CHECK-DAG: %[[FPPointer:[0-9]+]] = OpVariable %[[FPPointerType]] CrossWorkgroup
+; CHECK-DAG: %[[FPValue:[0-9]+]] = OpConstant %[[Float]] 1109917696
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-unknown"
