@@ -732,10 +732,11 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register resVReg,
   Register scopeReg = buildI32Constant(scope, MIRBuilder);
 
   auto ptr = I.getOperand(1).getReg();
-  auto scSem = getMemSemanticsForStorageClass(TR.getPointerStorageClass(ptr));
+  // Changed as it's implemented in the translator. See test/atomicrmw.ll
+  //auto scSem = getMemSemanticsForStorageClass(TR.getPointerStorageClass(ptr));
 
   auto memSem = getMemSemantics(memOp->getSuccessOrdering());
-  Register memSemReg = buildI32Constant(memSem | scSem, MIRBuilder);
+  Register memSemReg = buildI32Constant(memSem /*| scSem*/, MIRBuilder);
 
   return MIRBuilder.buildInstr(newOpcode)
       .addDef(resVReg)
@@ -1540,7 +1541,13 @@ bool SPIRVInstructionSelector::selectGlobalValue(
 
   bool HasInit = globalVar && globalVar->hasInitializer() &&
                  !isa<UndefValue>(globalVar->getInitializer());
+  // Skip empty declaration for GVs with initilaizers till we get the decl with
+  // passed initializer.
   if (HasInit && !Init)
+    return true;
+
+  // Skip if we have already output it.
+  if (DT.find(GV, &MIRBuilder.getMF(), resVReg))
     return true;
 
   auto addrSpace = GV->getAddressSpace();
