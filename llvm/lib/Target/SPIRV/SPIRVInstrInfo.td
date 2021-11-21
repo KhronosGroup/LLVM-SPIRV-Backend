@@ -434,10 +434,8 @@ def OpGenericCastToPtrExplicit : Op<123, (outs ID:$r), (ins TYPE:$t, ID:$p, Stor
 def OpBitcast : UnOp<"OpBitcast", 124>;
 
 //3.32.12 Composite Instructions
-def OpVectorExtractDynamicI: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
+def OpVectorExtractDynamic: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
                   "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vID:$vec, ID:$idx), TYPE:$type))]>;
-def OpVectorExtractDynamicF: Op<77, (outs ID:$res), (ins TYPE:$type, vfID:$vec, ID:$idx),
-                  "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vfID:$vec, ID:$idx), TYPE:$type))]>;
 
 def OpVectorInsertDynamic: Op<78, (outs ID:$res), (ins TYPE:$ty, ID:$vec, ID:$comp, ID:$idx),
                   "$res = OpVectorInsertDynamic $ty $vec $comp $idx">;

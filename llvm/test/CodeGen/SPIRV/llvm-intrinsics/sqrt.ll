@@ -11,12 +11,16 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
 
+; We need to store sqrt results, otherwise isel does not emit sqrts as dead insts.
 ; Function Attrs: noinline nounwind optnone
-define spir_func void @test_sqrt() #0 {
+define spir_func void @test_sqrt(float* %x, double* %y, <4 x double>* %z) #0 {
 entry:
   %0 = call float @llvm.sqrt.f32(float 0x40091EB860000000)
+  store float %0, float* %x
   %1 = call double @llvm.sqrt.f64(double 2.710000e+00)
+  store double %1, double* %y
   %2 = call <4 x double> @llvm.sqrt.v4f64(<4 x double> <double 5.000000e-01, double 2.000000e-01, double 3.000000e-01, double 4.000000e-01>)
+  store <4 x double> %2, <4 x double>* %z
 ; CHECK: %{{[0-9]+}} = OpExtInst %[[Float]] %[[ExtInstSetId]] sqrt %[[FloatArg]]
 ; CHECK: %{{[0-9]+}} = OpExtInst %[[Double]] %[[ExtInstSetId]] sqrt %[[DoubleArg]]
 ; CHECK: %{{[0-9]+}} = OpExtInst %[[Double4]] %[[ExtInstSetId]] sqrt %[[Double4Arg]]

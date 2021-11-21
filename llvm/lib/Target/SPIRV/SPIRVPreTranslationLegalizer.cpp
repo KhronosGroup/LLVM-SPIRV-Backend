@@ -346,6 +346,31 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
         Args.push_back(B.getInt32(Op));
       }
       NewIntr = B.CreateCall(IntrFn, {Args});
+    } else if (auto *EEI = dyn_cast<ExtractElementInst>(I)) {
+      auto *IntrFn = Intrinsic::getDeclaration(
+          F->getParent(), Intrinsic::spv_extractelt, {EEI->getType(), EEI->getVectorOperandType(), EEI->getIndexOperand()->getType()});
+      std::vector<Value *> Args;
+      Args.push_back(EEI->getVectorOperand());
+      Args.push_back(EEI->getIndexOperand());
+      auto *NewEEI = B.CreateCall(IntrFn, {Args});
+      StringRef InstName = "";
+      if (I->hasName())
+        InstName = I->getName();
+      EEI->replaceAllUsesWith(NewEEI);
+      EEI->eraseFromParent();
+      I = NewEEI;
+      I->setName(InstName);
+    } else if (auto *IEI = dyn_cast<InsertElementInst>(I)) {
+      auto *IntrFn = Intrinsic::getDeclaration(
+          F->getParent(), Intrinsic::spv_insertelt,
+          {IEI->getType(), IEI->getOperand(0)->getType(), IEI->getOperand(1)->getType(), IEI->getOperand(2)->getType()});
+      std::vector<Value *> Args;
+      for (auto &Op : IEI->operands())
+        Args.push_back(Op);
+      auto *NewIEI = B.CreateCall(IntrFn, {Args});
+      IEI->replaceAllUsesWith(NewIEI);
+      IEI->eraseFromParent();
+      I = NewIEI;
     } else if (isa<AllocaInst>(I))
       TrackConstants = false;
 
