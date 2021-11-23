@@ -169,17 +169,14 @@ private:
   bool selectInsertVal(Register resVReg, const SPIRVType *resType,
                        const MachineInstr &I,
                        MachineIRBuilder &MIRBuilder) const;
+  bool selectExtractElt(Register resVReg, const SPIRVType *resType,
+                        const MachineInstr &I,
+                        MachineIRBuilder &MIRBuilder) const;
+  bool selectInsertElt(Register resVReg, const SPIRVType *resType,
+                       const MachineInstr &I,
+                       MachineIRBuilder &MIRBuilder) const;
   bool selectGEP(Register resVReg, const SPIRVType *resType,
                  const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
-
-  bool selectVectorInsert(Register resVReg, const SPIRVType *resType,
-                          const MachineInstr &I,
-                          MachineIRBuilder &MIRBuilder) const;
-#if 0
-  bool selectVectorExtract(Register resVReg, const SPIRVType *resType,
-                           const MachineInstr &I,
-                           MachineIRBuilder &MIRBuilder) const;
-#endif
 
   bool selectFrameIndex(Register resVReg, const SPIRVType *resType,
                         MachineIRBuilder &MIRBuilder) const;
@@ -309,15 +306,6 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
 
   case TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS:
     return selectIntrinsic(resVReg, resType, I, MIRBuilder);
-    // #if 0
-    // won't reach this anyway as these two are TypeFoldingSupp set
-    // so assert should've fired already
-  case TargetOpcode::G_INSERT_VECTOR_ELT:
-    return selectVectorInsert(resVReg, resType, I, MIRBuilder);
-#if 0
-  case TargetOpcode::G_EXTRACT_VECTOR_ELT:
-    return selectVectorExtract(resVReg, resType, I, MIRBuilder);
-#endif
   case TargetOpcode::G_BITREVERSE:
     return selectBitreverse(resVReg, resType, I, MIRBuilder);
 
@@ -1297,6 +1285,15 @@ bool SPIRVInstructionSelector::selectOpUndef(
       .constrainAllUses(TII, TRI, RBI);
 }
 
+static bool isImm(const MachineOperand &MO) {
+  auto &MRI = MO.getParent()->getMF()->getRegInfo();
+  auto *TypeInst = MRI.getVRegDef(MO.getReg());
+  if (TypeInst->getOpcode() != SPIRV::ASSIGN_TYPE)
+    return false;
+  auto *ImmInst = MRI.getVRegDef(TypeInst->getOperand(1).getReg());
+  return ImmInst->getOpcode() == TargetOpcode::G_CONSTANT;
+}
+
 static int64_t foldImm(const MachineOperand &MO) {
   auto &MRI = MO.getParent()->getMF()->getRegInfo();
   auto *TypeInst = MRI.getVRegDef(MO.getReg());
@@ -1329,6 +1326,33 @@ bool SPIRVInstructionSelector::selectExtractVal(
       .addUse(I.getOperand(2).getReg())
       // TODO: support arbitrary number of indices
       .addImm(foldImm(I.getOperand(3)))
+      .constrainAllUses(TII, TRI, RBI);
+}
+
+bool SPIRVInstructionSelector::selectInsertElt(
+    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
+    MachineIRBuilder &MIRBuilder) const {
+  if (isImm(I.getOperand(4)))
+    return selectInsertVal(resVReg, resType, I, MIRBuilder);
+  return MIRBuilder.buildInstr(SPIRV::OpVectorInsertDynamic)
+      .addDef(resVReg)
+      .addUse(TR.getSPIRVTypeID(resType))
+      .addUse(I.getOperand(2).getReg())
+      .addUse(I.getOperand(3).getReg())
+      .addUse(I.getOperand(4).getReg())
+      .constrainAllUses(TII, TRI, RBI);
+}
+
+bool SPIRVInstructionSelector::selectExtractElt(
+    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
+    MachineIRBuilder &MIRBuilder) const {
+  if (isImm(I.getOperand(3)))
+    return selectExtractVal(resVReg, resType, I, MIRBuilder);
+  return MIRBuilder.buildInstr(SPIRV::OpVectorExtractDynamic)
+      .addDef(resVReg)
+      .addUse(TR.getSPIRVTypeID(resType))
+      .addUse(I.getOperand(2).getReg())
+      .addUse(I.getOperand(3).getReg())
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1368,6 +1392,12 @@ bool SPIRVInstructionSelector::selectIntrinsic(
   case Intrinsic::spv_insertv:
     return selectInsertVal(resVReg, resType, I, MIRBuilder);
     break;
+  case Intrinsic::spv_extractelt:
+    return selectExtractElt(resVReg, resType, I, MIRBuilder);
+    break;
+  case Intrinsic::spv_insertelt:
+    return selectInsertElt(resVReg, resType, I, MIRBuilder);
+    break;
   case Intrinsic::spv_gep:
     return selectGEP(resVReg, resType, I, MIRBuilder);
     break;
@@ -1403,56 +1433,6 @@ bool SPIRVInstructionSelector::selectIntrinsic(
   }
   return true;
 }
-
-bool SPIRVInstructionSelector::selectVectorInsert(
-    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
-    MachineIRBuilder &MIRBuilder) const {
-
-  Register base = I.getOperand(1).getReg();
-  Register valToInsert = I.getOperand(2).getReg();
-  Register idx = I.getOperand(3).getReg();
-
-  MachineInstr *idxTyInst = MIRBuilder.getMRI()->getVRegDef(idx);
-  MachineInstr *idxInst =
-      MIRBuilder.getMRI()->getVRegDef(idxTyInst->getOperand(1).getReg());
-  bool isConst = idxInst->getOpcode() == TargetOpcode::G_CONSTANT;
-
-  auto Op = isConst ? SPIRV::OpCompositeInsert : SPIRV::OpVectorInsertDynamic;
-  auto resTyID = TR.getSPIRVTypeID(resType);
-  auto MIB = MIRBuilder.buildInstr(Op).addDef(resVReg).addUse(resTyID);
-  if (isConst) {
-    auto idxImm = idxInst->getOperand(1).getCImm()->getZExtValue();
-    MIB.addUse(valToInsert).addUse(base).addImm(idxImm);
-  } else {
-    MIB.addUse(base).addUse(valToInsert).addUse(idx);
-  }
-  return MIB.constrainAllUses(TII, TRI, RBI);
-}
-
-#if 0
-bool SPIRVInstructionSelector::selectVectorExtract(
-    Register resVReg, const SPIRVType *resType, const MachineInstr &I,
-    MachineIRBuilder &MIRBuilder) const {
-  Register base = I.getOperand(1).getReg();
-  Register idx = I.getOperand(2).getReg();
-
-  MachineInstr *idxInst = MIRBuilder.getMRI()->getVRegDef(idx);
-  bool isConst = idxInst->getOpcode() == TargetOpcode::G_CONSTANT;
-
-  auto Op = isConst ? SPIRV::OpCompositeExtract : SPIRV::OpVectorExtractDynamic;
-  auto MIB = MIRBuilder.buildInstr(Op)
-                 .addDef(resVReg)
-                 .addUse(TR.getSPIRVTypeID(resType))
-                 .addUse(base);
-  if (isConst) {
-    auto idxImm = idxInst->getOperand(1).getCImm()->getZExtValue();
-    MIB.addImm(idxImm);
-  } else {
-    MIB.addUse(idx);
-  }
-  return MIB.constrainAllUses(TII, TRI, RBI);
-}
-#endif
 
 bool SPIRVInstructionSelector::selectFrameIndex(
     Register resVReg, const SPIRVType *resType,

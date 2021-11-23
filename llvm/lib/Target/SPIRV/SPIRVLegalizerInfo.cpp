@@ -24,6 +24,7 @@
 #include "llvm/IR/Type.h"
 
 #include <algorithm>
+#include <cassert>
 
 using namespace llvm;
 using namespace LegalizeActions;
@@ -131,7 +132,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 
   // TODO: add proper rules for vectors legalization
   getActionDefinitionsBuilder(
-      {G_BUILD_VECTOR, G_SHUFFLE_VECTOR, G_INSERT_VECTOR_ELT})
+      {G_BUILD_VECTOR, G_SHUFFLE_VECTOR})
       .alwaysLegal();
 
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
@@ -302,6 +303,7 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
                const SPIRVTypeRegistry &TR) {
   auto NewT = LLT::scalar(32);
   auto SpvType = TR.getSPIRVTypeForVReg(ValReg);
+  assert(SpvType && "VReg is expected to have SPIRV type");
   bool isFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
   bool isVectorFloat =
       SpvType->getOpcode() == SPIRV::OpTypeVector &&

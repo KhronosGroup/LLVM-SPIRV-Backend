@@ -230,6 +230,7 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
          "Cannot find reg alias in LocalAliasTables");
   auto MetaReg = LocalAliasTables[MF][Reg];
   auto *ToHoist = MF->getRegInfo().getVRegDef(Reg);
+  assert(ToHoist && "There should be an instruction that defines the register");
   ToRemove.push_back(ToHoist);
 
   if (!MetaBuilder.getMRI()->getVRegDef(MetaReg)) {
@@ -272,7 +273,10 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
-      hoistGlobalOp<T>(MetaBuilder, Reg, MF, ToRemove, LocalAliasTables);
+      // Some instructions may be deleted during global isel, so hoist only those
+      // that exist in current IR.
+      if (MF->getRegInfo().getVRegDef(Reg))
+        hoistGlobalOp<T>(MetaBuilder, Reg, MF, ToRemove, LocalAliasTables);
     }
   }
   // Hoist special types and constants collected in the map.

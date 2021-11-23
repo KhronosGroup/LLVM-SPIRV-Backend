@@ -246,34 +246,14 @@ void SPIRVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator I,
                                  const DebugLoc &DL, MCRegister DestReg,
                                  MCRegister SrcReg, bool KillSrc) const {
-  // if (AArch64::GPR32spRegClass.contains(DestReg) &&
-  //     (AArch64::GPR32spRegClass.contains(SrcReg) || SrcReg == AArch64::WZR))
-  //     {
-  //   const TargetRegisterInfo *TRI = &getRegisterInfo();
-
-  //   if (DestReg == AArch64::WSP || SrcReg == AArch64::WSP) {
-  //     // If either operand is WSP, expand to ADD #0.
-  //     if (Subtarget.hasZeroCycleRegMove()) {
-  //       // Cyclone recognizes "ADD Xd, Xn, #0" as a zero-cycle register move.
-  //       MCRegister DestRegX = TRI->getMatchingSuperReg(
-  //           DestReg, AArch64::sub_32, &AArch64::GPR64spRegClass);
-  //       MCRegister SrcRegX = TRI->getMatchingSuperReg(
-  //           SrcReg, AArch64::sub_32, &AArch64::GPR64spRegClass);
-  //       // This instruction is reading and writing X registers.  This may
-  //       upset
-  //       // the register scavenger and machine verifier, so we need to
-  //       indicate
-  //       // that we are reading an undefined value from SrcRegX, but a proper
-  //       // value from SrcReg.
-  //       BuildMI(MBB, I, DL, get(AArch64::ADDXri), DestRegX)
-  //           .addReg(SrcRegX, RegState::Undef)
-  //           .addImm(0)
-  //           .addImm(AArch64_AM::getShifterImm(AArch64_AM::LSL, 0))
-  //           .addReg(SrcReg, RegState::Implicit | getKillRegState(KillSrc));
-  //     } else {
-  //       BuildMI(MBB, I, DL, get(AArch64::ADDWri), DestReg)
-  //           .addReg(SrcReg, getKillRegState(KillSrc))
-  //           .addImm(0)
-  //           .addImm(AArch64_AM::getShifterImm(AArch64_AM::LSL, 0));
-  //     }
+  // Actually we don't need this COPY instruction. However if we do nothing with it,
+  // post RA pseudo instrs expansion just removes it and we get the code with undef
+  // registers. Therefore, we need to replace all uses of dst with the src register.
+  // COPY instr itself will be safely removed later.
+  assert(I->isCopy() && "Copy instruction is expected");
+  auto DstOp = I->getOperand(0);
+  auto SrcOp = I->getOperand(1);
+  assert(DstOp.isReg() && SrcOp.isReg() && "Register operands are expected in COPY");
+  auto &MRI = I->getMF()->getRegInfo();
+  MRI.replaceRegWith(DstOp.getReg(), SrcOp.getReg());
 }

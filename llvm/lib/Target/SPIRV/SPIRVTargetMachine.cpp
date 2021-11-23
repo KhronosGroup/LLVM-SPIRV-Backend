@@ -239,8 +239,11 @@ class SPIRVInstructionSelect : public InstructionSelect {
       for (auto &MI : MBB) {
         if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
           auto &SrcOp = MI.getOperand(1);
-          if (isTypeFoldingSupported(MRI.getVRegDef(SrcOp.getReg())->getOpcode()))
+          if (isTypeFoldingSupported(MRI.getVRegDef(SrcOp.getReg())->getOpcode())) {
+            if (MRI.getType(MI.getOperand(0).getReg()).isVector())
+              MRI.setRegClass(MI.getOperand(0).getReg(), &SPIRV::IDRegClass);
             MRI.setType(MI.getOperand(0).getReg(), LLT::scalar(32));
+          }
         }
       }
     }
