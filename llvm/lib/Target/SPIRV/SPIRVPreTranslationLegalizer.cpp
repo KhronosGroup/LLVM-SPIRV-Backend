@@ -170,6 +170,18 @@ static void setInsertPointSkippingPhis(IRBuilder<> &B, Instruction *I) {
   B.SetInsertPoint(I);
 }
 
+static bool requireAssignType(Instruction* I) {
+  IntrinsicInst *Intr = dyn_cast<IntrinsicInst>(I);
+  if (Intr) {
+    switch (Intr->getIntrinsicID()) {
+    case Intrinsic::invariant_start:
+    case Intrinsic::invariant_end:
+      return false;
+    }
+  }
+  return true;
+}
+
 void SPIRVPreTranslationLegalizer::preprocessCompositeConstants(IRBuilder<> &B,
                                                                 Function *F) {
   std::queue<Instruction *> Worklist;
@@ -380,7 +392,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
     }
 
     auto *Ty = I->getType();
-    if (!Ty->isVoidTy()) {
+    if (!Ty->isVoidTy() && requireAssignType(I)) {
       setInsertPointSkippingPhis(B, I->getNextNode());
       auto *TyFn = Intrinsic::getDeclaration(F->getParent(),
                                              Intrinsic::spv_assign_type, {Ty});

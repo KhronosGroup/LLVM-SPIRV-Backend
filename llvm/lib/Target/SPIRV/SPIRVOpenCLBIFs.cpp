@@ -483,6 +483,8 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
     // If the index is dynamic, need check if it's < 3, and then use a select
     if (!isConstantIndex) {
+      TR->insertAssignInstr(extr, nullptr, PtrSizeTy, MIRBuilder, *MRI);
+
       auto idxTy = TR->getSPIRVTypeForVReg(idxVReg);
       auto boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
 

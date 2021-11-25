@@ -1559,9 +1559,17 @@ bool SPIRVInstructionSelector::selectGlobalValue(
     //   return false;
     // }
   }
-  if (storage != StorageClass::Function)
-    DT.add(GV, &MIRBuilder.getMF(), resVReg);
-  return MIB.constrainAllUses(TII, TRI, RBI);
+
+  // ISel may introduce a new register on this step, so we need to add it to
+  // DT and correct its type avoiding fails on the next stage.
+  bool result = MIB.constrainAllUses(TII, TRI, RBI);
+  auto Reg = MIB->getOperand(0).getReg();
+  DT.add(GV, &MIRBuilder.getMF(), Reg);
+
+  auto MRI = MIRBuilder.getMRI();
+  if (MRI->getType(Reg).isPointer())
+    MRI->setType(Reg, LLT::pointer(MRI->getType(Reg).getAddressSpace(), 32));
+  return result;
 }
 
 namespace llvm {

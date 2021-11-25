@@ -72,8 +72,17 @@ class SPIRVTypeRegistry {
   SPIRVType *createSPIRVType(const Type *type, MachineIRBuilder &MIRBuilder,
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
-
+  // Set SPIRVType for GV, propagate it to GV's users, set register classes.
+  SPIRVType *propagateSPIRVType(MachineInstr* MI, MachineRegisterInfo &MRI,
+                                MachineIRBuilder &MIB);
 public:
+  // Insert ASSIGN_TYPE instuction between Reg and its definition, set
+  // NewReg as a dst of the definition, assign SPIRVType to both registers.
+  // If SpirvTy is provided, use it as SPIRVType in ASSIGN_TYPE, otherwise
+  // create it from Ty.
+  Register insertAssignInstr(Register Reg, Type* Ty, SPIRVType *SpirvTy,
+                             MachineIRBuilder &MIB, MachineRegisterInfo &MRI);
+
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
   SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
     return SpecialTypesAndConstsMap;
