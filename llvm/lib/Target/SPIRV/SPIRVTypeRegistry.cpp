@@ -72,43 +72,74 @@ SPIRVTypeRegistry::SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT,
                                      unsigned int pointerSize)
     : DT(DT), pointerSize(pointerSize) {}
 
-// void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
-//   MachineIRBuilder MIB(MF);
-//   MachineRegisterInfo &MRI = MF.getRegInfo();
-//   std::vector<std::pair<Register, Register>> PostProcessList;
-//   for (auto P : VRegToTypeMap[&MF]) {
-//     auto Reg = P.first;
-//     if (MRI.getRegClassOrNull(Reg) == &SPIRV::TYPERegClass)
-//       continue;
-//     // MRI.setType(Reg, LLT::scalar(32));
-//     auto *Ty = P.second;
-//     auto *Def = MRI.getVRegDef(Reg);
+// Translating GV, IRTranslator sometimes generates following IR:
+//   %1 = G_GLOBAL_VALUE
+//   %2 = COPY %1
+//   %3 = G_ADDRSPACE_CAST %2
+// New registers have no SPIRVType and no register class info.
+// Propagate SPIRVType from GV to other instructions, also set register classes.
+SPIRVType *SPIRVTypeRegistry::propagateSPIRVType(MachineInstr* MI,
+    MachineRegisterInfo &MRI, MachineIRBuilder &MIB) {
+  SPIRVType *SpirvTy = nullptr;
+  assert(MI && "Machine instr is expected");
+  if (MI->getOperand(0).isReg()) {
+    auto Reg = MI->getOperand(0).getReg();
+    SpirvTy = getSPIRVTypeForVReg(Reg);
+    if (!SpirvTy) {
+      switch(MI->getOpcode()) {
+      case TargetOpcode::G_GLOBAL_VALUE: {
+        MIB.setInsertPt(*MI->getParent(), MI);
+        Type *Ty = MI->getOperand(1).getGlobal()->getType();
+        SpirvTy = getOrCreateSPIRVType(Ty, MIB);
+        break;
+      }
+      case TargetOpcode::G_ADDRSPACE_CAST:
+      case TargetOpcode::COPY: {
+        auto Op = MI->getOperand(1);
+        auto *Def = Op.isReg() ? MRI.getVRegDef(Op.getReg()) : nullptr;
+        if (Def)
+          SpirvTy = propagateSPIRVType(Def, MRI, MIB);
+        break;
+      }
+      default:
+        break;
+      }
+      if (SpirvTy)
+        assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+      if (!MRI.getRegClassOrNull(Reg))
+          MRI.setRegClass(Reg, &SPIRV::IDRegClass);
+    }
+  }
+  return SpirvTy;
+}
 
-//     MIB.setInsertPt(*Def->getParent(),
-//                     (Def->getNextNode() ? Def->getNextNode()->getIterator()
-//                                         : Def->getParent()->end()));
-//     auto &MRI = MF.getRegInfo();
-//     auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
-//     PostProcessList.push_back({Reg, NewReg});
-//     if (auto *RC = MRI.getRegClassOrNull(Reg))
-//       MRI.setRegClass(NewReg, RC);
-//     auto MI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-//                   .addDef(Reg)
-//                   .addUse(NewReg)
-//                   .addUse(getSPIRVTypeID(Ty));
-//     Def->getOperand(0).setReg(NewReg);
-//     constrainRegOperands(MI, &MF);
-//   }
-//   // this to make it convenient for Legalizer to get the SPIRVType
-//   // when processing the actual MI (ie not pseudo one)
-//   for (auto &P : PostProcessList)
-//     assignSPIRVTypeToVReg(getSPIRVTypeForVReg(P.first), P.second, MIB);
-// }
+Register SPIRVTypeRegistry::insertAssignInstr(Register Reg, Type* Ty,
+    SPIRVType *SpirvTy, MachineIRBuilder &MIB, MachineRegisterInfo &MRI) {
+  auto *Def = MRI.getVRegDef(Reg);
+  assert((Ty || SpirvTy) && "Either LLVM or SPIRV type is expected.");
+  MIB.setInsertPt(*Def->getParent(),
+                  (Def->getNextNode() ? Def->getNextNode()->getIterator()
+                                      : Def->getParent()->end()));
+  auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+  if (auto *RC = MRI.getRegClassOrNull(Reg))
+    MRI.setRegClass(NewReg, RC);
+  SpirvTy = SpirvTy ? SpirvTy : getOrCreateSPIRVType(Ty, MIB);
+  assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+  // This is to make it convenient for Legalizer to get the SPIRVType
+  // when processing the actual MI (i.e. not pseudo one).
+  assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB);
+  auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+                 .addDef(Reg)
+                 .addUse(NewReg)
+                 .addUse(getSPIRVTypeID(SpirvTy));
+  Def->getOperand(0).setReg(NewReg);
+  constrainRegOperands(NewMI, &MIB.getMF());
+  return NewReg;
+}
 
 void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
   MachineIRBuilder MIB(MF);
   MachineRegisterInfo &MRI = MF.getRegInfo();
-  std::vector<std::pair<Register, Register>> PostProcessList;
   std::vector<MachineInstr *> ToDelete;
 
   for (MachineBasicBlock *MBB : post_order(&MF)) {
@@ -128,23 +159,10 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
             cast<ValueAsMetadata>(MI.getOperand(2).getMetadata()->getOperand(0))
                 ->getType();
         auto *Def = MRI.getVRegDef(Reg);
-
-        MIB.setInsertPt(*Def->getParent(),
-                        (Def->getNextNode() ? Def->getNextNode()->getIterator()
-                                            : Def->getParent()->end()));
-        auto &MRI = MF.getRegInfo();
-        auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
-        PostProcessList.push_back({Reg, NewReg});
-        if (auto *RC = MRI.getRegClassOrNull(Reg))
-          MRI.setRegClass(NewReg, RC);
-        auto *spvTy = getOrCreateSPIRVType(Ty, MIB);
-        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
-        auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-                         .addDef(Reg)
-                         .addUse(NewReg)
-                         .addUse(getSPIRVTypeID(spvTy));
-        Def->getOperand(0).setReg(NewReg);
-        constrainRegOperands(NewMI, &MF);
+        assert(Def && "Expecting an instruction that defines the register");
+        // G_GLOBAL_VALUE already has type info.
+        if (Def->getOpcode() != TargetOpcode::G_GLOBAL_VALUE)
+          insertAssignInstr(Reg, Ty, nullptr, MIB, MF.getRegInfo());
         ToDelete.push_back(&MI);
       } else if (MI.getOpcode() == TargetOpcode::G_CONSTANT ||
                  MI.getOpcode() == TargetOpcode::G_FCONSTANT ||
@@ -186,30 +204,11 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
               ElemTy, MI.getNumExplicitOperands() - MI.getNumExplicitDefs(),
               false);
         }
-
-        auto *Def = MRI.getVRegDef(Reg);
-
-        MIB.setInsertPt(*Def->getParent(),
-                        (Def->getNextNode() ? Def->getNextNode()->getIterator()
-                                            : Def->getParent()->end()));
-        auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
-        PostProcessList.push_back({Reg, NewReg});
-        if (auto *RC = MRI.getRegClassOrNull(Reg))
-          MRI.setRegClass(NewReg, RC);
-        auto *spvTy = getOrCreateSPIRVType(Ty, MIB);
-        auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-                         .addDef(Reg)
-                         .addUse(NewReg)
-                         .addUse(getSPIRVTypeID(spvTy));
-        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
-        Def->getOperand(0).setReg(NewReg);
-        constrainRegOperands(NewMI, &MF);
-      } else if (MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE) {
-        auto Reg = MI.getOperand(0).getReg();
-        MIB.setInsertPt(*MI.getParent(), MI);
-        Type *Ty = MI.getOperand(1).getGlobal()->getType();
-        SPIRVType *spvTy = getOrCreateSPIRVType(Ty, MIB);
-        assignSPIRVTypeToVReg(spvTy, Reg, MIB);
+        insertAssignInstr(Reg, Ty, nullptr, MIB, MRI);
+      } else if (MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
+                 MI.getOpcode() == TargetOpcode::COPY ||
+                 MI.getOpcode() == TargetOpcode::G_ADDRSPACE_CAST) {
+        propagateSPIRVType(&MI, MRI, MIB);
       }
 
       if (MII == Begin)
@@ -218,10 +217,6 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
         --MII;
     }
   }
-  // this to make it convenient for Legalizer to get the SPIRVType
-  // when processing the actual MI (ie not pseudo one)
-  for (auto &P : PostProcessList)
-    assignSPIRVTypeToVReg(getSPIRVTypeForVReg(P.first), P.second, MIB);
 
   for (auto &MI : ToDelete)
     MI->eraseFromParent();

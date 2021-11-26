@@ -392,10 +392,14 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
   // OpTypes and OpConstants can have cross references so at first we create
   // new meta regs and map them to old regs, then walk the list of instructions,
   // and create new (hoisted) instructions with new meta regs instead of old ones.
+  // Also there are references to global values in constants.
   fillLocalAliasTables<Type>(MIRBuilder, DT->get<Type>(), TR, MB_TypeConstVars,
                              LocalAliasTables);
   fillLocalAliasTables<Constant>(MIRBuilder, DT->get<Constant>(), TR,
                                  MB_TypeConstVars, LocalAliasTables);
+  fillLocalAliasTables<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), TR,
+                                    MB_TypeConstVars, LocalAliasTables);
+
   hoistGlobalOps<Type>(MIRBuilder, DT->get<Type>(), TR, MB_TypeConstVars,
                        LocalAliasTables);
   hoistGlobalOps<Constant>(MIRBuilder, DT->get<Constant>(), TR,
@@ -424,8 +428,6 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
     MI->removeFromParent();
   }
   END_FOR_MF_IN_MODULE()
-  fillLocalAliasTables<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), TR,
-                                    MB_TypeConstVars, LocalAliasTables);
   hoistGlobalOps<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), TR,
                               MB_TypeConstVars, LocalAliasTables);
   fillLocalAliasTables<Function>(MIRBuilder, DT->get<Function>(), TR,
