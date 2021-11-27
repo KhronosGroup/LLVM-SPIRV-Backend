@@ -262,11 +262,8 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
 
   B.SetInsertPoint(&F->getEntryBlock().front());
 
-  std::unordered_set<Constant *> InitConsts;
-
   for (auto &GV : Func->getParent()->globals()) {
-    if (GV.hasInitializer() && !isa<UndefValue>(GV.getInitializer()) &&
-        !InitConsts.count(GV.getInitializer())) {
+    if (GV.hasInitializer() && !isa<UndefValue>(GV.getInitializer())) {
       auto *Init = GV.getInitializer();
       Type *Ty = isAggrToReplace(Init) ? B.getInt32Ty() : Init->getType();
       auto *IntrFn = Intrinsic::getDeclaration(
@@ -274,7 +271,6 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       auto *InitInst = B.CreateCall(
           IntrFn, {&GV, isAggrToReplace(Init) ? B.getInt32(1) : Init});
       InitInst->setArgOperand(1, Init);
-      InitConsts.insert(Init);
     }
     if ((!GV.hasInitializer() || isa<UndefValue>(GV.getInitializer())) &&
         GV.getNumUses() == 0) {
