@@ -106,6 +106,12 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                    .addImm(Decoration::FuncParamAttr)
                    .addImm(FunctionParameterAttribute::NoWrite);
       }
+      if (Arg.hasAttribute(Attribute::ZExt)) {
+        MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(VRegs[i][0])
+                   .addImm(Decoration::FuncParamAttr)
+                   .addImm(FunctionParameterAttribute::Zext);
+      }
       ++i;
     }
   }
