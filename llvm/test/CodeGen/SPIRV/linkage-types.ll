@@ -8,49 +8,49 @@ target triple = "spirv32-unknown-unknown"
 ; SPIRV: OpEntryPoint Kernel %[[kern:[0-9]+]] "kern"
 
 @ae = available_externally addrspace(1) global i32 79, align 4
-; SPIRV: OpName %[[ae:[0-9]+]] "ae"
+; SPIRV-DAG: OpName %[[ae:[0-9]+]] "ae"
 
 @i1 = addrspace(1) global i32 1, align 4
-; SPIRV: OpName %[[i1:[0-9]+]] "i1"
+; SPIRV-DAG: OpName %[[i1:[0-9]+]] "i1"
 
 @i2 = internal addrspace(1) global i32 2, align 4
-; SPIRV: OpName %[[i2:[0-9]+]] "i2"
+; SPIRV-DAG: OpName %[[i2:[0-9]+]] "i2"
 
 @i3 = addrspace(1) global i32 3, align 4
-; SPIRV: OpName %[[i3:[0-9]+]] "i3"
+; SPIRV-DAG: OpName %[[i3:[0-9]+]] "i3"
 
 @i4 = common addrspace(1) global i32 0, align 4
-; SPIRV: OpName %[[i4:[0-9]+]] "i4"
+; SPIRV-DAG: OpName %[[i4:[0-9]+]] "i4"
 
 @i5 = internal addrspace(1) global i32 0, align 4
-; SPIRV: OpName %[[i5:[0-9]+]] "i5"
+; SPIRV-DAG: OpName %[[i5:[0-9]+]] "i5"
 
 @color_table = addrspace(2) constant [2 x i32] [i32 0, i32 1], align 4
-; SPIRV: OpName %[[color_table:[0-9]+]] "color_table"
+; SPIRV-DAG: OpName %[[color_table:[0-9]+]] "color_table"
 
 @noise_table = external addrspace(2) constant [256 x i32]
-; SPIRV: OpName %[[noise_table:[0-9]+]] "noise_table"
+; SPIRV-DAG: OpName %[[noise_table:[0-9]+]] "noise_table"
 
 @w = addrspace(1) constant i32 0, align 4
-; SPIRV: OpName %[[w:[0-9]+]] "w"
+; SPIRV-DAG: OpName %[[w:[0-9]+]] "w"
 
 @f.color_table = internal addrspace(2) constant [2 x i32] [i32 2, i32 3], align 4
-; SPIRV: OpName %[[f_color_table:[0-9]+]] "f.color_table"
+; SPIRV-DAG: OpName %[[f_color_table:[0-9]+]] "f.color_table"
 
 @e = external addrspace(1) global i32
-; SPIRV: OpName %[[e:[0-9]+]] "e"
+; SPIRV-DAG: OpName %[[e:[0-9]+]] "e"
 
 @f.t = internal addrspace(1) global i32 5, align 4
-; SPIRV: OpName %[[f_t:[0-9]+]] "f.t"
+; SPIRV-DAG: OpName %[[f_t:[0-9]+]] "f.t"
 
 @f.stint = internal addrspace(1) global i32 0, align 4
-; SPIRV: OpName %[[f_stint:[0-9]+]] "f.stint"
+; SPIRV-DAG: OpName %[[f_stint:[0-9]+]] "f.stint"
 
 @f.inside = internal addrspace(1) global i32 0, align 4
-; SPIRV: OpName %[[f_inside:[0-9]+]] "f.inside"
+; SPIRV-DAG: OpName %[[f_inside:[0-9]+]] "f.inside"
 
 @f.b = internal addrspace(2) constant float 1.000000e+00, align 4
-; SPIRV: OpName %[[f_b:[0-9]+]] "f.b"
+; SPIRV-DAG: OpName %[[f_b:[0-9]+]] "f.b"
 
 ; SPIRV-DAG: OpName %[[foo:[0-9]+]] "foo"
 ; SPIRV-DAG: OpName %[[f:[0-9]+]] "f"

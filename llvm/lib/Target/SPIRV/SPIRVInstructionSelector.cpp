@@ -1517,7 +1517,7 @@ bool SPIRVInstructionSelector::selectGlobalValue(
       TR.getOrCreateSPIRVType(GV->getType(), MIRBuilder, AQ::ReadWrite, false);
 
   auto globalIdent = GV->getGlobalIdentifier();
-  auto globalVar = GV->getParent()->getGlobalVariable(globalIdent);
+  auto globalVar = dyn_cast<GlobalVariable>(GV);
 
   bool HasInit = globalVar && globalVar->hasInitializer() &&
                  !isa<UndefValue>(globalVar->getInitializer());
@@ -1532,16 +1532,6 @@ bool SPIRVInstructionSelector::selectGlobalValue(
 
   auto addrSpace = GV->getAddressSpace();
   auto storage = TR.addressSpaceToStorageClass(addrSpace);
-
-  if (GV->getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage &&
-      storage != StorageClass::Function) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(resVReg)
-                   .addImm(Decoration::LinkageAttributes);
-    addStringImm(globalIdent, MIB);
-    MIB.addImm(LinkageType::Export);
-  }
-
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
                  .addDef(resVReg)
                  .addUse(TR.getSPIRVTypeID(resType))
@@ -1569,6 +1559,36 @@ bool SPIRVInstructionSelector::selectGlobalValue(
   auto MRI = MIRBuilder.getMRI();
   if (MRI->getType(Reg).isPointer())
     MRI->setType(Reg, LLT::pointer(MRI->getType(Reg).getAddressSpace(), 32));
+
+  // If it's a global variable with name, output OpName for it.
+  if (globalVar && globalVar->hasName())
+    buildOpName(Reg, globalVar->getName(), MIRBuilder);
+
+  // Output decorations for the GV.
+  // TODO: maybe move to GenerateDecorations pass.
+  if (globalVar && globalVar->isConstant())
+    decorate(Reg, Decoration::Constant, MIRBuilder);
+
+  if (globalVar && globalVar->getAlign().valueOrOne().value() != 1) {
+    auto Alignment = globalVar->getAlign().valueOrOne().value();
+    MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(Reg)
+                   .addImm(Decoration::Alignment)
+                   .addImm(Alignment);
+  }
+
+  if (GV->getLinkage() != GlobalValue::InternalLinkage &&
+      storage != StorageClass::Function) {
+    bool IsImport = GV->isDeclaration() ||
+                    GV->hasAvailableExternallyLinkage();
+    auto LinkageType = IsImport ? LinkageType::Import : LinkageType::Export;
+    MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(Reg)
+                   .addImm(Decoration::LinkageAttributes);
+    addStringImm(globalIdent, MIB);
+    MIB.addImm(LinkageType);
+  }
+
   return result;
 }
 

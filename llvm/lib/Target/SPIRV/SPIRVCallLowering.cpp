@@ -93,6 +93,25 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                    .addImm(Decoration::MaxByteOffset)
                    .addImm(DerefBytes);
       }
+      if (Arg.hasAttribute(Attribute::Alignment)) {
+        auto Alignment = Arg.getAttribute(Attribute::Alignment).getValueAsInt();
+        MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(VRegs[i][0])
+                   .addImm(Decoration::Alignment)
+                   .addImm(Alignment);
+      }
+      if (Arg.hasAttribute(Attribute::ReadOnly)) {
+        MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(VRegs[i][0])
+                   .addImm(Decoration::FuncParamAttr)
+                   .addImm(FunctionParameterAttribute::NoWrite);
+      }
+      if (Arg.hasAttribute(Attribute::ZExt)) {
+        MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                   .addUse(VRegs[i][0])
+                   .addImm(Decoration::FuncParamAttr)
+                   .addImm(FunctionParameterAttribute::Zext);
+      }
       ++i;
     }
   }
@@ -173,7 +192,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                    .addImm(execModel)
                    .addUse(funcVReg);
     addStringImm(F.getName(), MIB);
-  } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage) {
+  } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
+             F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
                    .addUse(funcVReg)
                    .addImm(Decoration::LinkageAttributes);
