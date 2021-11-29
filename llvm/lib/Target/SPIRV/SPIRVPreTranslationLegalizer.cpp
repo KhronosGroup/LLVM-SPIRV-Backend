@@ -376,9 +376,11 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       for (auto &Op : IEI->operands())
         Args.push_back(Op);
       auto *NewIEI = B.CreateCall(IntrFn, {Args});
+      StringRef InstName = I->hasName() ? I->getName() : "" ;
       IEI->replaceAllUsesWith(NewIEI);
       IEI->eraseFromParent();
       I = NewIEI;
+      I->setName(InstName);
     } else if (isa<AllocaInst>(I))
       TrackConstants = false;
 
