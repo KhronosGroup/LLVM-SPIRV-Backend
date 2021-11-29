@@ -48,8 +48,7 @@ class SPIRVPreTranslationLegalizer : public ModulePass {
 
   std::unordered_map<Instruction *, Constant *> AggrConsts;
 
-  Function *processFunctionSignature(IRBuilder<> &B, Function *F,
-                                     bool &EraseOldFunction);
+  Function *processFunctionSignature(Function *F);
   void preprocessCompositeConstants(IRBuilder<> &B, Function *F);
 
 public:
@@ -64,7 +63,7 @@ public:
         *PassRegistry::getPassRegistry());
   }
 
-  bool runOnFunction(Function *Func, bool &EraseOldFunction);
+  bool runOnFunction(Function *F);
   bool runOnModule(Module &M) override;
 
   StringRef getPassName() const override { return "SPIRV Types Assigner"; }
@@ -89,14 +88,16 @@ static bool isMemInstrToReplace(Instruction *I) {
 static void replaceMemInstrUses(Instruction *Old, Instruction *New) {
   while (!Old->user_empty()) {
     auto *U = Old->user_back();
-    assert(isMemInstrToReplace(cast<Instruction>(U)));
+    assert(isMemInstrToReplace(U) || isa<ReturnInst>(U));
     U->replaceUsesOfWith(Old, New);
   }
   Old->eraseFromParent();
 }
 
-Function *SPIRVPreTranslationLegalizer::processFunctionSignature(
-    IRBuilder<> &B, Function *F, bool &EraseOldFunction) {
+Function *
+SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
+  IRBuilder<> B(F->getContext());
+
   bool IsRetAggr = F->getReturnType()->isAggregateType();
   bool HasAggrArg =
       std::any_of(F->arg_begin(), F->arg_end(), [](Argument &Arg) {
@@ -146,8 +147,6 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(
          ValueAsMetadata::get(Constant::getNullValue(ChangedTyP.second))}));
   auto *ThisFuncMD = MDNode::get(B.getContext(), MDArgs);
   FuncMD->addOperand(ThisFuncMD);
-
-  EraseOldFunction = true;
 
   for (auto *U : F->users()) {
     if (auto *CI = dyn_cast<CallInst>(U))
@@ -237,32 +236,40 @@ void SPIRVPreTranslationLegalizer::preprocessCompositeConstants(IRBuilder<> &B,
 }
 
 bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
-  std::list<Function *> FuncsWorklist;
+  std::vector<Function *> FuncsWorklist;
   bool Changed = false;
   for (auto &F : M)
-    // if (!F.isDeclaration())
     FuncsWorklist.push_back(&F);
-  for (auto *F : FuncsWorklist) {
-    bool EraseOldFunction = false;
-    Changed |= runOnFunction(F, EraseOldFunction);
-    if (EraseOldFunction)
-      F->eraseFromParent();
+
+  for (auto *Func : FuncsWorklist) {
+    auto *F = processFunctionSignature(Func);
+
+    bool CreatedNewF = F != Func;
+
+    if (Func->isDeclaration()) {
+      Changed |= CreatedNewF;
+      continue;
+    }
+
+    if (CreatedNewF)
+      Func->eraseFromParent();
   }
+
+  for (auto &F : M)
+    Changed |= runOnFunction(&F);
+
   return Changed;
 }
 
-bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
-                                                 bool &EraseOldFunction) {
-  IRBuilder<> B(Func->getContext());
+bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
+  if (F->isDeclaration())
+    return false;
+  IRBuilder<> B(F->getContext());
   AggrConsts.clear();
-  auto *F = processFunctionSignature(B, Func, EraseOldFunction);
-
-  if (Func->isDeclaration())
-    return F != Func;
 
   B.SetInsertPoint(&F->getEntryBlock().front());
 
-  for (auto &GV : Func->getParent()->globals()) {
+  for (auto &GV : F->getParent()->globals()) {
     if (GV.hasInitializer() && !isa<UndefValue>(GV.getInitializer())) {
       auto *Init = GV.getInitializer();
       Type *Ty = isAggrToReplace(Init) ? B.getInt32Ty() : Init->getType();
@@ -348,8 +355,12 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
           F->getParent(), Intrinsic::spv_insertv,
           {IVI->getInsertedValueOperand()->getType()});
       std::vector<Value *> Args;
-      for (auto &Op : IVI->operands())
-        Args.push_back(Op);
+      for (auto &Op : IVI->operands()) {
+        if (isa<UndefValue>(Op))
+          Args.push_back(UndefValue::get(B.getInt32Ty()));
+        else
+          Args.push_back(Op);
+      }
       for (auto &Op : IVI->indices()) {
         Args.push_back(B.getInt32(Op));
       }
