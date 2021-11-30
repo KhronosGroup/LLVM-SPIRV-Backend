@@ -373,25 +373,6 @@ static uint64_t getIConstVal(Register constReg,
   return c->getOperand(1).getCImm()->getValue().getZExtValue();
 }
 
-static void buildIConstant(Register Reg, uint64_t Val, SPIRVType *type,
-                           MachineIRBuilder &MIRBuilder,
-                           SPIRVTypeRegistry *TR) {
-  assert(type->getOpcode() == SPIRV::OpTypeInt);
-  TR->assignSPIRVTypeToVReg(type, Reg, MIRBuilder);
-  auto &C = MIRBuilder.getMF().getFunction().getContext();
-  const auto intTy = IntegerType::get(C, TR->getScalarOrVectorBitWidth(type));
-  MIRBuilder.buildConstant(Reg, *ConstantInt::get(intTy, Val));
-}
-
-static Register buildIConstant(uint64_t Val, SPIRVType *type,
-                               MachineIRBuilder &MIRBuilder,
-                               SPIRVTypeRegistry *TR) {
-  auto llt = LLT::scalar(TR->getScalarOrVectorBitWidth(type));
-  auto Reg = MIRBuilder.getMRI()->createGenericVirtualRegister(llt);
-  buildIConstant(Reg, Val, type, MIRBuilder, TR);
-  return Reg;
-}
-
 static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
                               SPIRVType *varType,
                               SPIRVTypeRegistry *TR, BuiltIn::BuiltIn builtIn,
@@ -464,7 +445,8 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       TR->assignSPIRVTypeToVReg(PtrSizeTy, defaultReg, MIRBuilder);
       toTruncate = defaultReg;
     }
-    buildIConstant(defaultReg, defaultVal, PtrSizeTy, MIRBuilder, TR);
+    auto newReg = TR->buildConstantInt(defaultVal, MIRBuilder, PtrSizeTy, true);
+    MIRBuilder.buildCopy(defaultReg, newReg);
   } else { // If it could be in range, we need to load from the given builtin
 
     auto Vec3Ty = TR->getOrCreateSPIRVVectorType(PtrSizeTy, 3, MIRBuilder);
@@ -492,11 +474,12 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       TR->assignSPIRVTypeToVReg(boolTy, cmpReg, MIRBuilder);
 
       // Use G_ICMP to check if idxVReg < 3
-      Register three = buildIConstant(3, idxTy, MIRBuilder, TR);
+      Register three =  TR->buildConstantInt(3, MIRBuilder, idxTy, true);
       MIRBuilder.buildICmp(CmpInst::ICMP_ULT, cmpReg, idxVReg, three);
 
       // Get constant for the default value (0 or 1 depending on which function)
-      Register defaultReg = buildIConstant(defaultVal, PtrSizeTy, MIRBuilder, TR);
+      Register defaultReg = TR->buildConstantInt(defaultVal, MIRBuilder,
+                                                 PtrSizeTy, true);
 
       // Get a register for the selection result (possibly a new temporary one)
       Register selRes = resVReg;
@@ -795,7 +778,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
     scopeReg = args[1];
   } else {
     auto scope = Scope::Device;
-    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+    scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty, true);
   }
 
   Register memSemReg;
@@ -805,7 +788,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
   } else {
     auto scSm = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
     auto memSem = MemorySemantics::SequentiallyConsistent | scSm;
-    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+    memSemReg = TR->buildConstantInt(memSem, MIRBuilder, I32Ty, true);
   }
 
   auto MIB = MIRBuilder.buildInstr(OpAtomicLoad)
@@ -828,7 +811,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
   Register scopeReg;
   auto scope = Scope::Device;
   if (!scopeReg.isValid())
-    scopeReg = buildIConstant(scope, I32Ty, MIRBuilder, TR);
+    scopeReg = TR->buildConstantInt(scope, MIRBuilder, I32Ty, true);
 
   auto ptr = OrigArgs[0];
   auto scSem = getMemSemanticsForStorageClass(TR->getPointerStorageClass(ptr));
@@ -836,7 +819,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
   Register memSemReg;
   auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
   if (!memSemReg.isValid())
-    memSemReg = buildIConstant(memSem, I32Ty, MIRBuilder, TR);
+    memSemReg = TR->buildConstantInt(memSem, MIRBuilder, I32Ty, true);
 
   auto MIB = MIRBuilder.buildInstr(OpAtomicStore)
                  .addUse(ptr)

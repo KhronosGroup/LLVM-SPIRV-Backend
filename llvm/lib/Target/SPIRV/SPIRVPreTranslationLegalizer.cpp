@@ -361,9 +361,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       Args.push_back(EEI->getVectorOperand());
       Args.push_back(EEI->getIndexOperand());
       auto *NewEEI = B.CreateCall(IntrFn, {Args});
-      StringRef InstName = "";
-      if (I->hasName())
-        InstName = I->getName();
+      StringRef InstName = I->hasName() ? I->getName() : "";
       EEI->replaceAllUsesWith(NewEEI);
       EEI->eraseFromParent();
       I = NewEEI;
@@ -376,9 +374,11 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *Func,
       for (auto &Op : IEI->operands())
         Args.push_back(Op);
       auto *NewIEI = B.CreateCall(IntrFn, {Args});
+      StringRef InstName = I->hasName() ? I->getName() : "";
       IEI->replaceAllUsesWith(NewIEI);
       IEI->eraseFromParent();
       I = NewIEI;
+      I->setName(InstName);
     } else if (isa<AllocaInst>(I))
       TrackConstants = false;
 

@@ -1409,13 +1409,18 @@ bool SPIRVInstructionSelector::selectIntrinsic(
     return selectGlobalValue(MI->getOperand(0).getReg(), *MI, MIRBuilder, Init);
   } break;
   case Intrinsic::spv_const_composite: {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantComposite)
+    // If no values are attached, the composite is null constant.
+    auto IsNull = I.getNumExplicitDefs() + 1 == I.getNumExplicitOperands();
+    auto MIB = MIRBuilder.buildInstr(IsNull ? SPIRV::OpConstantNull
+                                            : SPIRV::OpConstantComposite)
                    .addDef(resVReg)
                    .addUse(TR.getSPIRVTypeID(resType));
     // skip type MD node we already used when generated assign.type for this
-    for (unsigned i = I.getNumExplicitDefs() + 1;
-         i < I.getNumExplicitOperands(); ++i) {
-      MIB.addUse(I.getOperand(i).getReg());
+    if (!IsNull) {
+      for (unsigned i = I.getNumExplicitDefs() + 1;
+           i < I.getNumExplicitOperands(); ++i) {
+        MIB.addUse(I.getOperand(i).getReg());
+      }
     }
     return MIB.constrainAllUses(TII, TRI, RBI);
   } break;
