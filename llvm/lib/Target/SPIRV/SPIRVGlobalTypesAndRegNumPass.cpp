@@ -30,6 +30,7 @@
 #include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
+#include "TargetInfo/SPIRVTargetInfo.h"
 
 #include "llvm/CodeGen/MachineModuleInfo.h"
 
