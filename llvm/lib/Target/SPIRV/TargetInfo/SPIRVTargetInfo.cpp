@@ -6,29 +6,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRV.h"
+#include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/Support/TargetRegistry.h"
 
-namespace llvm {
-Target &getTheSPIRV32Target() {
-  static Target TheSPIRVTarget;
-  return TheSPIRVTarget;
+using namespace llvm;
+
+Target &llvm::getTheSPIRV32Target() {
+  static Target TheSPIRV32Target;
+  return TheSPIRV32Target;
 }
-Target &getTheSPIRV64Target() {
-  static Target TheSPIRVTarget;
-  return TheSPIRVTarget;
+Target &llvm::getTheSPIRV64Target() {
+  static Target TheSPIRV64Target;
+  return TheSPIRV64Target;
 }
-Target &getTheSPIRVLogicalTarget() {
-  static Target TheSPIRVTarget;
-  return TheSPIRVTarget;
+Target &llvm::getTheSPIRVLogicalTarget() {
+  static Target TheSPIRVLogicalTarget;
+  return TheSPIRVLogicalTarget;
 }
 
-extern "C" void LLVMInitializeSPIRVTargetInfo() {
-  RegisterTarget<Triple::spirv32, /*HasJIT=*/false> X(
-      getTheSPIRV32Target(), "spirv32", "SPIRV", "SPIRV");
-  RegisterTarget<Triple::spirv64, /*HasJIT=*/false> Y(
-      getTheSPIRV64Target(), "spirv64", "SPIRV", "SPIRV");
-  RegisterTarget<Triple::spirvlogical, /*HasJIT=*/false> Z(
-      getTheSPIRVLogicalTarget(), "spirvlogical", "SPIRV", "SPIRV");
+extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTargetInfo() {
+  RegisterTarget<Triple::spirv32> X(getTheSPIRV32Target(), "spirv32",
+                                    "SPIR-V 32-bit", "SPIRV");
+  RegisterTarget<Triple::spirv64> Y(getTheSPIRV64Target(), "spirv64",
+                                    "SPIR-V 64-bit", "SPIRV");
+  RegisterTarget<Triple::spirvlogical> Z(
+      getTheSPIRVLogicalTarget(), "spirvlogical", "SPIR-V Logical", "SPIRV");
 }
-} // namespace llvm

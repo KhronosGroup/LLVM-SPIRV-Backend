@@ -29,10 +29,6 @@ class MCSubtargetInfo;
 class MCTargetOptions;
 class Target;
 
-Target &getTheSPIRV32Target();
-Target &getTheSPIRV64Target();
-Target &getTheSPIRVLogicalTarget();
-
 MCCodeEmitter *createSPIRVMCCodeEmitter(const MCInstrInfo &MCII,
                                         const MCRegisterInfo &MRI,
                                         MCContext &Ctx);

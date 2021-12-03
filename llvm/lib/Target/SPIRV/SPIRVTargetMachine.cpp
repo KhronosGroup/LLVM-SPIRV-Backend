@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVTargetMachine.h"
-#include "MCTargetDesc/SPIRVMCAsmInfo.h"
+#include "TargetInfo/SPIRVTargetInfo.h"
 #include "SPIRV.h"
 #include "SPIRVCallLowering.h"
 #include "SPIRVIRTranslator.h"
@@ -45,7 +45,7 @@ createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                SPIRVSubtarget &Subtarget,
                                SPIRVRegisterBankInfo &RBI);
 
-extern "C" void LLVMInitializeSPIRVTarget() {
+extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
   // Register the target.
   RegisterTargetMachine<SPIRVTargetMachine> X(getTheSPIRV32Target());
   RegisterTargetMachine<SPIRVTargetMachine> Y(getTheSPIRV64Target());
