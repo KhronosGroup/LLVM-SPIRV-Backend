@@ -435,15 +435,10 @@ def OpBitcast : UnOp<"OpBitcast", 124>;
 
 //3.32.12 Composite Instructions
 def OpVectorExtractDynamic: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
-                  "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (vector_extract vID:$vec, ID:$idx), TYPE:$type))]>;
+                  "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (extractelt vID:$vec, ID:$idx), TYPE:$type))]>;
 
 def OpVectorInsertDynamic: Op<78, (outs ID:$res), (ins TYPE:$ty, ID:$vec, ID:$comp, ID:$idx),
                   "$res = OpVectorInsertDynamic $ty $vec $comp $idx">;
-//def OpVectorInsertDynamicI: Op<78, (outs ID:$res), (ins TYPE:$ty, vID:$vec, ID:$comp, ID:$idx),
-//                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vID:$vec, ID:$comp, ID:$idx), TYPE:$ty))]>;
-//def OpVectorInsertDynamicF: Op<78, (outs ID:$res), (ins TYPE:$ty, vfID:$vec, fID:$comp, ID:$idx),
-//                  "$res = OpVectorInsertDynamic $ty $vec $comp $idx", [(set ID:$res, (assigntype (vector_insert vfID:$vec, fID:$comp, ID:$idx), TYPE:$ty))]>;
-
 def OpVectorShuffle: Op<79, (outs ID:$res), (ins TYPE:$ty, ID:$v1, ID:$v2, variable_ops),
                   "$res = OpVectorShuffle $ty $v1 $v2">;
 def OpCompositeConstruct: Op<80, (outs ID:$res), (ins TYPE:$type, variable_ops),
