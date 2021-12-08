@@ -320,7 +320,7 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
   Register Var = TR->buildGlobalVariable(NewReg, PtrTy,
       getLinkStrForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
       true, true, LinkageType::Import, MIRBuilder);
-  TR->buildDecoration(Var, MIRBuilder, Decoration::BuiltIn, {builtIn});
+  buildOpDecorate(Var, MIRBuilder, Decoration::BuiltIn, {builtIn});
 
   // Load the value from the global variable
   Register loadedReg = buildLoad(varType, Var, MIRBuilder, TR, llt, Reg);
@@ -1049,17 +1049,11 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
     }
   }
 
-  namespace Dec = Decoration;
-  bool success = true;
   if (isSat)
-    success &= TR->buildDecoration(ret, MIRBuilder, Dec::SaturatedConversion,
-                                   {});
-  if (isRounded && success)
-    success &= TR->buildDecoration(ret, MIRBuilder, Dec::FPRoundingMode,
-                                   {roundingMode});
-  if (!success)
-    return false;
-
+    buildOpDecorate(ret, MIRBuilder, Decoration::SaturatedConversion, {});
+  if (isRounded)
+    buildOpDecorate(ret, MIRBuilder, Decoration::FPRoundingMode,
+                               {roundingMode});
   if (isFromInt) {
     if (isToInt) { // I -> I
       auto op = dstSign ? OpUConvert : OpSConvert;

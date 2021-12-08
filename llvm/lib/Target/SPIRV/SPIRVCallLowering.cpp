@@ -86,24 +86,25 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
       if (Arg.getType()->isPointerTy()) {
-        auto DerefBytes = (unsigned) Arg.getDereferenceableBytes();
+        auto DerefBytes = static_cast<unsigned>(Arg.getDereferenceableBytes());
         if (DerefBytes != 0)
-          TR->buildDecoration(VRegs[i][0], MIRBuilder,
-                              Decoration::MaxByteOffset, {DerefBytes});
+          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::MaxByteOffset,
+                          {DerefBytes});
       }
       if (Arg.hasAttribute(Attribute::Alignment)) {
-        auto Alignment = (unsigned) Arg.getAttribute(Attribute::Alignment)
-                                       .getValueAsInt();
-        TR->buildDecoration(VRegs[i][0], MIRBuilder, Decoration::Alignment,
-                            {Alignment});
+        auto Alignment =
+            static_cast<unsigned>(Arg.getAttribute(Attribute::Alignment)
+                                     .getValueAsInt());
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Alignment,
+                        {Alignment});
       }
       if (Arg.hasAttribute(Attribute::ReadOnly)) {
-        TR->buildDecoration(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
-                            {FunctionParameterAttribute::NoWrite});
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
+                        {FunctionParameterAttribute::NoWrite});
       }
       if (Arg.hasAttribute(Attribute::ZExt)) {
-        TR->buildDecoration(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
-                            {FunctionParameterAttribute::Zext});
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
+                        {FunctionParameterAttribute::Zext});
       }
       ++i;
     }
@@ -188,7 +189,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
-    TR->buildDecoration(funcVReg, MIRBuilder, Decoration::LinkageAttributes,
+    buildOpDecorate(funcVReg, MIRBuilder, Decoration::LinkageAttributes,
                     {LnkTy}, F.getGlobalIdentifier());
   }
 

@@ -75,3 +75,15 @@ void buildOpName(Register target, const StringRef &name,
     addStringImm(name, MIB);
   }
 }
+
+void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
+    Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
+    StringRef StrImm) {
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
+                 .addUse(Reg)
+                 .addImm(Dec);
+  if (!StrImm.empty())
+    addStringImm(StrImm, MIB);
+  for (const auto &DecArg : DecArgs)
+    MIB.addImm(DecArg);
+}

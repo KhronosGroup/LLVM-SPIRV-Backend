@@ -387,20 +387,6 @@ SPIRVTypeRegistry::buildConstantSampler(Register resReg, unsigned int addrMode,
   return res->getOperand(0).getReg();
 }
 
-bool
-SPIRVTypeRegistry::buildDecoration(Register Reg, MachineIRBuilder &MIRBuilder,
-    Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
-    StringRef StrImm) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                 .addUse(Reg)
-                 .addImm(Dec);
-  if (!StrImm.empty())
-    addStringImm(StrImm, MIB);
-  for (const auto &DecArg : DecArgs)
-    MIB.addImm(DecArg);
-  return constrainRegOperands(MIB);
-}
-
 Register
 SPIRVTypeRegistry::buildGlobalVariable(Register ResVReg, SPIRVType *BaseType,
     StringRef Name, const GlobalValue *GV, StorageClass::StorageClass Storage,
@@ -461,15 +447,15 @@ SPIRVTypeRegistry::buildGlobalVariable(Register ResVReg, SPIRVType *BaseType,
   // Output decorations for the GV.
   // TODO: maybe move to GenerateDecorations pass.
   if (IsConst)
-    buildDecoration(Reg, MIRBuilder, Decoration::Constant, {});
+    buildOpDecorate(Reg, MIRBuilder, Decoration::Constant, {});
 
   if (GVar && GVar->getAlign().valueOrOne().value() != 1) {
     unsigned Alignment = (unsigned) GVar->getAlign().valueOrOne().value();
-    buildDecoration(Reg, MIRBuilder, Decoration::Alignment, {Alignment});
+    buildOpDecorate(Reg, MIRBuilder, Decoration::Alignment, {Alignment});
   }
 
   if (HasLinkageTy)
-    buildDecoration(Reg, MIRBuilder, Decoration::LinkageAttributes,
+    buildOpDecorate(Reg, MIRBuilder, Decoration::LinkageAttributes,
                     {LinkageType}, Name);
   return Reg;
 }

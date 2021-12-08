@@ -580,11 +580,11 @@ static void handleIntegerWrapFlags(const MachineInstr &I, Register Target,
                                    SPIRVTypeRegistry &TR) {
   if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && canUseNSW(NewOpcode) &&
       canUseDecoration(Decoration::NoSignedWrap, ST))
-    TR.buildDecoration(Target, MIRBuilder, Decoration::NoSignedWrap, {});
+    buildOpDecorate(Target, MIRBuilder, Decoration::NoSignedWrap, {});
 
   if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && canUseNUW(NewOpcode) &&
        canUseDecoration(Decoration::NoUnsignedWrap, ST))
-    TR.buildDecoration(Target, MIRBuilder, Decoration::NoUnsignedWrap, {});
+    buildOpDecorate(Target, MIRBuilder, Decoration::NoUnsignedWrap, {});
 }
 
 bool SPIRVInstructionSelector::selectUnOp(Register resVReg,

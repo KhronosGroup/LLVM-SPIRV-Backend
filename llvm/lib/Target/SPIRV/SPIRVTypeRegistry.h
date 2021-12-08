@@ -241,10 +241,6 @@ public:
   Register buildConstantSampler(Register res, unsigned int addrMode,
       unsigned int param, unsigned int filerMode,
       MachineIRBuilder &MIRBuilder, SPIRVType *spvType);
-
-  bool buildDecoration(Register Reg, MachineIRBuilder &MIRBuilder,
-      Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
-      StringRef StrImm = "");
   Register buildGlobalVariable(Register Reg, SPIRVType *BaseType,
       StringRef Name, const GlobalValue *GV, StorageClass::StorageClass Storage,
       const MachineInstr *Init, bool IsConst,  bool HasLinkageTy,
