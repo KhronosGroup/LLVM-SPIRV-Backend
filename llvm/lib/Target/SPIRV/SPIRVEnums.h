@@ -655,7 +655,7 @@ GEN_ENUM_HEADER(Decoration)
   X(N, SampleMask, 20, {Shader}, {}, 0, 0)                                     \
   X(N, FragDepth, 22, {Shader}, {}, 0, 0)                                      \
   X(N, HelperInvocation, 23, {Shader}, {}, 0, 0)                               \
-  X(N, NumWorkGroups, 24, {}, {}, 0, 0)                                        \
+  X(N, NumWorkgroups, 24, {}, {}, 0, 0)                                        \
   X(N, WorkgroupSize, 25, {}, {}, 0, 0)                                        \
   X(N, WorkgroupId, 26, {}, {}, 0, 0)                                          \
   X(N, LocalInvocationId, 27, {}, {}, 0, 0)                                    \
