@@ -573,27 +573,18 @@ static bool canUseNUW(unsigned opCode) {
   }
 }
 
-static void decorate(Register target, Decoration::Decoration dec,
-                     MachineIRBuilder &MIRBuilder) {
-  MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(target).addImm(dec);
-}
-
 // TODO: move to GenerateDecorations pass
-static void handleIntegerWrapFlags(const MachineInstr &I, Register target,
-                                   unsigned newOpcode, const SPIRVSubtarget &ST,
-                                   MachineIRBuilder &MIRBuilder) {
-  if (I.getFlag(MachineInstr::MIFlag::NoSWrap)) {
-    if (canUseNSW(newOpcode) &&
-        canUseDecoration(Decoration::NoSignedWrap, ST)) {
-      decorate(target, Decoration::NoSignedWrap, MIRBuilder);
-    }
-  }
-  if (I.getFlag(MachineInstr::MIFlag::NoUWrap)) {
-    if (canUseNUW(newOpcode) &&
-        canUseDecoration(Decoration::NoUnsignedWrap, ST)) {
-      decorate(target, Decoration::NoUnsignedWrap, MIRBuilder);
-    }
-  }
+static void handleIntegerWrapFlags(const MachineInstr &I, Register Target,
+                                   unsigned NewOpcode, const SPIRVSubtarget &ST,
+                                   MachineIRBuilder &MIRBuilder,
+                                   SPIRVTypeRegistry &TR) {
+  if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && canUseNSW(NewOpcode) &&
+      canUseDecoration(Decoration::NoSignedWrap, ST))
+    buildOpDecorate(Target, MIRBuilder, Decoration::NoSignedWrap, {});
+
+  if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && canUseNUW(NewOpcode) &&
+       canUseDecoration(Decoration::NoUnsignedWrap, ST))
+    buildOpDecorate(Target, MIRBuilder, Decoration::NoUnsignedWrap, {});
 }
 
 bool SPIRVInstructionSelector::selectUnOp(Register resVReg,
@@ -601,7 +592,7 @@ bool SPIRVInstructionSelector::selectUnOp(Register resVReg,
                                           const MachineInstr &I,
                                           MachineIRBuilder &MIRBuilder,
                                           unsigned newOpcode) const {
-  handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder);
+  handleIntegerWrapFlags(I, resVReg, newOpcode, STI, MIRBuilder, TR);
   return MIRBuilder.buildInstr(newOpcode)
       .addDef(resVReg)
       .addUse(TR.getSPIRVTypeID(resType))
@@ -1515,86 +1506,32 @@ bool SPIRVInstructionSelector::selectPhi(Register resVReg,
 }
 
 bool SPIRVInstructionSelector::selectGlobalValue(
-    Register resVReg, const MachineInstr &I, MachineIRBuilder &MIRBuilder,
+    Register ResVReg, const MachineInstr &I, MachineIRBuilder &MIRBuilder,
     const MachineInstr *Init) const {
   auto *GV = I.getOperand(1).getGlobal();
-  SPIRVType *resType =
+  SPIRVType *ResType =
       TR.getOrCreateSPIRVType(GV->getType(), MIRBuilder, AQ::ReadWrite, false);
 
-  auto globalIdent = GV->getGlobalIdentifier();
-  auto globalVar = dyn_cast<GlobalVariable>(GV);
+  auto GlobalIdent = GV->getGlobalIdentifier();
+  auto GlobalVar = dyn_cast<GlobalVariable>(GV);
 
-  bool HasInit = globalVar && globalVar->hasInitializer() &&
-                 !isa<UndefValue>(globalVar->getInitializer());
+  bool HasInit = GlobalVar && GlobalVar->hasInitializer() &&
+                 !isa<UndefValue>(GlobalVar->getInitializer());
   // Skip empty declaration for GVs with initilaizers till we get the decl with
   // passed initializer.
   if (HasInit && !Init)
     return true;
 
-  // Skip if we have already output it.
-  if (DT.find(GV, &MIRBuilder.getMF(), resVReg))
-    return true;
+  auto AddrSpace = GV->getAddressSpace();
+  auto Storage = TR.addressSpaceToStorageClass(AddrSpace);
+  bool HasLnkTy = GV->getLinkage() != GlobalValue::InternalLinkage &&
+      Storage != StorageClass::Function;
+  auto LnkType = (GV->isDeclaration() || GV->hasAvailableExternallyLinkage()) ?
+                 LinkageType::Import : LinkageType::Export;
 
-  auto addrSpace = GV->getAddressSpace();
-  auto storage = TR.addressSpaceToStorageClass(addrSpace);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
-                 .addDef(resVReg)
-                 .addUse(TR.getSPIRVTypeID(resType))
-                 .addImm(storage);
-
-  if (HasInit != 0) {
-    MIB.addUse(Init->getOperand(0).getReg());
-    // TODO should this check be here?
-    // if (storage != StorageClass::UniformConstant) {
-    //   auto ucAddrspace =
-    //   TR.StorageClassToAddressSpace(StorageClass::UniformConstant); errs() <<
-    //   "OpVariable initializers are only valid for the "
-    //             "UniformConstant storage class (addrspace "
-    //          << ucAddrspace << ") in: " << *GV << "\n";
-    //   return false;
-    // }
-  }
-
-  // ISel may introduce a new register on this step, so we need to add it to
-  // DT and correct its type avoiding fails on the next stage.
-  bool result = MIB.constrainAllUses(TII, TRI, RBI);
-  auto Reg = MIB->getOperand(0).getReg();
-  DT.add(GV, &MIRBuilder.getMF(), Reg);
-
-  auto MRI = MIRBuilder.getMRI();
-  if (MRI->getType(Reg).isPointer())
-    MRI->setType(Reg, LLT::pointer(MRI->getType(Reg).getAddressSpace(), 32));
-
-  // If it's a global variable with name, output OpName for it.
-  if (globalVar && globalVar->hasName())
-    buildOpName(Reg, globalVar->getName(), MIRBuilder);
-
-  // Output decorations for the GV.
-  // TODO: maybe move to GenerateDecorations pass.
-  if (globalVar && globalVar->isConstant())
-    decorate(Reg, Decoration::Constant, MIRBuilder);
-
-  if (globalVar && globalVar->getAlign().valueOrOne().value() != 1) {
-    auto Alignment = globalVar->getAlign().valueOrOne().value();
-    MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(Reg)
-                   .addImm(Decoration::Alignment)
-                   .addImm(Alignment);
-  }
-
-  if (GV->getLinkage() != GlobalValue::InternalLinkage &&
-      storage != StorageClass::Function) {
-    bool IsImport = GV->isDeclaration() ||
-                    GV->hasAvailableExternallyLinkage();
-    auto LinkageType = IsImport ? LinkageType::Import : LinkageType::Export;
-    MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(Reg)
-                   .addImm(Decoration::LinkageAttributes);
-    addStringImm(globalIdent, MIB);
-    MIB.addImm(LinkageType);
-  }
-
-  return result;
+  auto Reg = TR.buildGlobalVariable(ResVReg, ResType, GlobalIdent, GV, Storage,
+    Init, GlobalVar && GlobalVar->isConstant(), HasLnkTy, LnkType, MIRBuilder);
+  return Reg.isValid();
 }
 
 namespace llvm {

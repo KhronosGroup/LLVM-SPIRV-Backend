@@ -251,73 +251,6 @@ static Register buildSamplerLiteral(uint64_t samplerBitmask, Register res,
   return sampler;
 }
 
-static bool decorate(Register target, Decoration::Decoration decoration,
-                     MachineIRBuilder &MIRBuilder, SPIRVTypeRegistry *TR) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                 .addUse(target)
-                 .addImm(decoration);
-  return TR->constrainRegOperands(MIB);
-}
-
-static bool decorate(Register target, Decoration::Decoration decoration,
-                     uint32_t decArg, MachineIRBuilder &MIRBuilder,
-                     SPIRVTypeRegistry *TR) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                 .addUse(target)
-                 .addImm(decoration)
-                 .addImm(decArg);
-  return TR->constrainRegOperands(MIB);
-}
-
-static bool decorateLinkage(Register target, const StringRef name,
-                            LinkageType::LinkageType linkageType,
-                            MachineIRBuilder &MIRBuilder,
-                            SPIRVTypeRegistry *TR) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                 .addUse(target)
-                 .addImm(Decoration::LinkageAttributes);
-  addStringImm(name, MIB);
-  MIB.addImm(LinkageType::Import);
-  bool success = TR->constrainRegOperands(MIB);
-
-  auto nameMIB = MIRBuilder.buildInstr(SPIRV::OpName).addUse(target);
-  addStringImm(name, nameMIB);
-  return success;
-}
-
-static bool decorateConstant(Register target, MachineIRBuilder &MIRBuilder,
-                             SPIRVTypeRegistry *TR) {
-  return decorate(target, Decoration::Constant, MIRBuilder, TR);
-}
-
-static bool decorateBuiltIn(Register target, BuiltIn::BuiltIn builtInID,
-                            MachineIRBuilder &MIRBuilder,
-                            SPIRVTypeRegistry *TR) {
-  bool succ = decorate(target, Decoration::BuiltIn, builtInID, MIRBuilder, TR);
-  succ = succ && decorateLinkage(target, getLinkStrForBuiltIn(builtInID),
-                                 LinkageType::Import, MIRBuilder, TR);
-  return succ;
-}
-
-static Register buildOpVariable(SPIRVType *BaseType,
-                                StorageClass::StorageClass Storage,
-                                MachineIRBuilder &MIRBuilder,
-                                SPIRVTypeRegistry *TR) {
-  auto Reg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-  // TODO: consider using correct address space
-  // p0 is canonical type for selection though
-  MIRBuilder.getMRI()->setType(Reg, LLT::pointer(0, TR->getPointerSize()));
-  SPIRVType *PtrTy =
-      TR->getOrCreateSPIRVPointerType(BaseType, MIRBuilder, Storage);
-  TR->assignSPIRVTypeToVReg(PtrTy, Reg, MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
-                 .addDef(Reg)
-                 .addUse(TR->getSPIRVTypeID(PtrTy))
-                 .addImm(Storage);
-  TR->constrainRegOperands(MIB);
-  return Reg;
-}
-
 static Register buildLoad(SPIRVType *BaseType, Register PtrVReg,
                           MachineIRBuilder &MIRBuilder, SPIRVTypeRegistry *TR,
                           LLT llt, Register dstReg = Register(0)) {
@@ -377,13 +310,20 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
                               SPIRVType *varType,
                               SPIRVTypeRegistry *TR, BuiltIn::BuiltIn builtIn,
                               LLT llt, Register Reg = Register(0)) {
+  Register NewReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+  MIRBuilder.getMRI()->setType(NewReg, LLT::pointer(0, TR->getPointerSize()));
+  SPIRVType *PtrTy =
+      TR->getOrCreateSPIRVPointerType(varType, MIRBuilder, StorageClass::Input);
+  TR->assignSPIRVTypeToVReg(PtrTy, NewReg, MIRBuilder);
+
   // Set up the global OpVariable with the necessary builtin decorations
-  Register var = buildOpVariable(varType, StorageClass::Input, MIRBuilder, TR);
-  decorateBuiltIn(var, builtIn, MIRBuilder, TR);
-  decorateConstant(var, MIRBuilder, TR);
+  Register Var = TR->buildGlobalVariable(NewReg, PtrTy,
+      getLinkStrForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
+      true, true, LinkageType::Import, MIRBuilder);
+  buildOpDecorate(Var, MIRBuilder, Decoration::BuiltIn, {builtIn});
 
   // Load the value from the global variable
-  Register loadedReg = buildLoad(varType, var, MIRBuilder, TR, llt, Reg);
+  Register loadedReg = buildLoad(varType, Var, MIRBuilder, TR, llt, Reg);
   MIRBuilder.getMRI()->setType(loadedReg, llt);
   return loadedReg;
 }
@@ -460,8 +400,12 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       TR->assignSPIRVTypeToVReg(PtrSizeTy, extr, MIRBuilder);
     }
 
-    // Use G_EXTRACT_VECTOR_ELT so dynamic vs static extraction is handled later
-    MIRBuilder.buildExtractVectorElement(extr, loadedVector, idxVReg);
+    // Use Intrinsic::spv_extractelt so dynamic vs static extraction is
+    // handled later: extr = spv_extractelt loadedVector, idxVReg
+    MachineInstrBuilder ExtractInst = MIRBuilder.buildIntrinsic(
+        Intrinsic::spv_extractelt, ArrayRef<Register>{extr}, true);
+    ExtractInst.addUse(loadedVector)
+               .addUse(idxVReg);
 
     // If the index is dynamic, need check if it's < 3, and then use a select
     if (!isConstantIndex) {
@@ -1105,15 +1049,11 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
     }
   }
 
-  namespace Dec = Decoration;
-  bool success = true;
   if (isSat)
-    success &= decorate(ret, Dec::SaturatedConversion, MIRBuilder, TR);
-  if (isRounded && success)
-    success &= decorate(ret, Dec::FPRoundingMode, roundingMode, MIRBuilder, TR);
-  if (!success)
-    return false;
-
+    buildOpDecorate(ret, MIRBuilder, Decoration::SaturatedConversion, {});
+  if (isRounded)
+    buildOpDecorate(ret, MIRBuilder, Decoration::FPRoundingMode,
+                               {roundingMode});
   if (isFromInt) {
     if (isToInt) { // I -> I
       auto op = dstSign ? OpUConvert : OpSConvert;

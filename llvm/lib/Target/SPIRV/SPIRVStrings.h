@@ -17,6 +17,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSTRINGS_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSTRINGS_H
 
+#include "SPIRVEnums.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -39,4 +40,8 @@ std::string getStringImm(const llvm::MachineInstr &MI, unsigned int startIndex);
 void buildOpName(llvm::Register target, const llvm::StringRef &name,
                  llvm::MachineIRBuilder &MIRBuilder);
 
+// Add an OpDecorate instruction for the given Reg.
+void buildOpDecorate(llvm::Register Reg, llvm::MachineIRBuilder &MIRBuilder,
+    Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
+    llvm::StringRef StrImm = "");
 #endif

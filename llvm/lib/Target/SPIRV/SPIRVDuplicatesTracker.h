@@ -99,11 +99,11 @@ public:
     return CT.find(C, MF, R);
   }
 
-  bool find(const GlobalValue *GV, MachineFunction *MF, Register R) {
+  bool find(const GlobalValue *GV, MachineFunction *MF, Register& R) {
     return GT.find(GV, MF, R);
   }
 
-  bool find(const Function *F, MachineFunction *MF, Register R) {
+  bool find(const Function *F, MachineFunction *MF, Register& R) {
     return FT.find(F, MF, R);
   }
 

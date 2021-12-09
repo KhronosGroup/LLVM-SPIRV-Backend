@@ -86,31 +86,25 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
       if (Arg.getType()->isPointerTy()) {
-        uint64_t DerefBytes = Arg.getDereferenceableBytes();
+        auto DerefBytes = static_cast<unsigned>(Arg.getDereferenceableBytes());
         if (DerefBytes != 0)
-          MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(VRegs[i][0])
-                   .addImm(Decoration::MaxByteOffset)
-                   .addImm(DerefBytes);
+          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::MaxByteOffset,
+                          {DerefBytes});
       }
       if (Arg.hasAttribute(Attribute::Alignment)) {
-        auto Alignment = Arg.getAttribute(Attribute::Alignment).getValueAsInt();
-        MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(VRegs[i][0])
-                   .addImm(Decoration::Alignment)
-                   .addImm(Alignment);
+        auto Alignment =
+            static_cast<unsigned>(Arg.getAttribute(Attribute::Alignment)
+                                     .getValueAsInt());
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Alignment,
+                        {Alignment});
       }
       if (Arg.hasAttribute(Attribute::ReadOnly)) {
-        MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(VRegs[i][0])
-                   .addImm(Decoration::FuncParamAttr)
-                   .addImm(FunctionParameterAttribute::NoWrite);
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
+                        {FunctionParameterAttribute::NoWrite});
       }
       if (Arg.hasAttribute(Attribute::ZExt)) {
-        MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(VRegs[i][0])
-                   .addImm(Decoration::FuncParamAttr)
-                   .addImm(FunctionParameterAttribute::Zext);
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
+                        {FunctionParameterAttribute::Zext});
       }
       ++i;
     }
@@ -194,12 +188,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     addStringImm(F.getName(), MIB);
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                   .addUse(funcVReg)
-                   .addImm(Decoration::LinkageAttributes);
-    addStringImm(F.getGlobalIdentifier(), MIB);
-    auto lnk = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
-    MIB.addImm(lnk);
+    auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
+    buildOpDecorate(funcVReg, MIRBuilder, Decoration::LinkageAttributes,
+                    {LnkTy}, F.getGlobalIdentifier());
   }
 
   return true;

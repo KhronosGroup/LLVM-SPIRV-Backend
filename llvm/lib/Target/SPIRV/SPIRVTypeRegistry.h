@@ -241,6 +241,10 @@ public:
   Register buildConstantSampler(Register res, unsigned int addrMode,
       unsigned int param, unsigned int filerMode,
       MachineIRBuilder &MIRBuilder, SPIRVType *spvType);
+  Register buildGlobalVariable(Register Reg, SPIRVType *BaseType,
+      StringRef Name, const GlobalValue *GV, StorageClass::StorageClass Storage,
+      const MachineInstr *Init, bool IsConst,  bool HasLinkageTy,
+      LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder);
 
   // convenient helpers for getting types
   // w/ check for duplicates

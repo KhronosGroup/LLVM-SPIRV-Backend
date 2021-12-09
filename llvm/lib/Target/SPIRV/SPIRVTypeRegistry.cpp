@@ -387,6 +387,79 @@ SPIRVTypeRegistry::buildConstantSampler(Register resReg, unsigned int addrMode,
   return res->getOperand(0).getReg();
 }
 
+Register
+SPIRVTypeRegistry::buildGlobalVariable(Register ResVReg, SPIRVType *BaseType,
+    StringRef Name, const GlobalValue *GV, StorageClass::StorageClass Storage,
+    const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
+    LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder) {
+  const GlobalVariable *GVar = nullptr;
+  if (GV)
+    GVar = dyn_cast<const GlobalVariable>(GV);
+  else {
+    // If GV is not passed explicitly, use the name to find or construct
+    // the global variable.
+    auto *Module = MIRBuilder.getMBB().getBasicBlock()->getModule();
+    GVar = Module->getGlobalVariable(Name);
+    if (GVar == nullptr) {
+      auto Ty = getTypeForSPIRVType(BaseType);//TODO check type
+      GVar = new GlobalVariable(*const_cast<llvm::Module*>(Module),
+           const_cast<Type *>(Ty), false, GlobalValue::ExternalLinkage,
+           nullptr, Twine(Name));
+    }
+    GV = GVar;
+  }
+  assert(GV && "Global variable is expected");
+  Register Reg;
+  if (DT.find(GV, &MIRBuilder.getMF(), Reg)) {
+    if (Reg != ResVReg)
+      MIRBuilder.buildCopy(ResVReg, Reg);
+    return ResVReg;
+  }
+
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpVariable)
+                 .addDef(ResVReg)
+                 .addUse(getSPIRVTypeID(BaseType))
+                 .addImm(Storage);
+
+  if (Init != 0) {
+    MIB.addUse(Init->getOperand(0).getReg());
+  }
+
+  // ISel may introduce a new register on this step, so we need to add it to
+  // DT and correct its type avoiding fails on the next stage.
+  constrainRegOperands(MIB, CurMF);
+  Reg = MIB->getOperand(0).getReg();
+  DT.add(GV, &MIRBuilder.getMF(), Reg);
+
+  // Set to Reg the same type as ResVReg has.
+  auto MRI = MIRBuilder.getMRI();
+  assert(MRI->getType(ResVReg).isPointer() && "Pointer type is expected");
+  if (Reg != ResVReg) {
+    LLT RegLLTy = LLT::pointer(MRI->getType(ResVReg).getAddressSpace(), 32);
+    MRI->setType(Reg, RegLLTy);
+    assignSPIRVTypeToVReg(BaseType, Reg, MIRBuilder);
+  }
+
+  // If it's a global variable with name, output OpName for it.
+  if (GVar && GVar->hasName())
+    buildOpName(Reg, GVar->getName(), MIRBuilder);
+
+  // Output decorations for the GV.
+  // TODO: maybe move to GenerateDecorations pass.
+  if (IsConst)
+    buildOpDecorate(Reg, MIRBuilder, Decoration::Constant, {});
+
+  if (GVar && GVar->getAlign().valueOrOne().value() != 1) {
+    unsigned Alignment = (unsigned) GVar->getAlign().valueOrOne().value();
+    buildOpDecorate(Reg, MIRBuilder, Decoration::Alignment, {Alignment});
+  }
+
+  if (HasLinkageTy)
+    buildOpDecorate(Reg, MIRBuilder, Decoration::LinkageAttributes,
+                    {LinkageType}, Name);
+  return Reg;
+}
+
 SPIRVType *SPIRVTypeRegistry::getOpTypeArray(uint32_t numElems,
                                              SPIRVType *elemType,
                                              MachineIRBuilder &MIRBuilder,
