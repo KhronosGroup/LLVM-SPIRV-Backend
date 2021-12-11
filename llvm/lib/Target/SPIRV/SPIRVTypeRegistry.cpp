@@ -457,6 +457,11 @@ SPIRVTypeRegistry::buildGlobalVariable(Register ResVReg, SPIRVType *BaseType,
   if (HasLinkageTy)
     buildOpDecorate(Reg, MIRBuilder, Decoration::LinkageAttributes,
                     {LinkageType}, Name);
+
+  BuiltIn::BuiltIn BuiltInId;
+  if (getSpirvBuilInIdByName(Name, BuiltInId))
+    buildOpDecorate(Reg, MIRBuilder, Decoration::BuiltIn, {BuiltInId});
+
   return Reg;
 }
 

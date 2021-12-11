@@ -26,5 +26,6 @@ bool generateOpenCLBuiltinCall(const StringRef demangledName,
                                const Type *OrigRetTy,
                                const SmallVectorImpl<Register> &args,
                                SPIRVTypeRegistry *TR);
+bool getSpirvBuilInIdByName(StringRef Name, BuiltIn::BuiltIn &BI);
 } // end namespace llvm
 #endif

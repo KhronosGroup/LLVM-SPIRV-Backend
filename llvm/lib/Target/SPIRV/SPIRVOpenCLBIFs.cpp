@@ -147,7 +147,15 @@ static StringMap<BuiltIn::BuiltIn> OpenCLBIToBuiltInVarMap({
   _SPIRV_OP(get_sub_group_gt_mask, SubgroupGtMask)
   _SPIRV_OP(get_sub_group_le_mask, SubgroupLeMask)
   _SPIRV_OP(get_sub_group_lt_mask, SubgroupLtMask)
+  _SPIRV_OP(__spirv_BuiltInGlobalLinearId, GlobalLinearId)
+  _SPIRV_OP(__spirv_BuiltInGlobalInvocationId, GlobalInvocationId)
 #undef _SPIRV_OP
+});
+
+static StringMap<BuiltIn::BuiltIn> SpirvBuiltInNameToBuiltInVarMap({
+#define MAKE_BUILTIN_NAME_MAP(Enum, Var, Val, Caps, Exts, MinVer, MaxVer) \
+  {"__spirv_BuiltIn" #Var, BuiltIn::Var},
+  DEF_BuiltIn(BuiltIn, MAKE_BUILTIN_NAME_MAP)
 });
 
 static StringMap<GroupOperation::GroupOperation> GroupOperationMap({
@@ -171,6 +179,14 @@ static StringMap<GroupOperation::GroupOperation> GroupOperationMap({
 
 static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
     const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR);
+
+bool llvm::getSpirvBuilInIdByName(StringRef Name, BuiltIn::BuiltIn &BI) {
+  if (SpirvBuiltInNameToBuiltInVarMap.count(Name)) {
+    BI = SpirvBuiltInNameToBuiltInVarMap.lookup(Name);
+    return true;
+  }
+  return false;
+}
 
 static SamplerAddressingMode::SamplerAddressingMode
 getSamplerAddressingModeFromBitmask(unsigned int bitmask) {
@@ -320,7 +336,6 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
   Register Var = TR->buildGlobalVariable(NewReg, PtrTy,
       getLinkStrForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
       true, true, LinkageType::Import, MIRBuilder);
-  buildOpDecorate(Var, MIRBuilder, Decoration::BuiltIn, {builtIn});
 
   // Load the value from the global variable
   Register loadedReg = buildLoad(varType, Var, MIRBuilder, TR, llt, Reg);
@@ -1448,7 +1463,8 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   case BuiltIn::SubgroupGeMask:
   case BuiltIn::SubgroupGtMask:
   case BuiltIn::SubgroupLeMask:
-  case BuiltIn::SubgroupLtMask: {
+  case BuiltIn::SubgroupLtMask:
+  case BuiltIn::GlobalLinearId: {
     unsigned BitWidth = TR->getScalarOrVectorBitWidth(retTy);
     LLT llt;
     if (retTy->getOpcode() == SPIRV::OpTypeVector)
@@ -1456,6 +1472,10 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     else
       llt = LLT::scalar(BitWidth);
     return buildBuiltInLoad(MIRBuilder, retTy, TR, builtInVar, llt, OrigRet);
+  }
+  case BuiltIn::GlobalInvocationId: {
+    return genWorkgroupQuery(MIRBuilder, OrigRet, retTy, args, TR,
+                             builtInVar, 0);
   }
   default:
     break;
@@ -1506,7 +1526,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
                                BuiltIn::EnqueuedWorkgroupSize, 1);
     else if (nameNoArgs.startswith("get_num_groups"))
       return genWorkgroupQuery(MIRBuilder, OrigRet, retTy, args, TR,
-                               BuiltIn::NumWorkGroups, 1);
+                               BuiltIn::NumWorkgroups, 1);
     else if (nameNoArgs.startswith("get_work_dim"))
       // TODO
       llvm_unreachable("not implemented");
