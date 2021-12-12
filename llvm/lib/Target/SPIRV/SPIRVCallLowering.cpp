@@ -52,10 +52,10 @@ static uint32_t getFunctionControl(const Function &F) {
     funcControl |= FunctionControl::Inline;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadNone)) {
-    funcControl |= FunctionControl::Const;
+    funcControl |= FunctionControl::Pure;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadOnly)) {
-    funcControl |= FunctionControl::Pure;
+    funcControl |= FunctionControl::Const;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::NoInline)) {
     funcControl |= FunctionControl::DontInline;

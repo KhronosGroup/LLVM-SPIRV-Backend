@@ -252,7 +252,7 @@ static void addConstantsToTrack(MachineFunction &MF,
                                 SPIRVGeneralDuplicatesTracker *DT) {
   auto &MRI = MF.getRegInfo();
   DenseMap<MachineInstr *, Register> RegsAlreadyAddedToDT;
-  std::vector<MachineInstr *> ToErase;
+  std::vector<MachineInstr *> ToErase, ToEraseComposites;
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
       if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
@@ -279,8 +279,18 @@ static void addConstantsToTrack(MachineFunction &MF,
                         BuildVec->getOperand(1 + i).getReg());
             }
             DT->add(Const, &MF, MI.getOperand(2).getReg());
-          } else
+          } else {
             RegsAlreadyAddedToDT[&MI] = Reg;
+            // This MI is unused and will be removed. If the MI uses
+            // const_composite, it will be unused and should be removed too.
+            assert (MI.getOperand(2).isReg() && "Reg operand is expected");
+            MachineInstr *SrcMI = MRI.getVRegDef(MI.getOperand(2).getReg());
+            if (SrcMI && SrcMI->getOpcode() ==
+                TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+                SrcMI->getIntrinsicID() == Intrinsic::spv_const_composite)
+              ToEraseComposites.push_back(SrcMI);
+
+          }
         }
       }
     }
@@ -292,6 +302,8 @@ static void addConstantsToTrack(MachineFunction &MF,
     MRI.replaceRegWith(MI->getOperand(0).getReg(), Reg);
     MI->eraseFromParent();
   }
+  for (auto *MI : ToEraseComposites)
+    MI->eraseFromParent();
 }
 
 static std::map<Intrinsic::ID, unsigned> IntrsWConstsToFold = {

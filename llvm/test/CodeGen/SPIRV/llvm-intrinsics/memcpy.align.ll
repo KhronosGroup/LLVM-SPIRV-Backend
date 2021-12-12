@@ -47,7 +47,7 @@ entry:
   %b1 = getelementptr inbounds %struct.A, %struct.A* %agg.result, i32 0, i32 1
   %2 = bitcast %struct.B* %b1 to i8*
   %3 = bitcast %struct.B* %b to i8*
-; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} {{.*}} Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} {{.*}} 4
   call void @llvm.memcpy.p0i8.p0i8.i32(i8* align 8 %2, i8* align 4 %3, i32 8, i1 false), !tbaa.struct !4
   %4 = bitcast %struct.B* %b to i8*
   call void @llvm.lifetime.end.p0i8(i64 8, i8* %4) #2
@@ -78,7 +78,7 @@ entry:
   %b = getelementptr inbounds %struct.A, %struct.A* %a, i32 0, i32 1
   %2 = bitcast %struct.B* %agg.result to i8*
   %3 = bitcast %struct.B* %b to i8*
-; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} {{.*}} Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} {{.*}} 4
   call void @llvm.memcpy.p0i8.p0i8.i32(i8* align 4 %2, i8* align 8 %3, i32 8, i1 false), !tbaa.struct !4
   %4 = bitcast %struct.A* %a to i8*
   call void @llvm.lifetime.end.p0i8(i64 16, i8* %4) #2

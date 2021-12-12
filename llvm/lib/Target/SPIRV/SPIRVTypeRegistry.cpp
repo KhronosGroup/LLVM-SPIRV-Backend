@@ -87,12 +87,19 @@ SPIRVType *SPIRVTypeRegistry::propagateSPIRVType(MachineInstr* MI,
     SpirvTy = getSPIRVTypeForVReg(Reg);
     if (!SpirvTy) {
       switch(MI->getOpcode()) {
+      case TargetOpcode::G_CONSTANT: {
+        MIB.setInsertPt(*MI->getParent(), MI);
+        Type *Ty = MI->getOperand(1).getCImm()->getType();
+        SpirvTy = getOrCreateSPIRVType(Ty, MIB);
+        break;
+      }
       case TargetOpcode::G_GLOBAL_VALUE: {
         MIB.setInsertPt(*MI->getParent(), MI);
         Type *Ty = MI->getOperand(1).getGlobal()->getType();
         SpirvTy = getOrCreateSPIRVType(Ty, MIB);
         break;
       }
+      case TargetOpcode::G_TRUNC:
       case TargetOpcode::G_ADDRSPACE_CAST:
       case TargetOpcode::COPY: {
         auto Op = MI->getOperand(1);
@@ -205,7 +212,8 @@ void SPIRVTypeRegistry::generateAssignInstrs(MachineFunction &MF) {
               false);
         }
         insertAssignInstr(Reg, Ty, nullptr, MIB, MRI);
-      } else if (MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
+      } else if (MI.getOpcode() == TargetOpcode::G_TRUNC ||
+                 MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
                  MI.getOpcode() == TargetOpcode::COPY ||
                  MI.getOpcode() == TargetOpcode::G_ADDRSPACE_CAST) {
         propagateSPIRVType(&MI, MRI, MIB);
