@@ -135,6 +135,10 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
       {G_BUILD_VECTOR, G_SHUFFLE_VECTOR})
       .alwaysLegal();
 
+  getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE})
+      .legalIf(all(typeInSet(0, allWritablePtrs),
+                   typeInSet(1, allPtrs)));
+
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 

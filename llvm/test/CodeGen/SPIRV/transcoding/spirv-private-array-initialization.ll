@@ -20,13 +20,11 @@
 ;
 ; CHECK-SPIRV: %[[arr_i8_ptr:[0-9]+]] = OpBitcast %[[i8_ptr]] %[[arr]]
 ; CHECK-SPIRV: %[[test_arr_const_i8_ptr:[0-9]+]] = OpBitcast %[[const_i8_ptr]] %[[test_arr]]
-; FIXME: check syntax of OpCopyMemorySized
-; CHECK-SPIRV: OpCopyMemorySized %[[arr_i8_ptr]] %[[test_arr_const_i8_ptr]] %[[twelve]] Aligned Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %[[arr_i8_ptr]] %[[test_arr_const_i8_ptr]] %[[twelve]] Aligned 4
 ;
 ; CHECK-SPIRV: %[[arr2_i8_ptr:[0-9]+]] = OpBitcast %[[i8_ptr]] %[[arr2]]
 ; CHECK-SPIRV: %[[test_arr2_const_i8_ptr:[0-9]+]] = OpBitcast %[[const_i8_ptr]] %[[test_arr2]]
-; FIXME: check syntax of OpCopyMemorySized
-; CHECK-SPIRV: OpCopyMemorySized %[[arr2_i8_ptr]] %[[test_arr2_const_i8_ptr]] %[[twelve]] Aligned Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %[[arr2_i8_ptr]] %[[test_arr2_const_i8_ptr]] %[[twelve]] Aligned 4
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"

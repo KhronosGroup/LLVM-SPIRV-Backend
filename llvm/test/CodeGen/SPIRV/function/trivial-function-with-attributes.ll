@@ -56,19 +56,19 @@ define void @fn4() inlinehint {
 define void @fn5() readnone {
   ret void
 }
-; CHECK: [[FN5]] = OpFunction [[VOID]] Const [[FN]]
+; CHECK: [[FN5]] = OpFunction [[VOID]] Pure [[FN]]
 ; CHECK: OpFunctionEnd
 
 
 define void @fn6() readonly {
   ret void
 }
-; CHECK: [[FN6]] = OpFunction [[VOID]] Pure [[FN]]
+; CHECK: [[FN6]] = OpFunction [[VOID]] Const [[FN]]
 ; CHECK: OpFunctionEnd
 
 
 define void @fn7() alwaysinline readnone {
   ret void
 }
-; CHECK: [[FN7]] = OpFunction [[VOID]] Inline|Const [[FN]]
+; CHECK: [[FN7]] = OpFunction [[VOID]] Inline|Pure [[FN]]
 ; CHECK: OpFunctionEnd

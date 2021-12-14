@@ -101,6 +101,9 @@ private:
 
   bool selectStore(const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
 
+  bool selectMemOperation(Register ResVReg, const MachineInstr &I,
+                          MachineIRBuilder &MIRBuilder) const;
+
   bool selectAtomicRMW(Register resVReg, const SPIRVType *resType,
                        const MachineInstr &I, MachineIRBuilder &MIRBuilder,
                        unsigned newOpcode) const;
@@ -323,6 +326,9 @@ bool SPIRVInstructionSelector::spvSelect(Register resVReg,
 
     return MIB.constrainAllUses(TII, TRI, RBI);
   }
+  case TargetOpcode::G_MEMMOVE:
+  case TargetOpcode::G_MEMCPY:
+    return selectMemOperation(resVReg, I, MIRBuilder);
 
   case TargetOpcode::G_ICMP:
     return selectICmp(resVReg, resType, I, MIRBuilder);
@@ -697,6 +703,23 @@ bool SPIRVInstructionSelector::selectStore(const MachineInstr &I,
     addMemoryOperands(MemOp, MIB);
   }
   return MIB.constrainAllUses(TII, TRI, RBI);
+}
+
+bool SPIRVInstructionSelector::selectMemOperation(Register ResVReg,
+    const MachineInstr &I, MachineIRBuilder &MIRBuilder) const {
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpCopyMemorySized)
+                 .addDef(I.getOperand(0).getReg())
+                 .addUse(I.getOperand(1).getReg())
+                 .addUse(I.getOperand(2).getReg());
+  if (I.getNumMemOperands()) {
+    auto MemOp = *I.memoperands_begin();
+    addMemoryOperands(MemOp, MIB);
+  }
+  bool Result = MIB.constrainAllUses(TII, TRI, RBI);
+  if (ResVReg != MIB->getOperand(0).getReg()) {
+    MIRBuilder.buildCopy(ResVReg, MIB->getOperand(0).getReg());
+  }
+  return Result;
 }
 
 bool SPIRVInstructionSelector::selectAtomicRMW(Register resVReg,
