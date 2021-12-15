@@ -11,11 +11,16 @@
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64"
 target triple = "spirv64-unknown-unknown"
 
+@ga = addrspace(1) global float undef, align 4
+@gb = addrspace(1) global double undef, align 4
+
 ; Function Attrs: nounwind
 define spir_func void @foo(float %a, float %b, float %c, double %x, double %y, double %z) #0 {
 entry:
   %0 = call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+  store float %0, float addrspace(1)* @ga, align 4
   %1 = call double @llvm.fmuladd.f64(double %x, double %y, double %z)
+  store double %1, double addrspace(1)* @gb, align 8
 ret void
 }
 

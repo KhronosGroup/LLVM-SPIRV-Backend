@@ -171,9 +171,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 
   getActionDefinitionsBuilder({G_SITOFP, G_UITOFP})
       .legalForCartesianProduct(allFloatScalarsAndVectors,
-                                allIntScalarsAndVectors);
+                                allScalarsAndVectors);
 
-  getActionDefinitionsBuilder({G_SMIN, G_SMAX, G_UMIN, G_UMAX})
+  getActionDefinitionsBuilder({G_SMIN, G_SMAX, G_UMIN, G_UMAX, G_ABS})
       .legalFor(allIntScalarsAndVectors);
 
   getActionDefinitionsBuilder(G_CTPOP).legalForCartesianProduct(
@@ -283,8 +283,17 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder({G_FPOW, G_FEXP, G_FEXP2, G_FLOG, G_FLOG2, G_FABS,
                                G_FMINNUM, G_FMAXNUM, G_FCEIL, G_FCOS, G_FSIN,
                                G_FSQRT, G_FFLOOR, G_FRINT, G_FNEARBYINT,
-                               G_INTRINSIC_ROUND, G_INTRINSIC_TRUNC})
+                               G_INTRINSIC_ROUND, G_INTRINSIC_TRUNC,
+                               G_FMINIMUM, G_FMAXIMUM, G_INTRINSIC_ROUNDEVEN})
       .legalFor(allFloatScalarsAndVectors);
+
+  getActionDefinitionsBuilder(G_FCOPYSIGN)
+      .legalForCartesianProduct(allFloatScalarsAndVectors,
+                                allFloatScalarsAndVectors);
+
+  getActionDefinitionsBuilder(G_FPOWI)
+      .legalForCartesianProduct(allFloatScalarsAndVectors,
+                                allIntScalarsAndVectors);
 
   if (ST.canUseExtInstSet(ExtInstSet::OpenCL_std)) {
     getActionDefinitionsBuilder(G_FLOG10).legalFor(allFloatScalarsAndVectors);

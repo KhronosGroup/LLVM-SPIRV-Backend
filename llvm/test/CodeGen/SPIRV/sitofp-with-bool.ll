@@ -1,9 +1,9 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
 
 ; CHECK: %[[int_32:[0-9]+]] = OpTypeInt 32 0
-; CHECK: %[[zero:[0-9]+]] = OpConstant %{{[0-9]+}} 0
-; CHECK: %[[one:[0-9]+]] = OpConstant %{{[0-9]+}} 1
 ; CHECK: %[[bool:[0-9]+]] = OpTypeBool
+; CHECK: %[[zero:[0-9]+]] = OpConstant %[[int_32]] 0
+; CHECK: %[[one:[0-9]+]] = OpConstant %[[int_32]] 1
 
 ; CHECK: OpFunction
 ; CHECK: %[[A:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}

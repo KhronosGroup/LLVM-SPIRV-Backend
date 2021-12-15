@@ -7,11 +7,17 @@
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64"
 target triple = "spirv64-unknown-linux"
 
+@ga = addrspace(1) global i32 undef, align 4
+@gb = addrspace(1) global <4 x i32> undef, align 4
+
 ; Function Attrs: norecurse nounwind readnone
 define dso_local spir_kernel void @test(i32 %a, <4 x i32> %b) local_unnamed_addr #0 !kernel_arg_buffer_location !5 {
 entry:
   %0 = tail call i32 @llvm.abs.i32(i32 %a, i1 0) #2
+  store i32 %0, i32 addrspace(1)* @ga, align 4
   %1 = tail call <4 x i32> @llvm.abs.v4i32(<4 x i32> %b, i1 0) #2
+  store <4 x i32> %1, <4 x i32> addrspace(1)* @gb, align 4
+
   ret void
 }
 
