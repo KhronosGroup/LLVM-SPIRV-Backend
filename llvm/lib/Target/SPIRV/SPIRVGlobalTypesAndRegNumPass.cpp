@@ -556,6 +556,8 @@ static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
       // Add dummy regs to stop addUse crashing if Reg > max regs in func so far
       addDummyVRegsUpToIndex(op.getReg().virtRegIndex(), MetaMRI);
       MIB.addUse(op.getReg());
+    } else if (op.isFPImm()) {
+      MIB.addFPImm(op.getFPImm());
     } else {
       errs() << MI << "\n";
       llvm_unreachable("Unexpected operand type when copying spirv meta instr");
@@ -577,6 +579,10 @@ extractInstructionsWithGlobalRegsToMetablockForMBB(MachineBasicBlock &MBB,
       toRemove.push_back(&MI);
     } else if (TII->isDecorationInstr(MI)) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_Annotations);
+      toRemove.push_back(&MI);
+    } else if (TII->isConstantInstr(MI)) {
+      // Now OpSpecConstant*s are not in DT, but they need to be hoisted anyway.
+      hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_TypeConstVars);
       toRemove.push_back(&MI);
     }
   }

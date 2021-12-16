@@ -2,7 +2,6 @@
 
 ; CHECK-SPIRV-NOT: OpCapability Matrix
 ; CHECK-SPIRV-NOT: OpCapability Shader
-; CHECK-SPIRV: OpCapability Kernel
 
 ; CHECK-SPIRV-DAG: OpDecorate %[[SC0:[0-9]+]] SpecId 0
 ; CHECK-SPIRV-DAG: OpDecorate %[[SC1:[0-9]+]] SpecId 1

@@ -68,7 +68,7 @@ enum CLMemFenceFlags {
 };
 
 static StringMap<unsigned> OpenCLBIToOperationMap({
-#define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
+#define _SPIRV_OP(x, y) {#x, SPIRV::Op##y}, {"__spirv_"#y, SPIRV::Op##y},
   _SPIRV_OP(isequal, FOrdEqual)
   _SPIRV_OP(isnotequal, FUnordNotEqual)
   _SPIRV_OP(isgreater, FOrdGreaterThan)
@@ -85,6 +85,10 @@ static StringMap<unsigned> OpenCLBIToOperationMap({
   _SPIRV_OP(signbit, SignBitSet)
   _SPIRV_OP(any, Any)
   _SPIRV_OP(all, All)
+#undef _SPIRV_OP
+#define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
+  _SPIRV_OP(__spirv_Select, SelectSISCond)
+  _SPIRV_OP(__spirv_SpecConstant, SpecConstant)
   // CL 2.0 workgroup builtins
   _SPIRV_OP(group_all, GroupAll)
   _SPIRV_OP(group_any, GroupAny)
@@ -1168,8 +1172,11 @@ static bool buildScalarOrVectorSelect(MachineIRBuilder &MIRBuilder,
 static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
     unsigned opcode, Register resVReg, const SPIRVType *resType,
     const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
-  SPIRVType *relTy;
-  auto cmpReg = buildScalarOrVectorBoolReg(MIRBuilder, relTy, resType, TR);
+  bool IsBoolReturn = resType->getOpcode() == SPIRV::OpTypeBool;
+  SPIRVType *relTy = resType;
+  Register cmpReg = resVReg;
+  if (!IsBoolReturn)
+    cmpReg = buildScalarOrVectorBoolReg(MIRBuilder, relTy, resType, TR);
   // Build relational instruction
   auto MIB = MIRBuilder.buildInstr(opcode)
                  .addDef(cmpReg)
@@ -1177,9 +1184,45 @@ static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
   for (auto arg : OrigArgs) {
      MIB.addUse(arg);
   }
-  TR->constrainRegOperands(MIB);
-  // Build select instruction
-  return buildScalarOrVectorSelect(MIRBuilder, resVReg, cmpReg, resType, TR);
+  bool Result = TR->constrainRegOperands(MIB);
+  if (!IsBoolReturn)
+    // Build select instruction to convert bool result to the required type.
+    return buildScalarOrVectorSelect(MIRBuilder, resVReg, cmpReg, resType, TR);
+  return Result;
+}
+
+static bool buildSpecConstant(MachineIRBuilder &MIRBuilder, unsigned Opcode,
+    Register ResVReg, const SPIRVType *ResType,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVTypeRegistry *TR) {
+  assert(OrigArgs.size() == 2 && "SpecConstant intrinsic expects two args");
+  // Output SpecId decoration.
+  const auto MRI = MIRBuilder.getMRI();
+  auto SpecId = static_cast<unsigned>(getIConstVal(OrigArgs[0], MRI));
+  buildOpDecorate(ResVReg, MIRBuilder, Decoration::SpecId, {SpecId});
+  // Determine the constant MI.
+  Register ConstReg = OrigArgs[1];
+  const auto Const = getDefInstrMaybeConstant(ConstReg, MRI);
+  assert(Const && (Const->getOpcode() == TargetOpcode::G_CONSTANT ||
+                   Const->getOpcode() == TargetOpcode::G_FCONSTANT) &&
+         "Argument should be either int or fp constant");
+  // Determine opcode and output OpSpec MI.
+  bool IsBool = ResType->getOpcode() == SPIRV::OpTypeBool;
+  auto &ConstOp = Const->getOperand(1);
+  if (IsBool) {
+    assert(ConstOp.isCImm() && "Int constant operand is expected");
+    Opcode = ConstOp.getCImm()->getValue().getZExtValue() ?
+             SPIRV::OpSpecConstantTrue : SPIRV::OpSpecConstantFalse;
+  }
+  auto MIB = MIRBuilder.buildInstr(Opcode)
+                 .addDef(ResVReg)
+                 .addUse(TR->getSPIRVTypeID(ResType));
+  if (!IsBool) {
+    if (Const->getOpcode() == TargetOpcode::G_CONSTANT)
+      addNumImm(ConstOp.getCImm()->getValue(), MIB);
+    else
+      addNumImm(ConstOp.getFPImm()->getValueAPF().bitcastToAPInt(), MIB);
+  }
+  return TR->constrainRegOperands(MIB);
 }
 
 static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
@@ -1408,6 +1451,10 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   case OpAny:
   case OpAll:
     return genOpenCLRelational(MIRBuilder, opcode, OrigRet, retTy, args, TR);
+  case OpSelectSISCond:
+    return MIRBuilder.buildSelect(OrigRet, args[0], args[1], args[2]);
+  case OpSpecConstant:
+    return buildSpecConstant(MIRBuilder, opcode, OrigRet, retTy, args, TR);
   case OpGroupAll:
   case OpGroupAny:
   case OpGroupBroadcast:

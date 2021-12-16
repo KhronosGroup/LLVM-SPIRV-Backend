@@ -67,6 +67,31 @@ std::string getStringImm(const MachineInstr &MI, unsigned int startIndex) {
   return getSPIRVStringOperand(MI, startIndex);
 }
 
+void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB, bool IsFloat) {
+  const auto Bitwidth = Imm.getBitWidth();
+  switch (Bitwidth) {
+  case 1:
+    break; // Already handled
+  case 8:
+  case 16:
+  case 32:
+    MIB.addImm(Imm.getZExtValue());
+    break;
+  case 64: {
+    if (!IsFloat) {
+      uint64_t FullImm = Imm.getZExtValue();
+      uint32_t LowBits = FullImm & 0xffffffff;
+      uint32_t HighBits = (FullImm >> 32) & 0xffffffff;
+      MIB.addImm(LowBits).addImm(HighBits);
+    } else
+      MIB.addImm(Imm.getZExtValue());
+    break;
+  }
+  default:
+    report_fatal_error("Unsupported constant bitwidth");
+  }
+}
+
 // Add an OpName instruction for the given target register
 void buildOpName(Register target, const StringRef &name,
                  MachineIRBuilder &MIRBuilder) {

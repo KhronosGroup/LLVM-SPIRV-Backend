@@ -243,8 +243,8 @@ def OpConstantNull: Op<46, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstan
                       [(set ID:$dst, (assigntype ConstPseudoNull, TYPE:$src_ty))]>;
 //def OpConstantNull: Op<46, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantNull $ty">;
 
-def OpSpecConstantTrue: Op<48, (outs ID:$r), (ins TYPE:$t), "$r= OpSpecConstantTrue $t">;
-def OpSpecConstantFalse: Op<49, (outs ID:$r), (ins TYPE:$t), "$r= OpSpecConstantFalse $t">;
+def OpSpecConstantTrue: Op<48, (outs ID:$r), (ins TYPE:$t), "$r = OpSpecConstantTrue $t">;
+def OpSpecConstantFalse: Op<49, (outs ID:$r), (ins TYPE:$t), "$r = OpSpecConstantFalse $t">;
 def OpSpecConstant: Op<50, (outs ID:$res), (ins TYPE:$type, i32imm:$imm, variable_ops),
                   "$res = OpSpecConstant $type $imm">;
 def OpSpecConstantComposite: Op<51, (outs ID:$res), (ins TYPE:$type, variable_ops),
