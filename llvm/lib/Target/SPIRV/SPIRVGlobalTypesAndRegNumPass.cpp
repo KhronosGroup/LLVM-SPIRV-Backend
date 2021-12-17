@@ -578,6 +578,10 @@ extractInstructionsWithGlobalRegsToMetablockForMBB(MachineBasicBlock &MBB,
     } else if (TII->isDecorationInstr(MI)) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_Annotations);
       toRemove.push_back(&MI);
+    } else if (TII->isConstantInstr(MI)) {
+      // Now OpSpecConstant*s are not in DT, but they need to be hoisted anyway.
+      hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_TypeConstVars);
+      toRemove.push_back(&MI);
     }
   }
   for (MachineInstr *MI : toRemove) {

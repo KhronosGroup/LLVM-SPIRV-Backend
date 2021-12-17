@@ -36,6 +36,10 @@ void addStringImm(const llvm::StringRef &str, llvm::IRBuilder<> &B,
 // the reverse of the logic in addStringImm
 std::string getStringImm(const llvm::MachineInstr &MI, unsigned int startIndex);
 
+// Add the given numerical immediate to MIB.
+void addNumImm(const llvm::APInt &Imm, llvm::MachineInstrBuilder &MIB,
+               bool IsFloat = false);
+
 // Add an OpName instruction for the given target register
 void buildOpName(llvm::Register target, const llvm::StringRef &name,
                  llvm::MachineIRBuilder &MIRBuilder);

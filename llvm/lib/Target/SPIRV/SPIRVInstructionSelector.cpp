@@ -1136,45 +1136,20 @@ bool SPIRVInstructionSelector::selectICmp(Register resVReg,
   return selectCmp(resVReg, resType, typeOpc, cmpOpc, I, MIRBuilder, ptrToUInt);
 }
 
-static void transformConst(const APInt &imm, MachineInstrBuilder &MIB, bool IsFloat = false) {
-  const auto bitwidth = imm.getBitWidth();
-  switch (bitwidth) {
-  case 1:
-    break; // Already handled
-  case 8:
-  case 16:
-  case 32:
-    MIB.addImm(imm.getZExtValue());
-    break;
-  case 64: {
-    if (!IsFloat) {
-      uint64_t fullImm = imm.getZExtValue();
-      uint32_t lowBits = fullImm & 0xffffffff;
-      uint32_t highBits = (fullImm >> 32) & 0xffffffff;
-      MIB.addImm(lowBits).addImm(highBits);
-    } else
-      MIB.addImm(imm.getZExtValue());
-    break;
-  }
-  default:
-    report_fatal_error("Unsupported constant bitwidth");
-  }
-}
-
 void SPIRVInstructionSelector::renderFImm32(MachineInstrBuilder &MIB,
                                                    const MachineInstr &I,
                                                    int OpIdx) const {
   assert(I.getOpcode() == TargetOpcode::G_FCONSTANT && OpIdx == -1 &&
          "Expected G_FCONSTANT");
   const ConstantFP *FPImm = I.getOperand(1).getFPImm();
-  transformConst(FPImm->getValueAPF().bitcastToAPInt(), MIB, true);
+  addNumImm(FPImm->getValueAPF().bitcastToAPInt(), MIB, true);
 }
 
 void SPIRVInstructionSelector::renderImm32(
   MachineInstrBuilder &MIB, const MachineInstr &I, int OpIdx) const {
   assert(I.getOpcode() == TargetOpcode::G_CONSTANT && OpIdx == -1 &&
          "Expected G_CONSTANT");
-  transformConst(I.getOperand(1).getCImm()->getValue(), MIB);
+  addNumImm(I.getOperand(1).getCImm()->getValue(), MIB);
 }
 
 Register
@@ -1294,15 +1269,26 @@ bool SPIRVInstructionSelector::selectExt(Register resVReg,
 }
 
 bool SPIRVInstructionSelector::selectIntToBool(
-    Register intReg, Register resVReg, const SPIRVType *intTy,
-    const SPIRVType *boolTy, MachineIRBuilder &MIRBuilder) const {
-  // To truncate to a bool, we use OpINotEqual to zero
-  auto zero = buildZerosVal(intTy, MIRBuilder);
+    Register IntReg, Register ResVReg, const SPIRVType *IntTy,
+    const SPIRVType *BoolTy, MachineIRBuilder &MIRBuilder) const {
+  // To truncate to a bool, we use OpBitwiseAnd 1 and OpINotEqual to zero
+  auto MRI = MIRBuilder.getMRI();
+  Register BitIntReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  bool IsVectorTy = IntTy->getOpcode() == SPIRV::OpTypeVector;
+  auto Opcode = IsVectorTy ? SPIRV::OpBitwiseAndV : SPIRV::OpBitwiseAndS;
+  auto Zero = buildZerosVal(IntTy, MIRBuilder);
+  auto One = buildOnesVal(false, IntTy, MIRBuilder);
+  MIRBuilder.buildInstr(Opcode)
+      .addDef(BitIntReg)
+      .addUse(TR.getSPIRVTypeID(IntTy))
+      .addUse(IntReg)
+      .addUse(One)
+      .constrainAllUses(TII, TRI, RBI);
   return MIRBuilder.buildInstr(SPIRV::OpINotEqual)
-      .addDef(resVReg)
-      .addUse(TR.getSPIRVTypeID(boolTy))
-      .addUse(intReg)
-      .addUse(zero)
+      .addDef(ResVReg)
+      .addUse(TR.getSPIRVTypeID(BoolTy))
+      .addUse(BitIntReg)
+      .addUse(Zero)
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1336,7 +1322,7 @@ bool SPIRVInstructionSelector::selectConst(Register resVReg,
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI).addDef(resVReg).addUse(TR.getSPIRVTypeID(resType));
     // <=32-bit integers should be caught by the sdag pattern
     assert(imm.getBitWidth() > 32);
-    transformConst(imm, MIB);
+    addNumImm(imm, MIB);
     return MIB.constrainAllUses(TII, TRI, RBI);
   }
 }
