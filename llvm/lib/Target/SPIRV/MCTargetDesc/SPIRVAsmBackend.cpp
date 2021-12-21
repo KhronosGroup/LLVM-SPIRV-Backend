@@ -7,15 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
-#include "llvm/MC/MCContext.h"
-#include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/Support/EndianStream.h"
-#include <cassert>
-#include <cstdint>
 
 using namespace llvm;
 
@@ -31,7 +26,9 @@ public:
                   const MCSubtargetInfo *STI) const override {}
 
   std::unique_ptr<MCObjectTargetWriter>
-  createObjectTargetWriter() const override;
+  createObjectTargetWriter() const override {
+    return createSPIRVObjectTargetWriter();
+  }
 
   // No instruction requires relaxation
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
@@ -47,7 +44,8 @@ public:
     return false;
   }
 
-  void relaxInstruction(MCInst &Inst, const MCSubtargetInfo &STI) const override {}
+  void relaxInstruction(MCInst &Inst,
+                        const MCSubtargetInfo &STI) const override {}
 
 
   bool writeNopData(raw_ostream &OS, uint64_t Count) const override {
@@ -57,16 +55,9 @@ public:
 
 } // end anonymous namespace
 
-
-std::unique_ptr<MCObjectTargetWriter>
-SPIRVAsmBackend::createObjectTargetWriter() const {
-  return createSPIRVObjectTargetWriter();
-}
-
 MCAsmBackend *llvm::createSPIRVAsmBackend(const Target &T,
                                           const MCSubtargetInfo &STI,
                                           const MCRegisterInfo &MRI,
                                           const MCTargetOptions &) {
   return new SPIRVAsmBackend(support::little);
 }
-

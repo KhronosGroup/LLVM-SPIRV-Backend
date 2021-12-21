@@ -12,7 +12,6 @@
 
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
 #include "SPIRVRegisterInfo.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCInst.h"
@@ -22,24 +21,20 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/EndianStream.h"
-#include <cassert>
-#include <cstdint>
 
 using namespace llvm;
 
-#define DEBUG_TYPE "mccodeemitter"
+#define DEBUG_TYPE "spirv-mccodeemitter"
 
 namespace {
 
 class SPIRVMCCodeEmitter : public MCCodeEmitter {
   const MCInstrInfo &MCII;
   const MCRegisterInfo &MRI;
-  bool IsLittleEndian;
 
 public:
-  SPIRVMCCodeEmitter(const MCInstrInfo &mcii, const MCRegisterInfo &mri,
-                     bool IsLittleEndian)
-      : MCII(mcii), MRI(mri), IsLittleEndian(IsLittleEndian) {}
+  SPIRVMCCodeEmitter(const MCInstrInfo &mcii, const MCRegisterInfo &mri)
+      : MCII(mcii), MRI(mri) {}
   SPIRVMCCodeEmitter(const SPIRVMCCodeEmitter &) = delete;
   void operator=(const SPIRVMCCodeEmitter &) = delete;
   ~SPIRVMCCodeEmitter() override = default;
@@ -65,14 +60,14 @@ private:
 MCCodeEmitter *llvm::createSPIRVMCCodeEmitter(const MCInstrInfo &MCII,
                                               const MCRegisterInfo &MRI,
                                               MCContext &Ctx) {
-  return new SPIRVMCCodeEmitter(MCII, MRI, true);
+  return new SPIRVMCCodeEmitter(MCII, MRI);
 }
 
 using EndianWriter = support::endian::Writer;
 
 // Check if the instruction has a type argument for operand 1, and defines an ID
 // output register in operand 0. If so, we need to swap operands 0 and 1 so the
-// type comes first in the output, despide coming second in the MCInst
+// type comes first in the output, despide coming second in the MCInst.
 static bool hasType(const MCInst &MI, const MCInstrInfo &MII,
                     const MCRegisterInfo &MRI) {
   MCInstrDesc MCDesc = MII.get(MI.getOpcode());
@@ -120,11 +115,10 @@ static void emitUntypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
 void SPIRVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
                                            SmallVectorImpl<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
-
   auto features = computeAvailableFeatures(STI.getFeatureBits());
   verifyInstructionPredicates(MI, features);
 
-  EndianWriter OSE(OS, IsLittleEndian ? support::little : support::big);
+  EndianWriter OSE(OS, support::little);
 
   // Encode the first 32 SPIR-V bytes with the number of args and the opcode
   uint64_t OpCode = getBinaryCodeForInstr(MI, Fixups, STI);

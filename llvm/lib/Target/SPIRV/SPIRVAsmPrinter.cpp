@@ -61,6 +61,12 @@ public:
 
 void SPIRVAsmPrinter::emitFunctionHeader() {
   const Function &F = MF->getFunction();
+
+  if (isVerbose())
+    OutStreamer->GetCommentOS()
+        << "-- Begin function "
+        << GlobalValue::dropLLVMManglingEscape(F.getName()) << '\n';
+
   auto section = getObjFileLowering().SectionForGlobal(&F, TM);
   MF->setSection(section);
 }
