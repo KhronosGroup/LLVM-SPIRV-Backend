@@ -12,7 +12,7 @@
 
 #include "SPIRVMCAsmInfo.h"
 #include "SPIRVMCTargetDesc.h"
-#include "InstPrinter/SPIRVInstPrinter.h"
+#include "SPIRVInstPrinter.h"
 #include "SPIRVTargetStreamer.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/MC/MCInstrAnalysis.h"

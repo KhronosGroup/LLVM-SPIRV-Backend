@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "InstPrinter/SPIRVInstPrinter.h"
+#include "MCTargetDesc/SPIRVInstPrinter.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "SPIRV.h"
 #include "SPIRVInstrInfo.h"
