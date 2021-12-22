@@ -15,14 +15,13 @@ namespace llvm {
 
 class MCSection;
 
-class SPIRVTargetStreamer : public MCTargetStreamer{
+class SPIRVTargetStreamer : public MCTargetStreamer {
 public:
   SPIRVTargetStreamer(MCStreamer &S);
   ~SPIRVTargetStreamer() override;
 
   void changeSection(const MCSection *CurSection, MCSection *Section,
-                     const MCExpr *SubSection, raw_ostream &OS) override {};
-
+                     const MCExpr *SubSection, raw_ostream &OS) override{};
 };
 } // namespace llvm
 

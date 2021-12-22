@@ -10,8 +10,8 @@ add_llvm_component_library(LLVMSPIRVDesc
   ../SPIRVExtInsts.cpp
 
   LINK_COMPONENTS
-  MC 
-  SPIRVInfo 
+  MC
+  SPIRVInfo
   Support
 
   ADD_TO_COMPONENT
