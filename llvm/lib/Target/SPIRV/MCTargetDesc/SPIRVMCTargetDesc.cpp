@@ -10,18 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRV.h"
-
-#include "MCTargetDesc/SPIRVMCAsmInfo.h"
-#include "MCTargetDesc/SPIRVMCTargetDesc.h"
-#include "InstPrinter/SPIRVInstPrinter.h"
+#include "SPIRVMCAsmInfo.h"
+#include "SPIRVMCTargetDesc.h"
+#include "SPIRVInstPrinter.h"
 #include "SPIRVTargetStreamer.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/MC/MCInstrAnalysis.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
 
 #define GET_INSTRINFO_MC_DESC

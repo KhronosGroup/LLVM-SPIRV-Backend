@@ -13,5 +13,6 @@
 #include "SPIRVTargetStreamer.h"
 
 using namespace llvm;
+
 SPIRVTargetStreamer::SPIRVTargetStreamer(MCStreamer &S) : MCTargetStreamer(S) {}
 SPIRVTargetStreamer::~SPIRVTargetStreamer() = default;

@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "InstPrinter/SPIRVInstPrinter.h"
+#include "MCTargetDesc/SPIRVInstPrinter.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "SPIRV.h"
 #include "SPIRVInstrInfo.h"
@@ -61,6 +61,12 @@ public:
 
 void SPIRVAsmPrinter::emitFunctionHeader() {
   const Function &F = MF->getFunction();
+
+  if (isVerbose())
+    OutStreamer->GetCommentOS()
+        << "-- Begin function "
+        << GlobalValue::dropLLVMManglingEscape(F.getName()) << '\n';
+
   auto section = getObjFileLowering().SectionForGlobal(&F, TM);
   MF->setSection(section);
 }
