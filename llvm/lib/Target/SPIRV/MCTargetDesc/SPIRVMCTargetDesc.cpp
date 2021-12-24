@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVMCAsmInfo.h"
 #include "SPIRVMCTargetDesc.h"
 #include "SPIRVInstPrinter.h"
+#include "SPIRVMCAsmInfo.h"
 #include "SPIRVTargetStreamer.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/MC/MCInstrAnalysis.h"

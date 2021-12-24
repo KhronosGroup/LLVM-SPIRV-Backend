@@ -74,11 +74,11 @@ static bool hasType(const MCInst &MI, const MCInstrInfo &MII,
   // If we define an output, and have at least one other argument
   if (MCDesc.getNumDefs() == 1 && MCDesc.getNumOperands() >= 2) {
     // Check if we define an ID, and take a type as operand 1
-    auto defOpInfo = MCDesc.opInfo_begin();
-    auto firstArgOpInfo = MCDesc.opInfo_begin() + 1;
-    return (defOpInfo->RegClass == SPIRV::IDRegClassID ||
-            defOpInfo->RegClass == SPIRV::ANYIDRegClassID) &&
-           firstArgOpInfo->RegClass == SPIRV::TYPERegClassID;
+    auto DefOpInfo = MCDesc.opInfo_begin();
+    auto FirstArgOpInfo = MCDesc.opInfo_begin() + 1;
+    return (DefOpInfo->RegClass == SPIRV::IDRegClassID ||
+            DefOpInfo->RegClass == SPIRV::ANYIDRegClassID) &&
+           FirstArgOpInfo->RegClass == SPIRV::TYPERegClassID;
   }
   return false;
 }
@@ -97,10 +97,10 @@ static void emitOperand(const MCOperand &Op, EndianWriter &OSE) {
 // Emit the type in operand 1 before the ID in operand 0 it defines, and all
 // remaining operands in the order they come naturally
 static void emitTypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
-  unsigned int numOps = MI.getNumOperands();
+  unsigned int NumOps = MI.getNumOperands();
   emitOperand(MI.getOperand(1), OSE);
   emitOperand(MI.getOperand(0), OSE);
-  for (unsigned int i = 2; i < numOps; ++i) {
+  for (unsigned int i = 2; i < NumOps; ++i) {
     emitOperand(MI.getOperand(i), OSE);
   }
 }
@@ -115,16 +115,16 @@ static void emitUntypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
 void SPIRVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
                                            SmallVectorImpl<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
-  auto features = computeAvailableFeatures(STI.getFeatureBits());
-  verifyInstructionPredicates(MI, features);
+  auto Features = computeAvailableFeatures(STI.getFeatureBits());
+  verifyInstructionPredicates(MI, Features);
 
   EndianWriter OSE(OS, support::little);
 
   // Encode the first 32 SPIR-V bytes with the number of args and the opcode
   uint64_t OpCode = getBinaryCodeForInstr(MI, Fixups, STI);
-  uint32_t numWords = MI.getNumOperands() + 1;
-  uint32_t firstWord = ((numWords << 16) | OpCode);
-  OSE.write<uint32_t>(firstWord);
+  uint32_t NumWords = MI.getNumOperands() + 1;
+  uint32_t FirstWord = ((NumWords << 16) | OpCode);
+  OSE.write<uint32_t>(FirstWord);
 
   // Emit the instruction arguments (emitting the output type first if present)
   if (hasType(MI, MCII, MRI)) {

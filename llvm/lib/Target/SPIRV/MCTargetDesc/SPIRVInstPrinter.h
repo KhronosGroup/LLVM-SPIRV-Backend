@@ -20,14 +20,14 @@
 namespace llvm {
 class SPIRVInstPrinter : public MCInstPrinter {
 private:
-  SmallDenseMap<unsigned, ExtInstSet> extInstSetIDs;
+  SmallDenseMap<unsigned, ExtInstSet> ExtInstSetIDs;
   void recordOpExtInstImport(const MCInst *MI);
 
 public:
   using MCInstPrinter::MCInstPrinter;
 
   void printInst(const MCInst *MI, uint64_t Address, StringRef Annot,
-                         const MCSubtargetInfo &STI, raw_ostream &OS) override;
+                 const MCSubtargetInfo &STI, raw_ostream &OS) override;
   void printOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O,
                     const char *Modifier = nullptr);
 
@@ -35,10 +35,10 @@ public:
 
   void printOpDecorate(const MCInst *MI, raw_ostream &O);
   void printOpExtInst(const MCInst *MI, raw_ostream &O);
-  void printRemainingVariableOps(const MCInst *MI, unsigned startIndex,
-                                 raw_ostream &O, bool skipFirstSpace = false,
-                                 bool skipImmediates = false);
-  void printOpConstantVarOps(const MCInst *MI, unsigned startIndex,
+  void printRemainingVariableOps(const MCInst *MI, unsigned StartIndex,
+                                 raw_ostream &O, bool SkipFirstSpace = false,
+                                 bool SkipImmediates = false);
+  void printOpConstantVarOps(const MCInst *MI, unsigned StartIndex,
                              raw_ostream &O);
 
   void printExtInst(const MCInst *MI, unsigned OpNo, raw_ostream &O);

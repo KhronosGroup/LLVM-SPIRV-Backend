@@ -33,14 +33,14 @@ using namespace llvm;
 #include "SPIRVGenAsmWriter.inc"
 
 void SPIRVInstPrinter::printRemainingVariableOps(const MCInst *MI,
-                                                 unsigned startIndex,
+                                                 unsigned StartIndex,
                                                  raw_ostream &O,
-                                                 bool skipFirstSpace,
-                                                 bool skipImmediates) {
-  const unsigned int numOps = MI->getNumOperands();
-  for (unsigned int i = startIndex; i < numOps; ++i) {
-    if (!skipImmediates || !MI->getOperand(i).isImm()) {
-      if (!skipFirstSpace || i != startIndex) {
+                                                 bool SkipFirstSpace,
+                                                 bool SkipImmediates) {
+  const unsigned int NumOps = MI->getNumOperands();
+  for (unsigned int i = StartIndex; i < NumOps; ++i) {
+    if (!SkipImmediates || !MI->getOperand(i).isImm()) {
+      if (!SkipFirstSpace || i != StartIndex) {
         O << ' ';
       }
       printOperand(MI, i, O);
@@ -49,23 +49,23 @@ void SPIRVInstPrinter::printRemainingVariableOps(const MCInst *MI,
 }
 
 void SPIRVInstPrinter::printOpConstantVarOps(const MCInst *MI,
-                                             unsigned startIndex,
+                                             unsigned StartIndex,
                                              raw_ostream &O) {
   O << ' ';
-  if (MI->getNumOperands() - startIndex == 2) { // Handle 64 bit literals
-    uint64_t imm = MI->getOperand(startIndex).getImm();
-    imm |= (MI->getOperand(startIndex + 1).getImm() << 32);
-    O << imm;
+  if (MI->getNumOperands() - StartIndex == 2) { // Handle 64 bit literals
+    uint64_t Imm = MI->getOperand(StartIndex).getImm();
+    Imm |= (MI->getOperand(StartIndex + 1).getImm() << 32);
+    O << Imm;
   } else {
-    printRemainingVariableOps(MI, startIndex, O, true, false);
+    printRemainingVariableOps(MI, StartIndex, O, true, false);
   }
 }
 
 void SPIRVInstPrinter::recordOpExtInstImport(const MCInst *MI) {
-  Register reg = MI->getOperand(0).getReg();
-  auto name = getSPIRVStringOperand(*MI, 1);
-  auto set = getExtInstSetFromString(name);
-  extInstSetIDs.insert({reg, set});
+  Register Reg = MI->getOperand(0).getReg();
+  auto Name = getSPIRVStringOperand(*MI, 1);
+  auto Set = getExtInstSetFromString(Name);
+  ExtInstSetIDs.insert({Reg, Set});
 }
 
 void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
@@ -81,37 +81,36 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
   } else if (OpCode == SPIRV::OpExtInst) {
     printOpExtInst(MI, OS);
   } else {
-
     // Print any extra operands for variadic instructions
     MCInstrDesc MCDesc = MII.get(OpCode);
     if (MCDesc.isVariadic()) {
-      const unsigned numFixedOps = MCDesc.getNumOperands();
-      const unsigned lastFixedIndex = numFixedOps - 1;
-      const int firstVariableIndex = numFixedOps;
-      if (numFixedOps > 0 &&
-          MCDesc.OpInfo[lastFixedIndex].OperandType == MCOI::OPERAND_UNKNOWN) {
+      const unsigned NumFixedOps = MCDesc.getNumOperands();
+      const unsigned LastFixedIndex = NumFixedOps - 1;
+      const int FirstVariableIndex = NumFixedOps;
+      if (NumFixedOps > 0 &&
+          MCDesc.OpInfo[LastFixedIndex].OperandType == MCOI::OPERAND_UNKNOWN) {
         // For instructions where a custom type (not reg or immediate) comes as
         // the last operand before the variable_ops. This is usually a StringImm
-        // operand, but there are a few other cases
+        // operand, but there are a few other cases.
         switch (OpCode) {
         case SPIRV::OpTypeImage:
           OS << ' ';
-          printAccessQualifier(MI, firstVariableIndex, OS);
+          printAccessQualifier(MI, FirstVariableIndex, OS);
           break;
         case SPIRV::OpVariable:
           OS << ' ';
-          printOperand(MI, firstVariableIndex, OS);
+          printOperand(MI, FirstVariableIndex, OS);
           break;
         case SPIRV::OpEntryPoint: {
           // Print the interface ID operands, skipping the name's string literal
-          printRemainingVariableOps(MI, numFixedOps, OS, false, true);
+          printRemainingVariableOps(MI, NumFixedOps, OS, false, true);
           break;
         }
         case SPIRV::OpExecutionMode:
         case SPIRV::OpExecutionModeId:
         case SPIRV::OpLoopMerge: {
           // Print any literals after the OPERAND_UNKNOWN argument normally
-          printRemainingVariableOps(MI, numFixedOps, OS);
+          printRemainingVariableOps(MI, NumFixedOps, OS);
           break;
         }
         default:
@@ -120,13 +119,13 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
       } else {
         // For instructions with no fixed ops or a reg/immediate as the final
         // fixed operand, we can usually print the rest with "printOperand", but
-        // check for a few cases with custom types first
+        // check for a few cases with custom types first.
         switch (OpCode) {
         case SPIRV::OpLoad:
         case SPIRV::OpStore:
           OS << ' ';
-          printMemoryOperand(MI, firstVariableIndex, OS);
-          printRemainingVariableOps(MI, firstVariableIndex + 1, OS);
+          printMemoryOperand(MI, FirstVariableIndex, OS);
+          printRemainingVariableOps(MI, FirstVariableIndex + 1, OS);
           break;
         case SPIRV::OpImageSampleImplicitLod:
         case SPIRV::OpImageSampleDrefImplicitLod:
@@ -147,17 +146,17 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         case SPIRV::OpImageSparseRead:
         case SPIRV::OpImageSampleFootprintNV:
           OS << ' ';
-          printImageOperand(MI, firstVariableIndex, OS);
-          printRemainingVariableOps(MI, numFixedOps + 1, OS);
+          printImageOperand(MI, FirstVariableIndex, OS);
+          printRemainingVariableOps(MI, NumFixedOps + 1, OS);
           break;
         case SPIRV::OpCopyMemory:
         case SPIRV::OpCopyMemorySized: {
-          const unsigned int numOps = MI->getNumOperands();
-          for (unsigned int i = numFixedOps; i < numOps; ++i) {
+          const unsigned int NumOps = MI->getNumOperands();
+          for (unsigned int i = NumFixedOps; i < NumOps; ++i) {
             OS << ' ';
             printMemoryOperand(MI, i, OS);
             if (MI->getOperand(i).getImm() & MemoryOperand::Aligned) {
-              assert(i + 1 < numOps && "Missing alignment operand");
+              assert(i + 1 < NumOps && "Missing alignment operand");
               OS << ' ';
               printOperand(MI, i + 1, OS);
               i += 1;
@@ -167,10 +166,10 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         }
         case SPIRV::OpConstantI:
         case SPIRV::OpConstantF:
-          printOpConstantVarOps(MI, numFixedOps, OS);
+          printOpConstantVarOps(MI, NumFixedOps, OS);
           break;
         default:
-          printRemainingVariableOps(MI, numFixedOps, OS);
+          printRemainingVariableOps(MI, NumFixedOps, OS);
           break;
         }
       }
@@ -182,72 +181,72 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
 
 void SPIRVInstPrinter::printOpExtInst(const MCInst *MI, raw_ostream &O) {
   // The fixed operands have already been printed, so just need to decide what
-  // type of ExtInst operands to print based on the instruction set and number
+  // type of ExtInst operands to print based on the instruction set and number.
   MCInstrDesc MCDesc = MII.get(MI->getOpcode());
-  unsigned int numFixedOps = MCDesc.getNumOperands();
-  const auto numOps = MI->getNumOperands();
-  if (numOps == numFixedOps)
+  unsigned int NumFixedOps = MCDesc.getNumOperands();
+  const auto NumOps = MI->getNumOperands();
+  if (NumOps == NumFixedOps)
     return;
 
   O << ' ';
 
-  auto setReg = MI->getOperand(2).getReg();
-  auto set = extInstSetIDs[setReg];
-  if (set == ExtInstSet::OpenCL_std) {
-    auto inst = static_cast<OpenCL_std::OpenCL_std>(MI->getOperand(3).getImm());
-    switch (inst) {
+  auto SetReg = MI->getOperand(2).getReg();
+  auto Set = ExtInstSetIDs[SetReg];
+  if (Set == ExtInstSet::OpenCL_std) {
+    auto Inst = static_cast<OpenCL_std::OpenCL_std>(MI->getOperand(3).getImm());
+    switch (Inst) {
     case OpenCL_std::vstore_half_r:
     case OpenCL_std::vstore_halfn_r:
     case OpenCL_std::vstorea_halfn_r: {
       // These ops have a literal FPRoundingMode as the last arg
-      for (unsigned int i = numFixedOps; i < numOps - 1; ++i) {
+      for (unsigned int i = NumFixedOps; i < NumOps - 1; ++i) {
         printOperand(MI, i, O);
         O << ' ';
       }
-      printFPRoundingMode(MI, numOps - 1, O);
+      printFPRoundingMode(MI, NumOps - 1, O);
       break;
     }
     default:
-      printRemainingVariableOps(MI, numFixedOps, O, true);
+      printRemainingVariableOps(MI, NumFixedOps, O, true);
     }
   } else {
-    printRemainingVariableOps(MI, numFixedOps, O, true);
+    printRemainingVariableOps(MI, NumFixedOps, O, true);
   }
 }
 
 void SPIRVInstPrinter::printOpDecorate(const MCInst *MI, raw_ostream &O) {
   // The fixed operands have already been printed, so just need to decide what
-  // type of decoration operands to print based on the Decoration type
+  // type of decoration operands to print based on the Decoration type.
   MCInstrDesc MCDesc = MII.get(MI->getOpcode());
-  unsigned int numFixedOps = MCDesc.getNumOperands();
+  unsigned int NumFixedOps = MCDesc.getNumOperands();
 
-  if (numFixedOps != MI->getNumOperands()) {
-    auto decOp = MI->getOperand(numFixedOps - 1);
-    auto dec = static_cast<Decoration::Decoration>(decOp.getImm());
+  if (NumFixedOps != MI->getNumOperands()) {
+    auto DecOp = MI->getOperand(NumFixedOps - 1);
+    auto Dec = static_cast<Decoration::Decoration>(DecOp.getImm());
 
     O << ' ';
 
-    switch (dec) {
+    switch (Dec) {
     case Decoration::BuiltIn:
-      printBuiltIn(MI, numFixedOps, O);
+      printBuiltIn(MI, NumFixedOps, O);
       break;
     case Decoration::UniformId:
-      printScope(MI, numFixedOps, O);
+      printScope(MI, NumFixedOps, O);
       break;
     case Decoration::FuncParamAttr:
-      printFunctionParameterAttribute(MI, numFixedOps, O);
+      printFunctionParameterAttribute(MI, NumFixedOps, O);
       break;
     case Decoration::FPRoundingMode:
-      printFPRoundingMode(MI, numFixedOps, O);
+      printFPRoundingMode(MI, NumFixedOps, O);
       break;
     case Decoration::FPFastMathMode:
-      printFPFastMathMode(MI, numFixedOps, O);
+      printFPFastMathMode(MI, NumFixedOps, O);
       break;
     case Decoration::LinkageAttributes:
-      printStringImm(MI, numFixedOps, O);
+      printStringImm(MI, NumFixedOps, O);
       break;
     default:
-      printRemainingVariableOps(MI, numFixedOps, O, true);
+      printRemainingVariableOps(MI, NumFixedOps, O, true);
       break;
     }
   }
@@ -290,31 +289,31 @@ void SPIRVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
 
 void SPIRVInstPrinter::printStringImm(const MCInst *MI, unsigned OpNo,
                                       raw_ostream &O) {
-  const unsigned numOps = MI->getNumOperands();
-  unsigned strStartIndex = OpNo;
-  while (strStartIndex < numOps) {
-    if (MI->getOperand(strStartIndex).isReg())
+  const unsigned NumOps = MI->getNumOperands();
+  unsigned StrStartIndex = OpNo;
+  while (StrStartIndex < NumOps) {
+    if (MI->getOperand(StrStartIndex).isReg())
       break;
 
-    std::string str = getSPIRVStringOperand(*MI, OpNo);
-    if (strStartIndex != OpNo)
+    std::string Str = getSPIRVStringOperand(*MI, OpNo);
+    if (StrStartIndex != OpNo)
       O << ' '; // Add a space if we're starting a new string/argument
     O << '"';
-    for (char c : str) {
+    for (char c : Str) {
       if (c == '"')
         O.write('\\'); // Escape " characters (might break for complex UTF-8)
       O.write(c);
     }
     O << '"';
 
-    unsigned numOpsInString = (str.size() / 4) + 1;
-    strStartIndex += numOpsInString;
+    unsigned numOpsInString = (Str.size() / 4) + 1;
+    StrStartIndex += numOpsInString;
 
     // Check for final Op of "OpDecorate %x %stringImm %linkageAttribute"
     if (MI->getOpcode() == SPIRV::OpDecorate &&
         MI->getOperand(1).getImm() == Decoration::LinkageAttributes) {
       O << ' ';
-      printLinkageType(MI, strStartIndex, O);
+      printLinkageType(MI, StrStartIndex, O);
       break;
     }
   }
@@ -322,10 +321,10 @@ void SPIRVInstPrinter::printStringImm(const MCInst *MI, unsigned OpNo,
 
 void SPIRVInstPrinter::printExtInst(const MCInst *MI, unsigned OpNo,
                                     raw_ostream &O) {
-  auto setReg = MI->getOperand(2).getReg();
-  auto set = extInstSetIDs[setReg];
-  auto op = MI->getOperand(OpNo).getImm();
-  O << getExtInstName(set, op);
+  auto SetReg = MI->getOperand(2).getReg();
+  auto Set = ExtInstSetIDs[SetReg];
+  auto Op = MI->getOperand(OpNo).getImm();
+  O << getExtInstName(Set, Op);
 }
 
 // Methods for printing textual names of SPIR-V enums (see SPIRVEnums.h)
@@ -359,4 +358,3 @@ GEN_INSTR_PRINTER_IMPL(Scope)
 GEN_INSTR_PRINTER_IMPL(GroupOperation)
 GEN_INSTR_PRINTER_IMPL(KernelEnqueueFlags)
 GEN_INSTR_PRINTER_IMPL(KernelProfilingInfo)
-
