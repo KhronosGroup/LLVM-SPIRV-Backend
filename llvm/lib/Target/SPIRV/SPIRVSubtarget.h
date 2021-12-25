@@ -70,7 +70,7 @@ private:
   std::unique_ptr<SPIRVRegisterBankInfo> RegBankInfo;
 
   std::unordered_set<Extension::Extension> AvailableExtensions;
-  std::unordered_set<ExtInstSet> availableExtInstSets;
+  std::unordered_set<ExtInstSet> AvailableExtInstSets;
   std::unordered_set<Capability::Capability> AvailableCaps;
 
   // The legalizer and instruction selector both rely on the set of available

@@ -20,7 +20,6 @@
 #include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
-
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/Demangle/Demangle.h"
 
@@ -47,41 +46,40 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
 
 // Based on the LLVM function attributes, get a SPIR-V FunctionControl
 static uint32_t getFunctionControl(const Function &F) {
-  uint32_t funcControl = FunctionControl::None;
+  uint32_t FuncControl = FunctionControl::None;
   if (F.hasFnAttribute(Attribute::AttrKind::AlwaysInline)) {
-    funcControl |= FunctionControl::Inline;
+    FuncControl |= FunctionControl::Inline;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadNone)) {
-    funcControl |= FunctionControl::Pure;
+    FuncControl |= FunctionControl::Pure;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadOnly)) {
-    funcControl |= FunctionControl::Const;
+    FuncControl |= FunctionControl::Const;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::NoInline)) {
-    funcControl |= FunctionControl::DontInline;
+    FuncControl |= FunctionControl::DontInline;
   }
-  return funcControl;
+  return FuncControl;
 }
 
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
                                              FunctionLoweringInfo &FLI) const {
-
   assert(TR && "Must initialize the SPIRV type registry before lowering args.");
 
   // Assign types and names to all args, and store their types for later
-  SmallVector<Register, 4> argTypeVRegs;
+  SmallVector<Register, 4> ArgTypeVRegs;
   if (VRegs.size() > 0) {
     unsigned int i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-      // auto *spirvTy = TR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
-      // SPIRVType *spirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
-      // if (!spirvTy)
-      auto *spirvTy =
+      // auto *SpirvTy = TR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
+      // SPIRVType *SpirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
+      // if (!SpirvTy)
+      auto *SpirvTy =
           TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
-      argTypeVRegs.push_back(TR->getSPIRVTypeID(spirvTy));
+      ArgTypeVRegs.push_back(TR->getSPIRVTypeID(SpirvTy));
 
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
@@ -92,9 +90,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                           {DerefBytes});
       }
       if (Arg.hasAttribute(Attribute::Alignment)) {
-        auto Alignment =
-            static_cast<unsigned>(Arg.getAttribute(Attribute::Alignment)
-                                     .getValueAsInt());
+        auto Alignment = static_cast<unsigned>(
+            Arg.getAttribute(Attribute::Alignment).getValueAsInt());
         buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Alignment,
                         {Alignment});
       }
@@ -112,10 +109,10 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   // Generate a SPIR-V type for the function
   auto MRI = MIRBuilder.getMRI();
-  Register funcVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+  Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
   if (F.isDeclaration())
-    DT->add(&F, &MIRBuilder.getMF(), funcVReg);
-  MRI->setRegClass(funcVReg, &SPIRV::IDRegClass);
+    DT->add(&F, &MIRBuilder.getMF(), FuncVReg);
+  MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
 
   auto *FTy = F.getFunctionType();
 
@@ -153,43 +150,43 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     FTy = FunctionType::get(RetTy, ArgTypes, F.isVarArg());
   }
 
-  auto funcTy = TR->assignTypeToVReg(FTy, funcVReg, MIRBuilder);
+  auto FuncTy = TR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
 
   // Build the OpTypeFunction declaring it
-  Register returnTypeID = funcTy->getOperand(1).getReg();
-  uint32_t funcControl = getFunctionControl(F);
+  Register ReturnTypeID = FuncTy->getOperand(1).getReg();
+  uint32_t FuncControl = getFunctionControl(F);
 
   MIRBuilder.buildInstr(SPIRV::OpFunction)
-      .addDef(funcVReg)
-      .addUse(returnTypeID)
-      .addImm(funcControl)
-      .addUse(TR->getSPIRVTypeID(funcTy));
+      .addDef(FuncVReg)
+      .addUse(ReturnTypeID)
+      .addImm(FuncControl)
+      .addUse(TR->getSPIRVTypeID(FuncTy));
 
   // Add OpFunctionParameters
-  const unsigned int numArgs = argTypeVRegs.size();
-  for (unsigned int i = 0; i < numArgs; ++i) {
+  const unsigned int NumArgs = ArgTypeVRegs.size();
+  for (unsigned int i = 0; i < NumArgs; ++i) {
     assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
     MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
     MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
         .addDef(VRegs[i][0])
-        .addUse(argTypeVRegs[i]);
+        .addUse(ArgTypeVRegs[i]);
   }
 
   // Name the function
   if (F.hasName())
-    buildOpName(funcVReg, F.getName(), MIRBuilder);
+    buildOpName(FuncVReg, F.getName(), MIRBuilder);
 
   // Handle entry points and function linkage
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    auto execModel = ExecutionModel::Kernel;
+    auto ExecModel = ExecutionModel::Kernel;
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpEntryPoint)
-                   .addImm(execModel)
-                   .addUse(funcVReg);
+                   .addImm(ExecModel)
+                   .addUse(FuncVReg);
     addStringImm(F.getName(), MIB);
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
-    buildOpDecorate(funcVReg, MIRBuilder, Decoration::LinkageAttributes,
+    buildOpDecorate(FuncVReg, MIRBuilder, Decoration::LinkageAttributes,
                     {LnkTy}, F.getGlobalIdentifier());
   }
 
@@ -198,35 +195,36 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
-  auto funcName = Info.Callee.getGlobal()->getGlobalIdentifier();
+  auto FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
 
   size_t n;
-  int status;
-  char *demangledName = itaniumDemangle(funcName.c_str(), nullptr, &n, &status);
+  int Status;
+  char *DemangledName = itaniumDemangle(FuncName.c_str(), nullptr, &n, &Status);
 
   assert(Info.OrigRet.Regs.size() < 2 && "Call returns multiple vregs");
 
-  Register resVReg = Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
-  bool singleUnderscore = funcName.size() >= 1 && funcName[0] == '_';
-  bool doubleUnderscore =
-      singleUnderscore && funcName.size() >= 2 && funcName[1] == '_';
+  Register ResVReg =
+      Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
+  bool SingleUnderscore = FuncName.size() >= 1 && FuncName[0] == '_';
+  bool DoubleUnderscore =
+      SingleUnderscore && FuncName.size() >= 2 && FuncName[1] == '_';
   // FIXME: OCL builtin checks should be the same as in clang
   //        or SPIRV-LLVM translator
-  if ((status == demangle_success && singleUnderscore) || doubleUnderscore) {
+  if ((Status == demangle_success && SingleUnderscore) || DoubleUnderscore) {
     const auto &MF = MIRBuilder.getMF();
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
       // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp
-      SmallVector<Register, 8> argVRegs;
+      SmallVector<Register, 8> ArgVRegs;
       for (auto Arg : Info.OrigArgs) {
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
-        argVRegs.push_back(Arg.Regs[0]);
+        ArgVRegs.push_back(Arg.Regs[0]);
         auto SPIRVTy = TR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         TR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder);
       }
       return generateOpenCLBuiltinCall(
-          doubleUnderscore ? funcName : demangledName, MIRBuilder, resVReg,
-          Info.OrigRet.Ty, argVRegs, TR);
+          DoubleUnderscore ? FuncName : DemangledName, MIRBuilder, ResVReg,
+          Info.OrigRet.Ty, ArgVRegs, TR);
     }
     report_fatal_error("Unable to handle this environment's built-in funcs.");
   } else {
@@ -235,16 +233,16 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     // If it's an externally declared function, be sure to emit its type and
     // function declaration here. It will be hoisted globally later
     auto M = MIRBuilder.getMF().getFunction().getParent();
-    Function *Callee = M->getFunction(funcName);
-    Register funcVReg;
+    Function *Callee = M->getFunction(FuncName);
+    Register FuncVReg;
     if (Callee && Callee->isDeclaration() &&
-        (DT->find(Callee, &MIRBuilder.getMF(), funcVReg) == false)) {
+        (DT->find(Callee, &MIRBuilder.getMF(), FuncVReg) == false)) {
       // Emit the type info and forward function declaration to the first MBB
       // to ensure VReg definition dependencies are valid across all MBBs
-      MachineIRBuilder firstBlockBuilder;
+      MachineIRBuilder FirstBlockBuilder;
       auto &MF = MIRBuilder.getMF();
-      firstBlockBuilder.setMF(MF);
-      firstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
+      FirstBlockBuilder.setMF(MF);
+      FirstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
 
       SmallVector<ArrayRef<Register>, 8> VRegArgs;
       SmallVector<SmallVector<Register, 1>, 8> ToInsert;
@@ -255,22 +253,23 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
             LLT::scalar(32))});
         VRegArgs.push_back(ToInsert.back());
       }
-      
+
       // TODO: Reuse FunctionLoweringInfo
       FunctionLoweringInfo FuncInfo;
-      lowerFormalArguments(firstBlockBuilder, *Callee, VRegArgs, FuncInfo);
+      lowerFormalArguments(FirstBlockBuilder, *Callee, VRegArgs, FuncInfo);
     }
 
     // Make sure there's a valid return reg, even for functions returning void
-    if (!resVReg.isValid()) {
-      resVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+    if (!ResVReg.isValid()) {
+      ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     }
-    SPIRVType *retType = TR->assignTypeToVReg(Info.OrigRet.Ty, resVReg, MIRBuilder);
+    SPIRVType *RetType =
+        TR->assignTypeToVReg(Info.OrigRet.Ty, ResVReg, MIRBuilder);
 
     // Emit the OpFunctionCall and its args
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
-                   .addDef(resVReg)
-                   .addUse(TR->getSPIRVTypeID(retType))
+                   .addDef(ResVReg)
+                   .addUse(TR->getSPIRVTypeID(RetType))
                    .add(Info.Callee);
 
     for (const auto &arg : Info.OrigArgs) {

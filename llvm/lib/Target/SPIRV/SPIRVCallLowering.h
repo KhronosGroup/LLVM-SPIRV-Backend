@@ -13,8 +13,8 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVCALLLOWERING_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVCALLLOWERING_H
 
-#include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "SPIRVDuplicatesTracker.h"
+#include "llvm/CodeGen/GlobalISel/CallLowering.h"
 
 namespace llvm {
 
