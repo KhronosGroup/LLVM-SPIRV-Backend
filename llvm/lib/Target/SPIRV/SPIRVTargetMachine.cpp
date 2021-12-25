@@ -11,14 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVTargetMachine.h"
-#include "TargetInfo/SPIRVTargetInfo.h"
 #include "SPIRV.h"
 #include "SPIRVCallLowering.h"
 #include "SPIRVIRTranslator.h"
 #include "SPIRVLegalizerInfo.h"
-#include "SPIRVRegisterBankInfo.h"
+#include "SPIRVSubtarget.h"
 #include "SPIRVTargetObjectFile.h"
 #include "SPIRVTargetTransformInfo.h"
+#include "SPIRVTypeRegistry.h"
+#include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
@@ -27,17 +28,9 @@
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/Support/FormattedStream.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
-
-#include "SPIRVSubtarget.h"
-#include "SPIRVTypeRegistry.h"
-
-#include <string>
-
-#include "llvm/CodeGen/MachineModuleInfo.h"
-#include "llvm/Pass.h"
 
 using namespace llvm;
 InstructionSelector *
@@ -61,19 +54,18 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
 
 // DataLayout: little or big endian
 static std::string computeDataLayout(const Triple &TT) {
-  std::string dataLayout = "e-m:e";
+  std::string DataLayout = "e-m:e";
 
-  const auto arch = TT.getArch();
+  const auto Arch = TT.getArch();
   // TODO: unify this with pointers legalization
-  if (arch == Triple::spirv32)
-    dataLayout += "-p:32:32";
-  else if (arch == Triple::spirv64)
-    dataLayout += "-p:64:64";
-  else if (arch == Triple::spirvlogical)
-    dataLayout += "-p:8:8";
-  return dataLayout;
+  if (Arch == Triple::spirv32)
+    DataLayout += "-p:32:32";
+  else if (Arch == Triple::spirv64)
+    DataLayout += "-p:64:64";
+  else if (Arch == Triple::spirvlogical)
+    DataLayout += "-p:8:8";
+  return DataLayout;
 }
-
 
 static Reloc::Model getEffectiveRelocModel(Optional<Reloc::Model> RM) {
   if (!RM.hasValue())
@@ -239,7 +231,8 @@ class SPIRVInstructionSelect : public InstructionSelect {
       for (auto &MI : MBB) {
         if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
           auto &SrcOp = MI.getOperand(1);
-          if (isTypeFoldingSupported(MRI.getVRegDef(SrcOp.getReg())->getOpcode())) {
+          if (isTypeFoldingSupported(
+                  MRI.getVRegDef(SrcOp.getReg())->getOpcode())) {
             if (MRI.getType(MI.getOperand(0).getReg()).isVector())
               MRI.setRegClass(MI.getOperand(0).getReg(), &SPIRV::IDRegClass);
             MRI.setType(MI.getOperand(0).getReg(), LLT::scalar(32));
@@ -248,8 +241,8 @@ class SPIRVInstructionSelect : public InstructionSelect {
       }
     }
 
-    bool success = InstructionSelect::runOnMachineFunction(MF);
-    std::vector<MachineInstr*> ToRemove;
+    bool Success = InstructionSelect::runOnMachineFunction(MF);
+    std::vector<MachineInstr *> ToRemove;
     for (auto &MBB : MF) {
       for (auto &MI : MBB) {
         if (MI.getOpcode() == SPIRV::GET_ID ||
@@ -257,14 +250,15 @@ class SPIRVInstructionSelect : public InstructionSelect {
             MI.getOpcode() == SPIRV::GET_pID ||
             MI.getOpcode() == SPIRV::GET_vfID ||
             MI.getOpcode() == SPIRV::GET_vID) {
-          MRI.replaceRegWith(MI.getOperand(0).getReg(), MI.getOperand(1).getReg());
+          MRI.replaceRegWith(MI.getOperand(0).getReg(),
+                             MI.getOperand(1).getReg());
           ToRemove.push_back(&MI);
         }
       }
     }
-    for (auto *MI: ToRemove)
+    for (auto *MI : ToRemove)
       MI->eraseFromParent();
-    return success;
+    return Success;
   }
 };
 } // namespace

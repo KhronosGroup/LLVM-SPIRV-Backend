@@ -19,20 +19,20 @@ class Proc<string Name, list<SubtargetFeature> Features>
 
 def : Proc<"generic", []>;
 
-def SPIRV10 : SubtargetFeature<"spirv1.0", "targetSPIRVVersion", "10",
+def SPIRV10 : SubtargetFeature<"spirv1.0", "TargetSPIRVVersion", "10",
                              "Use SPIR-V version 1.0">;
-def SPIRV11 : SubtargetFeature<"spirv1.1", "targetSPIRVVersion", "11",
+def SPIRV11 : SubtargetFeature<"spirv1.1", "TargetSPIRVVersion", "11",
                              "Use SPIR-V version 1.1">;
-def SPIRV12 : SubtargetFeature<"spirv1.2", "targetSPIRVVersion", "12",
+def SPIRV12 : SubtargetFeature<"spirv1.2", "TargetSPIRVVersion", "12",
                              "Use SPIR-V version 1.2">;
-def SPIRV13 : SubtargetFeature<"spirv1.3", "targetSPIRVVersion", "13",
+def SPIRV13 : SubtargetFeature<"spirv1.3", "TargetSPIRVVersion", "13",
                              "Use SPIR-V version 1.3">;
 
-def OCL12 : SubtargetFeature<"CL1.2", "targetOpenCLVersion", "12",
+def OCL12 : SubtargetFeature<"CL1.2", "TargetOpenCLVersion", "12",
                              "Use OpenCL version 1.2">;
-def OCL20 : SubtargetFeature<"CL2.0", "targetOpenCLVersion", "20",
+def OCL20 : SubtargetFeature<"CL2.0", "TargetOpenCLVersion", "20",
                              "Use OpenCL version 2.0">;
-def OCL22 : SubtargetFeature<"CL2.2", "targetOpenCLVersion", "22",
+def OCL22 : SubtargetFeature<"CL2.2", "TargetOpenCLVersion", "22",
                              "Use OpenCL version 2.2">;
 
 def SPIRVInstPrinter : AsmWriter {
@@ -44,5 +44,3 @@ def SPIRV : Target {
   let InstructionSet = SPIRVInstrInfo;
   let AssemblyWriters = [SPIRVInstPrinter];
 }
-
-

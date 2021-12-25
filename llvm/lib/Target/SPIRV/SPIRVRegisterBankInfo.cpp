@@ -20,9 +20,6 @@
 #define GET_TARGET_REGBANK_IMPL
 #include "SPIRVGenRegisterBank.inc"
 
-// This file will be TableGen'ed at some point.
-#include "SPIRVGenRegisterBankInfo.def"
-
 using namespace llvm;
 
 // This required for .td selection patterns to work or we'd end up

@@ -28,6 +28,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp
   SPIRVIRTranslator.cpp
+  SPIRVISelLowering.cpp
   SPIRVLegalizerInfo.cpp
   SPIRVLowerConstExpr.cpp
   SPIRVMCInstLower.cpp

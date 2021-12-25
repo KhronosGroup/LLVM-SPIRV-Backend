@@ -37,4 +37,4 @@ public:
                                              LLT Ty) const override;
 };
 } // namespace llvm
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVREGISTERBANKINFO_H

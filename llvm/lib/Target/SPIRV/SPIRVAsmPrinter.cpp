@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/SPIRVInstPrinter.h"
-#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "SPIRV.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVMCInstLower.h"
@@ -23,6 +22,7 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCStreamer.h"
@@ -49,10 +49,9 @@ public:
 
   void emitInstruction(const MachineInstr *MI) override;
 
-  // TODO: consider if these are necessary
-  void emitFunctionEntryLabel() override {};
+  void emitFunctionEntryLabel() override {}
   void emitFunctionHeader() override;
-  void emitFunctionBodyStart() override {};
+  void emitFunctionBodyStart() override {}
   void emitBasicBlockStart(const MachineBasicBlock &MBB) override {}
   void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
   void emitGlobalVariable(const GlobalVariable *GV) override {}
@@ -67,8 +66,8 @@ void SPIRVAsmPrinter::emitFunctionHeader() {
         << "-- Begin function "
         << GlobalValue::dropLLVMManglingEscape(F.getName()) << '\n';
 
-  auto section = getObjFileLowering().SectionForGlobal(&F, TM);
-  MF->setSection(section);
+  auto Section = getObjFileLowering().SectionForGlobal(&F, TM);
+  MF->setSection(Section);
 }
 
 void SPIRVAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,

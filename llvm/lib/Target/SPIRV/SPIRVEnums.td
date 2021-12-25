@@ -49,4 +49,3 @@ def Scope : EnumOperand<"Scope">;
 def GroupOperation : EnumOperand<"GroupOperation">;
 def KernelEnqueueFlags : EnumOperand<"KernelEnqueueFlags">;
 def KernelProfilingInfo : EnumOperand<"KernelProfilingInfo">;
-

@@ -10,8 +10,8 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRV_H
 
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
-#include "llvm/Target/TargetMachine.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
 class SPIRVTargetMachine;
@@ -40,4 +40,4 @@ void initializeSPIRVGlobalTypesAndRegNumPass(PassRegistry &);
 void initializeSPIRVGenerateDecorationsPass(PassRegistry &);
 } // namespace llvm
 
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRV_H
