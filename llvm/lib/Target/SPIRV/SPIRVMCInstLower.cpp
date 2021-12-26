@@ -12,8 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVMCInstLower.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/IR/Constants.h"
 
 using namespace llvm;
 
@@ -36,7 +36,8 @@ void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
       MCOp = MCOperand::createImm(MO.getImm());
       break;
     case MachineOperand::MO_FPImmediate:
-      MCOp = MCOperand::createDFPImm(MO.getFPImm()->getValueAPF().convertToFloat());
+      MCOp = MCOperand::createDFPImm(
+          MO.getFPImm()->getValueAPF().convertToFloat());
       break;
     }
 

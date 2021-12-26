@@ -38,4 +38,4 @@ struct SPIRVRegisterInfo : public SPIRVGenRegisterInfo {
 };
 } // namespace llvm
 
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVREGISTERINFO_H

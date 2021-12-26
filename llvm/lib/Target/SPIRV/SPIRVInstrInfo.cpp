@@ -18,9 +18,6 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include <cassert>
-#include <iterator>
-
 #define GET_INSTRINFO_CTOR_DTOR
 #include "SPIRVGenInstrInfo.inc"
 
@@ -53,10 +50,8 @@ bool SPIRVInstrInfo::isConstantInstr(const MachineInstr &MI) const {
 bool SPIRVInstrInfo::isTypeDeclInstr(const MachineInstr &MI) const {
   auto &MRI = MI.getMF()->getRegInfo();
   if (MI.getNumDefs() >= 1 && MI.getOperand(0).isReg()) {
-    // MI.dump();
-    // errs() << "Def: " << MI.getOperand(0) << ", " << MI.getOperand(0).getReg() << "\n";
-    auto defRegClass = MRI.getRegClassOrNull(MI.getOperand(0).getReg());
-    return defRegClass && defRegClass->getID() == TYPERegClass.getID();
+    auto DefRegClass = MRI.getRegClassOrNull(MI.getOperand(0).getReg());
+    return DefRegClass && DefRegClass->getID() == TYPERegClass.getID();
   } else {
     return false;
   }
@@ -158,22 +153,8 @@ bool SPIRVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 // removed instructions.
 unsigned SPIRVInstrInfo::removeBranch(MachineBasicBlock &MBB,
                                       int *BytesRemoved) const {
-
   llvm_unreachable("Branch removal not supported, as MBB info not propagated "
                    "to OpPhi instructions. Try using -O0 instead.");
-
-  using namespace SPIRV;
-  auto MI = MBB.getLastNonDebugInstr();
-  if (MI.isValid() &&
-      (MI->getOpcode() == OpBranch || MI->getOpcode() == OpBranchConditional)) {
-    MI->eraseFromParent();
-    if (BytesRemoved)
-      *BytesRemoved = MI->getOpcode() == OpBranch ? 8 : 16;
-    return 1;
-  }
-  if (BytesRemoved)
-    *BytesRemoved = 0;
-  return 0;
 }
 
 // Insert branch code into the end of the specified MachineBasicBlock. The
@@ -200,8 +181,8 @@ unsigned SPIRVInstrInfo::insertBranch(
   MIRBuilder.setMF(*MBB.getParent());
   MIRBuilder.setMBB(MBB);
 
-  int bytesAdded = 0;
-  int instsAdded = 0;
+  int LocalBytesAdded = 0;
+  int InstsAdded = 0;
   if (Cond.size() > 0) { // Conditional branch (but may only have true MBB)
     assert(TBB != nullptr && "Require non-null block for conditional branch");
     assert(Cond.size() == 1 && "Require 1 condition for insertBranch");
@@ -212,14 +193,14 @@ unsigned SPIRVInstrInfo::insertBranch(
     if (falseBlock) {
       MIB.addMBB(falseBlock);
     }
-    bytesAdded = 16;
-    instsAdded = 1;
+    LocalBytesAdded = 16;
+    InstsAdded = 1;
   } else { // Either add unconditional branch, or add to last conditional branch
     assert(!FBB && "False block set with no conditions");
     if (TBB) {
       if (MBB.empty()) {
         MIRBuilder.buildInstr(SPIRV::OpBranch).addMBB(TBB);
-        bytesAdded = 8;
+        LocalBytesAdded = 8;
       } else {
         auto MI = MBB.getLastNonDebugInstr();
         if (MI.isValid() && !MI->isKnownSentinel() &&
@@ -231,29 +212,30 @@ unsigned SPIRVInstrInfo::insertBranch(
           }
         } else {
           MIRBuilder.buildInstr(SPIRV::OpBranch).addMBB(TBB);
-          bytesAdded = 8;
+          LocalBytesAdded = 8;
         }
       }
-      instsAdded = 1;
+      InstsAdded = 1;
     }
   }
-  if (BytesAdded)
-    *BytesAdded = bytesAdded;
-  return instsAdded;
+  if (LocalBytesAdded)
+    *BytesAdded = LocalBytesAdded;
+  return InstsAdded;
 }
 
 void SPIRVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator I,
                                  const DebugLoc &DL, MCRegister DestReg,
                                  MCRegister SrcReg, bool KillSrc) const {
-  // Actually we don't need this COPY instruction. However if we do nothing with it,
-  // post RA pseudo instrs expansion just removes it and we get the code with undef
-  // registers. Therefore, we need to replace all uses of dst with the src register.
-  // COPY instr itself will be safely removed later.
+  // Actually we don't need this COPY instruction. However if we do nothing with
+  // it, post RA pseudo instrs expansion just removes it and we get the code
+  // with undef registers. Therefore, we need to replace all uses of dst with
+  // the src register. COPY instr itself will be safely removed later.
   assert(I->isCopy() && "Copy instruction is expected");
   auto DstOp = I->getOperand(0);
   auto SrcOp = I->getOperand(1);
-  assert(DstOp.isReg() && SrcOp.isReg() && "Register operands are expected in COPY");
+  assert(DstOp.isReg() && SrcOp.isReg() &&
+         "Register operands are expected in COPY");
   auto &MRI = I->getMF()->getRegInfo();
   MRI.replaceRegWith(DstOp.getReg(), SrcOp.getReg());
 }

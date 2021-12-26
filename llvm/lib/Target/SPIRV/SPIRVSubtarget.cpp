@@ -33,14 +33,14 @@ static uint32_t v(uint8_t Maj, uint8_t Min, uint8_t Rev = 0) {
 }
 
 // Compare version numbers, but allow 0 to mean unspecified
-static bool isAtLeastVer(uint32_t target, uint32_t verToCompareTo) {
-  return target == 0 || target >= verToCompareTo;
+static bool isAtLeastVer(uint32_t Target, uint32_t VerToCompareTo) {
+  return Target == 0 || Target >= VerToCompareTo;
 }
 
 static unsigned computePointerSize(const Triple &TT) {
-  const auto arch = TT.getArch();
+  const auto Arch = TT.getArch();
   // TODO: unify this with pointers legalization
-  return arch == Triple::spirv32 ? 32 : arch == Triple::spirv64 ? 64 : 8;
+  return Arch == Triple::spirv32 ? 32 : Arch == Triple::spirv64 ? 64 : 8;
 }
 
 // TODO use command line args for this rather than defaulting to 1.1
@@ -62,25 +62,22 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
                                const std::string &FS,
                                const SPIRVTargetMachine &TM)
     : SPIRVGenSubtargetInfo(TT, CPU, /* TuneCPU */ CPU, FS),
-      pointerSize(computePointerSize(TT)),
-      usesLogicalAddressing(TT.isSPIRVLogical()),
-      usesVulkanEnv(TT.isVulkanEnvironment()),
-      usesOpenCLEnv(TT.isOpenCLEnvironment()),
-      targetSPIRVVersion(0),
-      targetOpenCLVersion(0),
-      targetVulkanVersion(computeTargetVulkanVersion(TT)),
-      openCLFullProfile(computeOpenCLFullProfile(TT)),
-      openCLImageSupport(computeOpenCLImageSupport(TT)),
-      InstrInfo(),
-      FrameLowering(initSubtargetDependencies(CPU, FS)),
-      TLInfo(TM, *this),
+      PointerSize(computePointerSize(TT)),
+      UsesLogicalAddressing(TT.isSPIRVLogical()),
+      UsesVulkanEnv(TT.isVulkanEnvironment()),
+      UsesOpenCLEnv(TT.isOpenCLEnvironment()), TargetSPIRVVersion(0),
+      TargetOpenCLVersion(0),
+      TargetVulkanVersion(computeTargetVulkanVersion(TT)),
+      OpenCLFullProfile(computeOpenCLFullProfile(TT)),
+      OpenCLImageSupport(computeOpenCLImageSupport(TT)), InstrInfo(),
+      FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
 
       DT(new SPIRVGeneralDuplicatesTracker()),
       // FIXME:
       // .get() here is unsafe, works due to subtarget is destroyed
       // later than these objects
       // see comment in the SPIRVSubtarget.h
-      TR(new SPIRVTypeRegistry(*DT.get(), pointerSize)),
+      TR(new SPIRVTypeRegistry(*DT.get(), PointerSize)),
       CallLoweringInfo(new SPIRVCallLowering(TLInfo, TR.get(), DT.get())),
       RegBankInfo(new SPIRVRegisterBankInfo()) {
 
@@ -97,64 +94,64 @@ SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
   ParseSubtargetFeatures(CPU, /* TuneCPU */ CPU, FS);
 
-  if (targetSPIRVVersion == 0)
-    targetSPIRVVersion = 14;
-  if (targetOpenCLVersion == 0)
-    targetOpenCLVersion = 22;
+  if (TargetSPIRVVersion == 0)
+    TargetSPIRVVersion = 14;
+  if (TargetOpenCLVersion == 0)
+    TargetOpenCLVersion = 22;
 
   return *this;
 }
 
-bool SPIRVSubtarget::canUseCapability(Capability::Capability c) const {
-  const auto &caps = availableCaps;
-  return std::find(caps.begin(), caps.end(), c) != caps.end();
+bool SPIRVSubtarget::canUseCapability(Capability::Capability C) const {
+  const auto &Caps = AvailableCaps;
+  return std::find(Caps.begin(), Caps.end(), C) != Caps.end();
 }
 
-bool SPIRVSubtarget::canUseExtension(Extension::Extension e) const {
-  const auto &exts = availableExtensions;
-  return std::find(exts.begin(), exts.end(), e) != exts.end();
+bool SPIRVSubtarget::canUseExtension(Extension::Extension E) const {
+  const auto &Exts = AvailableExtensions;
+  return std::find(Exts.begin(), Exts.end(), E) != Exts.end();
 }
 
-bool SPIRVSubtarget::canUseExtInstSet(ExtInstSet e) const {
-  const auto &sets = availableExtInstSets;
-  return std::find(sets.begin(), sets.end(), e) != sets.end();
+bool SPIRVSubtarget::canUseExtInstSet(ExtInstSet E) const {
+  const auto &Sets = AvailableExtInstSets;
+  return std::find(Sets.begin(), Sets.end(), E) != Sets.end();
 }
 
 bool SPIRVSubtarget::isLogicalAddressing() const {
-  return usesLogicalAddressing;
+  return UsesLogicalAddressing;
 }
 
 bool SPIRVSubtarget::isKernel() const {
-  return usesOpenCLEnv || !usesLogicalAddressing;
+  return UsesOpenCLEnv || !UsesLogicalAddressing;
 }
 
 bool SPIRVSubtarget::isShader() const {
-  return usesVulkanEnv || usesLogicalAddressing;
+  return UsesVulkanEnv || UsesLogicalAddressing;
 }
 
 // If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual
 bool SPIRVSubtarget::canDirectlyComparePointers() const {
-  bool res = isAtLeastVer(targetSPIRVVersion, 14);
-  return res;
+  bool Res = isAtLeastVer(TargetSPIRVVersion, 14);
+  return Res;
 }
 
 // TODO use command line args for this rather than defaults
 void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
   using namespace Extension;
   if (TT.isVulkanEnvironment()) {
-    availableExtensions = {};
+    AvailableExtensions = {};
   } else {
     // A default extension for testing - should use command line args
-    availableExtensions = {SPV_KHR_no_integer_wrap_decoration};
+    AvailableExtensions = {SPV_KHR_no_integer_wrap_decoration};
   }
 }
 
 // Add the given capabilities and all their implicitly defined capabilities too
-static void addCaps(std::unordered_set<Capability::Capability> &caps,
-                    const std::vector<Capability::Capability> &toAdd) {
-  for (const auto cap : toAdd) {
-    if (caps.insert(cap).second) {
-      addCaps(caps, getCapabilityCapabilities(cap));
+static void addCaps(std::unordered_set<Capability::Capability> &Caps,
+                    const std::vector<Capability::Capability> &ToAdd) {
+  for (const auto cap : ToAdd) {
+    if (Caps.insert(cap).second) {
+      addCaps(Caps, getCapabilityCapabilities(cap));
     }
   }
 }
@@ -165,37 +162,36 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
   using namespace Capability;
   if (TT.isVulkanEnvironment()) {
     // These are the min requirements
-    addCaps(availableCaps,
+    addCaps(AvailableCaps,
             {Matrix, Shader, InputAttachment, Sampled1D, Image1D, SampledBuffer,
              ImageBuffer, ImageQuery, DerivativeControl});
   } else {
     // Add the min requirements for different OpenCL and SPIR-V versions
-    addCaps(availableCaps,
-            {Addresses, Float16Buffer, Int16, Int8, Kernel, Linkage, Vector16,
-             Groups});
-    if (openCLFullProfile) {
-      addCaps(availableCaps, {Int64, Int64Atomics});
+    addCaps(AvailableCaps, {Addresses, Float16Buffer, Int16, Int8, Kernel,
+                            Linkage, Vector16, Groups});
+    if (OpenCLFullProfile) {
+      addCaps(AvailableCaps, {Int64, Int64Atomics});
     }
-    if (openCLImageSupport) {
-      addCaps(availableCaps, {ImageBasic, LiteralSampler, Image1D,
+    if (OpenCLImageSupport) {
+      addCaps(AvailableCaps, {ImageBasic, LiteralSampler, Image1D,
                               SampledBuffer, ImageBuffer});
-      if (isAtLeastVer(targetOpenCLVersion, 20)) {
-        addCaps(availableCaps, {ImageReadWrite});
+      if (isAtLeastVer(TargetOpenCLVersion, 20)) {
+        addCaps(AvailableCaps, {ImageReadWrite});
       }
     }
-    if (isAtLeastVer(targetSPIRVVersion, 11) &&
-        isAtLeastVer(targetOpenCLVersion, 22)) {
-      addCaps(availableCaps, {SubgroupDispatch, PipeStorage});
+    if (isAtLeastVer(TargetSPIRVVersion, 11) &&
+        isAtLeastVer(TargetOpenCLVersion, 22)) {
+      addCaps(AvailableCaps, {SubgroupDispatch, PipeStorage});
     }
-    if (isAtLeastVer(targetSPIRVVersion, 13)) {
-      addCaps(availableCaps, {GroupNonUniform, GroupNonUniformVote,
-                              GroupNonUniformArithmetic, GroupNonUniformBallot,
-                              GroupNonUniformClustered, GroupNonUniformShuffle,
-                              GroupNonUniformShuffleRelative});
+    if (isAtLeastVer(TargetSPIRVVersion, 13)) {
+      addCaps(AvailableCaps,
+              {GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic,
+               GroupNonUniformBallot, GroupNonUniformClustered,
+               GroupNonUniformShuffle, GroupNonUniformShuffleRelative});
     }
 
     // TODO Remove this - it's only here because the tests assume it's supported
-    addCaps(availableCaps, {Float16, Float64});
+    addCaps(AvailableCaps, {Float16, Float64});
 
     // TODO add OpenCL extensions
   }
@@ -204,14 +200,14 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
 // TODO use command line args for this rather than just defaults
 // Must have called initAvailableExtensions first.
 void SPIRVSubtarget::initAvailableExtInstSets(const Triple &TT) {
-  if (usesVulkanEnv) {
-    availableExtInstSets.insert(ExtInstSet::GLSL_std_450);
+  if (UsesVulkanEnv) {
+    AvailableExtInstSets.insert(ExtInstSet::GLSL_std_450);
   } else {
-    availableExtInstSets.insert(ExtInstSet::OpenCL_std);
+    AvailableExtInstSets.insert(ExtInstSet::OpenCL_std);
   }
 
   // Handle extended instruction sets from extensions.
   if (canUseExtension(Extension::SPV_AMD_shader_trinary_minmax)) {
-    availableExtInstSets.insert(ExtInstSet::SPV_AMD_shader_trinary_minmax);
+    AvailableExtInstSets.insert(ExtInstSet::SPV_AMD_shader_trinary_minmax);
   }
 }

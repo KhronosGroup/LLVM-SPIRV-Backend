@@ -32,4 +32,4 @@ public:
   bool hasFP(const MachineFunction &MF) const override { return false; }
 };
 } // namespace llvm
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVFRAMELOWERING_H

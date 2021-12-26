@@ -23,4 +23,4 @@ public:
 };
 } // namespace llvm
 
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVMCINSTLOWER_H
