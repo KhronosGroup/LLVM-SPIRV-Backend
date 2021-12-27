@@ -28,24 +28,25 @@
 // Add the given string as a series of integer operand, inserting null
 // terminators and padding to make sure the operands all have 32-bit
 // little-endian words
-void addStringImm(const llvm::StringRef &str, llvm::MachineInstrBuilder &MIB);
-void addStringImm(const llvm::StringRef &str, llvm::IRBuilder<> &B,
+void addStringImm(const llvm::StringRef &Str, llvm::MachineInstrBuilder &MIB);
+void addStringImm(const llvm::StringRef &Str, llvm::IRBuilder<> &B,
                   std::vector<llvm::Value *> &Args);
 
 // Read the series of integer operands back as a null-terminated string using
 // the reverse of the logic in addStringImm
-std::string getStringImm(const llvm::MachineInstr &MI, unsigned int startIndex);
+std::string getStringImm(const llvm::MachineInstr &MI, unsigned int StartIndex);
 
 // Add the given numerical immediate to MIB.
 void addNumImm(const llvm::APInt &Imm, llvm::MachineInstrBuilder &MIB,
                bool IsFloat = false);
 
 // Add an OpName instruction for the given target register
-void buildOpName(llvm::Register target, const llvm::StringRef &name,
+void buildOpName(llvm::Register Target, const llvm::StringRef &Name,
                  llvm::MachineIRBuilder &MIRBuilder);
 
 // Add an OpDecorate instruction for the given Reg.
 void buildOpDecorate(llvm::Register Reg, llvm::MachineIRBuilder &MIRBuilder,
-    Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
-    llvm::StringRef StrImm = "");
+                     Decoration::Decoration Dec,
+                     const std::vector<uint32_t> &DecArgs,
+                     llvm::StringRef StrImm = "");
 #endif

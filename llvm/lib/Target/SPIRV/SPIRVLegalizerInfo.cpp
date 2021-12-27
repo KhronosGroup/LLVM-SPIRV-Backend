@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRV.h"
 #include "SPIRVLegalizerInfo.h"
+#include "SPIRV.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
@@ -19,12 +19,6 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
-#include "llvm/CodeGen/ValueTypes.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Type.h"
-
-#include <algorithm>
-#include <cassert>
 
 using namespace llvm;
 using namespace LegalizeActions;
@@ -125,25 +119,21 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
                     v4s32, v4s64,  v8s1,   v8s8,  v8s16, v8s32, v8s64, v16s1,
                     v16s8, v16s16, v16s32, v16s64};
 
-  for (auto Opc: getTypeFoldingSupportingOpcs())
+  for (auto Opc : getTypeFoldingSupportingOpcs())
     getActionDefinitionsBuilder(Opc).custom();
 
   getActionDefinitionsBuilder(G_GLOBAL_VALUE).alwaysLegal();
 
   // TODO: add proper rules for vectors legalization
-  getActionDefinitionsBuilder(
-      {G_BUILD_VECTOR, G_SHUFFLE_VECTOR})
-      .alwaysLegal();
+  getActionDefinitionsBuilder({G_BUILD_VECTOR, G_SHUFFLE_VECTOR}).alwaysLegal();
 
   getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE})
-      .legalIf(all(typeInSet(0, allWritablePtrs),
-                   typeInSet(1, allPtrs)));
+      .legalIf(all(typeInSet(0, allWritablePtrs), typeInSet(1, allPtrs)));
 
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 
-  getActionDefinitionsBuilder({G_LOAD, G_STORE})
-      .legalIf(typeInSet(1, allPtrs));
+  getActionDefinitionsBuilder({G_LOAD, G_STORE}).legalIf(typeInSet(1, allPtrs));
 
   // getActionDefinitionsBuilder(
   //     {G_ADD, G_SUB, G_MUL, G_SDIV, G_UDIV, G_SREM, G_UREM})
@@ -156,11 +146,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
   //     .legalFor(allScalarsAndVectors);
 
-  getActionDefinitionsBuilder(G_BITREVERSE)
-      .legalFor(allFloatScalarsAndVectors);
+  getActionDefinitionsBuilder(G_BITREVERSE).legalFor(allFloatScalarsAndVectors);
 
-  getActionDefinitionsBuilder(G_FMA)
-      .legalFor(allFloatScalarsAndVectors);
+  getActionDefinitionsBuilder(G_FMA).legalFor(allFloatScalarsAndVectors);
 
   // getActionDefinitionsBuilder({G_FADD, G_FSUB, G_FMUL, G_FDIV, G_FREM})
   //     .customFor(allFloatScalarsAndVectors);
@@ -192,14 +180,16 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   //     .legalIf(all(typeInSet(0, allVectors), typeInSet(1, allScalars),
   //                  typeInSet(2, allIntScalars),
   //                  LegalityPredicate([=](const LegalityQuery &Query) {
-  //                    return Query.Types[0].getElementType() == Query.Types[1];
+  //                    return Query.Types[0].getElementType() ==
+  //                    Query.Types[1];
   //                  })));
 
   // getActionDefinitionsBuilder(G_EXTRACT_VECTOR_ELT)
   //     .legalIf(all(typeInSet(0, allScalars), typeInSet(1, allVectors),
   //                  typeInSet(2, allIntScalars),
   //                  LegalityPredicate(([=](const LegalityQuery &Query) {
-  //                    return Query.Types[1].getElementType() == Query.Types[0];
+  //                    return Query.Types[1].getElementType() ==
+  //                    Query.Types[0];
   //                  }))));
   // getActionDefinitionsBuilder(G_BUILD_VECTOR)
   //     .legalForCartesianProduct(allVectors, {s16, s32, s64});
@@ -217,20 +207,20 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
   // getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
 
-  getActionDefinitionsBuilder(G_ICMP)
-      .customIf(all(typeInSet(0, allBoolScalarsAndVectors),
-                    typeInSet(1, allPtrsScalarsAndVectors),
-                    LegalityPredicate([&](const LegalityQuery &Query) {
-                      LLT retTy = Query.Types[0];
-                      LLT cmpTy = Query.Types[1];
-                      if (retTy.isVector())
-                        return cmpTy.isVector() &&
-                               retTy.getNumElements() == cmpTy.getNumElements();
-                      else
-                        // ST.canDirectlyComparePointers() for ponter args is
-                        // checked in legalizeCustom().
-                        return cmpTy.isScalar() || cmpTy.isPointer();
-                    })));
+  getActionDefinitionsBuilder(G_ICMP).customIf(
+      all(typeInSet(0, allBoolScalarsAndVectors),
+          typeInSet(1, allPtrsScalarsAndVectors),
+          LegalityPredicate([&](const LegalityQuery &Query) {
+            LLT retTy = Query.Types[0];
+            LLT cmpTy = Query.Types[1];
+            if (retTy.isVector())
+              return cmpTy.isVector() &&
+                     retTy.getNumElements() == cmpTy.getNumElements();
+            else
+              // ST.canDirectlyComparePointers() for ponter args is
+              // checked in legalizeCustom().
+              return cmpTy.isScalar() || cmpTy.isPointer();
+          })));
 
   getActionDefinitionsBuilder(G_FCMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
@@ -279,21 +269,34 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // Control-flow
   getActionDefinitionsBuilder(G_BRCOND).legalFor({s1});
 
-
-  getActionDefinitionsBuilder({G_FPOW, G_FEXP, G_FEXP2, G_FLOG, G_FLOG2, G_FABS,
-                               G_FMINNUM, G_FMAXNUM, G_FCEIL, G_FCOS, G_FSIN,
-                               G_FSQRT, G_FFLOOR, G_FRINT, G_FNEARBYINT,
-                               G_INTRINSIC_ROUND, G_INTRINSIC_TRUNC,
-                               G_FMINIMUM, G_FMAXIMUM, G_INTRINSIC_ROUNDEVEN})
+  getActionDefinitionsBuilder({G_FPOW,
+                               G_FEXP,
+                               G_FEXP2,
+                               G_FLOG,
+                               G_FLOG2,
+                               G_FABS,
+                               G_FMINNUM,
+                               G_FMAXNUM,
+                               G_FCEIL,
+                               G_FCOS,
+                               G_FSIN,
+                               G_FSQRT,
+                               G_FFLOOR,
+                               G_FRINT,
+                               G_FNEARBYINT,
+                               G_INTRINSIC_ROUND,
+                               G_INTRINSIC_TRUNC,
+                               G_FMINIMUM,
+                               G_FMAXIMUM,
+                               G_INTRINSIC_ROUNDEVEN})
       .legalFor(allFloatScalarsAndVectors);
 
   getActionDefinitionsBuilder(G_FCOPYSIGN)
       .legalForCartesianProduct(allFloatScalarsAndVectors,
                                 allFloatScalarsAndVectors);
 
-  getActionDefinitionsBuilder(G_FPOWI)
-      .legalForCartesianProduct(allFloatScalarsAndVectors,
-                                allIntScalarsAndVectors);
+  getActionDefinitionsBuilder(G_FPOWI).legalForCartesianProduct(
+      allFloatScalarsAndVectors, allIntScalarsAndVectors);
 
   if (ST.canUseExtInstSet(ExtInstSet::OpenCL_std)) {
     getActionDefinitionsBuilder(G_FLOG10).legalFor(allFloatScalarsAndVectors);
@@ -317,22 +320,22 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
   auto NewT = LLT::scalar(32);
   auto SpvType = TR.getSPIRVTypeForVReg(ValReg);
   assert(SpvType && "VReg is expected to have SPIRV type");
-  bool isFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
-  bool isVectorFloat =
+  bool IsFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
+  bool IsVectorFloat =
       SpvType->getOpcode() == SPIRV::OpTypeVector &&
       TR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
           SPIRV::OpTypeFloat;
-  isFloat |= isVectorFloat;
-  auto GetIdOp = isFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
-  auto DstClass = isFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
+  IsFloat |= IsVectorFloat;
+  auto GetIdOp = IsFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
+  auto DstClass = IsFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
   if (MRI.getType(ValReg).isPointer()) {
     NewT = LLT::pointer(0, 32);
     GetIdOp = SPIRV::GET_pID;
     DstClass = &SPIRV::pIDRegClass;
   } else if (MRI.getType(ValReg).isVector()) {
     NewT = LLT::fixed_vector(2, NewT);
-    GetIdOp = isFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
-    DstClass = isFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
+    GetIdOp = IsFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
+    DstClass = IsFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
   }
   auto IdReg = MRI.createGenericVirtualRegister(NewT);
   MRI.setRegClass(IdReg, DstClass);
@@ -346,17 +349,18 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     assert(Opc == TargetOpcode::G_ICMP);
     auto &MRI = MI.getMF()->getRegInfo();
     // Add missed SPIRV type to the VReg
-    // TODO: move SPIRV type detection to one place 
-    auto resVReg = MI.getOperand(0).getReg();
-    auto resType = TR->getSPIRVTypeForVReg(resVReg);
-    if (!resType) {
-      LLT Ty = MRI.getType(resVReg);
+    // TODO: move SPIRV type detection to one place
+    auto ResVReg = MI.getOperand(0).getReg();
+    auto ResType = TR->getSPIRVTypeForVReg(ResVReg);
+    if (!ResType) {
+      LLT Ty = MRI.getType(ResVReg);
       LLT BaseTy = Ty.isVector() ? Ty.getElementType() : Ty;
-      Type* LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(), BaseTy.getSizeInBits());
+      Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
+                                      BaseTy.getSizeInBits());
       if (Ty.isVector())
         LLVMTy = FixedVectorType::get(LLVMTy, Ty.getNumElements());
-      auto *spirvType = TR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
-      TR->assignSPIRVTypeToVReg(spirvType, resVReg, Helper.MIRBuilder);
+      auto *SpirvType = TR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+      TR->assignSPIRVTypeToVReg(SpirvType, ResVReg, Helper.MIRBuilder);
     }
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
@@ -367,8 +371,8 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
       auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
       auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
       auto *SpirvType = TR->getOrCreateSPIRVType(
-              IntegerType::get(MI.getMF()->getFunction().getContext(),
-                               ST->getPointerSize()),
+          IntegerType::get(MI.getMF()->getFunction().getContext(),
+                           ST->getPointerSize()),
           Helper.MIRBuilder);
       TR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
       TR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
