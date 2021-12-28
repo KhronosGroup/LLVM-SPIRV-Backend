@@ -13,7 +13,7 @@
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRV.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"

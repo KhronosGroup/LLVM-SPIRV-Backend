@@ -15,7 +15,7 @@
 #include "SPIRVEnumRequirements.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVTargetMachine.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
 

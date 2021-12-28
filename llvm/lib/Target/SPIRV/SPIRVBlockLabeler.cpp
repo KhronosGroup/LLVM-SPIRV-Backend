@@ -25,7 +25,7 @@
 #include "llvm/Pass.h"
 
 #include "SPIRVInstrInfo.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 
 using namespace llvm;
 using namespace SPIRV;

@@ -18,7 +18,7 @@
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetObjectFile.h"
 #include "SPIRVTargetTransformInfo.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"

@@ -16,7 +16,7 @@
 #include "SPIRVEnums.h"
 #include "SPIRVExtInsts.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 
 #include "llvm/IR/IntrinsicsSPIRV.h"
 

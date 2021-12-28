@@ -30,7 +30,7 @@
 #include "SPIRVCapabilityUtils.h"
 #include "SPIRVEnumRequirements.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 
 using namespace llvm;
 

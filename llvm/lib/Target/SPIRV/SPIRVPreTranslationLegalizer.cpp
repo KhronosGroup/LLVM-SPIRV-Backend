@@ -1,5 +1,5 @@
 #include "SPIRV.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVTargetMachine.h"
 
 #include "llvm/IR/IntrinsicsSPIRV.h"

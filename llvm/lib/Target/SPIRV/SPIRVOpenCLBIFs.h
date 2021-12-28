@@ -14,7 +14,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVOPENCLBIFS_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVOPENCLBIFS_H
 
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 

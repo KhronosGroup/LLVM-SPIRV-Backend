@@ -13,7 +13,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
 

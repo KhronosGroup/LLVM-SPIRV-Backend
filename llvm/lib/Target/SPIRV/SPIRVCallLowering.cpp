@@ -17,9 +17,9 @@
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/Demangle/Demangle.h"
 
