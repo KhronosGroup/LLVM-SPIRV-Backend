@@ -16,7 +16,7 @@
 #include "SPIRVEnums.h"
 #include "SPIRVExtInsts.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 
 #include "llvm/IR/IntrinsicsSPIRV.h"
 
@@ -304,7 +304,7 @@ static Register buildOpSampledImage(Register res, Register image,
                        .addUse(TR->getSPIRVTypeID(sampImTy))
                        .addUse(image)
                        .addUse(sampler);
-  TR->constrainRegOperands(SampImMIB);
+  constrainRegOperands(SampImMIB);
   return sampledImage;
 }
 
@@ -346,6 +346,14 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
   MIRBuilder.getMRI()->setType(loadedReg, llt);
   return loadedReg;
 }
+
+// Insert ASSIGN_TYPE instuction between Reg and its definition, set NewReg as
+// a dst of the definition, assign SPIRVType to both registers. If SpirvTy is
+// provided, use it as SPIRVType in ASSIGN_TYPE, otherwise create it from Ty.
+// Defined in SPIRVIRTranslator.cpp.
+extern Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
+                                  SPIRVTypeRegistry *TR, MachineIRBuilder &MIB,
+                                  MachineRegisterInfo &MRI);
 
 // These queries ask for a single size_t result for a given dimension index, e.g
 // size_t get_global_id(uintt dimindex). In SPIR-V, the builtins corresonding to
@@ -428,7 +436,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
 
     // If the index is dynamic, need check if it's < 3, and then use a select
     if (!isConstantIndex) {
-      TR->insertAssignInstr(extr, nullptr, PtrSizeTy, MIRBuilder, *MRI);
+      insertAssignInstr(extr, nullptr, PtrSizeTy, TR, MIRBuilder, *MRI);
 
       auto idxTy = TR->getSPIRVTypeForVReg(idxVReg);
       auto boolTy = TR->getOrCreateSPIRVBoolType(MIRBuilder);
@@ -509,14 +517,14 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addUse(coord)
                  .addImm(ImageOperand::Lod)
                  .addUse(lod);
-  TR->constrainRegOperands(MIB);
+  constrainRegOperands(MIB);
 
   MIB = MIRBuilder.buildInstr(SPIRV::OpCompositeExtract)
                  .addDef(resVReg)
                  .addUse(TR->getSPIRVTypeID(retType))
                  .addUse(tmpReg)
                  .addImm(0);
-  return  TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genReadImageMSAA(MachineIRBuilder &MIRBuilder, Register resVReg,
@@ -532,7 +540,7 @@ static bool genReadImageMSAA(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addUse(coord)
                  .addImm(ImageOperand::Sample)
                  .addUse(OrigArgs[2]);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
@@ -546,17 +554,16 @@ static bool genReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addUse(TR->getSPIRVTypeID(retType))
                  .addUse(image)
                  .addUse(coord);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genWriteImage(MachineIRBuilder &MIRBuilder,
-                          const SmallVectorImpl<Register> &OrigArgs,
-                          SPIRVTypeRegistry *TR) {
+                          const SmallVectorImpl<Register> &OrigArgs) {
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageWrite)
                  .addUse(OrigArgs[0])  // Image
                  .addUse(OrigArgs[1])  // Coord vec2
                  .addUse(OrigArgs[2]); // Texel to write vec4
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool buildOpImageSampleExplicitLod(MachineIRBuilder &MIRBuilder,
@@ -572,7 +579,7 @@ static bool buildOpImageSampleExplicitLod(MachineIRBuilder &MIRBuilder,
                  .addUse(coord)
                  .addImm(ImageOperand::Lod)
                  .addUse(args[3]);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static unsigned getNumComponentsForDim(Dim::Dim dim) {
@@ -636,7 +643,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
                    .addUse(img)
                    .addUse(lodReg);
   }
-  bool success = TR->constrainRegOperands(MIB);
+  bool success = constrainRegOperands(MIB);
   if (numTempComps == numRetComps || !success) {
     return success;
   }
@@ -649,7 +656,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
                    .addUse(TR->getSPIRVTypeID(retType))
                    .addUse(sizeVec)
                    .addImm(component);
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   } else {
     // Need an OpShuffleVector to make the struct vector the right size
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpVectorShuffle)
@@ -662,7 +669,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       uint32_t compIdx = i < numTempComps ? i : 0xffffffff;
       MIB.addImm(compIdx);
     }
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   }
 }
 
@@ -680,7 +687,7 @@ static bool genNumSamplesQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
                  .addDef(resVReg)
                  .addUse(TR->getSPIRVTypeID(retType))
                  .addUse(img);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genGlobalLocalQuery(MachineIRBuilder &MIRBuilder,
@@ -761,7 +768,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
                  .addUse(scopeReg)
                  .addUse(memSemReg);
 
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
@@ -789,7 +796,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
                  .addUse(scopeReg)
                  .addUse(memSemReg)
                  .addUse(OrigArgs[1]);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
@@ -873,7 +880,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
     MIRBuilder.buildInstr(OpStore).addUse(expectedArg).addUse(tmp);
     MIRBuilder.buildICmp(CmpInst::ICMP_EQ, resVReg, tmp, expected);
   }
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
@@ -917,7 +924,7 @@ static bool genAtomicRMW(Register resVReg, const SPIRVType *resType,
                  .addUse(scopeReg)
                  .addUse(memSemReg)
                  .addUse(OrigArgs[1]);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genAtomicInstr(MachineIRBuilder &MIRBuilder,
@@ -1022,7 +1029,7 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
   if (!isMemBarrier)
     MIB.addUse(scopeReg);
   MIB.addUse(memSemReg);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
@@ -1081,13 +1088,13 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
                      .addDef(ret)
                      .addUse(TR->getSPIRVTypeID(retTy))
                      .addUse(src);
-      return TR->constrainRegOperands(MIB);
+      return constrainRegOperands(MIB);
     } else if (isToFloat) { // I -> F
       auto MIB = MIRBuilder.buildInstr(srcSign ? OpConvertSToF : OpConvertUToF)
                      .addDef(ret)
                      .addUse(TR->getSPIRVTypeID(retTy))
                      .addUse(src);
-      return TR->constrainRegOperands(MIB);
+      return constrainRegOperands(MIB);
     }
   } else if (isFromFloat) {
     if (isToInt) { // F -> I
@@ -1095,13 +1102,13 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
                      .addDef(ret)
                      .addUse(TR->getSPIRVTypeID(retTy))
                      .addUse(src);
-      return TR->constrainRegOperands(MIB);
+      return constrainRegOperands(MIB);
     } else if (isToFloat) { // F -> F
       auto MIB = MIRBuilder.buildInstr(OpFConvert)
                      .addDef(ret)
                      .addUse(TR->getSPIRVTypeID(retTy))
                      .addUse(src);
-      return TR->constrainRegOperands(MIB);
+      return constrainRegOperands(MIB);
     }
   }
 
@@ -1131,7 +1138,7 @@ static bool genDotOrFMul(Register resVReg, const SPIRVType *resType,
                  .addUse(TR->getSPIRVTypeID(resType))
                  .addUse(OrigArgs[0])
                  .addUse(OrigArgs[1]);
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static Register buildScalarOrVectorBoolReg(MachineIRBuilder &MIRBuilder,
@@ -1184,7 +1191,7 @@ static bool genOpenCLRelational(MachineIRBuilder &MIRBuilder,
   for (auto arg : OrigArgs) {
      MIB.addUse(arg);
   }
-  bool Result = TR->constrainRegOperands(MIB);
+  bool Result = constrainRegOperands(MIB);
   if (!IsBoolReturn)
     // Build select instruction to convert bool result to the required type.
     return buildScalarOrVectorSelect(MIRBuilder, resVReg, cmpReg, resType, TR);
@@ -1222,7 +1229,7 @@ static bool buildSpecConstant(MachineIRBuilder &MIRBuilder, unsigned Opcode,
     else
       addNumImm(ConstOp.getFPImm()->getValueAPF().bitcastToAPInt(), MIB);
   }
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
@@ -1297,7 +1304,7 @@ static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
       MIB.addUse(OrigArgs[i]);
     }
   }
-  TR->constrainRegOperands(MIB);
+  constrainRegOperands(MIB);
   // Build select instruction
   if (hasBoolReturnTy)
     buildScalarOrVectorSelect(MIRBuilder, resVReg, groupReg, resType, TR);
@@ -1317,7 +1324,7 @@ static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
   for (const auto &arg : args) {
     MIB.addUse(arg);
   }
-  return TR->constrainRegOperands(MIB);
+  return constrainRegOperands(MIB);
 }
 
 static std::string modifyBINameForLookup(StringRef nameNoArgs, SPIRVType *retTy,
@@ -1591,7 +1598,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     break;
   case 'w':
     if (nameNoArgs.startswith("write_image"))
-      return genWriteImage(MIRBuilder, args, TR);
+      return genWriteImage(MIRBuilder, args);
     else if (nameNoArgs.startswith("work_group_barrier"))
       return genBarrier(MIRBuilder, SPIRV::OpControlBarrier, args, TR);
     break;

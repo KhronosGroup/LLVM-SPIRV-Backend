@@ -20,9 +20,46 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
 
+#include <unordered_set>
+
 using namespace llvm;
 using namespace LegalizeActions;
 using namespace LegalityPredicates;
+
+static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
+    TargetOpcode::G_ADD,
+    TargetOpcode::G_FADD,
+    TargetOpcode::G_SUB,
+    TargetOpcode::G_FSUB,
+    TargetOpcode::G_MUL,
+    TargetOpcode::G_FMUL,
+    TargetOpcode::G_SDIV,
+    TargetOpcode::G_UDIV,
+    TargetOpcode::G_FDIV,
+    TargetOpcode::G_SREM,
+    TargetOpcode::G_UREM,
+    TargetOpcode::G_FREM,
+    TargetOpcode::G_FNEG,
+    TargetOpcode::G_CONSTANT,
+    TargetOpcode::G_FCONSTANT,
+    TargetOpcode::G_AND,
+    TargetOpcode::G_OR,
+    TargetOpcode::G_XOR,
+    TargetOpcode::G_SHL,
+    TargetOpcode::G_ASHR,
+    TargetOpcode::G_LSHR,
+    TargetOpcode::G_SELECT,
+    TargetOpcode::G_EXTRACT_VECTOR_ELT,
+    // TargetOpcode::G_INSERT_VECTOR_ELT
+};
+
+static const std::unordered_set<unsigned> &getTypeFoldingSupportingOpcs() {
+  return TypeFoldingSupportingOpcs;
+}
+
+bool isTypeFoldingSupported(unsigned Opcode) {
+  return TypeFoldingSupportingOpcs.count(Opcode) > 0;
+}
 
 SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   using namespace TargetOpcode;

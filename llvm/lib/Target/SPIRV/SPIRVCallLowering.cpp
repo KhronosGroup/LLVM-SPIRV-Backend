@@ -17,7 +17,7 @@
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
@@ -37,7 +37,7 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
   assert(VRegs.size() < 2 && "All return types should use a single register");
   if (Val) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpReturnValue).addUse(VRegs[0]);
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   } else {
     MIRBuilder.buildInstr(SPIRV::OpReturn);
     return true;
@@ -276,6 +276,6 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       assert(arg.Regs.size() == 1 && "Call arg has multiple VRegs");
       MIB.addUse(arg.Regs[0]);
     }
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   }
 }

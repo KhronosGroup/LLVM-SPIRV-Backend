@@ -14,17 +14,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVIRTranslator.h"
-
 #include "SPIRV.h"
-#include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
-
-#include "llvm/IR/IntrinsicsSPIRV.h"
-
+#include "SPIRVUtils.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/IntrinsicsSPIRV.h"
 #include "llvm/Target/TargetIntrinsicInfo.h"
 
 #include <vector>
@@ -339,6 +337,172 @@ static void foldConstantsIntoIntrinsics(MachineFunction &MF) {
     MI->eraseFromParent();
 }
 
+// Translating GV, IRTranslator sometimes generates following IR:
+//   %1 = G_GLOBAL_VALUE
+//   %2 = COPY %1
+//   %3 = G_ADDRSPACE_CAST %2
+// New registers have no SPIRVType and no register class info.
+//
+// Set SPIRVType for GV, propagate it from GV to other instructions,
+// also set register classes.
+static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVTypeRegistry *TR,
+                                     MachineRegisterInfo &MRI,
+                                     MachineIRBuilder &MIB) {
+  SPIRVType *SpirvTy = nullptr;
+  assert(MI && "Machine instr is expected");
+  if (MI->getOperand(0).isReg()) {
+    auto Reg = MI->getOperand(0).getReg();
+    SpirvTy = TR->getSPIRVTypeForVReg(Reg);
+    if (!SpirvTy) {
+      switch (MI->getOpcode()) {
+      case TargetOpcode::G_CONSTANT: {
+        MIB.setInsertPt(*MI->getParent(), MI);
+        Type *Ty = MI->getOperand(1).getCImm()->getType();
+        SpirvTy = TR->getOrCreateSPIRVType(Ty, MIB);
+        break;
+      }
+      case TargetOpcode::G_GLOBAL_VALUE: {
+        MIB.setInsertPt(*MI->getParent(), MI);
+        Type *Ty = MI->getOperand(1).getGlobal()->getType();
+        SpirvTy = TR->getOrCreateSPIRVType(Ty, MIB);
+        break;
+      }
+      case TargetOpcode::G_TRUNC:
+      case TargetOpcode::G_ADDRSPACE_CAST:
+      case TargetOpcode::COPY: {
+        auto Op = MI->getOperand(1);
+        auto *Def = Op.isReg() ? MRI.getVRegDef(Op.getReg()) : nullptr;
+        if (Def)
+          SpirvTy = propagateSPIRVType(Def, TR, MRI, MIB);
+        break;
+      }
+      default:
+        break;
+      }
+      if (SpirvTy)
+        TR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+      if (!MRI.getRegClassOrNull(Reg))
+        MRI.setRegClass(Reg, &SPIRV::IDRegClass);
+    }
+  }
+  return SpirvTy;
+}
+
+// Insert ASSIGN_TYPE instuction between Reg and its definition, set NewReg as
+// a dst of the definition, assign SPIRVType to both registers. If SpirvTy is
+// provided, use it as SPIRVType in ASSIGN_TYPE, otherwise create it from Ty.
+// It's used also in SPIRVOpenCLBIFs.cpp.
+Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
+                           SPIRVTypeRegistry *TR, MachineIRBuilder &MIB,
+                           MachineRegisterInfo &MRI) {
+  auto *Def = MRI.getVRegDef(Reg);
+  assert((Ty || SpirvTy) && "Either LLVM or SPIRV type is expected.");
+  MIB.setInsertPt(*Def->getParent(),
+                  (Def->getNextNode() ? Def->getNextNode()->getIterator()
+                                      : Def->getParent()->end()));
+  auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+  if (auto *RC = MRI.getRegClassOrNull(Reg))
+    MRI.setRegClass(NewReg, RC);
+  SpirvTy = SpirvTy ? SpirvTy : TR->getOrCreateSPIRVType(Ty, MIB);
+  TR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+  // This is to make it convenient for Legalizer to get the SPIRVType
+  // when processing the actual MI (i.e. not pseudo one).
+  TR->assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB);
+  auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+                   .addDef(Reg)
+                   .addUse(NewReg)
+                   .addUse(TR->getSPIRVTypeID(SpirvTy));
+  Def->getOperand(0).setReg(NewReg);
+  constrainRegOperands(NewMI, &MIB.getMF());
+  return NewReg;
+}
+
+static void generateAssignInstrs(MachineFunction &MF, SPIRVTypeRegistry *TR) {
+  MachineIRBuilder MIB(MF);
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  std::vector<MachineInstr *> ToDelete;
+
+  for (MachineBasicBlock *MBB : post_order(&MF)) {
+    if (MBB->empty())
+      continue;
+
+    bool ReachedBegin = false;
+    for (auto MII = std::prev(MBB->end()), Begin = MBB->begin();
+         !ReachedBegin;) {
+      MachineInstr &MI = *MII;
+
+      if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+          MI.getOperand(0).isIntrinsicID() &&
+          MI.getOperand(0).getIntrinsicID() == Intrinsic::spv_assign_type) {
+        auto Reg = MI.getOperand(1).getReg();
+        auto *Ty =
+            cast<ValueAsMetadata>(MI.getOperand(2).getMetadata()->getOperand(0))
+                ->getType();
+        auto *Def = MRI.getVRegDef(Reg);
+        assert(Def && "Expecting an instruction that defines the register");
+        // G_GLOBAL_VALUE already has type info.
+        if (Def->getOpcode() != TargetOpcode::G_GLOBAL_VALUE)
+          insertAssignInstr(Reg, Ty, nullptr, TR, MIB, MF.getRegInfo());
+        ToDelete.push_back(&MI);
+      } else if (MI.getOpcode() == TargetOpcode::G_CONSTANT ||
+                 MI.getOpcode() == TargetOpcode::G_FCONSTANT ||
+                 MI.getOpcode() == TargetOpcode::G_BUILD_VECTOR) {
+        // %rc = G_CONSTANT ty Val
+        // ===>
+        // %cty = OpType* ty
+        // %rctmp = G_CONSTANT ty Val
+        // %rc = ASSIGN_TYPE %rctmp, %cty
+        auto Reg = MI.getOperand(0).getReg();
+        if (MRI.hasOneUse(Reg) &&
+            MRI.use_instr_begin(Reg)->getOpcode() ==
+                TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+            (MRI.use_instr_begin(Reg)->getIntrinsicID() ==
+                 Intrinsic::spv_assign_type ||
+             MRI.use_instr_begin(Reg)->getIntrinsicID() ==
+                 Intrinsic::spv_assign_name))
+          continue;
+
+        auto &MRI = MF.getRegInfo();
+        Type *Ty = nullptr;
+        if (MI.getOpcode() == TargetOpcode::G_CONSTANT)
+          Ty = MI.getOperand(1).getCImm()->getType();
+        else if (MI.getOpcode() == TargetOpcode::G_FCONSTANT)
+          Ty = MI.getOperand(1).getFPImm()->getType();
+        else {
+          assert(MI.getOpcode() == TargetOpcode::G_BUILD_VECTOR);
+          Type *ElemTy = nullptr;
+          auto *ElemMI = MRI.getVRegDef(MI.getOperand(1).getReg());
+          assert(ElemMI);
+
+          if (ElemMI->getOpcode() == TargetOpcode::G_CONSTANT)
+            ElemTy = ElemMI->getOperand(1).getCImm()->getType();
+          else if (ElemMI->getOpcode() == TargetOpcode::G_FCONSTANT)
+            ElemTy = ElemMI->getOperand(1).getFPImm()->getType();
+          else
+            assert(0);
+          Ty = VectorType::get(
+              ElemTy, MI.getNumExplicitOperands() - MI.getNumExplicitDefs(),
+              false);
+        }
+        insertAssignInstr(Reg, Ty, nullptr, TR, MIB, MRI);
+      } else if (MI.getOpcode() == TargetOpcode::G_TRUNC ||
+                 MI.getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
+                 MI.getOpcode() == TargetOpcode::COPY ||
+                 MI.getOpcode() == TargetOpcode::G_ADDRSPACE_CAST) {
+        propagateSPIRVType(&MI, TR, MRI, MIB);
+      }
+
+      if (MII == Begin)
+        ReachedBegin = true;
+      else
+        --MII;
+    }
+  }
+
+  for (auto &MI : ToDelete)
+    MI->eraseFromParent();
+}
+
 bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
@@ -351,7 +515,7 @@ bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   bool Success = IRTranslator::runOnMachineFunction(MF);
   addConstantsToTrack(MF, DT);
   foldConstantsIntoIntrinsics(MF);
-  TR->generateAssignInstrs(MF);
+  generateAssignInstrs(MF, TR);
 
   return Success;
 }

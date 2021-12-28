@@ -27,9 +27,9 @@
 #include "SPIRV.h"
 #include "SPIRVCapabilityUtils.h"
 #include "SPIRVEnumRequirements.h"
-#include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTypeRegistry.h"
+#include "SPIRVUtils.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 
 #include "llvm/CodeGen/MachineModuleInfo.h"
@@ -828,7 +828,7 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
        I != E;) {
     GlobalVariable *GV = &*I++;
     auto AddrSpace = GV->getAddressSpace();
-    auto Storage = TR->addressSpaceToStorageClass(AddrSpace);
+    auto Storage = addressSpaceToStorageClass(AddrSpace);
     if (Storage != StorageClass::Function) {
       auto t = Map.find(GV);
       if (t == Map.end())
@@ -865,7 +865,7 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
                      .addDef(Res)
                      .addUse(TR->getSPIRVTypeID(ResType))
                      .addImm(Imm.getZExtValue());
-      TR->constrainRegOperands(MIB);
+      constrainRegOperands(MIB);
       ToRemove.push_back(&MI);
     }
   }

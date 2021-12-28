@@ -18,10 +18,10 @@
 #include "SPIRVInstrInfo.h"
 #include "SPIRVRegisterBankInfo.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVStrings.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "SPIRVTypeRegistry.h"
+#include "SPIRVUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelectorImpl.h"
@@ -231,6 +231,9 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(
 #undef GET_GLOBALISEL_TEMPORARIES_INIT
 {
 }
+
+// Defined in SPIRVLegalizerInfo.cpp
+extern bool isTypeFoldingSupported(unsigned Opcode);
 
 bool SPIRVInstructionSelector::select(MachineInstr &I) {
   assert(I.getParent() && "Instruction should be in a basic block!");
@@ -1205,7 +1208,7 @@ SPIRVInstructionSelector::buildOnesVal(bool AllOnes, const SPIRVType *ResType,
     for (unsigned i = 0; i < NumEles; ++i) {
       MIB.addUse(OneReg);
     }
-    TR.constrainRegOperands(MIB);
+    constrainRegOperands(MIB);
     return OneVec;
   } else {
     return OneReg;
@@ -1585,7 +1588,7 @@ bool SPIRVInstructionSelector::selectGlobalValue(
     return true;
 
   auto AddrSpace = GV->getAddressSpace();
-  auto Storage = TR.addressSpaceToStorageClass(AddrSpace);
+  auto Storage = addressSpaceToStorageClass(AddrSpace);
   bool HasLnkTy = GV->getLinkage() != GlobalValue::InternalLinkage &&
                   Storage != StorageClass::Function;
   auto LnkType = (GV->isDeclaration() || GV->hasAvailableExternallyLinkage())

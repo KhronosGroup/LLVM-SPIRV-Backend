@@ -14,8 +14,9 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 
 #include "SPIRVTypeRegistry.h"
-
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
+
+bool isTypeFoldingSupported(unsigned Opcode);
 
 namespace llvm {
 

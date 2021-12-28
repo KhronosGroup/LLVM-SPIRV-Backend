@@ -36,11 +36,11 @@ add_llvm_target(SPIRVCodeGen
   SPIRVOpenCLBIFs.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
-  SPIRVStrings.cpp
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
   SPIRVPreTranslationLegalizer.cpp
   SPIRVTypeRegistry.cpp
+  SPIRVUtils.cpp
 
   LINK_COMPONENTS
   AsmPrinter
