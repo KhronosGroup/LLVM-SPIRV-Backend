@@ -283,13 +283,13 @@ static void addConstantsToTrack(MachineFunction &MF,
             RegsAlreadyAddedToDT[&MI] = Reg;
             // This MI is unused and will be removed. If the MI uses
             // const_composite, it will be unused and should be removed too.
-            assert (MI.getOperand(2).isReg() && "Reg operand is expected");
+            assert(MI.getOperand(2).isReg() && "Reg operand is expected");
             MachineInstr *SrcMI = MRI.getVRegDef(MI.getOperand(2).getReg());
-            if (SrcMI && SrcMI->getOpcode() ==
-                TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+            if (SrcMI &&
+                SrcMI->getOpcode() ==
+                    TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
                 SrcMI->getIntrinsicID() == Intrinsic::spv_const_composite)
               ToEraseComposites.push_back(SrcMI);
-
           }
         }
       }
@@ -348,10 +348,10 @@ bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   TR->setCurrentFunc(MF);
 
   // Run the regular IRTranslator
-  bool success = IRTranslator::runOnMachineFunction(MF);
+  bool Success = IRTranslator::runOnMachineFunction(MF);
   addConstantsToTrack(MF, DT);
   foldConstantsIntoIntrinsics(MF);
   TR->generateAssignInstrs(MF);
 
-  return success;
+  return Success;
 }

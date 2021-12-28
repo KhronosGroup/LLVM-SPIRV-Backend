@@ -110,50 +110,50 @@ static void setMetaBlock(MachineIRBuilder &MetaBuilder, MetaBlockType block) {
 using LocalToGlobalRegTable = std::map<Register, Register>;
 
 // Retrieve an unsigned int from an MDNode with a list of them as operands
-static unsigned int getMetadataUInt(MDNode *mdNode, unsigned int opIndex,
-                                    unsigned int defaultVal = 0) {
-  if (mdNode && opIndex < mdNode->getNumOperands()) {
-    const auto &op = mdNode->getOperand(opIndex);
-    return mdconst::extract<ConstantInt>(op)->getZExtValue();
+static unsigned int getMetadataUInt(MDNode *MdNode, unsigned int OpIndex,
+                                    unsigned int DefaultVal = 0) {
+  if (MdNode && OpIndex < MdNode->getNumOperands()) {
+    const auto &Op = MdNode->getOperand(OpIndex);
+    return mdconst::extract<ConstantInt>(Op)->getZExtValue();
   } else {
-    return defaultVal;
+    return DefaultVal;
   }
 }
 
 // Add some initial header instructions such as OpSource and OpMemoryModel
 // TODO Maybe move the environment-specific logic used here elsewhere.
 static void addHeaderOps(Module &M, MachineIRBuilder &MIRBuilder,
-                         SPIRVRequirementHandler &reqs,
+                         SPIRVRequirementHandler &Reqs,
                          const SPIRVSubtarget &ST) {
   setMetaBlock(MIRBuilder, MB_MemoryModel);
-  unsigned ptrSize = ST.getPointerSize();
+  unsigned PtrSize = ST.getPointerSize();
 
   // Add OpMemoryModel
   using namespace AddressingModel;
-  auto addr = ptrSize == 32 ? Physical32 : ptrSize == 64 ? Physical64 : Logical;
-  auto mem = MemoryModel::OpenCL;
-  MIRBuilder.buildInstr(SPIRV::OpMemoryModel).addImm(addr).addImm(mem);
+  auto Addr = PtrSize == 32 ? Physical32 : PtrSize == 64 ? Physical64 : Logical;
+  auto Mem = MemoryModel::OpenCL;
+  MIRBuilder.buildInstr(SPIRV::OpMemoryModel).addImm(Addr).addImm(Mem);
 
   // Update required capabilities for this memory model
-  reqs.addRequirements(getMemoryModelRequirements(mem, ST));
-  reqs.addRequirements(getAddressingModelRequirements(addr, ST));
+  Reqs.addRequirements(getMemoryModelRequirements(Mem, ST));
+  Reqs.addRequirements(getAddressingModelRequirements(Addr, ST));
 
   // Get the OpenCL version number from metadata
-  unsigned openCLVersion = 0;
-  if (auto verNode = M.getNamedMetadata("opencl.ocl.version")) {
+  unsigned OpenCLVersion = 0;
+  if (auto VerNode = M.getNamedMetadata("opencl.ocl.version")) {
     // Construct version literal according to OpenCL 2.2 environment spec.
-    auto versionMD = verNode->getOperand(0);
-    unsigned majorNum = getMetadataUInt(versionMD, 0, 2);
-    unsigned minorNum = getMetadataUInt(versionMD, 1);
-    unsigned revNum = getMetadataUInt(versionMD, 2);
-    openCLVersion = 0 | (majorNum << 16) | (minorNum << 8) | revNum;
+    auto VersionMD = VerNode->getOperand(0);
+    unsigned MajorNum = getMetadataUInt(VersionMD, 0, 2);
+    unsigned MinorNum = getMetadataUInt(VersionMD, 1);
+    unsigned RevNum = getMetadataUInt(VersionMD, 2);
+    OpenCLVersion = 0 | (MajorNum << 16) | (MinorNum << 8) | RevNum;
     setMetaBlock(MIRBuilder, MB_DebugSourceAndStrings);
   }
 
   // Build the OpSource
-  auto srcLang = SourceLanguage::OpenCL_C;
-  MIRBuilder.buildInstr(SPIRV::OpSource).addImm(srcLang).addImm(openCLVersion);
-  reqs.addRequirements(getSourceLanguageRequirements(srcLang, ST));
+  auto SrcLang = SourceLanguage::OpenCL_C;
+  MIRBuilder.buildInstr(SPIRV::OpSource).addImm(SrcLang).addImm(OpenCLVersion);
+  Reqs.addRequirements(getSourceLanguageRequirements(SrcLang, ST));
 }
 
 // Create a new Function and MachineFunction for the given MachineIRBuilder to
@@ -167,14 +167,14 @@ static void initMetaBlockBuilder(Module &M, MachineModuleInfo &MMI,
   auto VoidType = Type::getVoidTy(M.getContext());
   auto FType = FunctionType::get(VoidType, false);
   auto Linkage = Function::LinkageTypes::InternalLinkage;
-  Function *f = Function::Create(FType, Linkage, "GlobalStuff");
+  Function *F = Function::Create(FType, Linkage, "GlobalStuff");
 
   // Add the function and a corresponding MachineFunction to the module
-  f->getBasicBlockList().push_back(BasicBlock::Create(M.getContext()));
-  M.getFunctionList().push_front(f);
+  F->getBasicBlockList().push_back(BasicBlock::Create(M.getContext()));
+  M.getFunctionList().push_front(F);
 
   // Add the necessary basic blocks according to the MetaBlockTypes enum.
-  MachineFunction &MetaMF = MMI.getOrCreateMachineFunction(*f);
+  MachineFunction &MetaMF = MMI.getOrCreateMachineFunction(*F);
   for (unsigned int i = 0; i < NUM_META_BLOCKS; ++i) {
     MachineBasicBlock *MetaMBB = MetaMF.CreateMachineBasicBlock();
     MetaMF.push_back(MetaMBB);
@@ -189,9 +189,9 @@ using LocalAliasTablesTy = std::map<MachineFunction *, LocalToGlobalRegTable>;
 
 template <typename T>
 static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
-                           const SPIRVDuplicatesTracker<T> *DT,
-                           SPIRVTypeRegistry* TR, MetaBlockType MBType,
-                           LocalAliasTablesTy &LocalAliasTables) {
+                                 const SPIRVDuplicatesTracker<T> *DT,
+                                 SPIRVTypeRegistry *TR, MetaBlockType MBType,
+                                 LocalAliasTablesTy &LocalAliasTables) {
   // FIXME: setMetaBlock
   setMetaBlock(MetaBuilder, MBType);
   // Make meta registers for entries of DT.
@@ -206,14 +206,14 @@ static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
     }
   }
   // Make meta registers for special types and constants collected in the map.
-  if(std::is_same<T,Type>::value) {
+  if (std::is_same<T, Type>::value) {
     for (auto &CU : TR->getSpecialTypesAndConstsMap()) {
       for (auto &typeGroup : CU.second) {
         auto MetaReg =
             MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
         for (auto &t : typeGroup) {
-          MachineFunction* MF = t.first;
-          assert (t.second->getOperand(0).isReg());
+          MachineFunction *MF = t.first;
+          assert(t.second->getOperand(0).isReg());
           Register reg = t.second->getOperand(0).getReg();
           LocalAliasTables[MF][reg] = MetaReg;
         }
@@ -223,8 +223,8 @@ static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
 }
 
 template <typename T>
-static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
-                          Register Reg, MachineFunction *MF,
+static void hoistGlobalOp(MachineIRBuilder &MetaBuilder, Register Reg,
+                          MachineFunction *MF,
                           SmallVector<MachineInstr *, 8> &ToRemove,
                           LocalAliasTablesTy &LocalAliasTables) {
   assert(LocalAliasTables[MF].find(Reg) != LocalAliasTables[MF].end() &&
@@ -246,17 +246,17 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
       } else if (Op.isFPImm()) {
         MIB.addFPImm(Op.getFPImm());
       } else if (Op.isReg()) {
-        auto metaRegID = LocalAliasTables[MF].find(Op.getReg());
-        if (metaRegID != LocalAliasTables[MF].end()) {
-          Register metaReg = metaRegID->second;
-          assert(metaReg.isValid() && "No reg alias found");
-          MIB.addUse(metaReg);
+        auto MetaRegID = LocalAliasTables[MF].find(Op.getReg());
+        if (MetaRegID != LocalAliasTables[MF].end()) {
+          Register MetaReg2 = MetaRegID->second;
+          assert(MetaReg2.isValid() && "No reg alias found");
+          MIB.addUse(MetaReg2);
         } else {
           llvm_unreachable("Generate WRONG type!\n");
         }
       } else {
         llvm_unreachable(
-          "Unexpected operand type when copying spirv meta instr");
+            "Unexpected operand type when copying spirv meta instr");
       }
     }
   }
@@ -265,7 +265,7 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder,
 template <typename T>
 static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
                            const SPIRVDuplicatesTracker<T> *DT,
-                           SPIRVTypeRegistry* TR, MetaBlockType MBType,
+                           SPIRVTypeRegistry *TR, MetaBlockType MBType,
                            LocalAliasTablesTy &LocalAliasTables) {
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
@@ -274,19 +274,19 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
-      // Some instructions may be deleted during global isel, so hoist only those
-      // that exist in current IR.
+      // Some instructions may be deleted during global isel, so hoist only
+      // those that exist in current IR.
       if (MF->getRegInfo().getVRegDef(Reg))
         hoistGlobalOp<T>(MetaBuilder, Reg, MF, ToRemove, LocalAliasTables);
     }
   }
   // Hoist special types and constants collected in the map.
-  if(std::is_same<T,Type>::value) {
+  if (std::is_same<T, Type>::value) {
     for (auto &CU : TR->getSpecialTypesAndConstsMap())
-      for (auto &typeGroup : CU.second)
-        for (auto &t : typeGroup) {
-          MachineFunction* MF = t.first;
-          assert (t.second->getOperand(0).isReg());
+      for (auto &TypeGroup : CU.second)
+        for (auto &t : TypeGroup) {
+          MachineFunction *MF = t.first;
+          assert(t.second->getOperand(0).isReg());
           Register Reg = t.second->getOperand(0).getReg();
           hoistGlobalOp<T>(MetaBuilder, Reg, MF, ToRemove, LocalAliasTables);
         }
@@ -308,9 +308,9 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
 // in CallLowering
 template <>
 void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
-                           const SPIRVDuplicatesTracker<Function> *DT,
-                           SPIRVTypeRegistry* TR, MetaBlockType MBType,
-                           LocalAliasTablesTy &LocalAliasTables) {
+                    const SPIRVDuplicatesTracker<Function> *DT,
+                    SPIRVTypeRegistry *TR, MetaBlockType MBType,
+                    LocalAliasTablesTy &LocalAliasTables) {
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
 
@@ -347,9 +347,9 @@ void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
             } else if (Op.isFPImm()) {
               MIB.addFPImm(Op.getFPImm());
             } else if (Op.isReg()) {
-              Register metaReg = LocalAliasTables[MF].at(Op.getReg());
-              assert(metaReg.isValid() && "No reg alias found");
-              MIB.addUse(metaReg);
+              Register MetaReg2 = LocalAliasTables[MF].at(Op.getReg());
+              assert(MetaReg2.isValid() && "No reg alias found");
+              MIB.addUse(MetaReg2);
             } else {
               errs() << *ToHoist << "\n";
               llvm_unreachable(
@@ -385,15 +385,16 @@ void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
 static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
                                    MachineIRBuilder &MIRBuilder,
                                    LocalAliasTablesTy &LocalAliasTables,
-                                   SPIRVRequirementHandler &reqs) {
-  const auto *ST = static_cast<const SPIRVSubtarget *>(&MIRBuilder.getMF().getSubtarget());
+                                   SPIRVRequirementHandler &Reqs) {
+  const auto *ST =
+      static_cast<const SPIRVSubtarget *>(&MIRBuilder.getMF().getSubtarget());
   auto *DT = ST->getSPIRVDuplicatesTracker();
   auto TR = ST->getSPIRVTypeRegistry();
 
   // OpTypes and OpConstants can have cross references so at first we create
   // new meta regs and map them to old regs, then walk the list of instructions,
-  // and create new (hoisted) instructions with new meta regs instead of old ones.
-  // Also there are references to global values in constants.
+  // and create new (hoisted) instructions with new meta regs instead of old
+  // ones. Also there are references to global values in constants.
   fillLocalAliasTables<Type>(MIRBuilder, DT->get<Type>(), TR, MB_TypeConstVars,
                              LocalAliasTables);
   fillLocalAliasTables<Constant>(MIRBuilder, DT->get<Constant>(), TR,
@@ -410,22 +411,22 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
 
   // Iterate through and hoist any instructions we can at this stage.
   // bool hasSeenFirstOpFunction = false;
-  SmallVector<MachineInstr *, 16> toRemove;
+  SmallVector<MachineInstr *, 16> ToRemove;
   for (MachineBasicBlock &MBB : *MF) {
     for (MachineInstr &MI : MBB) {
       if (MI.getOpcode() == SPIRV::OpExtension) {
         // Here, OpExtension just has a single enum operand, not a string
-        auto ext = Extension::Extension(MI.getOperand(0).getImm());
-        reqs.addExtension(ext);
-        toRemove.push_back(&MI);
+        auto Ext = Extension::Extension(MI.getOperand(0).getImm());
+        Reqs.addExtension(Ext);
+        ToRemove.push_back(&MI);
       } else if (MI.getOpcode() == SPIRV::OpCapability) {
-        auto cap = Capability::Capability(MI.getOperand(0).getImm());
-        reqs.addCapability(cap);
-        toRemove.push_back(&MI);
+        auto Cap = Capability::Capability(MI.getOperand(0).getImm());
+        Reqs.addCapability(Cap);
+        ToRemove.push_back(&MI);
       }
     }
   }
-  for (MachineInstr *MI : toRemove) {
+  for (MachineInstr *MI : ToRemove) {
     MI->removeFromParent();
   }
   END_FOR_MF_IN_MODULE()
@@ -440,14 +441,14 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
 // True when all the operands of an instruction are an exact match (after the
 // given starting index).
 static bool allOpsMatch(const MachineInstr &A, const MachineInstr &B,
-                        unsigned int startOpIndex = 0) {
-  const unsigned int numAOps = A.getNumOperands();
-  if (numAOps == B.getNumOperands() && A.getNumDefs() == B.getNumDefs()) {
-    bool allOpsMatch = true;
-    for (unsigned i = startOpIndex; i < numAOps && allOpsMatch; ++i) {
-      allOpsMatch = A.getOperand(i).isIdenticalTo(B.getOperand(i));
+                        unsigned int StartOpIndex = 0) {
+  const unsigned int NumAOps = A.getNumOperands();
+  if (NumAOps == B.getNumOperands() && A.getNumDefs() == B.getNumDefs()) {
+    bool AllOpsMatch = true;
+    for (unsigned i = StartOpIndex; i < NumAOps && AllOpsMatch; ++i) {
+      AllOpsMatch = A.getOperand(i).isIdenticalTo(B.getOperand(i));
     }
-    if (allOpsMatch)
+    if (AllOpsMatch)
       return true;
   }
   return false;
@@ -457,40 +458,40 @@ static void addOpExtInstImports(Module &M, MachineModuleInfo &MMI,
                                 MachineIRBuilder &MIRBuilder,
                                 LocalAliasTablesTy &LocalAliasTables) {
 
-  std::set<ExtInstSet> usedExtInstSets = {ExtInstSet::OpenCL_std};
+  std::set<ExtInstSet> UsedExtInstSets = {ExtInstSet::OpenCL_std};
   SmallVector<std::pair<MachineInstr *, LocalToGlobalRegTable *>, 8>
-      extInstInstrs;
+      ExtInstInstrs;
 
   // Record all OpExtInst instuctions and the instruction sets they use
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
   for (MachineBasicBlock &MBB : *MF) {
     for (MachineInstr &MI : MBB) {
       if (MI.getOpcode() == SPIRV::OpExtInst) {
-        auto set = static_cast<ExtInstSet>(MI.getOperand(2).getImm());
-        usedExtInstSets.insert(set);
-        extInstInstrs.push_back({&MI, &LocalAliasTables[MF]});
+        auto Set = static_cast<ExtInstSet>(MI.getOperand(2).getImm());
+        UsedExtInstSets.insert(Set);
+        ExtInstInstrs.push_back({&MI, &LocalAliasTables[MF]});
       }
     }
   }
   END_FOR_MF_IN_MODULE()
 
-  std::map<ExtInstSet, Register> setEnumToGlobalIDReg;
+  std::map<ExtInstSet, Register> SetEnumToGlobalIDReg;
 
   setMetaBlock(MIRBuilder, MB_ExtInstImports);
   auto MetaMRI = MIRBuilder.getMRI();
-  for (const auto set : usedExtInstSets) {
-    auto setReg = MetaMRI->createVirtualRegister(&SPIRV::IDRegClass);
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInstImport).addDef(setReg);
-    addStringImm(getExtInstSetName(set), MIB);
-    setEnumToGlobalIDReg.insert({set, setReg});
+  for (const auto Set : UsedExtInstSets) {
+    auto SetReg = MetaMRI->createVirtualRegister(&SPIRV::IDRegClass);
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInstImport).addDef(SetReg);
+    addStringImm(getExtInstSetName(Set), MIB);
+    SetEnumToGlobalIDReg.insert({Set, SetReg});
   }
 
   // Replace all OpFunctionCalls with new ones referring to funcID vregs
-  for (const auto &entry : extInstInstrs) {
-    auto *MI = entry.first;
-    auto *aliasTable = entry.second;
+  for (const auto &Entry : ExtInstInstrs) {
+    auto *MI = Entry.first;
+    auto *AliasTable = Entry.second;
 
-    auto extInstSet = static_cast<ExtInstSet>(MI->getOperand(2).getImm());
+    auto ExtInstSetVar = static_cast<ExtInstSet>(MI->getOperand(2).getImm());
 
     MachineIRBuilder MIRBuilder;
     MIRBuilder.setMF(*MI->getMF());
@@ -498,9 +499,9 @@ static void addOpExtInstImports(Module &M, MachineModuleInfo &MMI,
 
     // Ensure the mapping between local and global vregs is maintained for the
     // later reg numbering phase
-    auto localReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-    auto globalReg = setEnumToGlobalIDReg[extInstSet];
-    aliasTable->insert({localReg, globalReg});
+    auto LocalReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+    auto GlobalReg = SetEnumToGlobalIDReg[ExtInstSetVar];
+    AliasTable->insert({LocalReg, GlobalReg});
 
     // Create a new copy of the OpExtInst but with the IDVReg for the imported
     // instruction set rather than an enum, then delete the old instruction.
@@ -509,9 +510,9 @@ static void addOpExtInstImports(Module &M, MachineModuleInfo &MMI,
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInst)
                    .addDef(MI->getOperand(0).getReg())
                    .addUse(MI->getOperand(1).getReg())
-                   .addUse(localReg);
-    const unsigned int numOps = MI->getNumOperands();
-    for (unsigned int i = 3; i < numOps; ++i) {
+                   .addUse(LocalReg);
+    const unsigned int NumOps = MI->getNumOperands();
+    for (unsigned int i = 3; i < NumOps; ++i) {
       MIB.add(MI->getOperand(i));
     }
 
@@ -522,8 +523,8 @@ static void addOpExtInstImports(Module &M, MachineModuleInfo &MMI,
 // We need to add dummy registers whenever we need to reference a VReg that
 // might be beyond the number of virtual registers declared in the function so
 // far. This stops addUse and setReg from crashing when we use the new index.
-static void addDummyVRegsUpToIndex(unsigned index, MachineRegisterInfo &MRI) {
-  while (index >= MRI.getNumVirtRegs()) {
+static void addDummyVRegsUpToIndex(unsigned Index, MachineRegisterInfo &MRI) {
+  while (Index >= MRI.getNumVirtRegs()) {
     MRI.createVirtualRegister(&SPIRV::IDRegClass);
   }
 }
@@ -535,9 +536,9 @@ static void addDummyVRegsUpToIndex(unsigned index, MachineRegisterInfo &MRI) {
 // detecting duplicates, rather than having to use local-to-global alias tables.
 static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
                                          MachineIRBuilder &MIRBuilder,
-                                         MetaBlockType mbType) {
+                                         MetaBlockType MbType) {
 
-  setMetaBlock(MIRBuilder, mbType);
+  setMetaBlock(MIRBuilder, MbType);
   auto &MBB = MIRBuilder.getMBB();
   for (const auto &I : MBB) {
     if (allOpsMatch(MI, I))
@@ -546,16 +547,16 @@ static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
 
   // No duplicates, so add it
   auto &MetaMRI = MIRBuilder.getMF().getRegInfo();
-  const unsigned numOperands = MI.getNumOperands();
+  const unsigned NumOperands = MI.getNumOperands();
   auto MIB = MIRBuilder.buildInstr(MI.getOpcode());
-  for (unsigned i = 0; i < numOperands; ++i) {
-    MachineOperand op = MI.getOperand(i);
-    if (op.isImm()) {
-      MIB.addImm(op.getImm());
-    } else if (op.isReg()) {
+  for (unsigned i = 0; i < NumOperands; ++i) {
+    MachineOperand Op = MI.getOperand(i);
+    if (Op.isImm()) {
+      MIB.addImm(Op.getImm());
+    } else if (Op.isReg()) {
       // Add dummy regs to stop addUse crashing if Reg > max regs in func so far
-      addDummyVRegsUpToIndex(op.getReg().virtRegIndex(), MetaMRI);
-      MIB.addUse(op.getReg());
+      addDummyVRegsUpToIndex(Op.getReg().virtRegIndex(), MetaMRI);
+      MIB.addUse(Op.getReg());
     } else {
       errs() << MI << "\n";
       llvm_unreachable("Unexpected operand type when copying spirv meta instr");
@@ -563,28 +564,28 @@ static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
   }
 }
 
-static void
-extractInstructionsWithGlobalRegsToMetablockForMBB(MachineBasicBlock &MBB,
-    const SPIRVInstrInfo *TII, MachineIRBuilder &MIRBuilder) {
-  SmallVector<MachineInstr *, 16> toRemove;
+static void extractInstructionsWithGlobalRegsToMetablockForMBB(
+    MachineBasicBlock &MBB, const SPIRVInstrInfo *TII,
+    MachineIRBuilder &MIRBuilder) {
+  SmallVector<MachineInstr *, 16> ToRemove;
   for (MachineInstr &MI : MBB) {
     const unsigned OpCode = MI.getOpcode();
     if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_DebugNames);
-      toRemove.push_back(&MI);
+      ToRemove.push_back(&MI);
     } else if (OpCode == SPIRV::OpEntryPoint) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_EntryPoints);
-      toRemove.push_back(&MI);
+      ToRemove.push_back(&MI);
     } else if (TII->isDecorationInstr(MI)) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_Annotations);
-      toRemove.push_back(&MI);
+      ToRemove.push_back(&MI);
     } else if (TII->isConstantInstr(MI)) {
       // Now OpSpecConstant*s are not in DT, but they need to be hoisted anyway.
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_TypeConstVars);
-      toRemove.push_back(&MI);
+      ToRemove.push_back(&MI);
     }
   }
-  for (MachineInstr *MI : toRemove) {
+  for (MachineInstr *MI : ToRemove) {
     MI->removeFromParent();
   }
 }
@@ -620,26 +621,26 @@ static void addEntryPointLinkageInterfaces(Module &M, MachineModuleInfo &MMI,
                                            MachineIRBuilder &MIRBuilder) {
   // Find all IDs with Import linkage by examining OpDecorates
   setMetaBlock(MIRBuilder, MB_Annotations);
-  auto &decMBB = MIRBuilder.getMBB();
-  SmallVector<Register, 4> inputLinkedIDs;
-  for (MachineInstr &MI : decMBB) {
+  auto &DecMBB = MIRBuilder.getMBB();
+  SmallVector<Register, 4> InputLinkedIDs;
+  for (MachineInstr &MI : DecMBB) {
     const unsigned OpCode = MI.getOpcode();
-    const unsigned numOps = MI.getNumOperands();
+    const unsigned NumOps = MI.getNumOperands();
     if (OpCode == SPIRV::OpDecorate &&
         MI.getOperand(1).getImm() == Decoration::LinkageAttributes &&
-        MI.getOperand(numOps - 1).getImm() == LinkageType::Import) {
-      const Register target = MI.getOperand(0).getReg();
-      inputLinkedIDs.push_back(target);
+        MI.getOperand(NumOps - 1).getImm() == LinkageType::Import) {
+      const Register Target = MI.getOperand(0).getReg();
+      InputLinkedIDs.push_back(Target);
     }
   }
 
   // Add any Import linked IDs as interface args to all OpEntryPoints
-  if (!inputLinkedIDs.empty()) {
+  if (!InputLinkedIDs.empty()) {
     setMetaBlock(MIRBuilder, MB_EntryPoints);
-    auto &entryMBB = MIRBuilder.getMBB();
-    for (MachineInstr &MI : entryMBB) {
-      for (unsigned id : inputLinkedIDs) {
-        MI.addOperand(MachineOperand::CreateReg(id, false));
+    auto &EntryMBB = MIRBuilder.getMBB();
+    for (MachineInstr &MI : EntryMBB) {
+      for (unsigned Id : InputLinkedIDs) {
+        MI.addOperand(MachineOperand::CreateReg(Id, false));
       }
     }
   }
@@ -647,23 +648,23 @@ static void addEntryPointLinkageInterfaces(Module &M, MachineModuleInfo &MMI,
 
 static void numberRegistersInMBB(MachineBasicBlock &MBB,
                                  unsigned int &RegBaseIndex,
-                                 LocalToGlobalRegTable &localToMetaVRegAliasMap,
+                                 LocalToGlobalRegTable &LocalToMetaVRegAliasMap,
                                  MachineRegisterInfo &MRI) {
   for (MachineInstr &MI : MBB) {
-    for (MachineOperand &op : MI.operands()) {
-      if (op.isReg()) {
-        Register newReg;
-        auto VR = localToMetaVRegAliasMap.find(op.getReg());
+    for (MachineOperand &Op : MI.operands()) {
+      if (Op.isReg()) {
+        Register NewReg;
+        auto VR = LocalToMetaVRegAliasMap.find(Op.getReg());
         // Stops setReg crashing if reg index > max regs in func
         addDummyVRegsUpToIndex(RegBaseIndex, MRI);
-        if (VR == localToMetaVRegAliasMap.end()) {
-          newReg = Register::index2VirtReg(RegBaseIndex);
+        if (VR == LocalToMetaVRegAliasMap.end()) {
+          NewReg = Register::index2VirtReg(RegBaseIndex);
           ++RegBaseIndex;
-          localToMetaVRegAliasMap.insert({op.getReg(), newReg});
+          LocalToMetaVRegAliasMap.insert({Op.getReg(), NewReg});
         } else {
-          newReg = VR->second;
+          NewReg = VR->second;
         }
-        op.setReg(newReg);
+        Op.setReg(NewReg);
       }
     }
   }
@@ -675,21 +676,21 @@ static void numberRegistersInMBB(MachineBasicBlock &MBB,
 // the correct global registers instead of the function-local ones.
 static void numberRegistersGlobally(Module &M, MachineModuleInfo &MMI,
                                     MachineIRBuilder &MIRBuilder,
-                                    LocalAliasTablesTy &regAliasTables) {
+                                    LocalAliasTablesTy &RegAliasTables) {
 
   // Use raw index 0 - inf, and convert with index2VirtReg later
   unsigned int RegBaseIndex = 0;
   BEGIN_FOR_MF_IN_MODULE(M, MMI)
   auto &MRI = MF->getRegInfo();
-  auto localToMetaVRegAliasMap = regAliasTables[MF];
+  auto LocalToMetaVRegAliasMap = RegAliasTables[MF];
   if (MFIndex == 0) {
     RegBaseIndex = MIRBuilder.getMF().getRegInfo().getNumVirtRegs();
     setMetaBlock(MIRBuilder, MB_TmpGlobalData);
     auto &MBB = MIRBuilder.getMBB();
-    numberRegistersInMBB(MBB, RegBaseIndex, localToMetaVRegAliasMap, MRI);
+    numberRegistersInMBB(MBB, RegBaseIndex, LocalToMetaVRegAliasMap, MRI);
   } else {
     for (MachineBasicBlock &MBB : *MF) {
-      numberRegistersInMBB(MBB, RegBaseIndex, localToMetaVRegAliasMap, MRI);
+      numberRegistersInMBB(MBB, RegBaseIndex, LocalToMetaVRegAliasMap, MRI);
     }
   }
   END_FOR_MF_IN_MODULE()
@@ -702,7 +703,7 @@ using FuncNameToIDMap = std::map<std::string, Register>;
 // that variable (which will usually be the result of an OpFunction).
 // This lets us call externally imported functions using the correct VReg ID.
 static void addExternalDeclarationsToIDMap(MachineIRBuilder &MetaBuilder,
-                                           FuncNameToIDMap &funcNameToOpID) {
+                                           FuncNameToIDMap &FuncNameToOpID) {
 
   // Only look for OpDecorates in the global meta function
   setMetaBlock(MetaBuilder, MB_Annotations);
@@ -710,14 +711,14 @@ static void addExternalDeclarationsToIDMap(MachineIRBuilder &MetaBuilder,
   for (const auto &MI : DecMBB) {
     if (MI.getOpcode() == SPIRV::OpDecorate) {
       // If it's got Import linkage
-      auto dec = MI.getOperand(1).getImm();
-      if (dec == Decoration::LinkageAttributes) {
-        auto lnk = MI.getOperand(MI.getNumOperands() - 1).getImm();
-        if (lnk == LinkageType::Import) {
+      auto Dec = MI.getOperand(1).getImm();
+      if (Dec == Decoration::LinkageAttributes) {
+        auto Lnk = MI.getOperand(MI.getNumOperands() - 1).getImm();
+        if (Lnk == LinkageType::Import) {
           // Map imported function name to function ID VReg.
-          std::string name = getStringImm(MI, 2);
-          Register target = MI.getOperand(0).getReg();
-          funcNameToOpID[name] = target;
+          std::string Name = getStringImm(MI, 2);
+          Register Target = MI.getOperand(0).getReg();
+          FuncNameToOpID[Name] = Target;
         }
       }
     }
@@ -729,74 +730,74 @@ static void addExternalDeclarationsToIDMap(MachineIRBuilder &MetaBuilder,
 // globally numbered registers
 static void assignFunctionCallIDs(Module &M, MachineModuleInfo &MMI,
                                   MachineIRBuilder &MetaBuilder) {
-  std::map<std::string, Register> funcNameToID;
-  SmallVector<MachineInstr *, 8> funcCalls;
+  std::map<std::string, Register> FuncNameToID;
+  SmallVector<MachineInstr *, 8> FuncCalls;
 
-  addExternalDeclarationsToIDMap(MetaBuilder, funcNameToID);
+  addExternalDeclarationsToIDMap(MetaBuilder, FuncNameToID);
 
   // Record all OpFunctionCalls, and all internal OpFunction declarations.
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
   for (MachineBasicBlock &MBB : *MF) {
     for (MachineInstr &MI : MBB) {
       if (MI.getOpcode() == SPIRV::OpFunction) {
-        funcNameToID[F->getGlobalIdentifier()] = MI.defs().begin()->getReg();
+        FuncNameToID[F->getGlobalIdentifier()] = MI.defs().begin()->getReg();
       } else if (MI.getOpcode() == SPIRV::OpFunctionCall) {
-        funcCalls.push_back(&MI);
+        FuncCalls.push_back(&MI);
       }
     }
   }
   END_FOR_MF_IN_MODULE()
 
-  // Replace all OpFunctionCalls with new ones referring to funcID vregs
-  for (const auto funcCall : funcCalls) {
-    auto funcName = funcCall->getOperand(2).getGlobal()->getGlobalIdentifier();
+  // Replace all OpFunctionCalls with new ones referring to FuncID vregs
+  for (const auto FuncCall : FuncCalls) {
+    auto FuncName = FuncCall->getOperand(2).getGlobal()->getGlobalIdentifier();
 
-    auto funcID = funcNameToID.find(funcName);
-    if (funcID == funcNameToID.end()) {
-      errs() << "Unknown function: " << funcName << "\n";
+    auto FuncID = FuncNameToID.find(FuncName);
+    if (FuncID == FuncNameToID.end()) {
+      errs() << "Unknown function: " << FuncName << "\n";
       llvm_unreachable("Error: Could not find function id");
     }
-    const auto MF = funcCall->getMF();
+    const auto MF = FuncCall->getMF();
 
-    // Stops addUse crashing if funcID > max regs in func so far
-    addDummyVRegsUpToIndex(funcID->second.virtRegIndex(), MF->getRegInfo());
+    // Stops addUse crashing if FuncID > max regs in func so far
+    addDummyVRegsUpToIndex(FuncID->second.virtRegIndex(), MF->getRegInfo());
 
     // Create a new copy of the OpFunctionCall but with the IDVReg for the
     // callee rather than a GlobalValue, then delete the old instruction.
     MachineIRBuilder MIRBuilder;
     MIRBuilder.setMF(*MF);
-    MIRBuilder.setMBB(*funcCall->getParent());
-    MIRBuilder.setInstr(*funcCall);
+    MIRBuilder.setMBB(*FuncCall->getParent());
+    MIRBuilder.setInstr(*FuncCall);
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
-                   .addDef(funcCall->getOperand(0).getReg())
-                   .addUse(funcCall->getOperand(1).getReg())
-                   .addUse(funcID->second);
-    const unsigned int numOps = funcCall->getNumOperands();
-    for (unsigned int i = 3; i < numOps; ++i) {
-      MIB.addUse(funcCall->getOperand(i).getReg());
+                   .addDef(FuncCall->getOperand(0).getReg())
+                   .addUse(FuncCall->getOperand(1).getReg())
+                   .addUse(FuncID->second);
+    const unsigned int NumOps = FuncCall->getNumOperands();
+    for (unsigned int i = 3; i < NumOps; ++i) {
+      MIB.addUse(FuncCall->getOperand(i).getReg());
     }
 
-    funcCall->removeFromParent();
+    FuncCall->removeFromParent();
   }
 }
 
 // Create global OpCapability instructions for the required capabilities
-static void addGlobalRequirements(const SPIRVRequirementHandler &reqs,
+static void addGlobalRequirements(const SPIRVRequirementHandler &Reqs,
                                   const SPIRVSubtarget &ST,
                                   MachineIRBuilder &MIRBuilder) {
 
   // Abort here if not all requirements can be satisfied
-  reqs.checkSatisfiable(ST);
+  Reqs.checkSatisfiable(ST);
   setMetaBlock(MIRBuilder, MB_Capabilities);
 
-  for (const auto &cap : reqs.getMinimalCapabilities()) {
-    MIRBuilder.buildInstr(SPIRV::OpCapability).addImm(cap);
+  for (const auto &Cap : Reqs.getMinimalCapabilities()) {
+    MIRBuilder.buildInstr(SPIRV::OpCapability).addImm(Cap);
   }
 
   // Generate the final OpExtensions with strings instead of enums
-  for (const auto &ext : reqs.getExtensions()) {
+  for (const auto &Ext : Reqs.getExtensions()) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtension);
-    addStringImm(getExtensionName(ext), MIB);
+    addStringImm(getExtensionName(Ext), MIB);
   }
 
   // TODO add a pseudo instr for version number
@@ -805,15 +806,15 @@ static void addGlobalRequirements(const SPIRVRequirementHandler &reqs,
 // Add all requirements needed for the given instruction.
 // Defined in SPIRVAddRequirementsPass.cpp
 extern void addInstrRequirements(const MachineInstr &MI,
-                                 SPIRVRequirementHandler &reqs,
+                                 SPIRVRequirementHandler &Reqs,
                                  const SPIRVSubtarget &ST);
 
 // Process each unreferenced global variable so its type and initializer
 // will be emitted to MB_TmpGlobalData. Apply addInstrRequirements to it.
 // Substitute each created G_CONSTANT to OpConstantI.
 static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
-                                   MachineIRBuilder& MIRBuilder,
-                                   SPIRVRequirementHandler &reqs,
+                                   MachineIRBuilder &MIRBuilder,
+                                   SPIRVRequirementHandler &Reqs,
                                    const SPIRVSubtarget &ST) {
   auto *DT = ST.getSPIRVDuplicatesTracker();
   auto *TR = ST.getSPIRVTypeRegistry();
@@ -822,15 +823,15 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
   // Walk over each MF's DT and select all unreferenced global variables.
   SmallVector<GlobalVariable *, 8> GlobalVarList;
   const SPIRVDuplicatesTracker<GlobalValue> *GVDT = DT->get<GlobalValue>();
-  auto map = GVDT->getAllUses();
+  auto Map = GVDT->getAllUses();
   for (Module::global_iterator I = M.global_begin(), E = M.global_end();
        I != E;) {
     GlobalVariable *GV = &*I++;
-    auto addrSpace = GV->getAddressSpace();
-    auto storage = TR->addressSpaceToStorageClass(addrSpace);
-    if (storage != StorageClass::Function) {
-      auto t = map.find(GV);
-      if (t == map.end())
+    auto AddrSpace = GV->getAddressSpace();
+    auto Storage = TR->addressSpaceToStorageClass(AddrSpace);
+    if (Storage != StorageClass::Function) {
+      auto t = Map.find(GV);
+      if (t == Map.end())
         // GV is not found in maps of all MFs so it's unreferenced.
         GlobalVarList.push_back(GV);
     }
@@ -847,24 +848,23 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
   auto &MBB = MIRBuilder.getMBB();
   SmallVector<MachineInstr *, 8> ToRemove;
   for (MachineInstr &MI : MBB) {
-    addInstrRequirements(MI, reqs, ST);
-    auto opcode = MI.getOpcode();
-    if (opcode == TargetOpcode::G_CONSTANT ||
-        opcode == TargetOpcode::G_FCONSTANT) {
-      unsigned int OpCode = SPIRV::OpConstantI;
-      Register res = MI.getOperand(0).getReg();
-      APInt imm;
-      if (opcode == TargetOpcode::G_FCONSTANT) {
+    addInstrRequirements(MI, Reqs, ST);
+    auto Opcode = MI.getOpcode();
+    if (Opcode == TargetOpcode::G_CONSTANT ||
+        Opcode == TargetOpcode::G_FCONSTANT) {
+      Register Res = MI.getOperand(0).getReg();
+      APInt Imm;
+      if (Opcode == TargetOpcode::G_FCONSTANT) {
         const auto FPImm = MI.getOperand(1).getFPImm();
-        imm = FPImm->getValueAPF().bitcastToAPInt();
+        Imm = FPImm->getValueAPF().bitcastToAPInt();
       } else {
-        imm = MI.getOperand(1).getCImm()->getValue();
+        Imm = MI.getOperand(1).getCImm()->getValue();
       }
-      SPIRVType *resType = TR->getSPIRVTypeForVReg(res);
-      auto MIB = MIRBuilder.buildInstr(OpCode)
-               .addDef(res)
-               .addUse(TR->getSPIRVTypeID(resType))
-               .addImm(imm.getZExtValue());
+      SPIRVType *ResType = TR->getSPIRVTypeForVReg(Res);
+      auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
+                     .addDef(Res)
+                     .addUse(TR->getSPIRVTypeID(ResType))
+                     .addImm(Imm.getZExtValue());
       TR->constrainRegOperands(MIB);
       ToRemove.push_back(&MI);
     }
@@ -878,20 +878,21 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
 // Extract all OpType, OpConst etc. into this meta block
 // Number registers globally, including references to global OpType etc.
 bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
-  MachineModuleInfoWrapperPass &MMIWrapper = getAnalysis<MachineModuleInfoWrapperPass>();
+  MachineModuleInfoWrapperPass &MMIWrapper =
+      getAnalysis<MachineModuleInfoWrapperPass>();
 
   MachineIRBuilder MIRBuilder;
   initMetaBlockBuilder(M, MMIWrapper.getMMI(), MIRBuilder);
 
-  const auto &metaMF = MIRBuilder.getMF();
-  const auto &ST = static_cast<const SPIRVSubtarget &>(metaMF.getSubtarget());
+  const auto &MetaMF = MIRBuilder.getMF();
+  const auto &ST = static_cast<const SPIRVSubtarget &>(MetaMF.getSubtarget());
 
-  SPIRVRequirementHandler reqs;
+  SPIRVRequirementHandler Reqs;
 
-  addHeaderOps(M, MIRBuilder, reqs, ST);
+  addHeaderOps(M, MIRBuilder, Reqs, ST);
 
   // Process global variables which are not referenced in all functions.
-  processGlobalUnrefVars(M, MMIWrapper.getMMI(), MIRBuilder, reqs, ST);
+  processGlobalUnrefVars(M, MMIWrapper.getMMI(), MIRBuilder, Reqs, ST);
 
   LocalAliasTablesTy AliasMaps;
 
@@ -899,14 +900,15 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
 
   // Extract type instructions to the top MetaMBB and keep track of which local
   // VRegs the correspond to with functionLocalAliasTables
-  hoistInstrsToMetablock(M, MMIWrapper.getMMI(), MIRBuilder, AliasMaps, reqs);
+  hoistInstrsToMetablock(M, MMIWrapper.getMMI(), MIRBuilder, AliasMaps, Reqs);
 
   // Number registers from 0 onwards, and fix references to global OpType etc
   numberRegistersGlobally(M, MMIWrapper.getMMI(), MIRBuilder, AliasMaps);
 
   // Extract instructions like OpName, OpEntryPoint, OpDecorate etc.
   // which all rely on globally numbered registers, which they forward-reference
-  extractInstructionsWithGlobalRegsToMetablock(M, MMIWrapper.getMMI(), MIRBuilder);
+  extractInstructionsWithGlobalRegsToMetablock(M, MMIWrapper.getMMI(),
+                                               MIRBuilder);
 
   addEntryPointLinkageInterfaces(M, MMIWrapper.getMMI(), MIRBuilder);
 
@@ -914,10 +916,10 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
 
   // If there are no entry points, we need the Linkage capability
   if (MIRBuilder.getMF().getBlockNumbered(MB_EntryPoints)->empty()) {
-    reqs.addCapability(Capability::Linkage);
+    Reqs.addCapability(Capability::Linkage);
   }
 
-  addGlobalRequirements(reqs, ST, MIRBuilder);
+  addGlobalRequirements(Reqs, ST, MIRBuilder);
 
   // Check that all instructions have been moved from the TmpGlobalData block.
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
@@ -926,7 +928,6 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
 
   return false;
 }
-
 
 INITIALIZE_PASS(SPIRVGlobalTypesAndRegNum, DEBUG_TYPE,
                 "SPIRV hoist OpType etc. & number VRegs globally", false, false)

@@ -22,20 +22,20 @@
 // Return a string representation of the operands from startIndex onwards.
 // Templated to allow both MachineInstr and MCInst to use the same logic.
 template <class InstType>
-std::string getSPIRVStringOperand(const InstType &MI, unsigned int startIndex) {
+std::string getSPIRVStringOperand(const InstType &MI, unsigned int StartIndex) {
   std::string s = ""; // Iteratively append to this string
 
-  const unsigned int numOps = MI.getNumOperands();
-  bool isFinished = false;
-  for (unsigned int i = startIndex; i < numOps && !isFinished; ++i) {
+  const unsigned int NumOps = MI.getNumOperands();
+  bool IsFinished = false;
+  for (unsigned int i = StartIndex; i < NumOps && !IsFinished; ++i) {
     const auto &Op = MI.getOperand(i);
     if (!Op.isImm()) // Stop if we hit a register operand
       break;
-    uint32_t imm = Op.getImm(); // Each i32 word is up to 4 characters
+    uint32_t Imm = Op.getImm(); // Each i32 word is up to 4 characters
     for (unsigned shiftAmount = 0; shiftAmount < 32; shiftAmount += 8) {
-      char c = (imm >> shiftAmount) & 0xff;
+      char c = (Imm >> shiftAmount) & 0xff;
       if (c == 0) { // Stop if we hit a null-terminator character
-        isFinished = true;
+        IsFinished = true;
         break;
       } else {
         s += c; // Otherwise, append the character to the result string

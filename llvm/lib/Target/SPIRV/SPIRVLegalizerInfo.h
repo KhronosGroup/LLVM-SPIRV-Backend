@@ -26,9 +26,10 @@ class SPIRVSubtarget;
 class SPIRVLegalizerInfo : public LegalizerInfo {
   const SPIRVSubtarget *ST;
   SPIRVTypeRegistry *TR;
+
 public:
   bool legalizeCustom(LegalizerHelper &Helper, MachineInstr &MI) const override;
   SPIRVLegalizerInfo(const SPIRVSubtarget &ST);
 };
 } // namespace llvm
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H

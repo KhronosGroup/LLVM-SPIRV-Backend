@@ -23,48 +23,48 @@ using namespace llvm;
 // Add the given string as a series of integer operands, inserting null
 // terminators and padding to make sure the operands all have 32-bit
 // little-endian words
-void addStringImm(const StringRef &str, MachineInstrBuilder &MIB) {
+void addStringImm(const StringRef &Str, MachineInstrBuilder &MIB) {
   // Get length including padding and null terminator
-  const size_t len = str.size() + 1;
-  const size_t paddedLen = (len % 4 == 0) ? len : len + (4 - (len % 4));
-  for (unsigned i = 0; i < paddedLen; i += 4) {
-    uint32_t word = 0u; // Build up this 32-bit word from 4 8-bit chars
-    for (unsigned wordIndex = 0; wordIndex < 4; ++wordIndex) {
-      unsigned strIndex = i + wordIndex;
-      uint8_t charToAdd = 0; // Initilize char as padding/null
-      if (strIndex < (len - 1)) { // If it's within the string, get a real char
-        charToAdd = str[strIndex];
+  const size_t Len = Str.size() + 1;
+  const size_t PaddedLen = (Len % 4 == 0) ? Len : Len + (4 - (Len % 4));
+  for (unsigned i = 0; i < PaddedLen; i += 4) {
+    uint32_t Word = 0u; // Build up this 32-bit word from 4 8-bit chars
+    for (unsigned WordIndex = 0; WordIndex < 4; ++WordIndex) {
+      unsigned StrIndex = i + WordIndex;
+      uint8_t CharToAdd = 0;      // Initilize char as padding/null
+      if (StrIndex < (Len - 1)) { // If it's within the string, get a real char
+        CharToAdd = Str[StrIndex];
       }
-      word |= (charToAdd << (wordIndex * 8));
+      Word |= (CharToAdd << (WordIndex * 8));
     }
-    MIB.addImm(word); // Add an operand for the 32-bits of chars or padding
+    MIB.addImm(Word); // Add an operand for the 32-bits of chars or padding
   }
 }
 
-void addStringImm(const StringRef &str, IRBuilder<> &B,
+void addStringImm(const StringRef &Str, IRBuilder<> &B,
                   std::vector<Value *> &Args) {
   // Get length including padding and null terminator
-  const size_t len = str.size() + 1;
-  const size_t paddedLen = (len % 4 == 0) ? len : len + (4 - (len % 4));
-  for (unsigned i = 0; i < paddedLen; i += 4) {
-    uint32_t word = 0u; // Build up this 32-bit word from 4 8-bit chars
-    for (unsigned wordIndex = 0; wordIndex < 4; ++wordIndex) {
-      unsigned strIndex = i + wordIndex;
-      uint8_t charToAdd = 0;      // Initilize char as padding/null
-      if (strIndex < (len - 1)) { // If it's within the string, get a real char
-        charToAdd = str[strIndex];
+  const size_t Len = Str.size() + 1;
+  const size_t PaddedLen = (Len % 4 == 0) ? Len : Len + (4 - (Len % 4));
+  for (unsigned i = 0; i < PaddedLen; i += 4) {
+    uint32_t Word = 0u; // Build up this 32-bit word from 4 8-bit chars
+    for (unsigned WordIndex = 0; WordIndex < 4; ++WordIndex) {
+      unsigned StrIndex = i + WordIndex;
+      uint8_t CharToAdd = 0;      // Initilize char as padding/null
+      if (StrIndex < (Len - 1)) { // If it's within the string, get a real char
+        CharToAdd = Str[StrIndex];
       }
-      word |= (charToAdd << (wordIndex * 8));
+      Word |= (CharToAdd << (WordIndex * 8));
     }
     Args.push_back(
-        B.getInt32(word)); // Add an operand for the 32-bits of chars or padding
+        B.getInt32(Word)); // Add an operand for the 32-bits of chars or padding
   }
 }
 
 // Read the series of integer operands back as a null-terminated string using
 // the reverse of the logic in addStringImm
-std::string getStringImm(const MachineInstr &MI, unsigned int startIndex) {
-  return getSPIRVStringOperand(MI, startIndex);
+std::string getStringImm(const MachineInstr &MI, unsigned int StartIndex) {
+  return getSPIRVStringOperand(MI, StartIndex);
 }
 
 void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB, bool IsFloat) {
@@ -93,20 +93,18 @@ void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB, bool IsFloat) {
 }
 
 // Add an OpName instruction for the given target register
-void buildOpName(Register target, const StringRef &name,
+void buildOpName(Register Target, const StringRef &Name,
                  MachineIRBuilder &MIRBuilder) {
-  if (!name.empty()) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpName).addUse(target);
-    addStringImm(name, MIB);
+  if (!Name.empty()) {
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpName).addUse(Target);
+    addStringImm(Name, MIB);
   }
 }
 
 void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
-    Decoration::Decoration Dec, const std::vector<uint32_t> &DecArgs,
-    StringRef StrImm) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate)
-                 .addUse(Reg)
-                 .addImm(Dec);
+                     Decoration::Decoration Dec,
+                     const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(Reg).addImm(Dec);
   if (!StrImm.empty())
     addStringImm(StrImm, MIB);
   for (const auto &DecArg : DecArgs)
