@@ -10,15 +10,27 @@ target triple = "spirv32-unknown-unknown"
 %struct.st = type { %struct.inner }
 %struct.inner = type { float }
 
+; CHECK-SPIRV: %[[float_ty:[0-9]+]] = OpTypeFloat 32
+; FIXME: properly order array type decl & num elems constant
+; CHECK-SPIRV: %[[array_ty:[0-9]+]] = OpTypeArray %[[float_ty]]
+; CHECK-SPIRV: %[[struct_ty:[0-9]+]] = OpTypeStruct %[[array_ty]]
+; CHECK-SPIRV-DAG: %[[array_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[array_ty]]
+; CHECK-SPIRV-DAG: %[[struct_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct_ty]]
+
+; CHECK-SPIRV: %[[struct1_in_ty:[0-9]+]] = OpTypeStruct %[[float_ty]]
+; CHECK-SPIRV: %[[struct1_ty:[0-9]+]] = OpTypeStruct %[[struct1_in_ty]]
+; CHECK-SPIRV-DAG: %[[struct1_in_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_in_ty]]
+; CHECK-SPIRV-DAG: %[[struct1_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_ty]]
+
 ; CHECK-SPIRV-LABEL:  OpFunction
-; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
-; CHECK-SPIRV:        %{{[0-9]+}} = OpInBoundsPtrAccessChain %{{[0-9]+}} %[[object]] %{{[0-9]+}} %{{[0-9]+}}
-; CHECK-SPIRV:        %[[extracted_array:[0-9]+]] = OpLoad %{{[0-9]+}} %{{[0-9]+}} Aligned 4
-; CHECK-SPIRV:        %[[elem_4:[0-9]+]] = OpCompositeExtract %{{[0-9]+}} %[[extracted_array]] 4
-; CHECK-SPIRV:        %[[elem_2:[0-9]+]] = OpCompositeExtract %{{[0-9]+}} %[[extracted_array]] 2
-; CHECK-SPIRV:        %[[add:[0-9]+]] = OpFAdd %{{[0-9]+}} %[[elem_4]] %[[elem_2]]
-; CHECK-SPIRV:        %[[inserted_array:[0-9]+]] = OpCompositeInsert %{{[0-9]+}} %[[add]] %[[extracted_array]] 5
-; CHECK-SPIRV:        OpStore %{{[0-9]+}} %[[inserted_array]]
+; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %[[struct_ptr_ty]]
+; CHECK-SPIRV:        %[[store_ptr:[0-9]+]] = OpInBoundsPtrAccessChain %[[array_ptr_ty]] %[[object]] %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV:        %[[extracted_array:[0-9]+]] = OpLoad %[[array_ty]] %[[store_ptr]] Aligned 4
+; CHECK-SPIRV:        %[[elem_4:[0-9]+]] = OpCompositeExtract %[[float_ty]] %[[extracted_array]] 4
+; CHECK-SPIRV:        %[[elem_2:[0-9]+]] = OpCompositeExtract %[[float_ty]] %[[extracted_array]] 2
+; CHECK-SPIRV:        %[[add:[0-9]+]] = OpFAdd %[[float_ty]] %[[elem_4]] %[[elem_2]]
+; CHECK-SPIRV:        %[[inserted_array:[0-9]+]] = OpCompositeInsert %[[array_ty]] %[[add]] %[[extracted_array]] 5
+; CHECK-SPIRV:        OpStore %[[store_ptr]] %[[inserted_array]]
 ; CHECK-SPIRV-LABEL:  OpFunctionEnd
 
 ; Function Attrs: nounwind
@@ -35,13 +47,13 @@ entry:
 }
 
 ; CHECK-SPIRV-LABEL:  OpFunction
-; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
-; CHECK-SPIRV:        %{{[0-9]+}} = OpInBoundsPtrAccessChain %{{[0-9]+}} %[[object]] %{{[0-9]+}} %{{[0-9]+}}
-; CHECK-SPIRV:        %[[extracted_struct:[0-9]+]] = OpLoad %{{[0-9]+}} %{{[0-9]+}} Aligned 4
-; CHECK-SPIRV:        %[[elem:[0-9]+]] = OpCompositeExtract %{{[0-9]+}} %[[extracted_struct]] 0
-; CHECK-SPIRV:        %[[add:[0-9]+]] = OpFAdd %{{[0-9]+}} %[[elem]] %{{[0-9]+}}
-; CHECK-SPIRV:        %[[inserted_struct:[0-9]+]] = OpCompositeInsert %{{[0-9]+}} %[[add]] %[[extracted_struct]] 0
-; CHECK-SPIRV:        OpStore %{{[0-9]+}} %[[inserted_struct]]
+; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %[[struct1_ptr_ty]]
+; CHECK-SPIRV:        %[[store1_ptr:[0-9]+]] = OpInBoundsPtrAccessChain %[[struct1_in_ptr_ty]] %[[object]] %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV:        %[[extracted_struct:[0-9]+]] = OpLoad %[[struct1_in_ty]] %[[store1_ptr]] Aligned 4
+; CHECK-SPIRV:        %[[elem:[0-9]+]] = OpCompositeExtract %[[float_ty]] %[[extracted_struct]] 0
+; CHECK-SPIRV:        %[[add:[0-9]+]] = OpFAdd %[[float_ty]] %[[elem]] %{{[0-9]+}}
+; CHECK-SPIRV:        %[[inserted_struct:[0-9]+]] = OpCompositeInsert %[[struct1_in_ty]] %[[add]] %[[extracted_struct]] 0
+; CHECK-SPIRV:        OpStore %[[store1_ptr]] %[[inserted_struct]]
 ; CHECK-SPIRV-LABEL:  OpFunctionEnd
 
 ; Function Attrs: nounwind

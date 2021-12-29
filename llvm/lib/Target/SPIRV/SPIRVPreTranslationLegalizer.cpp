@@ -66,7 +66,7 @@ public:
   bool runOnFunction(Function *F);
   bool runOnModule(Module &M) override;
 
-  StringRef getPassName() const override { return "SPIRV Types Assigner"; }
+  StringRef getPassName() const override { return "SPIRV Pre-GISel Legalizer"; }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     ModulePass::getAnalysisUsage(AU);
@@ -77,19 +77,33 @@ public:
 
 char SPIRVPreTranslationLegalizer::ID = 0;
 
-INITIALIZE_PASS(SPIRVPreTranslationLegalizer, "spirv-type-assigner",
-                "SPIRV Type Assigner", false, false)
+INITIALIZE_PASS(SPIRVPreTranslationLegalizer, "pre-gisel-legalizer",
+                "SPIRV Pre-GISel Legalizer", false, false)
+
+static inline bool isAssignTypeInstr(const Instruction *I) {
+  return isa<IntrinsicInst>(I) &&
+         cast<IntrinsicInst>(I)->getIntrinsicID() == Intrinsic::spv_assign_type;
+}
 
 static bool isMemInstrToReplace(Instruction *I) {
   return isa<StoreInst>(I) || isa<LoadInst>(I) || isa<InsertValueInst>(I) ||
          isa<ExtractValueInst>(I);
 }
 
-static void replaceMemInstrUses(Instruction *Old, Instruction *New) {
+static void replaceMemInstrUses(Instruction *Old, Instruction *New, IRBuilder<> &B) {
   while (!Old->user_empty()) {
     auto *U = Old->user_back();
-    assert(isMemInstrToReplace(U) || isa<ReturnInst>(U));
-    U->replaceUsesOfWith(Old, New);
+    if(isMemInstrToReplace(U) || isa<ReturnInst>(U))
+      U->replaceUsesOfWith(Old, New);
+    else if (isAssignTypeInstr(U)) {
+      auto *TyFn = Intrinsic::getDeclaration(Old->getFunction()->getParent(),
+                                             Intrinsic::spv_assign_type, {New->getType()});
+      B.SetInsertPoint(U);
+      B.CreateCall(TyFn, {New, U->getOperand(1)});
+
+      U->eraseFromParent();
+    } else
+      llvm_unreachable("illegal aggregate intrinsic user");
   }
   Old->eraseFromParent();
 }
@@ -287,10 +301,41 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
     }
   }
 
-  std::vector<Instruction *> Worklist;
   preprocessCompositeConstants(B, F);
+  std::vector<Instruction *> Worklist;
   for (auto &I : instructions(F))
     Worklist.push_back(&I);
+
+  for (auto &I : Worklist) {
+    auto *Ty = I->getType();
+    if (!Ty->isVoidTy() && requireAssignType(I)) {
+      setInsertPointSkippingPhis(B, I->getNextNode());
+      auto *TyFn = Intrinsic::getDeclaration(F->getParent(),
+                                             Intrinsic::spv_assign_type, {Ty});
+      auto *TypeToAssign = Ty;
+      if (auto *II = dyn_cast<IntrinsicInst>(I)) {
+        if (II->getIntrinsicID() == Intrinsic::spv_const_composite)
+          TypeToAssign = AggrConsts.at(II)->getType();
+      }
+      auto *TyMD = MDNode::get(
+          F->getContext(),
+          ValueAsMetadata::getConstant(Constant::getNullValue(TypeToAssign)));
+      auto *VMD = MetadataAsValue::get(F->getContext(), TyMD);
+      B.CreateCall(TyFn, {I, VMD});
+    }
+    for (const auto &Op : I->operands()) {
+      if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op)) {
+        B.SetInsertPoint(I);
+        auto *CTy = Op->getType();
+        auto *CTyFn = Intrinsic::getDeclaration(
+            F->getParent(), Intrinsic::spv_assign_type, {CTy});
+        auto *CTyMD =
+            MDNode::get(F->getContext(), ValueAsMetadata::getConstant(Op));
+        auto *CVMD = MetadataAsValue::get(F->getContext(), CTyMD);
+        B.CreateCall(CTyFn, {Op, CVMD});
+      }
+    }
+  }
 
   for (auto *I : Worklist) {
     bool TrackConstants = true;
@@ -394,26 +439,10 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       TrackConstants = false;
 
     if (NewIntr) {
-      replaceMemInstrUses(I, NewIntr);
+      replaceMemInstrUses(I, NewIntr, B);
       I = NewIntr;
     }
 
-    auto *Ty = I->getType();
-    if (!Ty->isVoidTy() && requireAssignType(I)) {
-      setInsertPointSkippingPhis(B, I->getNextNode());
-      auto *TyFn = Intrinsic::getDeclaration(F->getParent(),
-                                             Intrinsic::spv_assign_type, {Ty});
-      auto *TypeToAssign = Ty;
-      if (auto *II = dyn_cast<IntrinsicInst>(I)) {
-        if (II->getIntrinsicID() == Intrinsic::spv_const_composite)
-          TypeToAssign = AggrConsts.at(II)->getType();
-      }
-      auto *TyMD = MDNode::get(
-          F->getContext(),
-          ValueAsMetadata::getConstant(Constant::getNullValue(TypeToAssign)));
-      auto *VMD = MetadataAsValue::get(F->getContext(), TyMD);
-      B.CreateCall(TyFn, {I, VMD});
-    }
     if (auto *II = dyn_cast<IntrinsicInst>(I)) {
       if (II->getIntrinsicID() == Intrinsic::spv_const_composite) {
         if (TrackConstants) {
@@ -432,16 +461,6 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       }
     }
     for (const auto &Op : I->operands()) {
-      if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op)) {
-        B.SetInsertPoint(I);
-        auto *CTy = Op->getType();
-        auto *CTyFn = Intrinsic::getDeclaration(
-            F->getParent(), Intrinsic::spv_assign_type, {CTy});
-        auto *CTyMD =
-            MDNode::get(F->getContext(), ValueAsMetadata::getConstant(Op));
-        auto *CVMD = MetadataAsValue::get(F->getContext(), CTyMD);
-        B.CreateCall(CTyFn, {Op, CVMD});
-      }
       if ((isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy()) ||
            isa<PHINode>(I))
         TrackConstants = false;
@@ -466,7 +485,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
     if (I->hasName()) {
       setInsertPointSkippingPhis(B, I->getNextNode());
       auto *NameFn = Intrinsic::getDeclaration(
-          F->getParent(), Intrinsic::spv_assign_name, {Ty});
+          F->getParent(), Intrinsic::spv_assign_name, {I->getType()});
       std::vector<Value *> Args = {I};
       addStringImm(I->getName(), B, Args);
       B.CreateCall(NameFn, Args);
