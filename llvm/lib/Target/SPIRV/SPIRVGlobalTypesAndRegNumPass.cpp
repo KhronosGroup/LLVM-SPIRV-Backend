@@ -27,11 +27,10 @@
 #include "SPIRV.h"
 #include "SPIRVCapabilityUtils.h"
 #include "SPIRVEnumRequirements.h"
-#include "SPIRVUtils.h"
-#include "SPIRVSubtarget.h"
 #include "SPIRVGlobalRegistry.h"
+#include "SPIRVSubtarget.h"
+#include "SPIRVUtils.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
-
 #include "llvm/CodeGen/MachineModuleInfo.h"
 
 using namespace llvm;
@@ -190,7 +189,7 @@ using LocalAliasTablesTy = std::map<MachineFunction *, LocalToGlobalRegTable>;
 template <typename T>
 static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
                                  const SPIRVDuplicatesTracker<T> *DT,
-                                 SPIRVTypeRegistry *TR, MetaBlockType MBType,
+                                 SPIRVGlobalRegistry *GR, MetaBlockType MBType,
                                  LocalAliasTablesTy &LocalAliasTables) {
   // FIXME: setMetaBlock
   setMetaBlock(MetaBuilder, MBType);
@@ -207,7 +206,7 @@ static void fillLocalAliasTables(MachineIRBuilder &MetaBuilder,
   }
   // Make meta registers for special types and constants collected in the map.
   if (std::is_same<T, Type>::value) {
-    for (auto &CU : TR->getSpecialTypesAndConstsMap()) {
+    for (auto &CU : GR->getSpecialTypesAndConstsMap()) {
       for (auto &typeGroup : CU.second) {
         auto MetaReg =
             MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
@@ -265,7 +264,7 @@ static void hoistGlobalOp(MachineIRBuilder &MetaBuilder, Register Reg,
 template <typename T>
 static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
                            const SPIRVDuplicatesTracker<T> *DT,
-                           SPIRVTypeRegistry *TR, MetaBlockType MBType,
+                           SPIRVGlobalRegistry *GR, MetaBlockType MBType,
                            LocalAliasTablesTy &LocalAliasTables) {
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
@@ -282,7 +281,7 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
   }
   // Hoist special types and constants collected in the map.
   if (std::is_same<T, Type>::value) {
-    for (auto &CU : TR->getSpecialTypesAndConstsMap())
+    for (auto &CU : GR->getSpecialTypesAndConstsMap())
       for (auto &TypeGroup : CU.second)
         for (auto &t : TypeGroup) {
           MachineFunction *MF = t.first;
@@ -309,7 +308,7 @@ static void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
 template <>
 void hoistGlobalOps(MachineIRBuilder &MetaBuilder,
                     const SPIRVDuplicatesTracker<Function> *DT,
-                    SPIRVTypeRegistry *TR, MetaBlockType MBType,
+                    SPIRVGlobalRegistry *GR, MetaBlockType MBType,
                     LocalAliasTablesTy &LocalAliasTables) {
   setMetaBlock(MetaBuilder, MBType);
   SmallVector<MachineInstr *, 8> ToRemove;
@@ -389,22 +388,22 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
   const auto *ST =
       static_cast<const SPIRVSubtarget *>(&MIRBuilder.getMF().getSubtarget());
   auto *DT = ST->getSPIRVDuplicatesTracker();
-  auto TR = ST->getSPIRVTypeRegistry();
+  auto GR = ST->getSPIRVGlobalRegistry();
 
   // OpTypes and OpConstants can have cross references so at first we create
   // new meta regs and map them to old regs, then walk the list of instructions,
   // and create new (hoisted) instructions with new meta regs instead of old
   // ones. Also there are references to global values in constants.
-  fillLocalAliasTables<Type>(MIRBuilder, DT->get<Type>(), TR, MB_TypeConstVars,
+  fillLocalAliasTables<Type>(MIRBuilder, DT->get<Type>(), GR, MB_TypeConstVars,
                              LocalAliasTables);
-  fillLocalAliasTables<Constant>(MIRBuilder, DT->get<Constant>(), TR,
+  fillLocalAliasTables<Constant>(MIRBuilder, DT->get<Constant>(), GR,
                                  MB_TypeConstVars, LocalAliasTables);
-  fillLocalAliasTables<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), TR,
+  fillLocalAliasTables<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), GR,
                                     MB_TypeConstVars, LocalAliasTables);
 
-  hoistGlobalOps<Type>(MIRBuilder, DT->get<Type>(), TR, MB_TypeConstVars,
+  hoistGlobalOps<Type>(MIRBuilder, DT->get<Type>(), GR, MB_TypeConstVars,
                        LocalAliasTables);
-  hoistGlobalOps<Constant>(MIRBuilder, DT->get<Constant>(), TR,
+  hoistGlobalOps<Constant>(MIRBuilder, DT->get<Constant>(), GR,
                            MB_TypeConstVars, LocalAliasTables);
 
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
@@ -430,11 +429,11 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
     MI->removeFromParent();
   }
   END_FOR_MF_IN_MODULE()
-  hoistGlobalOps<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), TR,
+  hoistGlobalOps<GlobalValue>(MIRBuilder, DT->get<GlobalValue>(), GR,
                               MB_TypeConstVars, LocalAliasTables);
-  fillLocalAliasTables<Function>(MIRBuilder, DT->get<Function>(), TR,
+  fillLocalAliasTables<Function>(MIRBuilder, DT->get<Function>(), GR,
                                  MB_ExtFuncDecls, LocalAliasTables);
-  hoistGlobalOps<Function>(MIRBuilder, DT->get<Function>(), TR, MB_ExtFuncDecls,
+  hoistGlobalOps<Function>(MIRBuilder, DT->get<Function>(), GR, MB_ExtFuncDecls,
                            LocalAliasTables);
 }
 
@@ -817,7 +816,7 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
                                    SPIRVRequirementHandler &Reqs,
                                    const SPIRVSubtarget &ST) {
   auto *DT = ST.getSPIRVDuplicatesTracker();
-  auto *TR = ST.getSPIRVTypeRegistry();
+  auto *GR = ST.getSPIRVGlobalRegistry();
   auto &MF = MIRBuilder.getMF();
 
   // Walk over each MF's DT and select all unreferenced global variables.
@@ -828,7 +827,7 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
        I != E;) {
     GlobalVariable *GV = &*I++;
     auto AddrSpace = GV->getAddressSpace();
-    auto Storage = TR->addressSpaceToStorageClass(AddrSpace);
+    auto Storage = addressSpaceToStorageClass(AddrSpace);
     if (Storage != StorageClass::Function) {
       auto t = Map.find(GV);
       if (t == Map.end())
@@ -839,11 +838,11 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
 
   // Walk over all unreferenced global variables and create required types,
   // constants, OpNames, OpVariables and OpDecorates.
-  TR->setCurrentFunc(MF);
+  GR->setCurrentFunc(MF);
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
 
   // Walk over all created instructions and add requirement. Also convert all
-  // G_CONSTANTs (TR creates them) to OpConstantI.
+  // G_CONSTANTs (GR creates them) to OpConstantI.
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
   auto &MBB = MIRBuilder.getMBB();
   SmallVector<MachineInstr *, 8> ToRemove;
@@ -860,12 +859,12 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
       } else {
         Imm = MI.getOperand(1).getCImm()->getValue();
       }
-      SPIRVType *ResType = TR->getSPIRVTypeForVReg(Res);
+      SPIRVType *ResType = GR->getSPIRVTypeForVReg(Res);
       auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
                      .addDef(Res)
-                     .addUse(TR->getSPIRVTypeID(ResType))
+                     .addUse(GR->getSPIRVTypeID(ResType))
                      .addImm(Imm.getZExtValue());
-      TR->constrainRegOperands(MIB);
+      constrainRegOperands(MIB);
       ToRemove.push_back(&MI);
     }
   }

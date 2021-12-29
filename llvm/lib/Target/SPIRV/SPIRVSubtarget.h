@@ -13,9 +13,15 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
+#include "SPIRVCallLowering.h"
+#include "SPIRVGlobalRegistry.h"
+#include "SPIRVEnums.h"
+#include "SPIRVExtInsts.h"
+#include "SPIRVExtensions.h"
 #include "SPIRVFrameLowering.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVInstrInfo.h"
+#include "SPIRVRegisterBankInfo.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
@@ -24,13 +30,6 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
-
-#include "SPIRVCallLowering.h"
-#include "SPIRVDuplicatesTracker.h"
-#include "SPIRVEnums.h"
-#include "SPIRVExtInsts.h"
-#include "SPIRVExtensions.h"
-#include "SPIRVRegisterBankInfo.h"
 
 #include <unordered_set>
 
@@ -41,7 +40,7 @@ namespace llvm {
 class StringRef;
 
 class SPIRVTargetMachine;
-class SPIRVTypeRegistry;
+class SPIRVGlobalRegistry;
 
 class SPIRVSubtarget : public SPIRVGenSubtargetInfo {
 private:
@@ -65,7 +64,7 @@ private:
   //      But they are shared with other classes, so if the SPIRVSubtarget
   //      moves, not relying on unique_ptr breaks things.
   std::unique_ptr<SPIRVGeneralDuplicatesTracker> DT;
-  std::unique_ptr<SPIRVTypeRegistry> TR;
+  std::unique_ptr<SPIRVGlobalRegistry> GR;
   std::unique_ptr<SPIRVCallLowering> CallLoweringInfo;
   std::unique_ptr<SPIRVRegisterBankInfo> RegBankInfo;
 
@@ -115,7 +114,7 @@ public:
   bool canUseExtension(Extension::Extension E) const;
   bool canUseExtInstSet(ExtInstSet E) const;
 
-  SPIRVTypeRegistry *getSPIRVTypeRegistry() const { return TR.get(); }
+  SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
 
   SPIRVGeneralDuplicatesTracker *getSPIRVDuplicatesTracker() const {
     return DT.get();

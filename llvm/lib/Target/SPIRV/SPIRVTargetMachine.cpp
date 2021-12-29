@@ -207,7 +207,7 @@ bool SPIRVPassConfig::addRegBankSelect() {
 namespace {
 // A custom subclass of InstructionSelect, which is mostly the same except from
 // not requiring RegBankSelect to occur previously, and making sure a
-// SPIRVTypeRegistry is initialized before and reset after each run.
+// SPIRVGlobalRegistry is initialized before and reset after each run.
 class SPIRVInstructionSelect : public InstructionSelect {
 
   // We don't use register banks, so unset the requirement for them
@@ -216,11 +216,12 @@ class SPIRVInstructionSelect : public InstructionSelect {
         MachineFunctionProperties::Property::RegBankSelected);
   }
 
-  // Init a SPIRVTypeRegistry before and reset it after the default parent code
+  // Init a SPIRVGlobalRegistry before and reset it after the default
+  // parent code.
   bool runOnMachineFunction(MachineFunction &MF) override {
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    auto *TR = ST->getSPIRVTypeRegistry();
-    TR->setCurrentFunc(MF);
+    auto *GR = ST->getSPIRVGlobalRegistry();
+    GR->setCurrentFunc(MF);
     auto &MRI = MF.getRegInfo();
 
     // we need to rewrite dst types for ASSIGN_TYPE instrs

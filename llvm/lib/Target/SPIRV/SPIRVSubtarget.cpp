@@ -13,9 +13,9 @@
 #include "SPIRVSubtarget.h"
 #include "SPIRV.h"
 #include "SPIRVEnumRequirements.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVTargetMachine.h"
-#include "SPIRVGlobalRegistry.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/TargetRegistry.h"
 
@@ -77,8 +77,8 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
       // .get() here is unsafe, works due to subtarget is destroyed
       // later than these objects
       // see comment in the SPIRVSubtarget.h
-      TR(new SPIRVTypeRegistry(*DT.get(), PointerSize)),
-      CallLoweringInfo(new SPIRVCallLowering(TLInfo, TR.get(), DT.get())),
+      GR(new SPIRVGlobalRegistry(*DT.get(), PointerSize)),
+      CallLoweringInfo(new SPIRVCallLowering(TLInfo, GR.get(), DT.get())),
       RegBankInfo(new SPIRVRegisterBankInfo()) {
 
   initAvailableExtensions(TT);

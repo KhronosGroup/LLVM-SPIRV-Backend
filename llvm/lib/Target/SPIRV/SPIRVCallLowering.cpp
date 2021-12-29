@@ -14,21 +14,21 @@
 #include "SPIRVCallLowering.h"
 #include "SPIRV.h"
 #include "SPIRVEnums.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVGlobalRegistry.h"
+#include "SPIRVUtils.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/Demangle/Demangle.h"
 
 using namespace llvm;
 
 SPIRVCallLowering::SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                                     SPIRVTypeRegistry *TR,
+                                     SPIRVGlobalRegistry *GR,
                                      SPIRVGeneralDuplicatesTracker *DT)
-    : CallLowering(&TLI), TR(TR), DT(DT) {}
+    : CallLowering(&TLI), GR(GR), DT(DT) {}
 
 bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     const Value *Val, ArrayRef<Register> VRegs,
@@ -37,7 +37,7 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
   assert(VRegs.size() < 2 && "All return types should use a single register");
   if (Val) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpReturnValue).addUse(VRegs[0]);
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   } else {
     MIRBuilder.buildInstr(SPIRV::OpReturn);
     return true;
@@ -66,7 +66,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
                                              FunctionLoweringInfo &FLI) const {
-  assert(TR && "Must initialize the SPIRV type registry before lowering args.");
+  assert(GR && "Must initialize the SPIRV type registry before lowering args.");
 
   // Assign types and names to all args, and store their types for later
   SmallVector<Register, 4> ArgTypeVRegs;
@@ -74,12 +74,12 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     unsigned int i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-      // auto *SpirvTy = TR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
-      // SPIRVType *SpirvTy = TR->getSPIRVTypeForVReg(VRegs[i][0]);
+      // auto *SpirvTy = GR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
+      // SPIRVType *SpirvTy = GR->getSPIRVTypeForVReg(VRegs[i][0]);
       // if (!SpirvTy)
       auto *SpirvTy =
-          TR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
-      ArgTypeVRegs.push_back(TR->getSPIRVTypeID(SpirvTy));
+          GR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
+      ArgTypeVRegs.push_back(GR->getSPIRVTypeID(SpirvTy));
 
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
@@ -150,7 +150,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     FTy = FunctionType::get(RetTy, ArgTypes, F.isVarArg());
   }
 
-  auto FuncTy = TR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
+  auto FuncTy = GR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
 
   // Build the OpTypeFunction declaring it
   Register ReturnTypeID = FuncTy->getOperand(1).getReg();
@@ -160,7 +160,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       .addDef(FuncVReg)
       .addUse(ReturnTypeID)
       .addImm(FuncControl)
-      .addUse(TR->getSPIRVTypeID(FuncTy));
+      .addUse(GR->getSPIRVTypeID(FuncTy));
 
   // Add OpFunctionParameters
   const unsigned int NumArgs = ArgTypeVRegs.size();
@@ -219,12 +219,12 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       for (auto Arg : Info.OrigArgs) {
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
         ArgVRegs.push_back(Arg.Regs[0]);
-        auto SPIRVTy = TR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
-        TR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder);
+        auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
+        GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder);
       }
       return generateOpenCLBuiltinCall(
           DoubleUnderscore ? FuncName : DemangledName, MIRBuilder, ResVReg,
-          Info.OrigRet.Ty, ArgVRegs, TR);
+          Info.OrigRet.Ty, ArgVRegs, GR);
     }
     report_fatal_error("Unable to handle this environment's built-in funcs.");
   } else {
@@ -264,18 +264,18 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     }
     SPIRVType *RetType =
-        TR->assignTypeToVReg(Info.OrigRet.Ty, ResVReg, MIRBuilder);
+        GR->assignTypeToVReg(Info.OrigRet.Ty, ResVReg, MIRBuilder);
 
     // Emit the OpFunctionCall and its args
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
                    .addDef(ResVReg)
-                   .addUse(TR->getSPIRVTypeID(RetType))
+                   .addUse(GR->getSPIRVTypeID(RetType))
                    .add(Info.Callee);
 
     for (const auto &arg : Info.OrigArgs) {
       assert(arg.Regs.size() == 1 && "Call arg has multiple VRegs");
       MIB.addUse(arg.Regs[0]);
     }
-    return TR->constrainRegOperands(MIB);
+    return constrainRegOperands(MIB);
   }
 }

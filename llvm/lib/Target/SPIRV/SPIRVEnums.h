@@ -82,15 +82,14 @@
 
 #define GEN_ENUM_HEADER(EnumName)                                              \
   DEF_ENUM(EnumName, DEF_##EnumName)                                           \
-  DEF_NAME_FUNC_HEADER(EnumName)                                               \
+  DEF_NAME_FUNC_HEADER(EnumName)
 
 // Use this for enums that can only take a single value
-#define GEN_ENUM_IMPL(EnumName)                                                \
-  DEF_NAME_FUNC_BODY(EnumName, DEF_##EnumName)                                 \
+#define GEN_ENUM_IMPL(EnumName) DEF_NAME_FUNC_BODY(EnumName, DEF_##EnumName)
 
 // Use this for bitmasks that can take multiple values e.g. DontInline|Const
 #define GEN_MASK_ENUM_IMPL(EnumName)                                           \
-  DEF_MASK_NAME_FUNC_BODY(EnumName, DEF_##EnumName)                            \
+  DEF_MASK_NAME_FUNC_BODY(EnumName, DEF_##EnumName)
 
 #define GEN_INSTR_PRINTER_IMPL(EnumName)                                       \
   void SPIRVInstPrinter::print##EnumName(const MCInst *MI, unsigned OpNo,      \
@@ -812,9 +811,6 @@ GEN_ENUM_HEADER(KernelEnqueueFlags)
   X(N, None, 0x0, {}, {}, 0, 0)                                                \
   X(N, CmdExecTime, 0x1, {Kernel}, {}, 0, 0)
 GEN_ENUM_HEADER(KernelProfilingInfo)
-
-MemorySemantics::MemorySemantics
-getMemSemanticsForStorageClass(StorageClass::StorageClass sc);
 
 const char *getLinkStrForBuiltIn(BuiltIn::BuiltIn builtIn);
 

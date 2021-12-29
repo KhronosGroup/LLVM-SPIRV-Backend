@@ -12,23 +12,60 @@
 
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRV.h"
-#include "SPIRVSubtarget.h"
 #include "SPIRVGlobalRegistry.h"
+#include "SPIRVSubtarget.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
 
+#include <unordered_set>
+
 using namespace llvm;
 using namespace LegalizeActions;
 using namespace LegalityPredicates;
+
+static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
+    TargetOpcode::G_ADD,
+    TargetOpcode::G_FADD,
+    TargetOpcode::G_SUB,
+    TargetOpcode::G_FSUB,
+    TargetOpcode::G_MUL,
+    TargetOpcode::G_FMUL,
+    TargetOpcode::G_SDIV,
+    TargetOpcode::G_UDIV,
+    TargetOpcode::G_FDIV,
+    TargetOpcode::G_SREM,
+    TargetOpcode::G_UREM,
+    TargetOpcode::G_FREM,
+    TargetOpcode::G_FNEG,
+    TargetOpcode::G_CONSTANT,
+    TargetOpcode::G_FCONSTANT,
+    TargetOpcode::G_AND,
+    TargetOpcode::G_OR,
+    TargetOpcode::G_XOR,
+    TargetOpcode::G_SHL,
+    TargetOpcode::G_ASHR,
+    TargetOpcode::G_LSHR,
+    TargetOpcode::G_SELECT,
+    TargetOpcode::G_EXTRACT_VECTOR_ELT,
+    // TargetOpcode::G_INSERT_VECTOR_ELT
+};
+
+static const std::unordered_set<unsigned> &getTypeFoldingSupportingOpcs() {
+  return TypeFoldingSupportingOpcs;
+}
+
+bool isTypeFoldingSupported(unsigned Opcode) {
+  return TypeFoldingSupportingOpcs.count(Opcode) > 0;
+}
 
 SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   using namespace TargetOpcode;
 
   this->ST = &ST;
-  TR = ST.getSPIRVTypeRegistry();
+  GR = ST.getSPIRVGlobalRegistry();
 
   const LLT s1 = LLT::scalar(1);
   const LLT s8 = LLT::scalar(8);
@@ -316,14 +353,14 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 
 static std::pair<Register, unsigned>
 createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
-               const SPIRVTypeRegistry &TR) {
+               const SPIRVGlobalRegistry &GR) {
   auto NewT = LLT::scalar(32);
-  auto SpvType = TR.getSPIRVTypeForVReg(ValReg);
+  auto SpvType = GR.getSPIRVTypeForVReg(ValReg);
   assert(SpvType && "VReg is expected to have SPIRV type");
   bool IsFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
   bool IsVectorFloat =
       SpvType->getOpcode() == SPIRV::OpTypeVector &&
-      TR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
+      GR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
           SPIRV::OpTypeFloat;
   IsFloat |= IsVectorFloat;
   auto GetIdOp = IsFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
@@ -351,7 +388,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     // Add missed SPIRV type to the VReg
     // TODO: move SPIRV type detection to one place
     auto ResVReg = MI.getOperand(0).getReg();
-    auto ResType = TR->getSPIRVTypeForVReg(ResVReg);
+    auto ResType = GR->getSPIRVTypeForVReg(ResVReg);
     if (!ResType) {
       LLT Ty = MRI.getType(ResVReg);
       LLT BaseTy = Ty.isVector() ? Ty.getElementType() : Ty;
@@ -359,8 +396,8 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
                                       BaseTy.getSizeInBits());
       if (Ty.isVector())
         LLVMTy = FixedVectorType::get(LLVMTy, Ty.getNumElements());
-      auto *SpirvType = TR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
-      TR->assignSPIRVTypeToVReg(SpirvType, ResVReg, Helper.MIRBuilder);
+      auto *SpirvType = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+      GR->assignSPIRVTypeToVReg(SpirvType, ResVReg, Helper.MIRBuilder);
     }
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
@@ -370,12 +407,12 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
       auto ConvT = LLT::scalar(ST->getPointerSize());
       auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
       auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
-      auto *SpirvType = TR->getOrCreateSPIRVType(
+      auto *SpirvType = GR->getOrCreateSPIRVType(
           IntegerType::get(MI.getMF()->getFunction().getContext(),
                            ST->getPointerSize()),
           Helper.MIRBuilder);
-      TR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
-      TR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
+      GR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
+      GR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
       Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
           .addDef(ConvReg0)
           .addUse(Op0.getReg());
@@ -391,7 +428,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
   MachineInstr &AssignTypeInst =
       *(MRI.use_instr_begin(MI.getOperand(0).getReg()));
-  auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *TR).first;
+  auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *GR).first;
   AssignTypeInst.getOperand(1).setReg(NewReg);
   // MRI.setRegClass(AssignTypeInst.getOperand(0).getReg(),
   // MRI.getRegClass(NewReg));
@@ -403,7 +440,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
     //   Op.setReg(Ids.at(&Op));
     //   // NewI.addUse(Ids.at(&Op));
     // } else {
-    auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *TR);
+    auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *GR);
     Helper.MIRBuilder.buildInstr(IdOpInfo.second)
         .addDef(IdOpInfo.first)
         .addUse(Op.getReg());

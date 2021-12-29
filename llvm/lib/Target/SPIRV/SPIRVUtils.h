@@ -1,4 +1,4 @@
-//===--- SPIRVStrings.h ---- String Utility Functions -----------*- C++ -*-===//
+//===--- SPIRVUtils.h ---- SPIR-V Utility Functions -------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,16 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// The methods here are used to add these string literals as a series of 32-bit
-// integer operands with the correct format, and unpack them if necessary when
-// making string comparisons in compiler passes.
-//
-// SPIR-V requires null-terminated UTF-8 strings padded to 32-bit alignment.
+// This file contains miscellaneous utility functions.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSTRINGS_H
-#define LLVM_LIB_TARGET_SPIRV_SPIRVSTRINGS_H
+#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
+#define LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
 
 #include "SPIRVEnums.h"
 #include "llvm/ADT/StringRef.h"
@@ -27,20 +23,20 @@
 
 // Add the given string as a series of integer operand, inserting null
 // terminators and padding to make sure the operands all have 32-bit
-// little-endian words
+// little-endian words.
 void addStringImm(const llvm::StringRef &Str, llvm::MachineInstrBuilder &MIB);
 void addStringImm(const llvm::StringRef &Str, llvm::IRBuilder<> &B,
                   std::vector<llvm::Value *> &Args);
 
 // Read the series of integer operands back as a null-terminated string using
-// the reverse of the logic in addStringImm
+// the reverse of the logic in addStringImm.
 std::string getStringImm(const llvm::MachineInstr &MI, unsigned int StartIndex);
 
 // Add the given numerical immediate to MIB.
 void addNumImm(const llvm::APInt &Imm, llvm::MachineInstrBuilder &MIB,
                bool IsFloat = false);
 
-// Add an OpName instruction for the given target register
+// Add an OpName instruction for the given target register.
 void buildOpName(llvm::Register Target, const llvm::StringRef &Name,
                  llvm::MachineIRBuilder &MIRBuilder);
 
@@ -49,4 +45,18 @@ void buildOpDecorate(llvm::Register Reg, llvm::MachineIRBuilder &MIRBuilder,
                      Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs,
                      llvm::StringRef StrImm = "");
-#endif
+
+// Convert a SPIR-V storage class to the corresponding LLVM IR address space.
+unsigned int storageClassToAddressSpace(StorageClass::StorageClass SC);
+
+// Convert an LLVM IR address space to a SPIR-V storage class.
+StorageClass::StorageClass addressSpaceToStorageClass(unsigned int AddrSpace);
+
+// Utility method to constrain an instruction's operands to the correct
+// register classes, and return true if this worked.
+bool constrainRegOperands(llvm::MachineInstrBuilder &MIB,
+                          llvm::MachineFunction *MF = nullptr);
+
+MemorySemantics::MemorySemantics
+getMemSemanticsForStorageClass(StorageClass::StorageClass sc);
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
