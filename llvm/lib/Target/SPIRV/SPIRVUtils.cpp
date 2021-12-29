@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRV.h"
 #include "SPIRVStringReader.h"
 

@@ -27,9 +27,9 @@
 #include "SPIRV.h"
 #include "SPIRVCapabilityUtils.h"
 #include "SPIRVEnumRequirements.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 
 #include "llvm/CodeGen/MachineModuleInfo.h"

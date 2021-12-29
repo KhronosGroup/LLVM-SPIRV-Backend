@@ -24,6 +24,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVEnumRequirements.cpp
   SPIRVExtInsts.cpp
   SPIRVGenerateDecorations.cpp
+  SPIRVGlobalRegistry.cpp
   SPIRVGlobalTypesAndRegNumPass.cpp
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp
@@ -36,11 +37,10 @@ add_llvm_target(SPIRVCodeGen
   SPIRVOpenCLBIFs.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
-  SPIRVStrings.cpp
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
   SPIRVPreTranslationLegalizer.cpp
-  SPIRVTypeRegistry.cpp
+  SPIRVUtils.cpp
 
   LINK_COMPONENTS
   AsmPrinter

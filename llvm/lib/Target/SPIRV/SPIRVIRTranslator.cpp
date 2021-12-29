@@ -16,7 +16,7 @@
 #include "SPIRVIRTranslator.h"
 
 #include "SPIRV.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
 
 #include "llvm/IR/IntrinsicsSPIRV.h"

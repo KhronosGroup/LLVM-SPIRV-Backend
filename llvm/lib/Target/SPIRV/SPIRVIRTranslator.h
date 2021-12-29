@@ -16,7 +16,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVIRTRANSLATOR_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVIRTRANSLATOR_H
 
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "llvm/CodeGen/GlobalISel/IRTranslator.h"
 
 namespace llvm {

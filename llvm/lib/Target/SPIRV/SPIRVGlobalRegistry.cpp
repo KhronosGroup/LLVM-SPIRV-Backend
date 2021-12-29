@@ -15,11 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVTypeRegistry.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRV.h"
 #include "SPIRVEnums.h"
 #include "SPIRVOpenCLBIFs.h"
-#include "SPIRVStrings.h"
+#include "SPIRVUtils.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "llvm/ADT/PostOrderIterator.h"
