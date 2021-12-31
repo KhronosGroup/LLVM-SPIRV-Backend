@@ -74,26 +74,6 @@ GEN_ENUM_IMPL(GroupOperation)
 GEN_ENUM_IMPL(KernelEnqueueFlags)
 GEN_MASK_ENUM_IMPL(KernelProfilingInfo)
 
-namespace MS = MemorySemantics;
-namespace SC = StorageClass;
-MS::MemorySemantics getMemSemanticsForStorageClass(SC::StorageClass sc) {
-  switch (sc) {
-  case SC::StorageBuffer:
-  case SC::Uniform:
-    return MS::UniformMemory;
-  case SC::Workgroup:
-    return MS::WorkgroupMemory;
-  case SC::CrossWorkgroup:
-    return MS::CrossWorkgroupMemory;
-  case SC::AtomicCounter:
-    return MS::AtomicCounterMemory;
-  case SC::Image:
-    return MS::ImageMemory;
-  default:
-    return MS::None;
-  }
-}
-
 DEF_BUILTIN_LINK_STR_FUNC_BODY()
 
 GEN_EXTENSION_IMPL(Extension)

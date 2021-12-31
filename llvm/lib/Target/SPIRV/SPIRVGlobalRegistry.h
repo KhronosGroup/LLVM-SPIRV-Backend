@@ -1,4 +1,4 @@
-//===-- SPIRVTypeRegistry.h - SPIR-V Type Registry --------------*- C++ -*-===//
+//===-- SPIRVGlobalRegistry.h - SPIR-V Global Registry ----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SPIRVTypeRegistry is used to maintain rich type information required for
+// SPIRVGlobalRegistry is used to maintain rich type information required for
 // SPIR-V even after lowering from LLVM IR to GMIR. It can convert an llvm::Type
-// into an OpTypeXXX instruction, and map it to a virtual register using and
-// ASSIGN_TYPE pseudo instruction.
+// into an OpTypeXXX instruction, and map it to a virtual register. Also it
+// builds and supports consistency of constants and global variables.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,17 +20,12 @@
 #include "SPIRVEnums.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
-#include <unordered_set>
-
 namespace AQ = AccessQualifier;
-
-const std::unordered_set<unsigned> &getTypeFoldingSupportingOpcs();
-bool isTypeFoldingSupported(unsigned Opcode);
 
 namespace llvm {
 using SPIRVType = const MachineInstr;
 
-class SPIRVTypeRegistry {
+class SPIRVGlobalRegistry {
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
   // Do not confuse this with DuplicatesTracker as DT maps Type* to <MF, Reg>
@@ -73,29 +68,17 @@ class SPIRVTypeRegistry {
   SPIRVType *createSPIRVType(const Type *Type, MachineIRBuilder &MIRBuilder,
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
-  // Set SPIRVType for GV, propagate it to GV's users, set register classes.
-  SPIRVType *propagateSPIRVType(MachineInstr *MI, MachineRegisterInfo &MRI,
-                                MachineIRBuilder &MIB);
 
 public:
-  // Insert ASSIGN_TYPE instuction between Reg and its definition, set
-  // NewReg as a dst of the definition, assign SPIRVType to both registers.
-  // If SpirvTy is provided, use it as SPIRVType in ASSIGN_TYPE, otherwise
-  // create it from Ty.
-  Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
-                             MachineIRBuilder &MIB, MachineRegisterInfo &MRI);
-
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
   SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
     return SpecialTypesAndConstsMap;
   }
 
-  SPIRVTypeRegistry(SPIRVGeneralDuplicatesTracker &DT,
-                    unsigned int PointerSize);
+  SPIRVGlobalRegistry(SPIRVGeneralDuplicatesTracker &DT,
+                      unsigned int PointerSize);
 
   MachineFunction *CurMF;
-
-  void generateAssignInstrs(MachineFunction &MF);
 
   // Get or create a SPIR-V type corresponding the given LLVM IR type,
   // and map it to the given VReg by creating an ASSIGN_TYPE instruction.
@@ -115,7 +98,7 @@ public:
   // want to emit extra IR instructions there
   SPIRVType *
   getOrCreateSPIRVType(const Type *Type, MachineIRBuilder &MIRBuilder,
-                       AQ::AccessQualifier accessQual = AQ ::ReadWrite,
+                       AQ::AccessQualifier accessQual = AQ::ReadWrite,
                        bool EmitIR = true);
 
   const Type *getTypeForSPIRVType(const SPIRVType *Ty) const {
@@ -252,8 +235,7 @@ public:
                                LinkageType::LinkageType LinkageType,
                                MachineIRBuilder &MIRBuilder);
 
-  // convenient helpers for getting types
-  // w/ check for duplicates
+  // Convenient helpers for getting types with check for duplicates.
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
                                          MachineIRBuilder &MIRBuilder);
   SPIRVType *getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder);
@@ -265,17 +247,6 @@ public:
       StorageClass::StorageClass SClass = StorageClass::Function);
   SPIRVType *getOrCreateSPIRVSampledImageType(SPIRVType *ImageType,
                                               MachineIRBuilder &MIRBuilder);
-  // Convert a SPIR-V storage class to the corresponding LLVM IR address space.
-  unsigned int StorageClassToAddressSpace(StorageClass::StorageClass SC);
-
-  // Convert an LLVM IR address space to a SPIR-V storage class.
-  StorageClass::StorageClass
-  addressSpaceToStorageClass(unsigned int AddressSpace);
-
-  // Utility method to constrain an instruction's operands to the correct
-  // register classes, and return true if this worked.
-  bool constrainRegOperands(MachineInstrBuilder &MIB,
-                            MachineFunction *MF = nullptr) const;
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H

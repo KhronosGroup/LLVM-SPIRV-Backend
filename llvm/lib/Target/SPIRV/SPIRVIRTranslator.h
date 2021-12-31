@@ -9,7 +9,7 @@
 // Overrides GlobalISel's IRTranslator to customize default lowering behavior.
 // This is mostly to stop aggregate types like Structs from getting expanded
 // into scalars, and to maintain type information required for SPIR-V using the
-// SPIRVTypeRegistry before it gets discarded as LLVM IR is lowered to GMIR.
+// SPIRVGlobalRegistry before it gets discarded as LLVM IR is lowered to GMIR.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,7 +22,7 @@
 namespace llvm {
 class SPIRVIRTranslator : public IRTranslator {
 private:
-  SPIRVTypeRegistry *TR;
+  SPIRVGlobalRegistry *GR;
   SPIRVGeneralDuplicatesTracker *DT;
 
   // Generate OpVariables with linkage data and their initializers if necessary
