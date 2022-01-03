@@ -128,8 +128,9 @@ static void addHeaderOps(Module &M, MachineIRBuilder &MIRBuilder,
   unsigned PtrSize = ST.getPointerSize();
 
   // Add OpMemoryModel
-  using namespace AddressingModel;
-  auto Addr = PtrSize == 32 ? Physical32 : PtrSize == 64 ? Physical64 : Logical;
+  auto Addr = PtrSize == 32 ? AddressingModel::Physical32
+                            : PtrSize == 64 ? AddressingModel::Physical64
+                                            : AddressingModel::Logical;
   auto Mem = MemoryModel::OpenCL;
   MIRBuilder.buildInstr(SPIRV::OpMemoryModel).addImm(Addr).addImm(Mem);
 

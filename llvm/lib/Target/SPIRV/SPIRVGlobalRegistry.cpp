@@ -16,7 +16,6 @@
 
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRV.h"
-#include "SPIRVEnums.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
@@ -81,12 +80,12 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeVoid(MachineIRBuilder &MIRBuilder) {
 SPIRVType *SPIRVGlobalRegistry::getOpTypeVector(uint32_t NumElems,
                                                 SPIRVType *ElemType,
                                                 MachineIRBuilder &MIRBuilder) {
-  using namespace SPIRV;
   auto EleOpc = ElemType->getOpcode();
-  if (EleOpc != OpTypeInt && EleOpc != OpTypeFloat && EleOpc != OpTypeBool)
+  if (EleOpc != SPIRV::OpTypeInt && EleOpc != SPIRV::OpTypeFloat &&
+      EleOpc != SPIRV::OpTypeBool)
     report_fatal_error("Invalid vector element type");
 
-  auto MIB = MIRBuilder.buildInstr(OpTypeVector)
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeVector)
                  .addDef(createTypeVReg(MIRBuilder))
                  .addUse(getSPIRVTypeID(ElemType))
                  .addImm(NumElems);
@@ -601,7 +600,6 @@ SPIRVGlobalRegistry::generateOpenCLOpaqueType(const StructType *Ty,
                                               AQ::AccessQualifier AccessQual) {
   const StringRef Name = Ty->getName();
   assert(Name.startswith("opencl.") && "CL types should start with 'opencl.'");
-  using namespace Dim;
   auto TypeName = Name.substr(strlen("opencl."));
 
   if (TypeName.startswith("image")) {
@@ -615,10 +613,11 @@ SPIRVGlobalRegistry::generateOpenCLOpaqueType(const StructType *Ty,
       AccessQual = AQ::ReadWrite;
     char DimC = TypeName[strlen("image")];
     if (DimC >= '1' && DimC <= '3') {
-      auto Dim = DimC == '1' ? DIM_1D : DimC == '2' ? DIM_2D : DIM_3D;
+      auto Dim =
+          DimC == '1' ? Dim::DIM_1D : DimC == '2' ? Dim::DIM_2D : Dim::DIM_3D;
       unsigned int Arrayed = 0;
       if (TypeName.contains("buffer"))
-        Dim = DIM_Buffer;
+        Dim = Dim::DIM_Buffer;
       if (TypeName.contains("array"))
         Arrayed = 1;
       auto *VoidTy = getOrCreateSPIRVType(

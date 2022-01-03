@@ -32,8 +32,8 @@ std::string getSPIRVStringOperand(const InstType &MI, unsigned int StartIndex) {
     if (!Op.isImm()) // Stop if we hit a register operand
       break;
     uint32_t Imm = Op.getImm(); // Each i32 word is up to 4 characters
-    for (unsigned shiftAmount = 0; shiftAmount < 32; shiftAmount += 8) {
-      char c = (Imm >> shiftAmount) & 0xff;
+    for (unsigned ShiftAmount = 0; ShiftAmount < 32; ShiftAmount += 8) {
+      char c = (Imm >> ShiftAmount) & 0xff;
       if (c == 0) { // Stop if we hit a null-terminator character
         IsFinished = true;
         break;

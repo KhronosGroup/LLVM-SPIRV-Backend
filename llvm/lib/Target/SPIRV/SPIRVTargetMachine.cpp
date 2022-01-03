@@ -52,7 +52,6 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
   initializeSPIRVAddRequirementsPass(PR);
 }
 
-// DataLayout: little or big endian
 static std::string computeDataLayout(const Triple &TT) {
   std::string DataLayout = "e-m:e";
 

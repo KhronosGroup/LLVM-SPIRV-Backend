@@ -293,7 +293,6 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
                                          const SPIRVType *ResType,
                                          const MachineInstr &I,
                                          MachineIRBuilder &MIRBuilder) const {
-  using namespace SPIRV;
   assert(!isTypeFoldingSupported(I.getOpcode()) ||
          I.getOpcode() == TargetOpcode::G_CONSTANT);
 
@@ -352,17 +351,19 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     return selectPhi(ResVReg, ResType, I, MIRBuilder);
 
   case TargetOpcode::G_FPTOSI:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpConvertFToS);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpConvertFToS);
   case TargetOpcode::G_FPTOUI:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpConvertFToU);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpConvertFToU);
 
   case TargetOpcode::G_SITOFP:
-    return selectIToF(ResVReg, ResType, I, true, MIRBuilder, OpConvertSToF);
+    return selectIToF(ResVReg, ResType, I, true, MIRBuilder,
+                      SPIRV::OpConvertSToF);
   case TargetOpcode::G_UITOFP:
-    return selectIToF(ResVReg, ResType, I, false, MIRBuilder, OpConvertUToF);
+    return selectIToF(ResVReg, ResType, I, false, MIRBuilder,
+                      SPIRV::OpConvertUToF);
 
   case TargetOpcode::G_CTPOP:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpBitCount);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpBitCount);
 
     // even SPIRV-LLVM translator doens't support overflow intrinsics
     // so we don't even have a reliable tests for this functionality
@@ -468,37 +469,44 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     return selectTrunc(ResVReg, ResType, I, MIRBuilder);
   case TargetOpcode::G_FPTRUNC:
   case TargetOpcode::G_FPEXT:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpFConvert);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpFConvert);
 
   case TargetOpcode::G_PTRTOINT:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpConvertPtrToU);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpConvertPtrToU);
   case TargetOpcode::G_INTTOPTR:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpConvertUToPtr);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpConvertUToPtr);
   case TargetOpcode::G_BITCAST:
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpBitcast);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpBitcast);
   case TargetOpcode::G_ADDRSPACE_CAST:
     return selectAddrSpaceCast(ResVReg, ResType, I, MIRBuilder);
 
   case TargetOpcode::G_ATOMICRMW_OR:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicOr);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, SPIRV::OpAtomicOr);
   case TargetOpcode::G_ATOMICRMW_ADD:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicIAdd);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicIAdd);
   case TargetOpcode::G_ATOMICRMW_AND:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicAnd);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, SPIRV::OpAtomicAnd);
   case TargetOpcode::G_ATOMICRMW_MAX:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicSMax);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicSMax);
   case TargetOpcode::G_ATOMICRMW_MIN:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicSMin);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicSMin);
   case TargetOpcode::G_ATOMICRMW_SUB:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicISub);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicISub);
   case TargetOpcode::G_ATOMICRMW_XOR:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicXor);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, SPIRV::OpAtomicXor);
   case TargetOpcode::G_ATOMICRMW_UMAX:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicUMax);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicUMax);
   case TargetOpcode::G_ATOMICRMW_UMIN:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicUMin);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicUMin);
   case TargetOpcode::G_ATOMICRMW_XCHG:
-    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder, OpAtomicExchange);
+    return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
+                           SPIRV::OpAtomicExchange);
 
   case TargetOpcode::G_ATOMIC_CMPXCHG_WITH_SUCCESS:
     return selectAtomicCmpXchg(ResVReg, ResType, I, MIRBuilder, true);
@@ -559,17 +567,16 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
 }
 
 static bool canUseNSW(unsigned Opcode) {
-  using namespace SPIRV;
   switch (Opcode) {
-  case OpIAddS:
-  case OpIAddV:
-  case OpISubS:
-  case OpISubV:
-  case OpIMulS:
-  case OpIMulV:
-  case OpShiftLeftLogicalS:
-  case OpShiftLeftLogicalV:
-  case OpSNegate:
+  case SPIRV::OpIAddS:
+  case SPIRV::OpIAddV:
+  case SPIRV::OpISubS:
+  case SPIRV::OpISubV:
+  case SPIRV::OpIMulS:
+  case SPIRV::OpIMulV:
+  case SPIRV::OpShiftLeftLogicalS:
+  case SPIRV::OpShiftLeftLogicalV:
+  case SPIRV::OpSNegate:
     return true;
   default:
     return false;
@@ -577,14 +584,13 @@ static bool canUseNSW(unsigned Opcode) {
 }
 
 static bool canUseNUW(unsigned Opcode) {
-  using namespace SPIRV;
   switch (Opcode) {
-  case OpIAddS:
-  case OpIAddV:
-  case OpISubS:
-  case OpISubV:
-  case OpIMulS:
-  case OpIMulV:
+  case SPIRV::OpIAddS:
+  case SPIRV::OpIAddV:
+  case SPIRV::OpISubS:
+  case SPIRV::OpISubV:
+  case SPIRV::OpIMulS:
+  case SPIRV::OpIMulV:
     return true;
   default:
     return false;
@@ -861,7 +867,6 @@ static bool isGenericCastablePtr(StorageClass::StorageClass Sc) {
 bool SPIRVInstructionSelector::selectAddrSpaceCast(
     Register ResVReg, const SPIRVType *ResType, const MachineInstr &I,
     MachineIRBuilder &MIRBuilder) const {
-  using namespace SPIRV;
   namespace SC = StorageClass;
   auto SrcPtr = I.getOperand(1).getReg();
   auto SrcPtrTy = GR.getSPIRVTypeForVReg(SrcPtr);
@@ -870,22 +875,24 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(
 
   if (DstSC == SC::Generic && isGenericCastablePtr(SrcSC)) {
     // We're casting from an eligable pointer to Generic
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpPtrCastToGeneric);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder,
+                      SPIRV::OpPtrCastToGeneric);
   } else if (SrcSC == SC::Generic && isGenericCastablePtr(DstSC)) {
     // We're casting from Generic to an eligable pointer
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpGenericCastToPtr);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder,
+                      SPIRV::OpGenericCastToPtr);
   } else if (isGenericCastablePtr(SrcSC) && isGenericCastablePtr(DstSC)) {
     // We're casting between 2 eligable pointers using Generic as an
     // intermediary
-    auto Tmp = MIRBuilder.getMRI()->createVirtualRegister(&IDRegClass);
+    auto Tmp = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     auto GenericPtrTy = GR.getOrCreateSPIRVPointerType(SrcPtrTy, MIRBuilder,
                                                        StorageClass::Generic);
-    bool Success = MIRBuilder.buildInstr(OpPtrCastToGeneric)
+    bool Success = MIRBuilder.buildInstr(SPIRV::OpPtrCastToGeneric)
                        .addDef(Tmp)
                        .addUse(GR.getSPIRVTypeID(GenericPtrTy))
                        .addUse(SrcPtr)
                        .constrainAllUses(TII, TRI, RBI);
-    return Success && MIRBuilder.buildInstr(OpGenericCastToPtr)
+    return Success && MIRBuilder.buildInstr(SPIRV::OpGenericCastToPtr)
                           .addDef(ResVReg)
                           .addUse(GR.getSPIRVTypeID(ResType))
                           .addUse(Tmp)
@@ -893,7 +900,7 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(
   } else {
     // TODO Should this case just be disallowed completely?
     // We're casting 2 other arbitrary address spaces, so have to bitcast
-    return selectUnOp(ResVReg, ResType, I, MIRBuilder, OpBitcast);
+    return selectUnOp(ResVReg, ResType, I, MIRBuilder, SPIRV::OpBitcast);
   }
 }
 
@@ -1083,15 +1090,13 @@ bool SPIRVInstructionSelector::selectCmp(Register ResVReg,
                                          unsigned scalarTyOpc, unsigned CmpOpc,
                                          const MachineInstr &I,
                                          MachineIRBuilder &MIRBuilder) const {
-  using namespace SPIRV;
-
   Register Cmp0 = I.getOperand(2).getReg();
   Register Cmp1 = I.getOperand(3).getReg();
   SPIRVType *Cmp0Type = GR.getSPIRVTypeForVReg(Cmp0);
   SPIRVType *Cmp1Type = GR.getSPIRVTypeForVReg(Cmp1);
   assert(Cmp0Type->getOpcode() == Cmp1Type->getOpcode());
 
-  if (Cmp0Type->getOpcode() != OpTypePointer &&
+  if (Cmp0Type->getOpcode() != SPIRV::OpTypePointer &&
       (!GR.isScalarOrVectorOfType(Cmp0, scalarTyOpc) ||
        !GR.isScalarOrVectorOfType(Cmp1, scalarTyOpc)))
     llvm_unreachable("Incompatible type for comparison");
@@ -1217,11 +1222,12 @@ bool SPIRVInstructionSelector::selectSelect(
     Register ResVReg, const SPIRVType *ResType, const MachineInstr &I,
     bool IsSigned, MachineIRBuilder &MIRBuilder) const {
   // To extend a bool, we need to use OpSelect between constants
-  using namespace SPIRV;
   Register ZeroReg = buildZerosVal(ResType, MIRBuilder);
   Register OneReg = buildOnesVal(IsSigned, ResType, MIRBuilder);
-  bool IsScalarBool = GR.isScalarOfType(I.getOperand(1).getReg(), OpTypeBool);
-  return MIRBuilder.buildInstr(IsScalarBool ? OpSelectSISCond : OpSelectSIVCond)
+  bool IsScalarBool =
+      GR.isScalarOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool);
+  auto Opcode = IsScalarBool ? SPIRV::OpSelectSISCond : SPIRV::OpSelectSIVCond;
+  return MIRBuilder.buildInstr(Opcode)
       .addDef(ResVReg)
       .addUse(GR.getSPIRVTypeID(ResType))
       .addUse(I.getOperand(1).getReg())
@@ -1256,12 +1262,11 @@ bool SPIRVInstructionSelector::selectExt(Register ResVReg,
                                          const SPIRVType *ResType,
                                          const MachineInstr &I, bool IsSigned,
                                          MachineIRBuilder &MIRBuilder) const {
-  using namespace SPIRV;
-  if (GR.isScalarOrVectorOfType(I.getOperand(1).getReg(), OpTypeBool)) {
+  if (GR.isScalarOrVectorOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool)) {
     return selectSelect(ResVReg, ResType, I, IsSigned, MIRBuilder);
   } else {
     return selectUnOp(ResVReg, ResType, I, MIRBuilder,
-                      IsSigned ? OpSConvert : OpUConvert);
+                      IsSigned ? SPIRV::OpSConvert : SPIRV::OpUConvert);
   }
 }
 
@@ -1293,15 +1298,14 @@ bool SPIRVInstructionSelector::selectTrunc(Register ResVReg,
                                            const SPIRVType *ResType,
                                            const MachineInstr &I,
                                            MachineIRBuilder &MIRBuilder) const {
-  using namespace SPIRV;
-  if (GR.isScalarOrVectorOfType(ResVReg, OpTypeBool)) {
+  if (GR.isScalarOrVectorOfType(ResVReg, SPIRV::OpTypeBool)) {
     auto IntReg = I.getOperand(1).getReg();
     auto ArgType = GR.getSPIRVTypeForVReg(IntReg);
     return selectIntToBool(IntReg, ResVReg, ArgType, ResType, MIRBuilder);
   } else {
     bool IsSigned = GR.isScalarOrVectorSigned(ResType);
     return selectUnOp(ResVReg, ResType, I, MIRBuilder,
-                      IsSigned ? OpSConvert : OpUConvert);
+                      IsSigned ? SPIRV::OpSConvert : SPIRV::OpUConvert);
   }
 }
 
