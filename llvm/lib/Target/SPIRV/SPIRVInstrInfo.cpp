@@ -22,25 +22,24 @@
 #include "SPIRVGenInstrInfo.inc"
 
 using namespace llvm;
-using namespace SPIRV;
 
 SPIRVInstrInfo::SPIRVInstrInfo() : SPIRVGenInstrInfo() {}
 
 bool SPIRVInstrInfo::isConstantInstr(const MachineInstr &MI) const {
   switch (MI.getOpcode()) {
-  case OpConstantTrue:
-  case OpConstantFalse:
-  case OpConstantI:
-  case OpConstantF:
-  case OpConstantComposite:
-  case OpConstantSampler:
-  case OpConstantNull:
-  case OpSpecConstantTrue:
-  case OpSpecConstantFalse:
-  case OpSpecConstant:
-  case OpSpecConstantComposite:
-  case OpSpecConstantOp:
-  case OpUndef:
+  case SPIRV::OpConstantTrue:
+  case SPIRV::OpConstantFalse:
+  case SPIRV::OpConstantI:
+  case SPIRV::OpConstantF:
+  case SPIRV::OpConstantComposite:
+  case SPIRV::OpConstantSampler:
+  case SPIRV::OpConstantNull:
+  case SPIRV::OpSpecConstantTrue:
+  case SPIRV::OpSpecConstantFalse:
+  case SPIRV::OpSpecConstant:
+  case SPIRV::OpSpecConstantComposite:
+  case SPIRV::OpSpecConstantOp:
+  case SPIRV::OpUndef:
     return true;
   default:
     return false;
@@ -51,7 +50,7 @@ bool SPIRVInstrInfo::isTypeDeclInstr(const MachineInstr &MI) const {
   auto &MRI = MI.getMF()->getRegInfo();
   if (MI.getNumDefs() >= 1 && MI.getOperand(0).isReg()) {
     auto DefRegClass = MRI.getRegClassOrNull(MI.getOperand(0).getReg());
-    return DefRegClass && DefRegClass->getID() == TYPERegClass.getID();
+    return DefRegClass && DefRegClass->getID() == SPIRV::TYPERegClass.getID();
   } else {
     return false;
   }
@@ -59,11 +58,11 @@ bool SPIRVInstrInfo::isTypeDeclInstr(const MachineInstr &MI) const {
 
 bool SPIRVInstrInfo::isDecorationInstr(const MachineInstr &MI) const {
   switch (MI.getOpcode()) {
-  case OpDecorate:
-  case OpDecorateId:
-  case OpDecorateString:
-  case OpMemberDecorate:
-  case OpMemberDecorateString:
+  case SPIRV::OpDecorate:
+  case SPIRV::OpDecorateId:
+  case SPIRV::OpDecorateString:
+  case SPIRV::OpMemberDecorate:
+  case SPIRV::OpMemberDecorateString:
     return true;
   default:
     return false;
@@ -72,20 +71,20 @@ bool SPIRVInstrInfo::isDecorationInstr(const MachineInstr &MI) const {
 
 bool SPIRVInstrInfo::isHeaderInstr(const MachineInstr &MI) const {
   switch (MI.getOpcode()) {
-  case OpCapability:
-  case OpExtension:
-  case OpExtInstImport:
-  case OpMemoryModel:
-  case OpEntryPoint:
-  case OpExecutionMode:
-  case OpExecutionModeId:
-  case OpString:
-  case OpSourceExtension:
-  case OpSource:
-  case OpSourceContinued:
-  case OpName:
-  case OpMemberName:
-  case OpModuleProcessed:
+  case SPIRV::OpCapability:
+  case SPIRV::OpExtension:
+  case SPIRV::OpExtInstImport:
+  case SPIRV::OpMemoryModel:
+  case SPIRV::OpEntryPoint:
+  case SPIRV::OpExecutionMode:
+  case SPIRV::OpExecutionModeId:
+  case SPIRV::OpString:
+  case SPIRV::OpSourceExtension:
+  case SPIRV::OpSource:
+  case SPIRV::OpSourceContinued:
+  case SPIRV::OpName:
+  case SPIRV::OpMemberName:
+  case SPIRV::OpModuleProcessed:
     return true;
   default:
     return isTypeDeclInstr(MI) || isConstantInstr(MI) || isDecorationInstr(MI);

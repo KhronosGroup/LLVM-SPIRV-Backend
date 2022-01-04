@@ -7,6 +7,10 @@
 //===----------------------------------------------------------------------===//
 //
 // This class implements SPIRV-specific bits of TargetFrameLowering class.
+// The target uses only virtual registers. It does not operate with stack frame
+// explicitly and does not generate prologues/epilogues of functions.
+// As a result, we are not required to implemented the frame lowering
+// functionality substantially.
 //
 //===----------------------------------------------------------------------===//
 
