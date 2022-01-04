@@ -7,11 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Implementation of SPIRVBlockLabeler, which ensures all basic blocks
-// start with an OpLabel, and ends with a suitable terminator (OpBranch is
-// inserted if necessary).
-//
-// All MBB literals in OpBranchConditional, OpBranch, and OpPhi, are also fixed
-// to use the virtual registers defined by OpLabel.
+// start with an OpLabel. All MBB literals in OpBranchConditional, OpBranch,
+// and OpPhi, are also fixed to use the virtual registers defined by OpLabel.
 //
 //===----------------------------------------------------------------------===//
 
@@ -116,25 +113,15 @@ bool SPIRVBlockLabeler::runOnMachineFunction(MachineFunction &MF) {
       if (MI.getOpcode() == SPIRV::OpBranch) {
         Branches.push_back(&MI);
       } else if (MI.getOpcode() == SPIRV::OpBranchConditional) {
-        // If previous optimizations generated conditionals with implicit
-        // fallthrough, add the missing explicit "else" to it valid SPIR-V
-        if (MI.getNumOperands() < 3) {
-          MI.addOperand(MachineOperand::CreateMBB(MBB.getNextNode()));
-        }
+        assert(MI.getNumOperands() == 3 &&
+               "3 operands are expected in conditional branch");
         CondBranches.push_back(&MI);
       } else if (MI.getOpcode() == SPIRV::OpPhi) {
         Phis.push_back(&MI);
       }
     }
-
-    // Add an unconditional branch if the block has no explicit terminator
-    // and is not the last one.
-    if (!MBB.getLastNonDebugInstr()->isTerminator() && MBB.getNextNode()) {
-      MIRBuilder.setMBB(MBB); // Insert at end of block
-      auto MIB =
-          MIRBuilder.buildInstr(SPIRV::OpBranch).addMBB(MBB.getNextNode());
-      Branches.push_back(MIB);
-    }
+    assert((MBB.getLastNonDebugInstr()->isTerminator() || !MBB.getNextNode()) &&
+           "Missed terminator in MBB");
   }
 
   // Replace MBB references with label IDs in OpBranch instructions
