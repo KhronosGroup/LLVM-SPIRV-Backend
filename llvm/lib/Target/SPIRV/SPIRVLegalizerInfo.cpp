@@ -282,9 +282,10 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_ATOMICRMW_XCHG)
       .legalForCartesianProduct(allFloatAndIntScalars, allWritablePtrs);
 
-  // Struct return types become a single large scalar, so cannot easily legalize
-  getActionDefinitionsBuilder({G_ATOMIC_CMPXCHG, G_ATOMIC_CMPXCHG_WITH_SUCCESS})
-      .alwaysLegal();
+  getActionDefinitionsBuilder(G_ATOMIC_CMPXCHG_WITH_SUCCESS).lower();
+  // TODO: add proper legalization rules
+  getActionDefinitionsBuilder(G_ATOMIC_CMPXCHG).alwaysLegal();
+
   getActionDefinitionsBuilder({G_UADDO, G_USUBO, G_SMULO, G_UMULO})
       .alwaysLegal();
 
