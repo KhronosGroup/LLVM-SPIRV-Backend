@@ -23,7 +23,7 @@
 // Templated to allow both MachineInstr and MCInst to use the same logic.
 template <class InstType>
 std::string getSPIRVStringOperand(const InstType &MI, unsigned int StartIndex) {
-  std::string s = ""; // Iteratively append to this string
+  std::string s; // Iteratively append to this string
 
   const unsigned int NumOps = MI.getNumOperands();
   bool IsFinished = false;
@@ -31,7 +31,8 @@ std::string getSPIRVStringOperand(const InstType &MI, unsigned int StartIndex) {
     const auto &Op = MI.getOperand(i);
     if (!Op.isImm()) // Stop if we hit a register operand
       break;
-    uint32_t Imm = Op.getImm(); // Each i32 word is up to 4 characters
+    assert((Op.getImm() >> 32) == 0 && "Imm operand should be i32 word");
+    const uint32_t Imm = Op.getImm(); // Each i32 word is up to 4 characters
     for (unsigned ShiftAmount = 0; ShiftAmount < 32; ShiftAmount += 8) {
       char c = (Imm >> ShiftAmount) & 0xff;
       if (c == 0) { // Stop if we hit a null-terminator character

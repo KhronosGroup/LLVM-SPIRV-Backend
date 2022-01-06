@@ -13,6 +13,7 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-DAG: OpName [[UGE:%.*]] "test_uge"
 ; CHECK-DAG: OpName [[SGE:%.*]] "test_sge"
 
+; FIXME: Translator uses OpIEqual/OpINotEqual for test_eq/test_ne cases
 ; CHECK: [[EQ]] = OpFunction
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
@@ -41,7 +42,9 @@ define i1 @test_ne(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpSLessThan {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpSLessThan {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_slt(i16* %a, i16* %b) {
@@ -53,7 +56,9 @@ define i1 @test_slt(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpULessThan {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpULessThan {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_ult(i16* %a, i16* %b) {
@@ -65,7 +70,9 @@ define i1 @test_ult(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpULessThanEqual {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpULessThanEqual {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_ule(i16* %a, i16* %b) {
@@ -77,7 +84,9 @@ define i1 @test_ule(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpSLessThanEqual {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpSLessThanEqual {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_sle(i16* %a, i16* %b) {
@@ -89,7 +98,9 @@ define i1 @test_sle(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpUGreaterThan {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpUGreaterThan {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_ugt(i16* %a, i16* %b) {
@@ -101,7 +112,9 @@ define i1 @test_ugt(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpSGreaterThan {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpSGreaterThan {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_sgt(i16* %a, i16* %b) {
@@ -113,7 +126,9 @@ define i1 @test_sgt(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpUGreaterThanEqual {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpUGreaterThanEqual {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_uge(i16* %a, i16* %b) {
@@ -125,7 +140,9 @@ define i1 @test_uge(i16* %a, i16* %b) {
 ; CHECK-NEXT: [[A:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: [[B:%.*]] = OpFunctionParameter
 ; CHECK-NEXT: OpLabel
-; CHECK: [[R:%.*]] = OpSGreaterThanEqual {{%.+}} [[A]] [[B]]
+; CHECK-NEXT: [[AI:%.*]] = OpConvertPtrToU {{%.+}} [[A]]
+; CHECK-NEXT: [[BI:%.*]] = OpConvertPtrToU {{%.+}} [[B]]
+; CHECK: [[R:%.*]] = OpSGreaterThanEqual {{%.+}} [[AI]] [[BI]]
 ; CHECK-NEXT: OpReturnValue [[R]]
 ; CHECK-NEXT: OpFunctionEnd
 define i1 @test_sge(i16* %a, i16* %b) {
