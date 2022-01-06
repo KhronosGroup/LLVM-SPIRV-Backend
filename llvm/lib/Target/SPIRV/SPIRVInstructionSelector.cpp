@@ -103,8 +103,8 @@ private:
                        unsigned NewOpcode) const;
 
   bool selectAtomicCmpXchg(Register ResVReg, const SPIRVType *ResType,
-                           const MachineInstr &I, MachineIRBuilder &MIRBuilder,
-                           bool WithSuccess) const;
+                           const MachineInstr &I,
+                           MachineIRBuilder &MIRBuilder) const;
 
   bool selectFence(const MachineInstr &I, MachineIRBuilder &MIRBuilder) const;
 
@@ -507,11 +507,8 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
   case TargetOpcode::G_ATOMICRMW_XCHG:
     return selectAtomicRMW(ResVReg, ResType, I, MIRBuilder,
                            SPIRV::OpAtomicExchange);
-
-  case TargetOpcode::G_ATOMIC_CMPXCHG_WITH_SUCCESS:
-    return selectAtomicCmpXchg(ResVReg, ResType, I, MIRBuilder, true);
   case TargetOpcode::G_ATOMIC_CMPXCHG:
-    return selectAtomicCmpXchg(ResVReg, ResType, I, MIRBuilder, false);
+    return selectAtomicCmpXchg(ResVReg, ResType, I, MIRBuilder);
 
   case TargetOpcode::G_FENCE:
     return selectFence(I, MIRBuilder);
@@ -791,12 +788,9 @@ bool SPIRVInstructionSelector::selectFence(const MachineInstr &I,
       .constrainAllUses(TII, TRI, RBI);
 }
 
-bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
-                                                   const SPIRVType *ResType,
-                                                   const MachineInstr &I,
-                                                   MachineIRBuilder &MIRBuilder,
-                                                   bool WithSuccess) const {
-  auto MRI = MIRBuilder.getMRI();
+bool SPIRVInstructionSelector::selectAtomicCmpXchg(
+    Register ResVReg, const SPIRVType *ResType, const MachineInstr &I,
+    MachineIRBuilder &MIRBuilder) const {
   assert(I.hasOneMemOperand());
   auto MemOp = *I.memoperands_begin();
   auto Scope = getScope(MemOp->getSyncScopeID());
@@ -817,35 +811,16 @@ bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
                               ? MemSemEqReg
                               : buildI32Constant(MemSemNeq, MIRBuilder);
 
-  auto TmpReg = WithSuccess ? MRI->createGenericVirtualRegister(LLT::scalar(32))
-                            : ResVReg;
-  bool Success = MIRBuilder.buildInstr(SPIRV::OpAtomicCompareExchange)
-                     .addDef(TmpReg)
-                     .addUse(GR.getSPIRVTypeID(SpvValTy))
-                     .addUse(Ptr)
-                     .addUse(ScopeReg)
-                     .addUse(MemSemEqReg)
-                     .addUse(MemSemNeqReg)
-                     .addUse(Val)
-                     .addUse(Cmp)
-                     .constrainAllUses(TII, TRI, RBI);
-  if (!WithSuccess) // If we just need the old Val, not {oldVal, Success}
-    return Success;
-  assert(ResType->getOpcode() == SPIRV::OpTypeStruct);
-  auto BoolReg = MRI->createGenericVirtualRegister(LLT::scalar(1));
-  Register BoolTyID = ResType->getOperand(2).getReg();
-  Success &= MIRBuilder.buildInstr(SPIRV::OpIEqual)
-                 .addDef(BoolReg)
-                 .addUse(BoolTyID)
-                 .addUse(TmpReg)
-                 .addUse(Cmp)
-                 .constrainAllUses(TII, TRI, RBI);
-  return Success && MIRBuilder.buildInstr(SPIRV::OpCompositeConstruct)
-                        .addDef(ResVReg)
-                        .addUse(GR.getSPIRVTypeID(ResType))
-                        .addUse(TmpReg)
-                        .addUse(BoolReg)
-                        .constrainAllUses(TII, TRI, RBI);
+  return MIRBuilder.buildInstr(SPIRV::OpAtomicCompareExchange)
+      .addDef(ResVReg)
+      .addUse(GR.getSPIRVTypeID(SpvValTy))
+      .addUse(Ptr)
+      .addUse(ScopeReg)
+      .addUse(MemSemEqReg)
+      .addUse(MemSemNeqReg)
+      .addUse(Val)
+      .addUse(Cmp)
+      .constrainAllUses(TII, TRI, RBI);
 }
 
 static bool isGenericCastablePtr(StorageClass::StorageClass Sc) {
