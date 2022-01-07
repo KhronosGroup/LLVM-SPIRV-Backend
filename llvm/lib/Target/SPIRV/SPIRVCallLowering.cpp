@@ -253,7 +253,6 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
               LLT::scalar(32))});
           VRegArgs.push_back(ToInsert.back());
         }
-
         // TODO: Reuse FunctionLoweringInfo
         FunctionLoweringInfo FuncInfo;
         lowerFormalArguments(FirstBlockBuilder, *CF, VRegArgs, FuncInfo);
