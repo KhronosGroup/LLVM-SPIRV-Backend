@@ -54,6 +54,7 @@ StorageClass::StorageClass addressSpaceToStorageClass(unsigned int AddrSpace);
 
 // Utility method to constrain an instruction's operands to the correct
 // register classes, and return true if this worked.
+// TODO: get rid of using this function
 bool constrainRegOperands(llvm::MachineInstrBuilder &MIB,
                           llvm::MachineFunction *MF = nullptr);
 

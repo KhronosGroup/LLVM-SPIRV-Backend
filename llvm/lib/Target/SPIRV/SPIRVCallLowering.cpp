@@ -38,10 +38,9 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
   if (Val) {
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpReturnValue).addUse(VRegs[0]);
     return constrainRegOperands(MIB);
-  } else {
-    MIRBuilder.buildInstr(SPIRV::OpReturn);
-    return true;
   }
+  MIRBuilder.buildInstr(SPIRV::OpReturn);
+  return true;
 }
 
 // Based on the LLVM function attributes, get a SPIR-V FunctionControl
@@ -116,10 +115,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   auto *FTy = F.getFunctionType();
 
-  // this code restores function args/retvalue types
-  // for composite cases because the final types should still be aggregate
-  // whereas they're i32 during the translation to cope with
-  // aggregates flattenning etc
+  // This code restores function args/retvalue types for composite cases
+  // because the final types should still be aggregate whereas they're i32
+  // during the translation to cope with aggregate flattening etc.
   auto *NamedMD = F.getParent()->getNamedMetadata("spv.cloned_funcs");
   if (NamedMD) {
     Type *RetTy = F.getFunctionType()->getReturnType();
@@ -132,6 +130,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
     if (ThisFuncMDIt != NamedMD->op_end()) {
       auto *ThisFuncMD = *ThisFuncMDIt;
+      // TODO: improve readability and get rid of the unchecked casts
       if (cast<ConstantInt>(
               cast<ConstantAsMetadata>(
                   cast<MDNode>(ThisFuncMD->getOperand(1))->getOperand(0))
@@ -196,6 +195,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
   auto FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
+  auto &MF = MIRBuilder.getMF();
 
   size_t n;
   int Status;
@@ -211,7 +211,6 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   // FIXME: OCL builtin checks should be the same as in clang
   //        or SPIRV-LLVM translator
   if ((Status == demangle_success && SingleUnderscore) || DoubleUnderscore) {
-    const auto &MF = MIRBuilder.getMF();
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
       // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp
@@ -228,38 +227,39 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     }
     report_fatal_error("Unable to handle this environment's built-in funcs.");
   } else {
-    // Emit a regular OpFunctionCall
+    // Emit a regular OpFunctionCall. If it's an externally declared function,
+    // be sure to emit its type and function declaration here. It will be
+    // hoisted globally later.
+    if (Info.Callee.isGlobal()) {
+      const Function *CF =
+          static_cast<const Function *>(Info.Callee.getGlobal());
+      Register FuncVReg;
+      if (CF->isDeclaration() &&
+          (DT->find(CF, &MIRBuilder.getMF(), FuncVReg) == false)) {
+        // Emit the type info and forward function declaration to the first MBB
+        // to ensure VReg definition dependencies are valid across all MBBs.
+        MachineIRBuilder FirstBlockBuilder;
+        FirstBlockBuilder.setMF(MF);
+        FirstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
 
-    // If it's an externally declared function, be sure to emit its type and
-    // function declaration here. It will be hoisted globally later
-    auto M = MIRBuilder.getMF().getFunction().getParent();
-    Function *Callee = M->getFunction(FuncName);
-    Register FuncVReg;
-    if (Callee && Callee->isDeclaration() &&
-        (DT->find(Callee, &MIRBuilder.getMF(), FuncVReg) == false)) {
-      // Emit the type info and forward function declaration to the first MBB
-      // to ensure VReg definition dependencies are valid across all MBBs
-      MachineIRBuilder FirstBlockBuilder;
-      auto &MF = MIRBuilder.getMF();
-      FirstBlockBuilder.setMF(MF);
-      FirstBlockBuilder.setMBB(*MF.getBlockNumbered(0));
-
-      SmallVector<ArrayRef<Register>, 8> VRegArgs;
-      SmallVector<SmallVector<Register, 1>, 8> ToInsert;
-      for (const Argument &Arg : Callee->args()) {
-        if (MIRBuilder.getDataLayout().getTypeStoreSize(Arg.getType()).isZero())
-          continue; // Don't handle zero sized types.
-        ToInsert.push_back({MIRBuilder.getMRI()->createGenericVirtualRegister(
-            LLT::scalar(32))});
-        VRegArgs.push_back(ToInsert.back());
+        SmallVector<ArrayRef<Register>, 8> VRegArgs;
+        SmallVector<SmallVector<Register, 1>, 8> ToInsert;
+        for (const Argument &Arg : CF->args()) {
+          if (MIRBuilder.getDataLayout()
+                  .getTypeStoreSize(Arg.getType())
+                  .isZero())
+            continue; // Don't handle zero sized types.
+          ToInsert.push_back({MIRBuilder.getMRI()->createGenericVirtualRegister(
+              LLT::scalar(32))});
+          VRegArgs.push_back(ToInsert.back());
+        }
+        // TODO: Reuse FunctionLoweringInfo
+        FunctionLoweringInfo FuncInfo;
+        lowerFormalArguments(FirstBlockBuilder, *CF, VRegArgs, FuncInfo);
       }
-
-      // TODO: Reuse FunctionLoweringInfo
-      FunctionLoweringInfo FuncInfo;
-      lowerFormalArguments(FirstBlockBuilder, *Callee, VRegArgs, FuncInfo);
     }
 
-    // Make sure there's a valid return reg, even for functions returning void
+    // Make sure there's a valid return reg, even for functions returning void.
     if (!ResVReg.isValid()) {
       ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     }
@@ -276,6 +276,8 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       assert(arg.Regs.size() == 1 && "Call arg has multiple VRegs");
       MIB.addUse(arg.Regs[0]);
     }
-    return constrainRegOperands(MIB);
+    const auto &STI = MF.getSubtarget();
+    return MIB.constrainAllUses(MIRBuilder.getTII(), *STI.getRegisterInfo(),
+                                *STI.getRegBankInfo());
   }
 }

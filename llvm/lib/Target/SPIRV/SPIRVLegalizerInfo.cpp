@@ -20,13 +20,11 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetOpcodes.h"
 
-#include <unordered_set>
-
 using namespace llvm;
-using namespace LegalizeActions;
-using namespace LegalityPredicates;
+using namespace llvm::LegalizeActions;
+using namespace llvm::LegalityPredicates;
 
-static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
+static const std::set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_ADD,
     TargetOpcode::G_FADD,
     TargetOpcode::G_SUB,
@@ -52,10 +50,6 @@ static const std::unordered_set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_EXTRACT_VECTOR_ELT,
     // TargetOpcode::G_INSERT_VECTOR_ELT
 };
-
-static const std::unordered_set<unsigned> &getTypeFoldingSupportingOpcs() {
-  return TypeFoldingSupportingOpcs;
-}
 
 bool isTypeFoldingSupported(unsigned Opcode) {
   return TypeFoldingSupportingOpcs.count(Opcode) > 0;
@@ -156,7 +150,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
                     v4s32, v4s64,  v8s1,   v8s8,  v8s16, v8s32, v8s64, v16s1,
                     v16s8, v16s16, v16s32, v16s64};
 
-  for (auto Opc : getTypeFoldingSupportingOpcs())
+  for (auto Opc : TypeFoldingSupportingOpcs)
     getActionDefinitionsBuilder(Opc).custom();
 
   getActionDefinitionsBuilder(G_GLOBAL_VALUE).alwaysLegal();
@@ -204,7 +198,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_CTPOP).legalForCartesianProduct(
       allIntScalarsAndVectors, allIntScalarsAndVectors);
 
-  getActionDefinitionsBuilder(G_PHI).alwaysLegal();
+  getActionDefinitionsBuilder(G_PHI).legalFor(allPtrsScalarsAndVectors);
 
   getActionDefinitionsBuilder(G_BITCAST).legalIf(all(
       typeInSet(0, allPtrsScalarsAndVectors),
@@ -251,12 +245,10 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
             LLT retTy = Query.Types[0];
             LLT cmpTy = Query.Types[1];
             if (retTy.isVector())
-              return cmpTy.isVector() &&
-                     retTy.getNumElements() == cmpTy.getNumElements();
-            else
-              // ST.canDirectlyComparePointers() for ponter args is
-              // checked in legalizeCustom().
-              return cmpTy.isScalar() || cmpTy.isPointer();
+              return cmpTy.isVector();
+            // ST.canDirectlyComparePointers() for pointer args is
+            // checked in legalizeCustom().
+            return cmpTy.isScalar() || cmpTy.isPointer();
           })));
 
   getActionDefinitionsBuilder(G_FCMP).legalIf(
@@ -265,12 +257,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
           LegalityPredicate([=](const LegalityQuery &Query) {
             LLT retTy = Query.Types[0];
             LLT cmpTy = Query.Types[1];
-            if (retTy.isVector()) {
-              return cmpTy.isVector() &&
-                     retTy.getNumElements() == cmpTy.getNumElements();
-            } else {
-              return cmpTy.isScalar();
-            }
+            if (retTy.isVector())
+              return cmpTy.isVector();
+            return cmpTy.isScalar();
           })));
 
   getActionDefinitionsBuilder({G_ATOMICRMW_OR, G_ATOMICRMW_ADD, G_ATOMICRMW_AND,
@@ -380,52 +369,43 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
   return {IdReg, GetIdOp};
 }
 
+static Register convertPtrToInt(Register Reg, LLT ConvTy, SPIRVType *SpirvType,
+                                LegalizerHelper &Helper,
+                                MachineRegisterInfo &MRI,
+                                SPIRVGlobalRegistry *GR) {
+  Register ConvReg = MRI.createGenericVirtualRegister(ConvTy);
+  GR->assignSPIRVTypeToVReg(SpirvType, ConvReg, Helper.MIRBuilder);
+  Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
+      .addDef(ConvReg)
+      .addUse(Reg);
+  return ConvReg;
+}
+
 bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
                                         MachineInstr &MI) const {
   auto Opc = MI.getOpcode();
+  MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
   if (!isTypeFoldingSupported(Opc)) {
     assert(Opc == TargetOpcode::G_ICMP);
-    auto &MRI = MI.getMF()->getRegInfo();
-    // Add missed SPIRV type to the VReg
-    // TODO: move SPIRV type detection to one place
-    auto ResVReg = MI.getOperand(0).getReg();
-    auto ResType = GR->getSPIRVTypeForVReg(ResVReg);
-    if (!ResType) {
-      LLT Ty = MRI.getType(ResVReg);
-      LLT BaseTy = Ty.isVector() ? Ty.getElementType() : Ty;
-      Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
-                                      BaseTy.getSizeInBits());
-      if (Ty.isVector())
-        LLVMTy = FixedVectorType::get(LLVMTy, Ty.getNumElements());
-      auto *SpirvType = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
-      GR->assignSPIRVTypeToVReg(SpirvType, ResVReg, Helper.MIRBuilder);
-    }
+    assert(GR->getSPIRVTypeForVReg(MI.getOperand(0).getReg()));
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
-    if (!ST->canDirectlyComparePointers() &&
-        MRI.getType(Op0.getReg()).isPointer() &&
-        MRI.getType(Op1.getReg()).isPointer()) {
-      auto ConvT = LLT::scalar(ST->getPointerSize());
-      auto ConvReg0 = MRI.createGenericVirtualRegister(ConvT);
-      auto ConvReg1 = MRI.createGenericVirtualRegister(ConvT);
-      auto *SpirvType = GR->getOrCreateSPIRVType(
-          IntegerType::get(MI.getMF()->getFunction().getContext(),
-                           ST->getPointerSize()),
-          Helper.MIRBuilder);
-      GR->assignSPIRVTypeToVReg(SpirvType, ConvReg0, Helper.MIRBuilder);
-      GR->assignSPIRVTypeToVReg(SpirvType, ConvReg1, Helper.MIRBuilder);
-      Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
-          .addDef(ConvReg0)
-          .addUse(Op0.getReg());
-      Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
-          .addDef(ConvReg1)
-          .addUse(Op1.getReg());
-      Op0.setReg(ConvReg0);
-      Op1.setReg(ConvReg1);
+    Register Reg0 = Op0.getReg();
+    Register Reg1 = Op1.getReg();
+    CmpInst::Predicate Cond =
+        static_cast<CmpInst::Predicate>(MI.getOperand(1).getPredicate());
+    if ((!ST->canDirectlyComparePointers() ||
+         (Cond != CmpInst::ICMP_EQ && Cond != CmpInst::ICMP_NE)) &&
+        MRI.getType(Reg0).isPointer() && MRI.getType(Reg1).isPointer()) {
+      LLT ConvT = LLT::scalar(ST->getPointerSize());
+      Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
+                                      ST->getPointerSize());
+      SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+      Op0.setReg(convertPtrToInt(Reg0, ConvT, SpirvTy, Helper, MRI, GR));
+      Op1.setReg(convertPtrToInt(Reg1, ConvT, SpirvTy, Helper, MRI, GR));
     }
     return true;
   }
-  auto &MRI = MI.getMF()->getRegInfo();
   assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
   MachineInstr &AssignTypeInst =
       *(MRI.use_instr_begin(MI.getOperand(0).getReg()));

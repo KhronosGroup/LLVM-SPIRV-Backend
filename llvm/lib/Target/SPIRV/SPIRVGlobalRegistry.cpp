@@ -81,9 +81,9 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeVector(uint32_t NumElems,
                                                 SPIRVType *ElemType,
                                                 MachineIRBuilder &MIRBuilder) {
   auto EleOpc = ElemType->getOpcode();
-  if (EleOpc != SPIRV::OpTypeInt && EleOpc != SPIRV::OpTypeFloat &&
-      EleOpc != SPIRV::OpTypeBool)
-    report_fatal_error("Invalid vector element type");
+  assert((EleOpc == SPIRV::OpTypeInt || EleOpc == SPIRV::OpTypeFloat ||
+          EleOpc == SPIRV::OpTypeBool) &&
+         "Invalid vector element type");
 
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeVector)
                  .addDef(createTypeVReg(MIRBuilder))
@@ -98,16 +98,14 @@ Register SPIRVGlobalRegistry::buildConstantInt(uint64_t Val,
                                                bool EmitIR) {
   auto &MF = MIRBuilder.getMF();
   Register Res;
-  IntegerType *LLVMIntTy;
-  if (SpvType) {
-    Type *LLVMTy = const_cast<Type *>(getTypeForSPIRVType(SpvType));
-    assert(LLVMTy->isIntegerTy());
-    LLVMIntTy = cast<IntegerType>(LLVMTy);
-  } else {
+  const IntegerType *LLVMIntTy;
+  if (SpvType)
+    LLVMIntTy = cast<IntegerType>(getTypeForSPIRVType(SpvType));
+  else
     LLVMIntTy = IntegerType::getInt32Ty(MF.getFunction().getContext());
-  }
   // Find a constant in DT or build a new one.
-  const auto ConstInt = ConstantInt::get(LLVMIntTy, Val);
+  const auto ConstInt =
+      ConstantInt::get(const_cast<IntegerType *>(LLVMIntTy), Val);
   if (DT.find(ConstInt, &MIRBuilder.getMF(), Res) == false) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     Res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
@@ -128,11 +126,10 @@ Register SPIRVGlobalRegistry::buildConstantFP(APFloat Val,
                                               SPIRVType *SpvType) {
   auto &MF = MIRBuilder.getMF();
   Register Res;
-  Type *LLVMFPTy;
+  const Type *LLVMFPTy;
   if (SpvType) {
-    Type *LLVMTy = const_cast<Type *>(getTypeForSPIRVType(SpvType));
-    assert(LLVMTy->isFloatingPointTy());
-    LLVMFPTy = LLVMTy;
+    LLVMFPTy = getTypeForSPIRVType(SpvType);
+    assert(LLVMFPTy->isFloatingPointTy());
   } else {
     LLVMFPTy = IntegerType::getFloatTy(MF.getFunction().getContext());
   }
@@ -277,8 +274,8 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeArray(uint32_t NumElems,
                                                SPIRVType *ElemType,
                                                MachineIRBuilder &MIRBuilder,
                                                bool EmitIR) {
-  if (ElemType->getOpcode() == SPIRV::OpTypeVoid)
-    report_fatal_error("Invalid array element type");
+  assert((ElemType->getOpcode() != SPIRV::OpTypeVoid) &&
+         "Invalid array element type");
   Register NumElementsVReg =
       buildConstantInt(NumElems, MIRBuilder, nullptr, EmitIR);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeArray)
@@ -356,7 +353,7 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeFunction(
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeFunction)
                  .addDef(createTypeVReg(MIRBuilder))
                  .addUse(getSPIRVTypeID(RetType));
-  for (const auto &ArgType : ArgTypes)
+  for (const SPIRVType *ArgType : ArgTypes)
     MIB.addUse(getSPIRVTypeID(ArgType));
   return MIB;
 }
@@ -377,35 +374,39 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
     const unsigned int Width = IType->getBitWidth();
     return Width == 1 ? getOpTypeBool(MIRBuilder)
                       : getOpTypeInt(Width, MIRBuilder, false);
-  } else if (Ty->isFloatingPointTy())
+  }
+  if (Ty->isFloatingPointTy())
     return getOpTypeFloat(Ty->getPrimitiveSizeInBits(), MIRBuilder);
-  else if (Ty->isVoidTy())
+  if (Ty->isVoidTy())
     return getOpTypeVoid(MIRBuilder);
-  else if (Ty->isVectorTy()) {
+  if (Ty->isVectorTy()) {
     auto El = getOrCreateSPIRVType(cast<FixedVectorType>(Ty)->getElementType(),
                                    MIRBuilder);
     return getOpTypeVector(cast<FixedVectorType>(Ty)->getNumElements(), El,
                            MIRBuilder);
-  } else if (Ty->isArrayTy()) {
+  }
+  if (Ty->isArrayTy()) {
     auto *El = getOrCreateSPIRVType(Ty->getArrayElementType(), MIRBuilder);
     return getOpTypeArray(Ty->getArrayNumElements(), El, MIRBuilder, EmitIR);
-  } else if (auto SType = dyn_cast<StructType>(Ty)) {
+  }
+  if (auto SType = dyn_cast<StructType>(Ty)) {
     if (isOpenCLBuiltinType(SType))
       return handleOpenCLBuiltin(SType, MIRBuilder, AccQual);
-    else if (isSPIRVBuiltinType(SType))
+    if (isSPIRVBuiltinType(SType))
       return handleSPIRVBuiltin(SType, MIRBuilder, AccQual);
-    else if (SType->isOpaque())
+    if (SType->isOpaque())
       return getOpTypeOpaque(SType, MIRBuilder);
-    else
-      return getOpTypeStruct(SType, MIRBuilder, EmitIR);
-  } else if (auto FType = dyn_cast<FunctionType>(Ty)) {
+    return getOpTypeStruct(SType, MIRBuilder, EmitIR);
+  }
+  if (auto FType = dyn_cast<FunctionType>(Ty)) {
     SPIRVType *RetTy = getOrCreateSPIRVType(FType->getReturnType(), MIRBuilder);
     SmallVector<SPIRVType *, 4> ParamTypes;
     for (const auto &t : FType->params()) {
       ParamTypes.push_back(getOrCreateSPIRVType(t, MIRBuilder));
     }
     return getOpTypeFunction(RetTy, ParamTypes, MIRBuilder);
-  } else if (const auto &PType = dyn_cast<PointerType>(Ty)) {
+  }
+  if (auto PType = dyn_cast<PointerType>(Ty)) {
     Type *ElemType = PType->getPointerElementType();
 
     // Some OpenCL and SPIRV builtins like image2d_t are passed in as pointers,
@@ -422,8 +423,8 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
     SPIRVType *SpvElementType =
         getOrCreateSPIRVType(ElemType, MIRBuilder, AQ::ReadWrite, EmitIR);
     return getOpTypePointer(SC, SpvElementType, MIRBuilder);
-  } else
-    llvm_unreachable("Unable to convert LLVM type to SPIRVType");
+  }
+  llvm_unreachable("Unable to convert LLVM type to SPIRVType");
 }
 
 SPIRVType *SPIRVGlobalRegistry::getSPIRVTypeForVReg(Register VReg) const {
@@ -461,9 +462,9 @@ bool SPIRVGlobalRegistry::isScalarOrVectorOfType(
     Register VReg, unsigned int TypeOpcode) const {
   SPIRVType *Type = getSPIRVTypeForVReg(VReg);
   assert(Type && "isScalarOrVectorOfType VReg has no type assigned");
-  if (Type->getOpcode() == TypeOpcode) {
+  if (Type->getOpcode() == TypeOpcode)
     return true;
-  } else if (Type->getOpcode() == SPIRV::OpTypeVector) {
+  if (Type->getOpcode() == SPIRV::OpTypeVector) {
     Register ScalarTypeVReg = Type->getOperand(1).getReg();
     SPIRVType *ScalarType = getSPIRVTypeForVReg(ScalarTypeVReg);
     return ScalarType->getOpcode() == TypeOpcode;
@@ -478,11 +479,10 @@ SPIRVGlobalRegistry::getScalarOrVectorBitWidth(const SPIRVType *Type) const {
     Type = getSPIRVTypeForVReg(EleTypeReg);
   }
   if (Type && (Type->getOpcode() == SPIRV::OpTypeInt ||
-               Type->getOpcode() == SPIRV::OpTypeFloat)) {
+               Type->getOpcode() == SPIRV::OpTypeFloat))
     return Type->getOperand(1).getImm();
-  } else if (Type && Type->getOpcode() == SPIRV::OpTypeBool) {
+  if (Type && Type->getOpcode() == SPIRV::OpTypeBool)
     return 1;
-  }
   llvm_unreachable("Attempting to get bit width of non-integer/float type.");
 }
 
