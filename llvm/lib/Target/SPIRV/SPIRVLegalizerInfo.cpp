@@ -238,29 +238,15 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder(G_CONSTANT).legalFor(allScalars);
   // getActionDefinitionsBuilder(G_FCONSTANT).legalFor(allFloatScalars);
 
+  // ST.canDirectlyComparePointers() for pointer args is supported in
+  // legalizeCustom().
   getActionDefinitionsBuilder(G_ICMP).customIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
-          typeInSet(1, allPtrsScalarsAndVectors),
-          LegalityPredicate([&](const LegalityQuery &Query) {
-            LLT retTy = Query.Types[0];
-            LLT cmpTy = Query.Types[1];
-            if (retTy.isVector())
-              return cmpTy.isVector();
-            // ST.canDirectlyComparePointers() for pointer args is
-            // checked in legalizeCustom().
-            return cmpTy.isScalar() || cmpTy.isPointer();
-          })));
+          typeInSet(1, allPtrsScalarsAndVectors)));
 
   getActionDefinitionsBuilder(G_FCMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
-          typeInSet(1, allFloatScalarsAndVectors),
-          LegalityPredicate([=](const LegalityQuery &Query) {
-            LLT retTy = Query.Types[0];
-            LLT cmpTy = Query.Types[1];
-            if (retTy.isVector())
-              return cmpTy.isVector();
-            return cmpTy.isScalar();
-          })));
+          typeInSet(1, allFloatScalarsAndVectors)));
 
   getActionDefinitionsBuilder({G_ATOMICRMW_OR, G_ATOMICRMW_ADD, G_ATOMICRMW_AND,
                                G_ATOMICRMW_MAX, G_ATOMICRMW_MIN,

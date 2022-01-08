@@ -227,13 +227,12 @@ public:
                                 unsigned int Param, unsigned int FilerMode,
                                 MachineIRBuilder &MIRBuilder,
                                 SPIRVType *SpvType);
-  Register buildGlobalVariable(Register Reg, SPIRVType *BaseType,
-                               StringRef Name, const GlobalValue *GV,
-                               StorageClass::StorageClass Storage,
-                               const MachineInstr *Init, bool IsConst,
-                               bool HasLinkageTy,
-                               LinkageType::LinkageType LinkageType,
-                               MachineIRBuilder &MIRBuilder);
+  Register
+  buildGlobalVariable(Register Reg, SPIRVType *BaseType, StringRef Name,
+                      const GlobalValue *GV, StorageClass::StorageClass Storage,
+                      const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
+                      LinkageType::LinkageType LinkageType,
+                      MachineIRBuilder &MIRBuilder, bool IsInstSelector);
 
   // Convenient helpers for getting types with check for duplicates.
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,

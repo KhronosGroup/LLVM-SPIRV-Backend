@@ -1163,7 +1163,7 @@ SPIRVInstructionSelector::buildOnesVal(bool AllOnes, const SPIRVType *ResType,
     for (unsigned i = 0; i < NumEles; ++i) {
       MIB.addUse(OneReg);
     }
-    constrainRegOperands(MIB);
+    constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
     return OneVec;
   }
   return OneReg;
@@ -1547,7 +1547,7 @@ bool SPIRVInstructionSelector::selectGlobalValue(
 
   Register Reg = GR.buildGlobalVariable(ResVReg, ResType, GlobalIdent, GV,
                                         Storage, Init, GlobalVar->isConstant(),
-                                        HasLnkTy, LnkType, MIRBuilder);
+                                        HasLnkTy, LnkType, MIRBuilder, true);
   return Reg.isValid();
 }
 

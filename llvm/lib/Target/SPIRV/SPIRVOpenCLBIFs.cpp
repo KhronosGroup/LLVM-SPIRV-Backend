@@ -339,7 +339,7 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
   // Set up the global OpVariable with the necessary builtin decorations
   Register Var = GR->buildGlobalVariable(NewReg, PtrTy,
       getLinkStrForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
-      true, true, LinkageType::Import, MIRBuilder);
+      true, true, LinkageType::Import, MIRBuilder, false);
 
   // Load the value from the global variable
   Register loadedReg = buildLoad(varType, Var, MIRBuilder, GR, llt, Reg);
