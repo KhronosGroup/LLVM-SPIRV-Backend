@@ -196,7 +196,8 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
     Register ResVReg, SPIRVType *BaseType, StringRef Name,
     const GlobalValue *GV, StorageClass::StorageClass Storage,
     const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
-    LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder) {
+    LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder,
+    bool IsInstSelector) {
   const GlobalVariable *GVar = nullptr;
   if (GV)
     GVar = dyn_cast<const GlobalVariable>(GV);
@@ -232,7 +233,12 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
 
   // ISel may introduce a new register on this step, so we need to add it to
   // DT and correct its type avoiding fails on the next stage.
-  constrainRegOperands(MIB, CurMF);
+  if (IsInstSelector) {
+    const auto &Subtarget = CurMF->getSubtarget();
+    constrainSelectedInstRegOperands(*MIB, *Subtarget.getInstrInfo(),
+                                     *Subtarget.getRegisterInfo(),
+                                     *Subtarget.getRegBankInfo());
+  }
   Reg = MIB->getOperand(0).getReg();
   DT.add(GV, &MIRBuilder.getMF(), Reg);
 
@@ -282,7 +288,6 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeArray(uint32_t NumElems,
                  .addDef(createTypeVReg(MIRBuilder))
                  .addUse(getSPIRVTypeID(ElemType))
                  .addUse(NumElementsVReg);
-  assert(constrainRegOperands(MIB, CurMF));
   return MIB;
 }
 

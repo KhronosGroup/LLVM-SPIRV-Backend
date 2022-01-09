@@ -36,8 +36,11 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     Register SwiftErrorVReg) const {
   assert(VRegs.size() < 2 && "All return types should use a single register");
   if (Val) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpReturnValue).addUse(VRegs[0]);
-    return constrainRegOperands(MIB);
+    const auto &STI = MIRBuilder.getMF().getSubtarget();
+    return MIRBuilder.buildInstr(SPIRV::OpReturnValue)
+        .addUse(VRegs[0])
+        .constrainAllUses(MIRBuilder.getTII(), *STI.getRegisterInfo(),
+                          *STI.getRegBankInfo());
   }
   MIRBuilder.buildInstr(SPIRV::OpReturn);
   return true;
