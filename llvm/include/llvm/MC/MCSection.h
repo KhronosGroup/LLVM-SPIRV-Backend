@@ -47,7 +47,7 @@ public:
     SV_MachO,
     SV_Wasm,
     SV_XCOFF,
-    SV_SPIRV
+    SV_SPIRV,
   };
 
   /// Express the state of bundle locked groups while emitting code.

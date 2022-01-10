@@ -68,9 +68,8 @@ static MCInstPrinter *createSPIRVMCInstPrinter(const Triple &T,
                                                const MCAsmInfo &MAI,
                                                const MCInstrInfo &MII,
                                                const MCRegisterInfo &MRI) {
-  if (SyntaxVariant == 0)
-    return new SPIRVInstPrinter(MAI, MII, MRI);
-  return nullptr;
+  assert(SyntaxVariant == 0);
+  return new SPIRVInstPrinter(MAI, MII, MRI);
 }
 
 namespace {
@@ -90,34 +89,15 @@ static MCInstrAnalysis *createSPIRVInstrAnalysis(const MCInstrInfo *Info) {
 extern "C" void LLVMInitializeSPIRVTargetMC() {
   for (Target *T : {&getTheSPIRV32Target(), &getTheSPIRV64Target(),
                     &getTheSPIRVLogicalTarget()}) {
-    // Register the MC asm info.
     RegisterMCAsmInfo<SPIRVMCAsmInfo> X(*T);
-
-    // Register the MC instruction info.
     TargetRegistry::RegisterMCInstrInfo(*T, createSPIRVMCInstrInfo);
-
-    // Register the MC register info.
     TargetRegistry::RegisterMCRegInfo(*T, createSPIRVMCRegisterInfo);
-
-    // Register the MC subtarget info.
     TargetRegistry::RegisterMCSubtargetInfo(*T, createSPIRVMCSubtargetInfo);
-
-    // Register the object streamer
     TargetRegistry::RegisterSPIRVStreamer(*T, createSPIRVMCStreamer);
-
-    // Register the MCInstPrinter.
     TargetRegistry::RegisterMCInstPrinter(*T, createSPIRVMCInstPrinter);
-
-    // Register the MC instruction analyzer.
     TargetRegistry::RegisterMCInstrAnalysis(*T, createSPIRVInstrAnalysis);
-
-    // Register the MC code emitter
     TargetRegistry::RegisterMCCodeEmitter(*T, createSPIRVMCCodeEmitter);
-
-    // Register the ASM Backend
     TargetRegistry::RegisterMCAsmBackend(*T, createSPIRVAsmBackend);
-
-    // Register the AsmTargetStreamer
     TargetRegistry::RegisterAsmTargetStreamer(*T, createTargetAsmStreamer);
   }
 }

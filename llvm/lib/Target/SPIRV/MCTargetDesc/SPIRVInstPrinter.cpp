@@ -40,9 +40,8 @@ void SPIRVInstPrinter::printRemainingVariableOps(const MCInst *MI,
   const unsigned int NumOps = MI->getNumOperands();
   for (unsigned int i = StartIndex; i < NumOps; ++i) {
     if (!SkipImmediates || !MI->getOperand(i).isImm()) {
-      if (!SkipFirstSpace || i != StartIndex) {
+      if (!SkipFirstSpace || i != StartIndex)
         O << ' ';
-      }
       printOperand(MI, i, O);
     }
   }
@@ -279,7 +278,7 @@ void SPIRVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
     } else if (Op.isImm()) {
       O << formatImm((int64_t)Op.getImm());
     } else if (Op.isDFPImm()) {
-      O << formatImm((float)Op.getDFPImm());
+      O << formatImm((double)Op.getDFPImm());
     } else {
       assert(Op.isExpr() && "Expected an expression");
       printExpr(Op.getExpr(), O);

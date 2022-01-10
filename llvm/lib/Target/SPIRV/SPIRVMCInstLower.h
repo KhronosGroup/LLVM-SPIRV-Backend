@@ -15,10 +15,9 @@ namespace llvm {
 class MCInst;
 class MachineInstr;
 
-// SPIRVMCInstLower - This class is used to lower a MachineInstr into an MCInst.
+// This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
 public:
-  SPIRVMCInstLower() {}
   void Lower(const MachineInstr *MI, MCInst &OutMI) const;
 };
 } // namespace llvm

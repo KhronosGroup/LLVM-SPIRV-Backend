@@ -119,8 +119,8 @@ namespace llvm {
     SpecificBumpPtrAllocator<MCSectionGOFF> GOFFAllocator;
     SpecificBumpPtrAllocator<MCSectionWasm> WasmAllocator;
     SpecificBumpPtrAllocator<MCSectionXCOFF> XCOFFAllocator;
-    SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
     SpecificBumpPtrAllocator<MCSectionSPIRV> SPIRVAllocator;
+    SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
 
     /// Bindings of names to symbols.
     SymbolTable Symbols;

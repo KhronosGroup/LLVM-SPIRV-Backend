@@ -67,7 +67,7 @@ static std::string computeDataLayout(const Triple &TT) {
 }
 
 static Reloc::Model getEffectiveRelocModel(Optional<Reloc::Model> RM) {
-  if (!RM.hasValue())
+  if (!RM)
     return Reloc::PIC_;
   return *RM;
 }
@@ -218,9 +218,9 @@ class SPIRVInstructionSelect : public InstructionSelect {
   // Init a SPIRVGlobalRegistry before and reset it after the default
   // parent code.
   bool runOnMachineFunction(MachineFunction &MF) override {
-    const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    auto *GR = ST->getSPIRVGlobalRegistry();
-    GR->setCurrentFunc(MF);
+    //const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
+    //auto *GR = ST->getSPIRVGlobalRegistry();
+    //GR->setCurrentFunc(MF);
     auto &MRI = MF.getRegInfo();
 
     // we need to rewrite dst types for ASSIGN_TYPE instrs
