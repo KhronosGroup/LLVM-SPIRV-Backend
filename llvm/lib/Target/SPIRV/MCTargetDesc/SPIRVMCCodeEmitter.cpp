@@ -50,9 +50,9 @@ public:
                          const MCSubtargetInfo &STI) const override;
 
 private:
-  llvm::FeatureBitset computeAvailableFeatures(const FeatureBitset &FB) const;
+  FeatureBitset computeAvailableFeatures(const FeatureBitset &FB) const;
   void verifyInstructionPredicates(
-      const MCInst &MI, const llvm::FeatureBitset &AvailableFeatures) const;
+      const MCInst &MI, const FeatureBitset &AvailableFeatures) const;
 };
 
 } // end anonymous namespace
@@ -85,7 +85,7 @@ static bool hasType(const MCInst &MI, const MCInstrInfo &MII,
 
 static void emitOperand(const MCOperand &Op, EndianWriter &OSE) {
   if (Op.isReg()) {
-    // Emit the id index starting at 1 (0 is an invalid index)
+    // Emit the id index starting at 1 (0 is an invalid index).
     OSE.write<uint32_t>(Register::virtReg2Index(Op.getReg()) + 1);
   } else if (Op.isImm()) {
     OSE.write<uint32_t>(Op.getImm());
@@ -95,21 +95,19 @@ static void emitOperand(const MCOperand &Op, EndianWriter &OSE) {
 }
 
 // Emit the type in operand 1 before the ID in operand 0 it defines, and all
-// remaining operands in the order they come naturally
+// remaining operands in the order they come naturally.
 static void emitTypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
   unsigned int NumOps = MI.getNumOperands();
   emitOperand(MI.getOperand(1), OSE);
   emitOperand(MI.getOperand(0), OSE);
-  for (unsigned int i = 2; i < NumOps; ++i) {
+  for (unsigned int i = 2; i < NumOps; ++i)
     emitOperand(MI.getOperand(i), OSE);
-  }
 }
 
-// Emit operands in the order they come naturally
+// Emit operands in the order they come naturally.
 static void emitUntypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
-  for (const auto &Op : MI) {
+  for (const auto &Op : MI)
     emitOperand(Op, OSE);
-  }
 }
 
 void SPIRVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
@@ -120,18 +118,17 @@ void SPIRVMCCodeEmitter::encodeInstruction(const MCInst &MI, raw_ostream &OS,
 
   EndianWriter OSE(OS, support::little);
 
-  // Encode the first 32 SPIR-V bytes with the number of args and the opcode
-  uint64_t OpCode = getBinaryCodeForInstr(MI, Fixups, STI);
-  uint32_t NumWords = MI.getNumOperands() + 1;
-  uint32_t FirstWord = ((NumWords << 16) | OpCode);
+  // Encode the first 32 SPIR-V bytes with the number of args and the opcode.
+  const uint64_t OpCode = getBinaryCodeForInstr(MI, Fixups, STI);
+  const uint32_t NumWords = MI.getNumOperands() + 1;
+  const uint32_t FirstWord = (NumWords << 16) | OpCode;
   OSE.write<uint32_t>(FirstWord);
 
-  // Emit the instruction arguments (emitting the output type first if present)
-  if (hasType(MI, MCII, MRI)) {
+  // Emit the instruction arguments (emitting the output type first if present).
+  if (hasType(MI, MCII, MRI))
     emitTypedInstrOperands(MI, OSE);
-  } else {
+  else
     emitUntypedInstrOperands(MI, OSE);
-  }
 }
 
 #define ENABLE_INSTR_PREDICATE_VERIFIER

@@ -241,6 +241,7 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
 
   MachineBasicBlock &MBB = *I.getParent();
   MachineFunction &MF = *MBB.getParent();
+  GR.setCurrentFunc(MF);
 
   Register Opcode = I.getOpcode();
   MachineRegisterInfo &MRI = MF.getRegInfo();

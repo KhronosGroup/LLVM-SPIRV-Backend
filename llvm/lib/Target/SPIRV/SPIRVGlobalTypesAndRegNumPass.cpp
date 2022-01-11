@@ -558,7 +558,7 @@ static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
       addDummyVRegsUpToIndex(Op.getReg().virtRegIndex(), MetaMRI);
       MIB.addUse(Op.getReg());
     } else {
-      errs() << MI << "\n";
+      errs() << MI;
       llvm_unreachable("Unexpected operand type when copying spirv meta instr");
     }
   }
