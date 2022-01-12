@@ -43,7 +43,7 @@ public:
   }
 
   bool isNoopAddrSpaceCast(unsigned SrcAS, unsigned DestAS) const override {
-    return true;
+    return false;
   }
 };
 } // namespace llvm

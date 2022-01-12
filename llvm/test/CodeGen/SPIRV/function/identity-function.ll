@@ -17,4 +17,3 @@ target triple = "spirv32-unknown-unknown"
 define i32 @identity(i32 %value) {
   ret i32 %value
 }
-
