@@ -31,8 +31,6 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include <unordered_set>
-
 #define GET_SUBTARGETINFO_HEADER
 #include "SPIRVGenSubtargetInfo.inc"
 
@@ -45,7 +43,6 @@ class SPIRVGlobalRegistry;
 class SPIRVSubtarget : public SPIRVGenSubtargetInfo {
 private:
   const unsigned int PointerSize;
-
   const bool UsesLogicalAddressing;
   const bool UsesVulkanEnv;
   const bool UsesOpenCLEnv;
@@ -56,24 +53,20 @@ private:
   bool OpenCLFullProfile;
   bool OpenCLImageSupport;
 
+  std::set<Extension::Extension> AvailableExtensions;
+  std::set<ExtInstSet> AvailableExtInstSets;
+  std::set<Capability::Capability> AvailableCaps;
+
+  std::unique_ptr<SPIRVGeneralDuplicatesTracker> DT;
+  std::unique_ptr<SPIRVGlobalRegistry> GR;
+
   SPIRVInstrInfo InstrInfo;
   SPIRVFrameLowering FrameLowering;
   SPIRVTargetLowering TLInfo;
 
-  // TODO Some of these fields might work without unique_ptr.
-  //      But they are shared with other classes, so if the SPIRVSubtarget
-  //      moves, not relying on unique_ptr breaks things.
-  std::unique_ptr<SPIRVGeneralDuplicatesTracker> DT;
-  std::unique_ptr<SPIRVGlobalRegistry> GR;
-  std::unique_ptr<SPIRVCallLowering> CallLoweringInfo;
-  std::unique_ptr<SPIRVRegisterBankInfo> RegBankInfo;
-
-  std::unordered_set<Extension::Extension> AvailableExtensions;
-  std::unordered_set<ExtInstSet> AvailableExtInstSets;
-  std::unordered_set<Capability::Capability> AvailableCaps;
-
-  // The legalizer and instruction selector both rely on the set of available
-  // extensions, capabilities, register bank information, and so on.
+  // GlobalISel related APIs.
+  std::unique_ptr<CallLowering> CallLoweringInfo;
+  std::unique_ptr<RegisterBankInfo> RegBankInfo;
   std::unique_ptr<LegalizerInfo> Legalizer;
   std::unique_ptr<InstructionSelector> InstSelector;
 
@@ -124,19 +117,17 @@ public:
     return CallLoweringInfo.get();
   }
 
-  InstructionSelector *getInstructionSelector() const override {
-    return InstSelector.get();
+  const RegisterBankInfo *getRegBankInfo() const override {
+    return RegBankInfo.get();
   }
 
   const LegalizerInfo *getLegalizerInfo() const override {
     return Legalizer.get();
   }
 
-  const RegisterBankInfo *getRegBankInfo() const override {
-    return RegBankInfo.get();
+  InstructionSelector *getInstructionSelector() const override {
+    return InstSelector.get();
   }
-
-  bool isLittleEndian() const { return true; }
 
   const SPIRVInstrInfo *getInstrInfo() const override { return &InstrInfo; }
 

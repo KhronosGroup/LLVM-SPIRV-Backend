@@ -89,13 +89,13 @@ class UnOpTyped<string name, bits<16> opCode, RegisterClass CID, SDNode node>
 
 class SimpleOp<string name, bits<16> opCode>: Op<opCode, (outs), (ins), name>;
 
-//3.32.1 Miscellaneous Instructions
+// 3.42.1 Miscellaneous Instructions
 
 def OpNop: SimpleOp<"OpNop", 0>;
 def OpUndef: Op<1, (outs ID:$res), (ins TYPE:$type), "$res = OpUndef $type">;
 def OpSizeOf: Op<321, (outs ID:$res), (ins TYPE:$ty, ID:$ptr), "$res = OpSizeOf $ty $ptr">;
 
-//3.32.2 Debug Instructions
+// 3.42.2 Debug Instructions
 
 def OpSourceContinued: Op<2, (outs), (ins StringImm:$str, variable_ops),
                   "OpSourceContinued $str">;
@@ -112,7 +112,7 @@ def OpNoLine: Op<317, (outs), (ins), "OpNoLine">;
 def OpModuleProcessed: Op<330, (outs), (ins StringImm:$process, variable_ops),
                   "OpModuleProcessed $process">;
 
-//3.32.3 Annotation Instructions
+// 3.42.3 Annotation Instructions
 
 def OpDecorate: Op<71, (outs), (ins ANY:$target, Decoration:$dec, variable_ops),
                   "OpDecorate $target $dec">;
@@ -130,7 +130,7 @@ def OpMemberDecorateString: Op<5633, (outs),
                   (ins TYPE:$ty, i32imm:$mem, Decoration:$dec, StringImm:$str, variable_ops),
                   "OpMemberDecorateString $ty $mem $dec $str">;
 
-//3.32.4 Extension Instructions
+// 3.42.4 Extension Instructions
 
 def OpExtension: Op<10, (outs), (ins StringImm:$name, variable_ops), "OpExtension $name">;
 def OpExtInstImport: Op<11, (outs ID:$res), (ins StringImm:$extInstsName, variable_ops),
@@ -138,7 +138,7 @@ def OpExtInstImport: Op<11, (outs ID:$res), (ins StringImm:$extInstsName, variab
 def OpExtInst: Op<12, (outs ID:$res), (ins TYPE:$ty, ID:$set, ExtInst:$inst, variable_ops),
                   "$res = OpExtInst $ty $set $inst">;
 
-//3.32.5 Mode-Setting Instructions
+// 3.42.5 Mode-Setting Instructions
 
 def OpMemoryModel: Op<14, (outs), (ins AddressingModel:$addr, MemoryModel:$mem),
                   "OpMemoryModel $addr $mem">;
@@ -151,8 +151,7 @@ def OpCapability: Op<17, (outs), (ins Capability:$cap), "OpCapability $cap">;
 def OpExecutionModeId: Op<331, (outs), (ins ID:$entry, ExecutionMode:$mode, variable_ops),
                   "OpExecutionModeId $entry $mode">;
 
-//3.32.6 Type-Declaration Instructions
-
+// 3.42.6 Type-Declaration Instructions
 
 def OpTypeVoid: Op<19, (outs TYPE:$type), (ins), "$type = OpTypeVoid">;
 def OpTypeBool: Op<20, (outs TYPE:$type), (ins), "$type = OpTypeBool">;
@@ -196,7 +195,7 @@ def OpTypeCooperativeMatrixNV: Op<5358, (outs TYPE:$res),
                   (ins TYPE:$compType, ID:$scope, ID:$rows, ID:$cols),
                   "$res = OpTypeCooperativeMatrixNV $compType $scope $rows $cols">;
 
-//3.32.7 Constant-Creation Instructions
+// 3.42.7 Constant-Creation Instructions
 
 def imm_to_i32 : SDNodeXForm<imm, [{
 return CurDAG->getTargetConstant(
@@ -241,7 +240,6 @@ def OpConstantSampler: Op<45, (outs ID:$res),
                   "$res = OpConstantSampler $t $s $p $f">;
 def OpConstantNull: Op<46, (outs ID:$dst), (ins TYPE:$src_ty), "$dst = OpConstantNull $src_ty",
                       [(set ID:$dst, (assigntype ConstPseudoNull, TYPE:$src_ty))]>;
-//def OpConstantNull: Op<46, (outs ID:$res), (ins TYPE:$ty), "$res = OpConstantNull $ty">;
 
 def OpSpecConstantTrue: Op<48, (outs ID:$r), (ins TYPE:$t), "$r = OpSpecConstantTrue $t">;
 def OpSpecConstantFalse: Op<49, (outs ID:$r), (ins TYPE:$t), "$r = OpSpecConstantFalse $t">;
@@ -252,7 +250,7 @@ def OpSpecConstantComposite: Op<51, (outs ID:$res), (ins TYPE:$type, variable_op
 def OpSpecConstantOp: Op<52, (outs ID:$res), (ins TYPE:$t, i32imm:$c, ID:$o, variable_ops),
                   "$res = OpSpecConstantOp $t $c $o">;
 
-//3.32.8 Memory Instructions
+// 3.42.8 Memory Instructions
 
 def OpVariable: Op<59, (outs ID:$res), (ins TYPE:$type, StorageClass:$sc, variable_ops),
                   "$res = OpVariable $type $sc">;
@@ -289,7 +287,7 @@ def OpPtrNotEqual: Op<402, (outs ID:$res), (ins TYPE:$resType, ID:$a, ID:$b),
 def OpPtrDiff: Op<403, (outs ID:$res), (ins TYPE:$resType, ID:$a, ID:$b),
                   "$res = OpPtrDiff $resType $a $b">;
 
-//3.32.9 Function Instructions
+// 3.42.9 Function Instructions
 
 def OpFunction: Op<54, (outs ID:$func),
                   (ins TYPE:$resType, FunctionControl:$funcControl, TYPE:$funcType),
@@ -302,7 +300,7 @@ def OpFunctionEnd: Op<56, (outs), (ins), "OpFunctionEnd"> {
 def OpFunctionCall: Op<57, (outs ID:$res), (ins TYPE:$resType, ID:$function, variable_ops),
                   "$res = OpFunctionCall $resType $function">;
 
-//3.32.10 Image Instructions
+// 3.42.10 Image Instructions
 
 def OpSampledImage: BinOp<"OpSampledImage", 86>;
 
@@ -359,7 +357,6 @@ def OpImageQueryLod: BinOp<"OpImageQueryLod", 105>;
 def OpImageQueryLevels: UnOp<"OpImageQueryLevels", 106>;
 def OpImageQuerySamples: UnOp<"OpImageQuerySamples", 107>;
 
-
 def OpImageSparseSampleImplicitLod: Op<305, (outs ID:$res),
                   (ins TYPE:$type, ID:$sampledImage, ID:$coord, variable_ops),
                   "$res = OpImageSparseSampleImplicitLod $type $sampledImage $coord">;
@@ -408,7 +405,7 @@ def OpImageSampleFootprintNV: Op<5283, (outs ID:$res),
                   (ins TYPE:$ty, ID:$sImg, ID:$uv, ID:$granularity, ID:$coarse, variable_ops),
                   "$res = OpImageSampleFootprintNV $ty $sImg $uv $granularity $coarse">;
 
-//3.32.11 Conversion instructions
+// 3.42.11 Conversion instructions
 
 def OpConvertFToU : UnOp<"OpConvertFToU", 109>;
 def OpConvertFToS : UnOp<"OpConvertFToS", 110>;
@@ -433,7 +430,8 @@ def OpGenericCastToPtrExplicit : Op<123, (outs ID:$r), (ins TYPE:$t, ID:$p, Stor
                               "$r = OpGenericCastToPtrExplicit $t $p $s">;
 def OpBitcast : UnOp<"OpBitcast", 124>;
 
-//3.32.12 Composite Instructions
+// 3.42.12 Composite Instructions
+
 def OpVectorExtractDynamic: Op<77, (outs ID:$res), (ins TYPE:$type, vID:$vec, ID:$idx),
                   "$res = OpVectorExtractDynamic $type $vec $idx", [(set ID:$res, (assigntype (extractelt vID:$vec, ID:$idx), TYPE:$type))]>;
 
@@ -451,8 +449,7 @@ def OpCopyObject: UnOp<"OpCopyObject", 83>;
 def OpTranspose: UnOp<"OpTranspose", 84>;
 def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 
-
-//3.32.13 Arithmetic Instructions
+// 3.42.13 Arithmetic Instructions
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
 def OpFNegate: UnOpTyped<"OpFNegate", 127, fID, fneg>;
@@ -491,11 +488,7 @@ def OpISubBorrow: BinOpTyped<"OpISubBorrow", 150, ID, subc>;
 def OpUMulExtended: BinOp<"OpUMulExtended", 151>;
 def OpSMulExtended: BinOp<"OpSMulExtended", 152>;
 
-//3.32.14 Bit Instructions
-
-//def OpShiftRightLogical: BinOp<"OpShiftRightLogical", 194>;
-//def OpShiftRightArithmetic: BinOp<"OpShiftRightArithmetic", 195>;
-//def OpShiftLeftLogical: BinOp<"OpShiftLeftLogical", 196>;
+// 3.42.14 Bit Instructions
 
 defm OpShiftRightLogical: BinOpTypedGen<"OpShiftRightLogical", 194, srl, 0, 1>;
 defm OpShiftRightArithmetic: BinOpTypedGen<"OpShiftRightArithmetic", 195, sra, 0, 1>;
@@ -518,7 +511,7 @@ def OpBitFieldUExtract: Op<203, (outs ID:$res),
 def OpBitReverse: Op<204, (outs ID:$r), (ins TYPE:$ty, ID:$b), "$r = OpBitReverse $ty $b">;
 def OpBitCount: Op<205, (outs ID:$r), (ins TYPE:$ty, ID:$b), "$r = OpBitCount $ty $b">;
 
-//3.32.15 Relational and Logical Instructions
+// 3.42.15 Relational and Logical Instructions
 
 def OpAny: Op<154, (outs ID:$res), (ins TYPE:$ty, ID:$vec),
                   "$res = OpAny $ty $vec">;
@@ -570,7 +563,7 @@ def OpFUnordLessThanEqual: BinOp<"OpFUnordLessThanEqual", 189>;
 def OpFOrdGreaterThanEqual: BinOp<"OpFOrdGreaterThanEqual", 190>;
 def OpFUnordGreaterThanEqual: BinOp<"OpFUnordGreaterThanEqual", 191>;
 
-//3.32.16 Derivative Instructions
+// 3.42.16 Derivative Instructions
 
 def OpDPdx: UnOp<"OpDPdx", 207>;
 def OpDPdy: UnOp<"OpDPdy", 208>;
@@ -584,8 +577,7 @@ def OpDPdxCoarse: UnOp<"OpDPdxCoarse", 213>;
 def OpDPdyCoarse: UnOp<"OpDPdyCoarse", 214>;
 def OpFwidthCoarse: UnOp<"OpFwidthCoarse", 215>;
 
-
-//3.32.17 Control-Flow Instructions
+// 3.42.17 Control-Flow Instructions
 
 def OpPhi: Op<245, (outs ID:$res), (ins TYPE:$type, ID:$var0, ID:$block0, variable_ops),
                   "$res = OpPhi $type $var0 $block0">;
@@ -595,10 +587,10 @@ def OpSelectionMerge: Op<247, (outs), (ins ID:$merge, SelectionControl:$sc),
                   "OpSelectionMerge $merge $sc">;
 def OpLabel: Op<248, (outs ID:$label), (ins), "$label = OpLabel">;
 let isTerminator=1 in {
-def OpBranch: Op<249, (outs), (ins ID:$label), "OpBranch $label">;
-def OpBranchConditional: Op<250, (outs), (ins ID:$cond, ID:$true, ID:$false, variable_ops),
+  def OpBranch: Op<249, (outs), (ins ID:$label), "OpBranch $label">;
+  def OpBranchConditional: Op<250, (outs), (ins ID:$cond, ID:$true, ID:$false, variable_ops),
                   "OpBranchConditional $cond $true $false">;
-def OpSwitch: Op<251, (outs), (ins ID:$sel, ID:$dflt, variable_ops), "OpSwitch $sel $dflt">;
+  def OpSwitch: Op<251, (outs), (ins ID:$sel, ID:$dflt, variable_ops), "OpSwitch $sel $dflt">;
 }
 let isReturn = 1, hasDelaySlot=0, isBarrier = 0, isTerminator=1, isNotDuplicable = 1 in {
   def OpKill: SimpleOp<"OpKill", 252>;
@@ -609,7 +601,7 @@ let isReturn = 1, hasDelaySlot=0, isBarrier = 0, isTerminator=1, isNotDuplicable
 def OpLifetimeStart: Op<256, (outs), (ins ID:$ptr, i32imm:$sz), "OpLifetimeStart $ptr, $sz">;
 def OpLifetimeStop: Op<257, (outs), (ins ID:$ptr, i32imm:$sz), "OpLifetimeStop $ptr, $sz">;
 
-//3.32.18 Atomic Instructions
+// 3.42.18 Atomic Instructions
 
 class AtomicOp<string name, bits<16> opCode>: Op<opCode, (outs ID:$res),
                   (ins TYPE:$ty, ID:$ptr, ID:$sc, ID:$sem),
@@ -630,7 +622,8 @@ def OpAtomicCompareExchange: Op<230, (outs ID:$res),
                   (ins TYPE:$ty, ID:$ptr, ID:$sc, ID:$eq,
                    ID:$neq, ID:$val, ID:$cmp),
                   "$res = OpAtomicCompareExchange $ty $ptr $sc $eq $neq $val $cmp">;
-// TODO Currently the following deprecated opcode is missing: OpAtomicCompareExchangeWeak
+// TODO Currently the following deprecated opcode is missing:
+// OpAtomicCompareExchangeWeak
 
 def OpAtomicIIncrement: AtomicOp<"OpAtomicIIncrement", 232>;
 def OpAtomicIDecrement: AtomicOp<"OpAtomicIDecrement", 233>;
@@ -652,14 +645,14 @@ def OpAtomicFlagTestAndSet: AtomicOp<"OpAtomicFlagTestAndSet", 318>;
 def OpAtomicFlagClear: Op<319, (outs), (ins ID:$ptr, ID:$sc, ID:$sem),
                   "OpAtomicFlagClear $ptr $sc $sem">;
 
-//3.32.19 Primitive Instructions
+// 3.42.19 Primitive Instructions
 
 def OpEmitVertex: SimpleOp<"OpEmitVertex", 218>;
 def OpEndPrimitive: SimpleOp<"OpEndPrimitive", 219>;
 def OpEmitStreamVertex: Op<220, (outs), (ins ID:$stream), "OpEmitStreamVertex $stream">;
 def OpEndStreamPrimitive: Op<221, (outs), (ins ID:$stream), "OpEndStreamPrimitive $stream">;
 
-//3.32.20 Barrier Instructions
+// 3.42.20 Barrier Instructions
 
 def OpControlBarrier: Op<224, (outs), (ins ID:$exec, ID:$mem, ID:$sem),
                   "OpControlBarrier $exec $mem $sem">;
@@ -669,8 +662,7 @@ def OpNamedBarrierInitialize: UnOp<"OpNamedBarrierInitialize", 328>;
 def OpMemoryNamedBarrier: Op<329, (outs), (ins ID:$barr, ID:$mem, ID:$sem),
                   "OpMemoryNamedBarrier $barr $mem $sem">;
 
-// TODO Complete this list, or auto-generate it, to include later sections such as
-// 3.37.21. Group and Subgroup Instructions
+// 3.42.21. Group and Subgroup Instructions
 
 def OpGroupAll: Op<261, (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pr),
                   "$res = OpGroupAll $ty $scope $pr">;
@@ -691,11 +683,11 @@ def OpGroupFMax: OpGroup<"FMax", 269>;
 def OpGroupUMax: OpGroup<"UMax", 270>;
 def OpGroupSMax: OpGroup<"SMax", 271>;
 
+// TODO: 3.42.22. Device-Side Enqueue Instructions
+// TODO: 3.42.23. Pipe Instructions
 
-// 3.32.22. Device-Side Enqueue Instructions,
-// 3.32.23. Pipe Instructions,
+// 3.42.24. Non-Uniform Instructions
 
-// 3.37.24. Non-Uniform Instructions
 def OpGroupNonUniformElect: Op<333, (outs ID:$res), (ins TYPE:$ty, ID:$scope),
                   "$res = OpGroupNonUniformElect $ty $scope">;
 class OpGroupNU3<string name, bits<16> opCode>: Op<opCode,
@@ -742,5 +734,3 @@ def OpGroupNonUniformBitwiseXor: OpGroupNUGroup<"BitwiseXor", 361>;
 def OpGroupNonUniformLogicalAnd: OpGroupNUGroup<"LogicalAnd", 362>;
 def OpGroupNonUniformLogicalOr: OpGroupNUGroup<"LogicalOr", 363>;
 def OpGroupNonUniformLogicalXor: OpGroupNUGroup<"LogicalXor", 364>;
-
-// and possibly 3.32.25. Reserved Instructions.

@@ -61,7 +61,7 @@ static bool computeOpenCLFullProfile(const Triple &TT) { return true; }
 SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
                                const std::string &FS,
                                const SPIRVTargetMachine &TM)
-    : SPIRVGenSubtargetInfo(TT, CPU, /* TuneCPU */ CPU, FS),
+    : SPIRVGenSubtargetInfo(TT, CPU, /*TuneCPU=*/CPU, FS),
       PointerSize(computePointerSize(TT)),
       UsesLogicalAddressing(TT.isSPIRVLogical()),
       UsesVulkanEnv(TT.isVulkanEnvironment()),
@@ -70,29 +70,25 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
       TargetVulkanVersion(computeTargetVulkanVersion(TT)),
       OpenCLFullProfile(computeOpenCLFullProfile(TT)),
       OpenCLImageSupport(computeOpenCLImageSupport(TT)), InstrInfo(),
-      FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this),
-
-      DT(new SPIRVGeneralDuplicatesTracker()),
-      // FIXME:
-      // .get() here is unsafe, works due to subtarget is destroyed
-      // later than these objects
-      // see comment in the SPIRVSubtarget.h
-      GR(new SPIRVGlobalRegistry(*DT.get(), PointerSize)),
-      CallLoweringInfo(new SPIRVCallLowering(TLInfo, GR.get(), DT.get())),
-      RegBankInfo(new SPIRVRegisterBankInfo()) {
-
+      FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this) {
   initAvailableExtensions(TT);
   initAvailableExtInstSets(TT);
   initAvailableCapabilities(TT);
 
+  DT.reset(new SPIRVGeneralDuplicatesTracker());
+  GR.reset(new SPIRVGlobalRegistry(*DT.get(), PointerSize));
+
+  CallLoweringInfo.reset(new SPIRVCallLowering(TLInfo, GR.get(), DT.get()));
   Legalizer.reset(new SPIRVLegalizerInfo(*this));
-  InstSelector.reset(
-      createSPIRVInstructionSelector(TM, *this, *RegBankInfo.get()));
+
+  auto *RBI = new SPIRVRegisterBankInfo();
+  RegBankInfo.reset(RBI);
+  InstSelector.reset(createSPIRVInstructionSelector(TM, *this, *RBI));
 }
 
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
-  ParseSubtargetFeatures(CPU, /* TuneCPU */ CPU, FS);
+  ParseSubtargetFeatures(CPU, /*TuneCPU=*/CPU, FS);
 
   if (TargetSPIRVVersion == 0)
     TargetSPIRVVersion = 14;
@@ -131,8 +127,7 @@ bool SPIRVSubtarget::isShader() const {
 
 // If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual
 bool SPIRVSubtarget::canDirectlyComparePointers() const {
-  bool Res = isAtLeastVer(TargetSPIRVVersion, 14);
-  return Res;
+  return isAtLeastVer(TargetSPIRVVersion, 14);
 }
 
 // TODO use command line args for this rather than defaults
@@ -147,7 +142,7 @@ void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
 }
 
 // Add the given capabilities and all their implicitly defined capabilities too
-static void addCaps(std::unordered_set<Capability::Capability> &Caps,
+static void addCaps(std::set<Capability::Capability> &Caps,
                     const std::vector<Capability::Capability> &ToAdd) {
   for (const auto cap : ToAdd) {
     if (Caps.insert(cap).second) {

@@ -27,6 +27,10 @@ def SPIRV12 : SubtargetFeature<"spirv1.2", "TargetSPIRVVersion", "12",
                              "Use SPIR-V version 1.2">;
 def SPIRV13 : SubtargetFeature<"spirv1.3", "TargetSPIRVVersion", "13",
                              "Use SPIR-V version 1.3">;
+def SPIRV14 : SubtargetFeature<"spirv1.4", "TargetSPIRVVersion", "14",
+                             "Use SPIR-V version 1.4">;
+def SPIRV15 : SubtargetFeature<"spirv1.5", "TargetSPIRVVersion", "15",
+                             "Use SPIR-V version 1.5">;
 
 def OCL12 : SubtargetFeature<"CL1.2", "TargetOpenCLVersion", "12",
                              "Use OpenCL version 1.2">;
