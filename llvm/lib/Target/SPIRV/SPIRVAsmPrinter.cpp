@@ -122,10 +122,16 @@ bool SPIRVAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
 }
 
 void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
+  const auto *MetaMF = MI->getMF();
+  const auto &ST = static_cast<const SPIRVSubtarget &>(MetaMF->getSubtarget());
+  SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
+
+  if (GR->getNotToEmit(MI))
+    return;
 
   SPIRVMCInstLower MCInstLowering;
   MCInst TmpInst;
-  MCInstLowering.Lower(MI, TmpInst);
+  MCInstLowering.Lower(MI, TmpInst, GR);
   EmitToStreamer(*OutStreamer, TmpInst);
 }
 
