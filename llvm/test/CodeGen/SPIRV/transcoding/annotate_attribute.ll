@@ -1,6 +1,5 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; FIXME: Re-check these all
 ; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "42"
 ; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "bar"
 ; CHECK-SPIRV-DAG: OpDecorate %{{[0-9]+}} UserSemantic "{FOO}"

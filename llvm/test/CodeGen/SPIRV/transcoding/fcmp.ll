@@ -90,7 +90,7 @@
 ; CHECK-SPIRV: OpName %[[#r88:]] "r88"
 ; CHECK-SPIRV: OpName %[[#r89:]] "r89"
 ; CHECK-SPIRV: OpName %[[#r90:]] "r90"
-; CHECK-SPIRV-NOT: OpDecorate {{.*}} FPFastMathMode
+; CHECK-SPIRV-NOT: OpDecorate %{{.*}} FPFastMathMode
 ; CHECK-SPIRV: %[[#bool:]] = OpTypeBool
 ; CHECK-SPIRV: %[[#r1]] = OpFOrdEqual %[[#bool]]
 ; CHECK-SPIRV: %[[#r2]] = OpFOrdEqual %[[#bool]]

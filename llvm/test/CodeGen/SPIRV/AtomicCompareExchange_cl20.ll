@@ -61,7 +61,7 @@ entry:
 ; CHECK: %[[Value:[0-9]+]] = OpLoad %[[int]] %[[desired_addr]]
 ; CHECK: %[[ComparatorWeak:[0-9]+]] = OpLoad %[[int]] %[[exp]]
   %call2 = call spir_func zeroext i1 @_Z28atomic_compare_exchange_weakPVU3AS4U7_AtomiciPU3AS4ii(i32 addrspace(4)* %4, i32 addrspace(4)* %5, i32 %6)
-; OpAtomicCompareExchangeWeak is depricate, use OpAtomicCompareExchange
+; OpAtomicCompareExchangeWeak is depricated, use OpAtomicCompareExchange
 ; CHECK-NEXT: %[[Result:[0-9]+]] = OpAtomicCompareExchange %[[int]] %[[Pointer]] %[[DeviceScope]] %[[SequentiallyConsistent_MS]] %[[SequentiallyConsistent_MS]] %[[Value]] %[[ComparatorWeak]]
 ; CHECK-NEXT: OpStore %[[exp]] %[[Result]]
 ; CHECK-NEXT: %[[CallRes:[0-9]+]] = OpIEqual %[[bool]] %[[Result]] %[[ComparatorWeak]]

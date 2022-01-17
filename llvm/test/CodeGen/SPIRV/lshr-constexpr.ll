@@ -12,7 +12,6 @@ target triple = "spirv64-unknown-unknown"
 
 ; CHECK-SPIRV: %[[bitcast_res:[0-9]+]] = OpBitcast %[[type_int64]] %[[vec_const]]
 ; CHECK-SPIRV: %[[shift_res:[0-9]+]] = OpShiftRightLogical %[[type_int64]] %[[bitcast_res]] %[[const32]]
-; FIXME: Have no information about OpDebugValue and it's syntax
 ; CHECK-SPIRV-DEBUG: OpDebugValue %{{[0-9]+}} %[[shift_res]]
 
 ; Function Attrs: nounwind ssp uwtable

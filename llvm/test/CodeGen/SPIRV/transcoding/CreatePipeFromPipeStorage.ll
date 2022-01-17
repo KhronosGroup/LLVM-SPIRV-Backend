@@ -13,10 +13,10 @@
 ; CHECK-SPIRV: %[[INT_T:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-SPIRV: %[[CONSTANT_ZERO_ID:[0-9]+]] = OpConstant %[[INT_T]] 0
 
-; CHECK-SPIRV: %[[READ_PIPE:[0-9]+]] = OpTypePipe 0
+; CHECK-SPIRV: %[[READ_PIPE:[0-9]+]] = OpTypePipe ReadOnly
 ; CHECK-SPIRV: %[[READ_PIPE_WRAPPER:[0-9]+]] = OpTypeStruct %[[READ_PIPE]]
 ; CHECK-SPIRV: %[[READ_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer Function %[[READ_PIPE_WRAPPER]]
-; CHECK-SPIRV: %[[WRITE_PIPE:[0-9]+]] = OpTypePipe 1
+; CHECK-SPIRV: %[[WRITE_PIPE:[0-9]+]] = OpTypePipe WriteOnly
 ; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER:[0-9]+]] = OpTypeStruct %[[WRITE_PIPE]]
 
 ; CHECK-SPIRV: %[[WRITE_PIPE_WRAPPER_PTR:[0-9]+]] = OpTypePointer Function %[[WRITE_PIPE_WRAPPER]]
@@ -54,8 +54,7 @@ entry:
   %1 = getelementptr %"class.cl::pipe_storage<int __attribute__((ext_vector_type(4))), 1>", %"class.cl::pipe_storage<int __attribute__((ext_vector_type(4))), 1>" addrspace(4)* %0, i32 0, i32 0
 
 
-  ; FIXME: "2 4"
-  ; CHECK-SPIRV: %[[PIPE_STORAGE_ID0:[0-9]+]] = OpLoad %{{[0-9]+}} %[[SPIRV1]] 2 4
+  ; CHECK-SPIRV: %[[PIPE_STORAGE_ID0:[0-9]+]] = OpLoad %{{[0-9]+}} %[[SPIRV1]] Aligned 4
   ; CHECK-SPIRV: %[[WRITE_PIPE_ID:[0-9]+]] = OpCreatePipeFromPipeStorage %[[WRITE_PIPE]] %[[PIPE_STORAGE_ID0]]
   ; CHECK-SPIRV: %[[GENERIC_WRITE_PIPE_WRAPPER_ID:[0-9]+]] = OpPtrCastToGeneric %{{[0-9]+}} %[[WRITE_PIPE_WRAPPER_ID]]
   ; CHECK-SPIRV: %{{[0-9]+}} = OpFunctionCall %{{[0-9]+}} %[[WRITE_PIPE_WRAPPER_CTOR]] %[[GENERIC_WRITE_PIPE_WRAPPER_ID]] %[[WRITE_PIPE_ID]]
@@ -66,8 +65,7 @@ entry:
   call spir_func void @_ZNU3AS42cl4pipeIDv4_iLNS_11pipe_accessE1EEC1EPU3AS1NS_7__spirv10OpTypePipeILNS3_15AccessQualifierE1EEE(%"class.cl::pipe<int __attribute__((ext_vector_type(4))), cl::pipe_access::write>" addrspace(4)* %4, %spirv.Pipe._1 addrspace(1)* %3)
 
 
-  ; FIXME: "2 4"
-  ; CHECK-SPIRV: %[[PIPE_STORAGE_ID1:[0-9]+]] = OpLoad %{{[0-9]+}} %[[SPIRV1]] 2 4
+  ; CHECK-SPIRV: %[[PIPE_STORAGE_ID1:[0-9]+]] = OpLoad %{{[0-9]+}} %[[SPIRV1]] Aligned 4
   ; CHECK-SPIRV: %[[READ_PIPE_ID:[0-9]+]] = OpCreatePipeFromPipeStorage %[[READ_PIPE]] %[[PIPE_STORAGE_ID1]]
   ; CHECK-SPIRV: %[[GENERIC_READ_PIPE_WRAPPER_ID:[0-9]+]] = OpPtrCastToGeneric %{{[0-9]+}} %[[READ_PIPE_WRAPPER_ID]]
   ; CHECK-SPIRV: %{{[0-9]+}} = OpFunctionCall %{{[0-9]+}} %[[READ_PIPE_WRAPPER_CTOR]] %[[GENERIC_READ_PIPE_WRAPPER_ID]] %[[READ_PIPE_ID]]

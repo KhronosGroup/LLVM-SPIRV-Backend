@@ -26,7 +26,6 @@
 ; CHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
 ; CHECK-SPIRV: OpLifetimeStart %[[#TMP]]
 ; CHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
-; FIXME: What is "64" for Memory Operand of OpCopyMemorySized?
 ; CHECK-SPIRV: OpCopyMemorySized %[[#TMP]] %[[#I8_ARG_IN]] %[[#C128]] Aligned 64
 ; CHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
 ; CHECK-SPIRV: OpCopyMemorySized %[[#I8_ARG_OUT]] %[[#TMP]] %[[#C128]] Aligned 64
@@ -74,9 +73,9 @@
 ; xCHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
 ; xCHECK-SPIRV: OpLifetimeStart %[[#TMP]]
 ; xCHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
-; xCHECK-SPIRV: OpCopyMemorySized %[[#TMP]] %[[#]] %[[#C32]] Aligned MakePointerAvailable
+; xCHECK-SPIRV: OpCopyMemorySized %[[#TMP]] %[[#]] %[[#C32]] Aligned 8
 ; xCHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
-; xCHECK-SPIRV: OpCopyMemorySized %[[#]] %[[#TMP]] %[[#C32]] Aligned MakePointerAvailable
+; xCHECK-SPIRV: OpCopyMemorySized %[[#]] %[[#TMP]] %[[#C32]] Aligned 8
 ; xCHECK-SPIRV: %[[#TMP:]] = OpBitcast %[[#]] %[[#MEM]]
 ; xCHECK-SPIRV: OpLifetimeStop %[[#TMP]]
 

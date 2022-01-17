@@ -568,7 +568,6 @@ declare dso_local spir_func i32 @_Z25sub_group_broadcast_firsti(i32) local_unnam
 ; CHECK-SPIRV: %{{[0-9]+}} = OpGroupNonUniformBroadcastFirst %[[int]] %[[ScopeSubgroup]] %[[int_value]]
 ; CHECK-SPIRV: OpFunctionEnd
 
-
 ; Function Attrs: convergent nounwind
 define dso_local spir_kernel void @testNonUniformBroadcastUInts() local_unnamed_addr #3 !kernel_arg_addr_space !3 !kernel_arg_access_qual !3 !kernel_arg_type !3 !kernel_arg_base_type !3 !kernel_arg_type_qual !3 {
   %1 = tail call spir_func i32 @_Z31sub_group_non_uniform_broadcastjj(i32 0, i32 0) #7

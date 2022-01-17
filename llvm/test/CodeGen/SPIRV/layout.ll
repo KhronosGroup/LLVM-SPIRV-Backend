@@ -46,17 +46,16 @@
 ; CHECK: %[[TypeFloat:[0-9]+]] = OpTypeFloat
 ; CHECK: %[[TypeArray:[0-9]+]] = OpTypeArray %[[TypeFloat]] %[[Two]]
 ; CHECK: %[[TypeVectorInt3:[0-9]+]] = OpTypeVector %[[TypeInt]] 3
-; CHECK: %[[BID:[0-9]+]] = OpTypeStruct %[[AFwdPtr]]
-; CHECK: %[[CID:[0-9]+]] = OpTypeStruct %[[BID]]
-; CHECK: %[[AID:[0-9]+]] = OpTypeStruct %[[CID]]
-; CHECK: %[[AFwdPtr]] = OpTypePointer CrossWorkgroup %[[AID]]
+; CHECK: %[[BID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[AFwdPtr]]
+; CHECK: %[[CID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[BID]]
+; CHECK: %[[AID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[CID]]
+; CHECK: %[[AFwdPtr]] = OpTypePointer {{.*}} %[[AID]]
 ; CHECK: %[[Void:[0-9]+]] = OpTypeVoid
-; CHECK: %[[Int3Ptr:[0-9]+]] = OpTypePointer UniformConstant %[[TypeVectorInt3]]
+; CHECK: %[[Int3Ptr:[0-9]+]] = OpTypePointer {{.*}} %[[TypeVectorInt3]]
 ; CHECK: %[[TypeBar1:[0-9]+]] = OpTypeFunction %[[Void]] %[[Int3Ptr]]
 ; CHECK: %[[Var:[0-9]+]] = OpVariable %[[TPointer]]
 ; CHECK: %[[SConstOp:[0-9]+]] = OpSpecConstantOp %[[SConstOpType]] 70 %[[Var]]
 ; CHECK: %{{[0-9]+}} = OpVariable %{{[0-9]+}} CrossWorkgroup %[[SConstOp]]
-; FIXME: 70? %?
 
 ; CHECK-NOT: OpCapability
 ; CHECK-NOT: OpExtInstImport

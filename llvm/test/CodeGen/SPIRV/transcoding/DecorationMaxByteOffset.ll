@@ -2,15 +2,12 @@
 
 ; CHECK-SPIRV: OpName %[[PTR_ID:[0-9]+]] "ptr"
 ; CHECK-SPIRV: OpName %[[PTR2_ID:[0-9]+]] "ptr2"
-; FIXME: "MaxByteOffset 12", "123"
 ; CHECK-SPIRV-DAG: OpDecorate %[[PTR_ID]] MaxByteOffset 12
 ; CHECK-SPIRV-DAG: OpDecorate %[[PTR2_ID]] MaxByteOffset 123
 ; CHECK-SPIRV: %[[CHAR_T:[0-9]+]] = OpTypeInt 8 0
 ; CHECK-SPIRV: %[[CHAR_PTR_T:[0-9]+]] = OpTypePointer Workgroup %[[CHAR_T]]
 ; CHECK-SPIRV: %[[PTR_ID]] = OpFunctionParameter %[[CHAR_PTR_T]]
 ; CHECK-SPIRV: %[[PTR2_ID]] = OpFunctionParameter %[[CHAR_PTR_T]]
-
-; CHECK-SPIRV_1_0-NOT: OpDecorate %{{[0-9]+}} MaxByteOffset
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"

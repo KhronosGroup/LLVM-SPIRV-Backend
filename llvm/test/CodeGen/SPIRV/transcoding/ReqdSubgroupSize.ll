@@ -7,7 +7,6 @@
 
 ; CHECK-SPIRV: OpCapability SubgroupDispatch
 ; CHECK-SPIRV: OpEntryPoint Kernel %[[kernel:[0-9]+]] "foo"
-; FIXME: operands of OpExecutionMode
 ; CHECK-SPIRV: OpExecutionMode %[[kernel]] SubgroupSize 8
 
 ; ModuleID = 'ReqdSubgroupSize.ll'

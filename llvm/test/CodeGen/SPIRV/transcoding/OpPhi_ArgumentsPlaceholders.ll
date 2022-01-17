@@ -39,7 +39,7 @@ for.body:                                         ; preds = %for.cond
 
   %0 = load %struct.Node.0 addrspace(1)*, %struct.Node.0 addrspace(1)* addrspace(1)* %pNext, align 4
   %1 = bitcast %struct.Node.0 addrspace(1)* %0 to %struct.Node addrspace(1)*
-;CHECK-SPIRV: %[[LoadResultId:[0-9]+]] = OpLoad %{{[0-9]+}} %{{[0-9]+}}
+;CHECK-SPIRV: %[[LoadResultId:[0-9]+]] = OpLoad %{{[0-9]+}}
 ;CHECK-SPIRV: %[[BitcastResultId]] = OpBitcast %{{[0-9]+}} %[[LoadResultId]]
 
   br label %for.inc

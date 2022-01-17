@@ -7,7 +7,6 @@
 ; CHECK-SPIRV: %[[CL_PIPE_STORAGE_ID:[0-9]+]] = OpTypeStruct %[[PIPE_STORAGE_ID_2]]
 ; CHECK-SPIRV: %[[CL_PIPE_STORAGE_PTR_ID:[0-9]+]] = OpTypePointer CrossWorkgroup %[[CL_PIPE_STORAGE_ID]]
 
-; FIXME: How to convert "16 16 1"?
 ; CHECK-SPIRV: %[[CPS_ID:[0-9]+]] = OpConstantPipeStorage %[[PIPE_STORAGE_ID]] 16 16 1
 ; CHECK-SPIRV: %[[COMPOSITE_ID:[0-9]+]] = OpConstantComposite %[[CL_PIPE_STORAGE_ID]] %[[CPS_ID]]
 ; CHECK-SPIRV: %[[MYPIPE_ID]] = OpVariable %[[CL_PIPE_STORAGE_PTR_ID]] CrossWorkgroup %[[COMPOSITE_ID]]

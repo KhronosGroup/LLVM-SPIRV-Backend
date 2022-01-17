@@ -4,7 +4,7 @@ target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:
 target triple = "spirv64-unknown-unknown"
 
 ; CHECK-SPIRV: OpDecorate %[[ALIGNMENT:[0-9]+]] Alignment 16
-; CHECk-SPIRV: %[[ALIGNMENT]] = OpFunctionParameter %{{[0-9]+}}
+; CHECK-SPIRV: %[[ALIGNMENT]] = OpFunctionParameter %{{[0-9]+}}
 
 %struct._ZTS6Struct.Struct = type { %struct._ZTS11floatStruct.floatStruct, %struct._ZTS11floatStruct.floatStruct }
 %struct._ZTS11floatStruct.floatStruct = type { float, float, float, float }

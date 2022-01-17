@@ -3,7 +3,6 @@
 ; LLVM => SPIRV checks
 
 ; CHECK-SPIRV-DAG: OpEntryPoint Kernel %[[WORKER:[0-9]+]] "worker"
-; FIXME: operands of OpExecutionMode
 ; CHECK-SPIRV-DAG: OpExecutionMode %[[WORKER]] LocalSizeHint 128 10 1
 
 

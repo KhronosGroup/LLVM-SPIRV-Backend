@@ -14,7 +14,7 @@ target triple = "spirv32-unknown-unknown"
 ; Function Attrs: convergent noinline nounwind optnone
 define spir_kernel void @test_kernel() #0 !dbg !8 !kernel_arg_addr_space !2 !kernel_arg_access_qual !2 !kernel_arg_type !2 !kernel_arg_base_type !2 !kernel_arg_type_qual !2 !kernel_arg_host_accessible !2 {
 entry:
-; CHECK: Line
+; CHECK: OpLine
   ret void, !dbg !11
 }
 

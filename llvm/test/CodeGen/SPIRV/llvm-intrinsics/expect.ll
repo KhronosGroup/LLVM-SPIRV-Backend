@@ -3,15 +3,13 @@
 ; CHECK-SPIRV-NO-EXT-NOT: OpCapability ExpectAssumeKHR
 ; CHECK-SPIRV-NO-EXT-NOT: OpExtension "SPV_KHR_expect_assume"
 ; CHECK-SPIRV-NO-EXT: OpFunction
-; FIXME: check format/syntax of "OpExpectKHR"
-; CHECK-SPIRV-NO-EXT-NOT: OpExpectKHR %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV-NO-EXT-NOT: %{{[0-9]+}} = OpExpectKHR %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
 ; CHECK-SPIRV-NO-EXT: %[[RES1:[0-9]+]] = OpSConvert %{{[0-9]+}} %{{[0-9]+}}
 ; CHECK-SPIRV-NO-EXT: %{{[0-9]+}} = OpINotEqual %{{[0-9]+}} %[[RES1]] %{{[0-9]+}}
 
 ; CHECK-SPIRV-NO-EXT: OpFunction
 ; CHECK-SPIRV-NO-EXT: %[[RES2:[0-9]+]] = OpSConvert %{{[0-9]+}} %{{[0-9]+}}
-; FIXME: check format/syntax of "OpExpectKHR"
-; CHECK-SPIRV-NO-EXT-NOT: OpExpectKHR %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
+; CHECK-SPIRV-NO-EXT-NOT: %{{[0-9]+}} = OpExpectKHR %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
 ; CHECK-SPIRV-NO-EXT: %{{[0-9]+}} = OpINotEqual %{{[0-9]+}} %[[RES2]] %{{[0-9]+}}
 
 ; ModuleID = 'expect.cpp'
