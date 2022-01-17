@@ -37,8 +37,7 @@ void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
       // OpFunctionCall already contains global register with OpFunction id.
       bool IsOldReg = (MI->getOpcode() == SPIRV::OpFunctionCall && i == 2) ||
                       IsMetaFunc || !NewReg.isValid();
-      Register Reg = IsOldReg ? MO.getReg() : NewReg;
-      MCOp = MCOperand::createReg(Reg);
+      MCOp = MCOperand::createReg(IsOldReg ? MO.getReg() : NewReg);
       break;
     }
     case MachineOperand::MO_Immediate:

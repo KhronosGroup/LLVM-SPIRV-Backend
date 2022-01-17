@@ -108,9 +108,9 @@ public:
     return RegisterAliasTable[MF].find(Reg) != RegisterAliasTable[MF].end();
   }
 
-  void setNotToEmit(MachineInstr *MI) { InstrsToDelete.insert(MI); }
+  void setSkipEmission(MachineInstr *MI) { InstrsToDelete.insert(MI); }
 
-  bool getNotToEmit(const MachineInstr *MI) {
+  bool getSkipEmission(const MachineInstr *MI) {
     return InstrsToDelete.contains(MI);
   }
 
