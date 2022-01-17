@@ -56,7 +56,6 @@ for.cond:                                         ; preds = %for.inc, %entry
   %0 = load i32, i32* %i, align 4
   %cmp = icmp slt i32 %0, 1024
 ; Per SPIRV spec p3.23 "DontUnroll" loop control = 0x2
-; FIXME: LoopMerge's format
 ; CHECK-SPIRV: OpLoopMerge %[[#MERGEBLOCK:]] %[[#CONTINUE:]] DontUnroll
 ; CHECK-SPIRV: OpBranchConditional %[[#]] %[[#]] %[[#MERGEBLOCK]]
   br i1 %cmp, label %for.body, label %for.end
@@ -108,7 +107,6 @@ while.cond:                                       ; preds = %if.end, %if.then, %
   store i32 %dec, i32* %i, align 4
   %cmp = icmp sgt i32 %0, 0
 ; Per SPIRV spec p3.23 "Unroll" loop control = 0x1
-; FIXME: LoopMerge's format - what is "8"?
 ; CHECK-SPIRV: OpLoopMerge %[[#MERGEBLOCK:]] %[[#CONTINUE:]] PartialCount 8
 ; CHECK-SPIRV: OpBranchConditional %[[#]] %[[#]] %[[#MERGEBLOCK]]
   br i1 %cmp, label %while.body, label %while.end
@@ -156,7 +154,6 @@ do.body:                                          ; preds = %do.cond, %entry
   %rem = srem i32 %0, 2
   %tobool = icmp ne i32 %rem, 0
 ; Per SPIRV spec p3.23 "Unroll" loop control = 0x1
-; FIXME: LoopMerge's format
 ; CHECK-SPIRV: OpLoopMerge %[[#MERGEBLOCK:]] %[[#CONTINUE:]] Unroll
 ; CHECK-SPIRV: OpBranchConditional
   br i1 %tobool, label %if.then, label %if.end
@@ -201,7 +198,6 @@ for.body:                                          ; preds = %for.cond, %entry
   %rem = srem i32 %0, 2
   %tobool = icmp ne i32 %rem, 0
 ; Per SPIRV spec p3.23 "Unroll" loop control = 0x1
-; FIXME: LoopMerge's format
 ; CHECK-SPIRV: OpLoopMerge %[[#MERGEBLOCK:]] %[[#CONTINUE:]] Unroll
 ; CHECK-SPIRV: OpBranchConditional
   br i1 %tobool, label %if.then, label %if.end

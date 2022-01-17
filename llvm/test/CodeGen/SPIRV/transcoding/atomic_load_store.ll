@@ -12,7 +12,7 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV-LABEL:  OpFunction
 ; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV:        %[[ret:[0-9]+]] = OpAtomicLoad %{{[0-9]+}} %[[object]] %{{[0-9]+}} %{{[0-9]+}}
-; CHECK-SPIRV:        ReturnValue %[[ret]]
+; CHECK-SPIRV:        OpReturnValue %[[ret]]
 ; CHECK-SPIRV-LABEL:  OpFunctionEnd
 
 ; Function Attrs: nounwind

@@ -1,6 +1,5 @@
 ; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; FIXME: Why was "6" as "<id> Sampled Type" (before "2D")?
 ; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown WriteOnly
 ; CHECK-SPIRV-NOT: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly

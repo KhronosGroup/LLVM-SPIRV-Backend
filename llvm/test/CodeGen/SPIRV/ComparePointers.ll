@@ -1,17 +1,28 @@
 ; RUN: llc -O0 -global-isel --mattr=+spirv1.3  %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV:ConvertPtrToU 
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:INotEqual
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:IEqual
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:UGreaterThan
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:ConvertPtrToU
-; CHECK-SPIRV:ULessThan
+; kernel void test(int global *in, int global *in2) {
+;   if (!in)
+;     return;
+;   if (in == 1)
+;     return;
+;   if (in > in2)
+;     return;
+;   if (in < in2)
+;     return;
+; }
+
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpINotEqual
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpIEqual
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpUGreaterThan
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpConvertPtrToU
+; CHECK-SPIRV:OpULessThan
 
 ; ModuleID = 'ComparePointers.cl'
 source_filename = "ComparePointers.cl"

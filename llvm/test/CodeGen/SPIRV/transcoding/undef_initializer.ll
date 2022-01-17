@@ -15,7 +15,7 @@ entry:
 
 ; CHECK-SPIRV: %[[UNDEF_ID:[0-9]+]] = OpUndef %{{[0-9]+}}
 ; CHECK-SPIRV: %[[CC_ID:[0-9]+]] = OpConstantComposite %{{[0-9]+}} %[[UNDEF_ID]]
-; CHECK-SPIRV: %{{[0-9]+}} = OpVariable %{{[0-9]+}} %{{[0-9]+}} %[[CC_ID]]
+; CHECK-SPIRV: %{{[0-9]+}} = OpVariable %{{[0-9]+}} {{.*}} %[[CC_ID]]
 
 !llvm.module.flags = !{!1}
 !opencl.ocl.version = !{!2}

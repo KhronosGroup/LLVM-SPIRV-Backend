@@ -18,10 +18,10 @@
 
 ; CHECK-SPIRV: %[[Target:[0-9]+]] = OpBitcast %[[Int8Ptr]] %{{[0-9]+}}
 ; CHECK-SPIRV: %[[Source:[0-9]+]] = OpBitcast %[[Int8PtrConst]] %[[Val]]
-; CHECK-SPIRV: OpCopyMemorySized %[[Target]] %[[Source]] %[[Lenmemset0]] Aligned Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %[[Target]] %[[Source]] %[[Lenmemset0]] Aligned 4
 
 ; CHECK-SPIRV: %[[SourceComp:[0-9]+]] = OpBitcast %[[Int8PtrConst]] %[[ValComp]]
-; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %[[SourceComp]] %[[Lenmemset21]] Aligned Nontemporal
+; CHECK-SPIRV: OpCopyMemorySized %{{[0-9]+}} %[[SourceComp]] %[[Lenmemset21]] Aligned 4
 
 ; CHECK-SPIRV: %[[#]] = OpFunctionCall %[[#]] %[[#NonConstMemset]] %[[#]] %[[#]] %[[#]] %[[#False]]
 
