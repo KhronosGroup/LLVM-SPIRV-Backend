@@ -69,7 +69,53 @@ class SPIRVGlobalRegistry {
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
 
+  const MachineFunction *MetaMF;
+
+  // Maps a local register to the corresponding global aliases in meta-function.
+  using LocalToGlobalRegTable = std::map<Register, Register>;
+  using RegisterAliasMapTy =
+      std::map<const MachineFunction *, LocalToGlobalRegTable>;
+
+  // The table contains global aliases of local registers for each machine
+  // function. They are collected when local instructions are moved to global
+  // level on SPIRVGlobalTypesAndRegNumPass. Then the aliases are used
+  // to substitute global aliases during code emission.
+  RegisterAliasMapTy RegisterAliasTable;
+
+  // The set contains machine instructions which are necessary for correct MIR
+  // but will not be finally emitted.
+  DenseSet<MachineInstr *> InstrsToDelete;
+
 public:
+  void setMetaMF(const MachineFunction *MF) { MetaMF = MF; }
+  const MachineFunction *getMetaMF() { return MetaMF; }
+
+  void setRegisterAlias(const MachineFunction *MF, Register Reg,
+                        Register AliasReg) {
+    RegisterAliasTable[MF][Reg] = AliasReg;
+  }
+
+  Register getRegisterAlias(const MachineFunction *MF, Register Reg) {
+    auto RI = RegisterAliasTable[MF].find(Reg);
+    if (RI == RegisterAliasTable[MF].end()) {
+      return Register(0);
+    }
+    return RegisterAliasTable[MF][Reg];
+  }
+
+  bool hasRegisterAlias(const MachineFunction *MF, Register Reg) {
+    assert(RegisterAliasTable.find(MF) != RegisterAliasTable.end());
+    return RegisterAliasTable[MF].find(Reg) != RegisterAliasTable[MF].end();
+  }
+
+  void setSkipEmission(MachineInstr *MI) { InstrsToDelete.insert(MI); }
+
+  bool getSkipEmission(const MachineInstr *MI) {
+    return InstrsToDelete.contains(MI);
+  }
+
+  SPIRVGeneralDuplicatesTracker *getDT() const { return &DT; }
+
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
   SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
     return SpecialTypesAndConstsMap;
