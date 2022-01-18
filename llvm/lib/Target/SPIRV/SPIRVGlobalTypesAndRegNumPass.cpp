@@ -250,8 +250,8 @@ static void makeGlobalOp(MachineIRBuilder &MetaBuilder, Register Reg,
 static void hoistGlobalOp(MachineIRBuilder &MetaBuilder, Register Reg,
                           MachineFunction *MF, SPIRVGlobalRegistry *GR) {
   assert(GR->hasRegisterAlias(MF, Reg) && "Cannot find register alias");
-  auto MetaReg = GR->getRegisterAlias(MF, Reg);
-  auto *ToHoist = MF->getRegInfo().getVRegDef(Reg);
+  Register MetaReg = GR->getRegisterAlias(MF, Reg);
+  MachineInstr *ToHoist = MF->getRegInfo().getVRegDef(Reg);
   makeGlobalOp(MetaBuilder, Reg, MetaReg, ToHoist, MF, GR);
 }
 
@@ -302,10 +302,13 @@ void hoistGlobalOpsFunction(MachineIRBuilder &MetaBuilder,
       while (ToHoist && (ToHoist->getOpcode() == SPIRV::OpFunction ||
                          ToHoist->getOpcode() == SPIRV::OpFunctionParameter)) {
         Reg = ToHoist->getOperand(0).getReg();
-        Register MetaReg =
-            MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-        makeGlobalOp(MetaBuilder, Reg, MetaReg, ToHoist, MF, GR);
-        GR->setRegisterAlias(MF, Reg, MetaReg);
+        if (ToHoist->getOpcode() == SPIRV::OpFunctionParameter) {
+          Register MetaReg =
+              MetaBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+          GR->setRegisterAlias(MF, Reg, MetaReg);
+          makeGlobalOp(MetaBuilder, Reg, MetaReg, ToHoist, MF, GR);
+        } else
+          hoistGlobalOp(MetaBuilder, Reg, MF, GR);
         ToHoist = ToHoist->getNextNode();
         Reg = ToHoist->getOperand(0).getReg();
       }
@@ -494,6 +497,8 @@ static void extractInstructionsWithGlobalRegsToMetablockForMBB(
     MachineBasicBlock &MBB, const SPIRVInstrInfo *TII,
     MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
   for (MachineInstr &MI : MBB) {
+    if (GR->getSkipEmission(&MI))
+      continue;
     const unsigned OpCode = MI.getOpcode();
     if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
       hoistMetaInstrWithGlobalRegs(MI, MIRBuilder, MB_DebugNames);
@@ -759,7 +764,6 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
   // constants, OpNames, OpVariables and OpDecorates.
   GR->setCurrentFunc(MF);
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
-
   // Walk over all created instructions and add requirement. Also convert all
   // G_CONSTANTs (GR creates them) to OpConstantI.
   setMetaBlock(MIRBuilder, MB_TmpGlobalData);
