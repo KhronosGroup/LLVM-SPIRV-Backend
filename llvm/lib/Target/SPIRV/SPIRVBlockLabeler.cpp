@@ -38,40 +38,34 @@ public:
 };
 } // namespace
 
-// Initialize MIRBuilder with the instruction position for an OpLabel within
-// MBB. At this stage, all hoistable global instrs will still be function-local,
-// so we must skip past them plus the initial OpFunction and its parameters.
-static void setLabelPos(MachineBasicBlock &MBB, MachineIRBuilder &MIRBuilder) {
-  const auto TII = static_cast<const SPIRVInstrInfo *>(&MIRBuilder.getTII());
-  MIRBuilder.setMBB(MBB);
+// Return the instruction position for an OpLabel within MBB. At this stage,
+// all hoistable global instrs will still be function-local, so we must skip
+// past them plus the initial OpFunction and its parameters.
+static MachineInstr *setLabelPos(MachineBasicBlock &MBB,
+                                 const SPIRVInstrInfo *TII) {
   for (auto &I : MBB) {
     unsigned o = I.getOpcode();
     if (o == SPIRV::OpFunction || o == SPIRV::OpFunctionParameter ||
-        TII->isHeaderInstr(I)) {
+        TII->isHeaderInstr(I))
       continue;
-    }
-    MIRBuilder.setInstr(I);
-    break;
+    return &I;
   }
+  llvm_unreachable("Cannot find OpLabel position");
 }
 
-// Build an OpLabel at the start of the block (ignoring hoistable instrs)
-static Register buildLabel(MachineBasicBlock &MBB,
-                           MachineIRBuilder &MIRBuilder) {
-  setLabelPos(MBB, MIRBuilder);
-  auto LabelID = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
-  MIRBuilder.buildInstr(SPIRV::OpLabel).addDef(LabelID);
-  buildOpName(LabelID, MBB.getName(), MIRBuilder);
+// Build an OpLabel at the start of the block (ignoring hoistable instrs).
+static Register buildLabel(MachineBasicBlock &MBB, const SPIRVInstrInfo *TII) {
+  MachineInstr *MI = setLabelPos(MBB, TII);
+  DebugLoc DL = MI->getDebugLoc();
+  MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
+  Register LabelID = MRI.createVirtualRegister(&SPIRV::IDRegClass);
+  BuildMI(*MI->getParent(), MI, DL, TII->get(SPIRV::OpLabel)).addDef(LabelID);
+  if (!MBB.getName().empty()) {
+    auto MIB = BuildMI(*MI->getParent(), MI, DL, TII->get(SPIRV::OpName))
+                   .addUse(LabelID);
+    addStringImm(MBB.getName(), MIB);
+  }
   return LabelID;
-}
-
-// Remove one instruction, and insert another in its place
-static void replaceInstr(MachineInstr *ToReplace, MachineInstrBuilder &NewInstr,
-                         MachineIRBuilder &MIRBuilder) {
-  MIRBuilder.setMBB(*ToReplace->getParent());
-  MIRBuilder.setInstr(*ToReplace);
-  MIRBuilder.insertInstr(NewInstr);
-  ToReplace->removeFromParent();
 }
 
 // A unique identifier for MBBs for use as a map key
@@ -80,12 +74,10 @@ using MBB_ID = int;
 static Register getLabelIDForMBB(const std::map<MBB_ID, Register> &BBNumMap,
                                  MBB_ID BBNum) {
   auto f = BBNumMap.find(BBNum);
-  if (f != BBNumMap.end()) {
+  if (f != BBNumMap.end())
     return f->second;
-  } else {
-    errs() << "MBB Num: = " << BBNum << "\n";
-    llvm_unreachable("MBB number not in MBB to label map.");
-  }
+  errs() << "MBB Num: = " << BBNum << "\n";
+  llvm_unreachable("MBB number not in MBB to label map.");
 }
 
 static MBB_ID getMBBID(const MachineBasicBlock &MBB) {
@@ -96,17 +88,17 @@ static MBB_ID getMBBID(const MachineOperand &Op) {
   return getMBBID(*Op.getMBB());
 }
 
-// Add OpLabels and terminators. Fix any instructions with MBB references
+// Add OpLabels and terminators. Fix any instructions with MBB references.
 bool SPIRVBlockLabeler::runOnMachineFunction(MachineFunction &MF) {
-  MachineIRBuilder MIRBuilder;
-  MIRBuilder.setMF(MF);
+  const SPIRVInstrInfo *TII =
+      static_cast<const SPIRVInstrInfo *>(MF.getSubtarget().getInstrInfo());
 
   std::map<MBB_ID, Register> BBNumToLabelMap;
   SmallVector<MachineInstr *, 4> Branches, CondBranches, Phis;
 
   for (MachineBasicBlock &MBB : MF) {
     // Add the missing OpLabel in the right place
-    auto LabelID = buildLabel(MBB, MIRBuilder);
+    auto LabelID = buildLabel(MBB, TII);
     BBNumToLabelMap.insert({getMBBID(MBB), LabelID});
     // Record all instructions that need to refer to a MBB label ID
     for (MachineInstr &MI : MBB) {
@@ -125,44 +117,48 @@ bool SPIRVBlockLabeler::runOnMachineFunction(MachineFunction &MF) {
   }
 
   // Replace MBB references with label IDs in OpBranch instructions
-  for (const auto &Branch : Branches) {
-    auto BBNum = getMBBID(Branch->getOperand(0));
+  for (const auto &MI : Branches) {
+    DebugLoc DL = MI->getDebugLoc();
+    auto BBNum = getMBBID(MI->getOperand(0));
     Register BBID = getLabelIDForMBB(BBNumToLabelMap, BBNum);
-    auto MIB = MIRBuilder.buildInstrNoInsert(SPIRV::OpBranch).addUse(BBID);
-    replaceInstr(Branch, MIB, MIRBuilder);
+    BuildMI(*MI->getParent(), MI, DL, TII->get(SPIRV::OpBranch)).addUse(BBID);
+    MI->eraseFromParent();
   }
 
   // Replace MBB references with label IDs in OpBranchConditional instructions
-  for (const auto &Branch : CondBranches) {
-    auto BBNum0 = getMBBID(Branch->getOperand(1));
-    auto BBNum1 = getMBBID(Branch->getOperand(2));
-    auto MIB = MIRBuilder.buildInstrNoInsert(SPIRV::OpBranchConditional)
-                   .addUse(Branch->getOperand(0).getReg())
-                   .addUse(getLabelIDForMBB(BBNumToLabelMap, BBNum0))
-                   .addUse(getLabelIDForMBB(BBNumToLabelMap, BBNum1));
-    replaceInstr(Branch, MIB, MIRBuilder);
+  for (const auto &MI : CondBranches) {
+    DebugLoc DL = MI->getDebugLoc();
+    auto BBNum0 = getMBBID(MI->getOperand(1));
+    auto BBNum1 = getMBBID(MI->getOperand(2));
+    BuildMI(*MI->getParent(), MI, DL, TII->get(SPIRV::OpBranchConditional))
+        .addUse(MI->getOperand(0).getReg())
+        .addUse(getLabelIDForMBB(BBNumToLabelMap, BBNum0))
+        .addUse(getLabelIDForMBB(BBNumToLabelMap, BBNum1));
+    MI->eraseFromParent();
   }
 
   // Replace MBB references with label IDs in OpPhi instructions
-  for (const auto &Phi : Phis) {
-    auto MIB = MIRBuilder.buildInstrNoInsert(SPIRV::OpPhi)
-                   .addDef(Phi->getOperand(0).getReg())
-                   .addUse(Phi->getOperand(1).getReg());
+  for (const auto &MI : Phis) {
+    DebugLoc DL = MI->getDebugLoc();
+    auto MIB = BuildMI(*MI->getParent(), MI, DL, TII->get(SPIRV::OpPhi))
+                   .addDef(MI->getOperand(0).getReg())
+                   .addUse(MI->getOperand(1).getReg());
 
     // PHIs require def, type, and list of (val, MBB) pairs
-    const unsigned NumOps = Phi->getNumOperands();
+    const unsigned NumOps = MI->getNumOperands();
     assert(((NumOps % 2) == 0) && "Require even num operands for PHI instrs");
     for (unsigned i = 2; i < NumOps; i += 2) {
-      MIB.addUse(Phi->getOperand(i).getReg());
-      auto BBNum = getMBBID(Phi->getOperand(i + 1));
+      MIB.addUse(MI->getOperand(i).getReg());
+      auto BBNum = getMBBID(MI->getOperand(i + 1));
       MIB.addUse(getLabelIDForMBB(BBNumToLabelMap, BBNum));
     }
-    replaceInstr(Phi, MIB, MIRBuilder);
+    MI->eraseFromParent();
   }
 
   // Add OpFunctionEnd at the end of the last MBB
-  MIRBuilder.setMBB(MF.back());
-  MIRBuilder.buildInstr(SPIRV::OpFunctionEnd);
+  MachineInstr &MI = *MF.back().getLastNonDebugInstr();
+  DebugLoc DL = MI.getDebugLoc();
+  BuildMI(&MF.back(), DL, TII->get(SPIRV::OpFunctionEnd));
   return true;
 }
 
