@@ -12,26 +12,34 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVMCInstLower.h"
+#include "SPIRV.h"
+#include "SPIRVSubtarget.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/IR/Constants.h"
 
 using namespace llvm;
 
-void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
+void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
+                             SPIRVGlobalRegistry *GR) const {
   OutMI.setOpcode(MI->getOpcode());
-
+  const MachineFunction *MF = MI->getMF();
+  bool IsMetaFunc = GR->getMetaMF() == MF;
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI->getOperand(i);
-
     // At this stage, SPIR-V should only have Register and Immediate operands
     MCOperand MCOp;
     switch (MO.getType()) {
     default:
       MI->print(errs());
       llvm_unreachable("unknown operand type");
-    case MachineOperand::MO_Register:
-      MCOp = MCOperand::createReg(MO.getReg());
+    case MachineOperand::MO_Register: {
+      Register NewReg = GR->getRegisterAlias(MF, MO.getReg());
+      // OpFunctionCall already contains global register with OpFunction id.
+      bool IsOldReg = (MI->getOpcode() == SPIRV::OpFunctionCall && i == 2) ||
+                      IsMetaFunc || !NewReg.isValid();
+      MCOp = MCOperand::createReg(IsOldReg ? MO.getReg() : NewReg);
       break;
+    }
     case MachineOperand::MO_Immediate:
       MCOp = MCOperand::createImm(MO.getImm());
       break;
