@@ -10,7 +10,7 @@
 ;   read_imagef(src, sampler2, 0, 0);
 ; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[SamplerID0:[0-9]+]] = OpConstantSampler %{{[0-9]+}} Repeat 1 Nearest
 ; CHECK-SPIRV: %[[SamplerID1:[0-9]+]] = OpConstantSampler %{{[0-9]+}} None 0 Nearest

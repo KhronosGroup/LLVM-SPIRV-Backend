@@ -9,7 +9,7 @@
 ; }
 ; clang -cc1 /work/tmp/tmp.cl -cl-std=CL2.0 -triple spir-unknown-unknown  -finclude-default-header -emit-llvm -o test/mangled_function.ll
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpName %[[foo:[0-9]+]] "_Z3foo14ocl_image2d_ro"
 ; CHECK-SPIRV: %[[foo]] = OpFunction %{{[0-9]+}}

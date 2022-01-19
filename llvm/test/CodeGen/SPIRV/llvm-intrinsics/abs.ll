@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 
 ; CHECK: %{{[0-9]+}} = OpExtInst %{{[0-9]+}} %{{[0-9]+}} s_abs

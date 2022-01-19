@@ -308,7 +308,7 @@
 ;;     dst[8] = sub_group_non_uniform_scan_exclusive_logical_xor(v);
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: OpCapability GroupNonUniformArithmetic
 

@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpDecorate %[[#NonConstMemset:]] LinkageAttributes "spirv.llvm_memset_p3i8_i32"
 ; CHECK-SPIRV: %[[Int8:[0-9]+]] = OpTypeInt 8 0

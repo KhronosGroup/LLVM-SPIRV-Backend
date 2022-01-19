@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ;CHECK:  OpDecorate %[[#FUNC_NAME:]] LinkageAttributes "_Z10BitReversei"
 ;CHECK-NOT: OpBitReverse

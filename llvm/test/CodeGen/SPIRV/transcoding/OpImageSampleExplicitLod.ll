@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: %[[RetID:[0-9]+]] = OpImageSampleExplicitLod %[[RetType:[0-9]+]] %{{[0-9]+}} %{{[0-9]+}} Lod %{{[0-9]+}}
 ; CHECK-SPIRV-DAG: %[[RetType]] = OpTypeVector %{{[0-9]+}} 4

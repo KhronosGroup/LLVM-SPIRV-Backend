@@ -61,7 +61,7 @@
 ;;     }
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; ModuleID = 'sub_group_non_uniform_vote.cl'
 source_filename = "sub_group_non_uniform_vote.cl"

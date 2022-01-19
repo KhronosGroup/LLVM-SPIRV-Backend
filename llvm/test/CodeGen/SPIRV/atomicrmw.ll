@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-DAG: %[[Scope_Device:[0-9]+]] = OpConstant %[[Int]] 1 {{$}}

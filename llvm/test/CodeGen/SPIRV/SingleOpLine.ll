@@ -4,7 +4,7 @@
 ; Command:
 ; clang -cc1 -triple spir -O0 -debug-info-kind=line-tables-only -emit-llvm -o /tmp/SingleOpLine.ll /tmp/SingleOpLine.cl
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; ModuleID = '/tmp/SingleOpLine.cl'
 source_filename = "/tmp/SingleOpLine.cl"

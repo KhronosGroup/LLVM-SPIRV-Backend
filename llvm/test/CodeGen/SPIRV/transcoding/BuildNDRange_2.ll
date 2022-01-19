@@ -18,7 +18,7 @@
 ;; }
 ;; bash$ $PATH_TO_GEN/bin/clang -cc1 -x cl -cl-std=CL2.0 -triple spir64-unknonw-unknown -emit-llvm  -include opencl-20.h  BuildNDRange_2.cl -o BuildNDRange_2.ll
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG:     %[[LEN2_ID:[0-9]+]] = OpConstant %{{[0-9]+}} 2
 ; CHECK-SPIRV-DAG:     %[[LEN3_ID:[0-9]+]] = OpConstant %{{[0-9]+}} 3

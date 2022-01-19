@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown ReadOnly
 ; CHECK-SPIRV-DAG: %{{[0-9]*}} = OpTypeImage %{{[0-9]*}} 2D 0 0 0 0 Unknown WriteOnly

@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[result:[0-9]+]] = OpFOrdGreaterThanEqual %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}}
 ; CHECK-SPIRV: %{{[0-9]+}} = OpSelect %{{[0-9]+}} %[[result]] %{{[0-9]+}} %{{[0-9]+}}

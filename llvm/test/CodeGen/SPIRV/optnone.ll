@@ -1,5 +1,5 @@
 ; Check that optnone is correctly ignored when extension is not enabled
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV-NO-EXT
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV-NO-EXT
 
 ; Per SPIR-V spec:
 ; FunctionControlDontInlineMask = 0x2 (2)

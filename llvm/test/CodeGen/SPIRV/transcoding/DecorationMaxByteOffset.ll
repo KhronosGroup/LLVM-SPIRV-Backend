@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpName %[[PTR_ID:[0-9]+]] "ptr"
 ; CHECK-SPIRV: OpName %[[PTR2_ID:[0-9]+]] "ptr2"

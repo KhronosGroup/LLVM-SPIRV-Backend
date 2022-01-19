@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[ResID:[0-9]+]] = OpGenericPtrMemSemantics %{{[0-9]+}} %{{[0-9]+}}
 ; CHECK-SPIRV-NEXT: %{{[0-9]+}} = OpShiftRightLogical %{{[0-9]+}} %[[ResID]] %{{[0-9]+}}

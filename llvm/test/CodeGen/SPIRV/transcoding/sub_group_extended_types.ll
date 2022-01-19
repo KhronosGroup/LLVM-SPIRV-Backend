@@ -179,7 +179,7 @@
 ;;     dst[8] = sub_group_scan_exclusive_max(v);
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: %[[char:[0-9]+]] = OpTypeInt 8 0
 ; CHECK-SPIRV-DAG: %[[short:[0-9]+]] = OpTypeInt 16 0

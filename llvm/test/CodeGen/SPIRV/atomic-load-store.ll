@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; CHECK-DAG: %[[#Relaxed:]] = OpConstant %[[#]] 0
 ; CHECK-DAG: %[[#DeviceScope:]] = OpConstant %[[#]] 1

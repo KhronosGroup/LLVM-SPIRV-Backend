@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[IMAGE_TYPE:[0-9]+]] = OpTypeImage
 ; CHECK-SPIRV: %[[IMAGE_ARG:[0-9]+]] = OpFunctionParameter %[[IMAGE_TYPE]]

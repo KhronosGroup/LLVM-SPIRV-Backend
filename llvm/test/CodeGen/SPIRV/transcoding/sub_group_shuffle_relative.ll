@@ -79,7 +79,7 @@
 ;;     dst[1] = sub_group_shuffle_down( v, 0 );
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: OpCapability GroupNonUniformShuffleRelative
 

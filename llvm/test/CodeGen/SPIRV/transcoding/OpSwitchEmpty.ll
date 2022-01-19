@@ -8,7 +8,7 @@
 ; Command:
 ; clang -cc1 -triple spir -emit-llvm -o test/SPIRV/OpSwitchEmpty.ll OpSwitchEmpty.cl -disable-llvm-passes
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[X:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
 ; CHECK-SPIRV: OpSwitch %[[X]] %[[DEFAULT:[0-9]+]] {{$}}

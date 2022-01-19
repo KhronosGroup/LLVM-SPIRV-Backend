@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV-NO-EXT
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV-NO-EXT
 
 ; CHECK-SPIRV-NO-EXT-NOT: OpCapability ExpectAssumeKHR
 ; CHECK-SPIRV-NO-EXT-NOT: OpExtension "SPV_KHR_expect_assume"

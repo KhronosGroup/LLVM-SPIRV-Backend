@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %{{[0-9]+}} = OpExtInst %{{[0-9]+}} %{{[0-9]+}} fclamp
 ; CHECK-SPIRV-NOT: %{{[0-9]+}} = OpExtInst %{{[0-9]+}} %{{[0-9]+}} clamp

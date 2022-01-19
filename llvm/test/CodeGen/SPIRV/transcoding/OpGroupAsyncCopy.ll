@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: %{{[0-9]+}} = OpGroupAsyncCopy %{{[0-9]+}} %[[Scope:[0-9]+]]
 ; CHECK-SPIRV-DAG: %[[Scope]] = OpConstant %{{[0-9]+}}

@@ -1,7 +1,7 @@
 ; __kernel void fmod_kernel( float out, float in1, float in2 )
 ; { out = fmod( in1, in2 ); }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %{{[0-9]+}} = OpExtInst %{{[0-9]+}} %{{[0-9]+}} fmod %{{[0-9]+}} %{{[0-9]+}}
 

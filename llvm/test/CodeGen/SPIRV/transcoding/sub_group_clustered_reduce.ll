@@ -173,7 +173,7 @@
 ;;     dst[2] = sub_group_clustered_reduce_logical_xor(v, 2);
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: OpCapability GroupNonUniformClustered
 

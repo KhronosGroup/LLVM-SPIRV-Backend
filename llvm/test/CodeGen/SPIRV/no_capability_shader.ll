@@ -1,6 +1,6 @@
 ;__kernel void sample_test(read_only image2d_t src, read_only image1d_buffer_t buff){}
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-NOT: OpCapability Shader
 
