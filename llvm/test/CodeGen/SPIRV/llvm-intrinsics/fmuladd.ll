@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefixes=COMMON,REPLACE
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefixes=COMMON,REPLACE
 
 ; COMMON-NOT: llvm.fmuladd
 

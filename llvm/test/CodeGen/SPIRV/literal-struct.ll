@@ -11,7 +11,7 @@
 ;   myBlock();
 ; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
 ; CHECK: %[[Int8:[0-9]+]] = OpTypeInt 8 0

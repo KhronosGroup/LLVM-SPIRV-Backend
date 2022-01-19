@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-DAG: %{{[0-9]+}} = OpBuildNDRange %{{[0-9]+}} %[[GWS:[0-9]+]] %[[LWS:[0-9]+]] %[[GWO:[0-9]+]]
 ; CHECK-SPIRV-DAG: %[[GWS]] = OpConstant %{{[0-9]+}} 123

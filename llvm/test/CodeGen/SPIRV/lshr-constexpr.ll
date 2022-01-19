@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "spirv64-unknown-unknown"

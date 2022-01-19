@@ -3,7 +3,7 @@
 ; kernel __attribute__((intel_reqd_sub_group_size(8)))
 ; void foo() {}
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpCapability SubgroupDispatch
 ; CHECK-SPIRV: OpEntryPoint Kernel %[[kernel:[0-9]+]] "foo"

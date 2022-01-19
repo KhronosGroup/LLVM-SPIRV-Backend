@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV-NOT: OpStore %{{[0-9]+}} %{{[0-9]+}} Volatile Aligned 8
 ; CHECK-SPIRV: OpStore %{{[0-9]+}} %{{[0-9]+}} Volatile|Aligned 8

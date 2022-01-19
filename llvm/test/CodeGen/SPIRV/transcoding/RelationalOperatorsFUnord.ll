@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[bool:[0-9]+]] = OpTypeBool
 ; CHECK-SPIRV: %[[bool2:[0-9]+]] = OpTypeVector %[[bool]] 2

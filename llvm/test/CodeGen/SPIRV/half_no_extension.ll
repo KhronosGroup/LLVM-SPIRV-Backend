@@ -5,7 +5,7 @@
 ;   vstorea_half4_rtp( data, 0, f );
 ;}
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpCapability Float16Buffer
 ; CHECK-SPIRV-NOT: OpCapability Float16

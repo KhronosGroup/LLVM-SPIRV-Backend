@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=SPV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=SPV
 
 ; ModuleID = 'float_control_empty.bc'
 source_filename = "float_control_empty.cpp"

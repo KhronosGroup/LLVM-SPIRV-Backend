@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[Int:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-SPIRV-DAG: %[[MemScope_Device:[0-9]+]] = OpConstant %[[Int]] 1

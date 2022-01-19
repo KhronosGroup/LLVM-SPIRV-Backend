@@ -3,7 +3,7 @@
 ;  return c;
 ;}
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; CHECK: %[[TypeInt:[0-9]+]] = OpTypeInt 32
 ; CHECK: %[[TypeVector:[0-9]+]] = OpTypeVector %[[TypeInt]] 8

@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; CHECK: OpName %[[sf:[0-9]+]] "conv"
 ; CHECK: OpName %[[uf:[0-9]+]] "conv1"

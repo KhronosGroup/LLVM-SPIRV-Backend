@@ -155,7 +155,7 @@
 ;;     dst[4] = get_sub_group_lt_mask();
 ;; }
 
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; ModuleID = 'subgroup_ballot.cl'
 source_filename = "subgroup_ballot.cl"

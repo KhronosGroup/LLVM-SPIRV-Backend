@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; This test checks that the backend is capable to correctly translate
 ; legacy atomic OpenCL C 1.2 built-in functions [1] into corresponding SPIR-V

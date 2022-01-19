@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; This test checks that the backend is capable to correctly translate
 ; atomic_work_item_fence OpenCL C 2.0 built-in function [1] into corresponding

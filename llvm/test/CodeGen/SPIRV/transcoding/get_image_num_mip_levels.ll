@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; Generated from the following OpenCL C code:
 ; #pragma OPENCL EXTENSION cl_khr_mipmap_image : enable

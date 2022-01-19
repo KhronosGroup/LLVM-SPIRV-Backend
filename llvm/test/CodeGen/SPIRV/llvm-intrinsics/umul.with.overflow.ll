@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpName %[[NAME_UMUL_FUNC_8:[0-9]+]] "spirv.llvm_umul_with_overflow_i8"
 ; CHECK-SPIRV: OpName %[[NAME_UMUL_FUNC_32:[0-9]+]] "spirv.llvm_umul_with_overflow_i32"

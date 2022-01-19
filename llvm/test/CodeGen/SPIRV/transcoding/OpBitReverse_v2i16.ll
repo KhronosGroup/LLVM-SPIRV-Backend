@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[short:[0-9]+]] = OpTypeInt 16
 ; CHECK-SPIRV: %[[short2:[0-9]+]] = OpTypeVector %[[short]] 2

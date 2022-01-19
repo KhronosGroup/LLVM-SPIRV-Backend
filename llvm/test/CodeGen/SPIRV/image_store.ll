@@ -1,4 +1,4 @@
-; RUN: llc -O0 -global-isel %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 ; Image types may be represented in two ways while translating to SPIR-V:
 ; - OpenCL form, for example, '%opencl.image2d_ro_t',
