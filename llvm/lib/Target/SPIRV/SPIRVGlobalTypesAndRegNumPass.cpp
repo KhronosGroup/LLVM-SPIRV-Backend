@@ -372,12 +372,19 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
 // True when all the operands of an instruction are an exact match (after the
 // given starting index).
 static bool allOpsMatch(const MachineInstr &A, const MachineInstr &B,
+                        SPIRVGlobalRegistry *GR,
                         unsigned int StartOpIndex = 0) {
   const unsigned int NumAOps = A.getNumOperands();
   if (NumAOps == B.getNumOperands() && A.getNumDefs() == B.getNumDefs()) {
     bool AllOpsMatch = true;
     for (unsigned i = StartOpIndex; i < NumAOps && AllOpsMatch; ++i) {
-      AllOpsMatch = A.getOperand(i).isIdenticalTo(B.getOperand(i));
+      if (A.getOperand(i).isReg() && B.getOperand(i).isReg()) {
+        Register RegA = A.getOperand(i).getReg();
+        Register RegB = B.getOperand(i).getReg();
+        AllOpsMatch = GR->getRegisterAlias(A.getMF(), RegA) == RegB;
+      } else {
+        AllOpsMatch = A.getOperand(i).isIdenticalTo(B.getOperand(i));
+      }
     }
     if (AllOpsMatch)
       return true;
@@ -462,16 +469,16 @@ static void addDummyVRegsUpToIndex(unsigned Index, MachineRegisterInfo &MRI) {
 static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
                                          MachineIRBuilder &MIRBuilder,
                                          MetaBlockType MbType) {
-  setMetaBlock(MIRBuilder, MbType);
-  auto &MBB = MIRBuilder.getMBB();
-  for (const auto &I : MBB) {
-    if (allOpsMatch(MI, I))
-      return; // Found a duplicate, so don't add it
-  }
-
   auto &MF = MIRBuilder.getMF();
   const auto &ST = static_cast<const SPIRVSubtarget &>(MF.getSubtarget());
   SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
+
+  setMetaBlock(MIRBuilder, MbType);
+  auto &MBB = MIRBuilder.getMBB();
+  for (const auto &I : MBB) {
+    if (allOpsMatch(MI, I, GR))
+      return; // Found a duplicate, so don't add it
+  }
 
   // No duplicates, so add it
   auto &MetaMRI = MF.getRegInfo();
@@ -662,7 +669,7 @@ static void assignFunctionCallIDs(Module &M, MachineModuleInfo &MMI,
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
   for (MachineBasicBlock &MBB : *MF) {
     for (MachineInstr &MI : MBB) {
-      if (MI.getOpcode() == SPIRV::OpFunction) {
+      if (MI.getOpcode() == SPIRV::OpFunction && !GR->getSkipEmission(&MI)) {
         Register Reg = GR->getRegisterAlias(MF, MI.defs().begin()->getReg());
         assert(Reg.isValid());
         FuncNameToID[F->getGlobalIdentifier()] = Reg;
