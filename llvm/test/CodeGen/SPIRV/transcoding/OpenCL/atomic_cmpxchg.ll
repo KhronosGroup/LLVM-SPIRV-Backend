@@ -42,18 +42,18 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV: %{{[0-9]+}} = OpAtomicCompareExchange %[[UINT]] %[[PTR]] %[[WORKGROUP_SCOPE]] %[[RELAXED]] %[[RELAXED]] %[[VAL]] %[[CMP]]
 
 ; Function Attrs: convergent norecurse nounwind
-define dso_local spir_kernel void @test_atomic_cmpxchg(i32 addrspace(1)* %p, i32 %cmp, i32 %val) local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
+define dso_local spir_kernel void @test_atomic_cmpxchg(i32 addrspace(1)* noundef %p, i32 noundef %cmp, i32 noundef %val) local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
 entry:
-  %call = tail call spir_func i32 @_Z14atomic_cmpxchgPU3AS1Viii(i32 addrspace(1)* %p, i32 %cmp, i32 %val) #2
-  %call1 = tail call spir_func i32 @_Z14atomic_cmpxchgPU3AS1Vjjj(i32 addrspace(1)* %p, i32 %cmp, i32 %val) #2
+  %call = tail call spir_func i32 @_Z14atomic_cmpxchgPU3AS1Viii(i32 addrspace(1)* noundef %p, i32 noundef %cmp, i32 noundef %val) #2
+  %call1 = tail call spir_func i32 @_Z14atomic_cmpxchgPU3AS1Vjjj(i32 addrspace(1)* noundef %p, i32 noundef %cmp, i32 noundef %val) #2
   ret void
 }
 
 ; Function Attrs: convergent
-declare spir_func i32 @_Z14atomic_cmpxchgPU3AS1Viii(i32 addrspace(1)*, i32, i32) local_unnamed_addr #1
+declare spir_func i32 @_Z14atomic_cmpxchgPU3AS1Viii(i32 addrspace(1)* noundef, i32 noundef, i32 noundef) local_unnamed_addr #1
 
 ; Function Attrs: convergent
-declare spir_func i32 @_Z14atomic_cmpxchgPU3AS1Vjjj(i32 addrspace(1)*, i32, i32) local_unnamed_addr #1
+declare spir_func i32 @_Z14atomic_cmpxchgPU3AS1Vjjj(i32 addrspace(1)* noundef, i32 noundef, i32 noundef) local_unnamed_addr #1
 
 attributes #0 = { convergent norecurse nounwind "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "uniform-work-group-size"="true" }
 attributes #1 = { convergent "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }
@@ -66,7 +66,7 @@ attributes #2 = { convergent nounwind }
 
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 1, i32 2}
-!2 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project.git 969b72fb662b9dc2124c6eb7797feb7e3bdd38d5)"}
+!2 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project.git 881b6a009fb6e2dd5fb924524cd6eacd14148a08)"}
 !3 = !{i32 1, i32 0, i32 0}
 !4 = !{!"none", !"none", !"none"}
 !5 = !{!"int*", !"int", !"int"}
