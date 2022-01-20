@@ -62,20 +62,20 @@ target triple = "spirv32-unknown-unknown"
 ; Function Attrs: convergent norecurse nounwind
 define dso_local spir_kernel void @test_mem_fence_const_flags() local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !3 !kernel_arg_type !3 !kernel_arg_base_type !3 !kernel_arg_type_qual !3 {
 entry:
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 1, i32 0, i32 0) #3
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 2, i32 2, i32 1) #3
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 4, i32 3, i32 2) #3
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 1, i32 4, i32 3) #3
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 2, i32 5, i32 4) #3
-  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 5, i32 2, i32 4) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 1, i32 noundef 0, i32 noundef 0) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 2, i32 noundef 2, i32 noundef 1) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 4, i32 noundef 3, i32 noundef 2) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 1, i32 noundef 4, i32 noundef 3) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 2, i32 noundef 5, i32 noundef 4) #3
+  tail call spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef 5, i32 noundef 2, i32 noundef 4) #3
   ret void
 }
 
 ; Function Attrs: convergent
-declare spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32, i32, i32) local_unnamed_addr #1
+declare spir_func void @_Z22atomic_work_item_fencej12memory_order12memory_scope(i32 noundef, i32 noundef, i32 noundef) local_unnamed_addr #1
 
 ; Function Attrs: mustprogress nofree norecurse nosync nounwind readnone willreturn
-define dso_local spir_kernel void @test_mem_fence_non_const_flags(i32 %flags, i32 %order, i32 %scope) local_unnamed_addr #2 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 {
+define dso_local spir_kernel void @test_mem_fence_non_const_flags(i32 noundef %flags, i32 noundef %order, i32 noundef %scope) local_unnamed_addr #2 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 {
 entry:
   ret void
 }
@@ -92,7 +92,7 @@ attributes #3 = { convergent nounwind }
 
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 2, i32 0}
-!2 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project.git 969b72fb662b9dc2124c6eb7797feb7e3bdd38d5)"}
+!2 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project.git 881b6a009fb6e2dd5fb924524cd6eacd14148a08)"}
 !3 = !{}
 !4 = !{i32 0, i32 0, i32 0}
 !5 = !{!"none", !"none", !"none"}

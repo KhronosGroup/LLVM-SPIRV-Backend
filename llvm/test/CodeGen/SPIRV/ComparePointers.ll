@@ -30,7 +30,7 @@ target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:
 target triple = "spirv64-unknown-unknown"
 
 ; Function Attrs: convergent noinline norecurse nounwind optnone
-define spir_kernel void @test(i32 addrspace(1)* %in, i32 addrspace(1)* %in2) #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
+define dso_local spir_kernel void @test(i32 addrspace(1)* noundef %in, i32 addrspace(1)* noundef %in2) #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
 entry:
   %in.addr = alloca i32 addrspace(1)*, align 8
   %in2.addr = alloca i32 addrspace(1)*, align 8
@@ -73,7 +73,7 @@ if.end8:                                          ; preds = %if.then, %if.then1,
   ret void
 }
 
-attributes #0 = { convergent noinline norecurse nounwind optnone "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "frame-pointer"="none" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "uniform-work-group-size"="false" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #0 = { convergent noinline norecurse nounwind optnone "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "uniform-work-group-size"="false" }
 
 !llvm.module.flags = !{!0}
 !opencl.ocl.version = !{!1}
@@ -82,7 +82,7 @@ attributes #0 = { convergent noinline norecurse nounwind optnone "correctly-roun
 
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 2, i32 0}
-!2 = !{!"clang version 12.0.0"}
+!2 = !{!"clang version 14.0.0 (https://github.com/llvm/llvm-project.git 881b6a009fb6e2dd5fb924524cd6eacd14148a08)"}
 !3 = !{i32 1, i32 1}
 !4 = !{!"none", !"none"}
 !5 = !{!"int*", !"int*"}
