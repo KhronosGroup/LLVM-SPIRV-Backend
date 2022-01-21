@@ -20,10 +20,6 @@
 // local registers to the global registry. AsmPrinter uses these aliases to
 // output instructions that refers global registers.
 //
-// In OpFunctionCalls callee identifiers are substituted with function IDs
-// which are globally scoped registers.
-// TODO: use local scoped registers for MIR consistency.
-//
 //===----------------------------------------------------------------------===//
 
 #include "SPIRV.h"
@@ -695,19 +691,32 @@ static void assignFunctionCallIDs(Module &M, MachineModuleInfo &MMI,
 
     // Create a new copy of the OpFunctionCall but with the IDVReg for the
     // callee rather than a GlobalValue, then delete the old instruction.
+    // Also insert dummy OpFunction which generates local register.
     MachineIRBuilder MIRBuilder;
     MIRBuilder.setMF(*MF);
     MIRBuilder.setMBB(*FuncCall->getParent());
     MIRBuilder.setInstr(*FuncCall);
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
-                   .addDef(FuncCall->getOperand(0).getReg())
+
+    Register GlobaFuncReg = FuncID->second;
+    Register FuncTypeReg = FuncCall->getOperand(1).getReg();
+    Register LocalFuncReg =
+        MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunction)
+                   .addDef(LocalFuncReg)
                    .addUse(FuncCall->getOperand(1).getReg())
-                   .addUse(FuncID->second);
+                   .addImm(FunctionControl::None)
+                   .addUse(FuncTypeReg);
+    GR->setSkipEmission(MIB);
+
+    auto MIB2 = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
+                    .addDef(FuncCall->getOperand(0).getReg())
+                    .addUse(FuncCall->getOperand(1).getReg())
+                    .addUse(LocalFuncReg);
     const unsigned int NumOps = FuncCall->getNumOperands();
     for (unsigned int i = 3; i < NumOps; ++i) {
-      MIB.addUse(FuncCall->getOperand(i).getReg());
+      MIB2.addUse(FuncCall->getOperand(i).getReg());
     }
-
+    GR->setRegisterAlias(MF, LocalFuncReg, GlobaFuncReg);
     FuncCall->removeFromParent();
   }
 }
