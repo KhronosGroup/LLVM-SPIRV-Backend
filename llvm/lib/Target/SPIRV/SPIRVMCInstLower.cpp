@@ -34,9 +34,7 @@ void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
       llvm_unreachable("unknown operand type");
     case MachineOperand::MO_Register: {
       Register NewReg = GR->getRegisterAlias(MF, MO.getReg());
-      // OpFunctionCall already contains global register with OpFunction id.
-      bool IsOldReg = (MI->getOpcode() == SPIRV::OpFunctionCall && i == 2) ||
-                      IsMetaFunc || !NewReg.isValid();
+      bool IsOldReg = IsMetaFunc || !NewReg.isValid();
       MCOp = MCOperand::createReg(IsOldReg ? MO.getReg() : NewReg);
       break;
     }
