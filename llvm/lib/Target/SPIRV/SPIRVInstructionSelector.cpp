@@ -50,7 +50,6 @@ class SPIRVInstructionSelector : public InstructionSelector {
   const SPIRVRegisterInfo &TRI;
   const SPIRVRegisterBankInfo &RBI;
   SPIRVGlobalRegistry &GR;
-  SPIRVGeneralDuplicatesTracker &DT;
 
 public:
   SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
@@ -222,7 +221,6 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(
     const SPIRVRegisterBankInfo &RBI)
     : InstructionSelector(), STI(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), GR(*ST.getSPIRVGlobalRegistry()),
-      DT(*ST.getSPIRVDuplicatesTracker()),
 #define GET_GLOBALISEL_PREDICATES_INIT
 #include "SPIRVGenGlobalISel.inc"
 #undef GET_GLOBALISEL_PREDICATES_INIT
@@ -1115,9 +1113,9 @@ SPIRVInstructionSelector::buildI32Constant(uint32_t Val,
   // Find a constant in DT or build a new one.
   auto ConstInt = ConstantInt::get(LLVMTy, Val);
   Register NewReg;
-  if (DT.find(ConstInt, &MIRBuilder.getMF(), NewReg) == false) {
+  if (GR.find(ConstInt, &MIRBuilder.getMF(), NewReg) == false) {
     NewReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
-    DT.add(ConstInt, &MIRBuilder.getMF(), NewReg);
+    GR.add(ConstInt, &MIRBuilder.getMF(), NewReg);
     MachineInstr *MI;
     if (Val == 0)
       MI = MIRBuilder.buildInstr(SPIRV::OpConstantNull)

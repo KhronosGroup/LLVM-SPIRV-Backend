@@ -197,12 +197,11 @@ static void initMetaBlockBuilder(Module &M, MachineModuleInfo &MMI) {
 template <typename T>
 static void fillLocalAliasTables(SPIRVGlobalRegistry *GR,
                                  MetaBlockType MBType) {
-  const SPIRVDuplicatesTracker<T> *DT = GR->getDT()->get<T>();
   setMetaBlock(MBType);
   MachineRegisterInfo &MRI = getMetaMF()->getRegInfo();
 
   // Make meta registers for entries of DT.
-  for (auto &CU : DT->getAllUses()) {
+  for (auto &CU : GR->getAllUses<T>()) {
     Register MetaReg = MRI.createVirtualRegister(&SPIRV::IDRegClass);
     for (auto &U : CU.second) {
       auto *MF = U.first;
@@ -266,10 +265,9 @@ static void hoistGlobalOp(Register Reg, MachineFunction *MF,
 
 template <typename T>
 static void hoistGlobalOps(SPIRVGlobalRegistry *GR, MetaBlockType MBType) {
-  const SPIRVDuplicatesTracker<T> *DT = GR->getDT()->get<T>();
   setMetaBlock(MBType);
   // Hoist instructions from DT.
-  for (auto &CU : DT->getAllUses()) {
+  for (auto &CU : GR->getAllUses<T>()) {
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
@@ -298,11 +296,10 @@ static void hoistGlobalOps(SPIRVGlobalRegistry *GR, MetaBlockType MBType) {
 // TODO: consider replacing this with explicit OpFunctionParameter generation
 // here instead handling it in CallLowering.
 static void hoistGlobalOpsFunction(SPIRVGlobalRegistry *GR) {
-  const SPIRVDuplicatesTracker<Function> *DT = GR->getDT()->get<Function>();
   setMetaBlock(MB_ExtFuncDecls);
   MachineRegisterInfo &MRI = getMetaMF()->getRegInfo();
 
-  for (auto &CU : DT->getAllUses()) {
+  for (auto &CU : GR->getAllUses<Function>()) {
     for (auto &U : CU.second) {
       auto *MF = U.first;
       auto Reg = U.second;
@@ -743,9 +740,7 @@ static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
                                    const SPIRVSubtarget &ST) {
   // Walk over each MF's DT and select all unreferenced global variables.
   SmallVector<GlobalVariable *, 8> GlobalVarList;
-  auto *DT = GR->getDT();
-  const SPIRVDuplicatesTracker<GlobalValue> *GVDT = DT->get<GlobalValue>();
-  auto Map = GVDT->getAllUses();
+  auto Map = GR->getAllUses<GlobalValue>();
   for (Module::global_iterator I = M.global_begin(), E = M.global_end();
        I != E;) {
     GlobalVariable *GV = &*I++;

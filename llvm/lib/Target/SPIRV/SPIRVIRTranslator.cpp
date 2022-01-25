@@ -246,8 +246,7 @@ using namespace llvm;
 //   return ResVRegs;
 // }
 
-static void addConstantsToTrack(MachineFunction &MF,
-                                SPIRVGeneralDuplicatesTracker *DT) {
+static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   auto &MRI = MF.getRegInfo();
   DenseMap<MachineInstr *, Register> RegsAlreadyAddedToDT;
   std::vector<MachineInstr *> ToErase, ToEraseComposites;
@@ -262,21 +261,21 @@ static void addConstantsToTrack(MachineFunction &MF,
                                ->getValue());
         Register Reg;
         if (auto *GV = dyn_cast<GlobalValue>(Const)) {
-          if (DT->find(GV, &MF, Reg) == false) {
-            DT->add(GV, &MF, MI.getOperand(2).getReg());
+          if (GR->find(GV, &MF, Reg) == false) {
+            GR->add(GV, &MF, MI.getOperand(2).getReg());
           } else
             RegsAlreadyAddedToDT[&MI] = Reg;
         } else {
-          if (DT->find(Const, &MF, Reg) == false) {
+          if (GR->find(Const, &MF, Reg) == false) {
             if (auto *ConstVec = dyn_cast<ConstantDataVector>(Const)) {
               auto *BuildVec = MRI.getVRegDef(MI.getOperand(2).getReg());
               assert(BuildVec &&
                      BuildVec->getOpcode() == TargetOpcode::G_BUILD_VECTOR);
               for (unsigned i = 0; i < ConstVec->getNumElements(); ++i)
-                DT->add(ConstVec->getElementAsConstant(i), &MF,
+                GR->add(ConstVec->getElementAsConstant(i), &MF,
                         BuildVec->getOperand(1 + i).getReg());
             }
-            DT->add(Const, &MF, MI.getOperand(2).getReg());
+            GR->add(Const, &MF, MI.getOperand(2).getReg());
           } else {
             RegsAlreadyAddedToDT[&MI] = Reg;
             // This MI is unused and will be removed. If the MI uses
@@ -507,13 +506,12 @@ bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
   GR = ST->getSPIRVGlobalRegistry();
-  DT = ST->getSPIRVDuplicatesTracker();
 
   GR->setCurrentFunc(MF);
 
   // Run the regular IRTranslator
   bool Success = IRTranslator::runOnMachineFunction(MF);
-  addConstantsToTrack(MF, DT);
+  addConstantsToTrack(MF, GR);
   foldConstantsIntoIntrinsics(MF);
   generateAssignInstrs(MF, GR);
 

@@ -26,9 +26,8 @@
 using namespace llvm;
 
 SPIRVCallLowering::SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                                     SPIRVGlobalRegistry *GR,
-                                     SPIRVGeneralDuplicatesTracker *DT)
-    : CallLowering(&TLI), GR(GR), DT(DT) {}
+                                     SPIRVGlobalRegistry *GR)
+    : CallLowering(&TLI), GR(GR) {}
 
 bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     const Value *Val, ArrayRef<Register> VRegs,
@@ -113,7 +112,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   auto MRI = MIRBuilder.getMRI();
   Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
   if (F.isDeclaration())
-    DT->add(&F, &MIRBuilder.getMF(), FuncVReg);
+    GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
   MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
 
   auto *FTy = F.getFunctionType();
@@ -238,7 +237,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
           static_cast<const Function *>(Info.Callee.getGlobal());
       Register FuncVReg;
       if (CF->isDeclaration() &&
-          (DT->find(CF, &MIRBuilder.getMF(), FuncVReg) == false)) {
+          (GR->find(CF, &MIRBuilder.getMF(), FuncVReg) == false)) {
         // Emit the type info and forward function declaration to the first MBB
         // to ensure VReg definition dependencies are valid across all MBBs.
         MachineIRBuilder FirstBlockBuilder;

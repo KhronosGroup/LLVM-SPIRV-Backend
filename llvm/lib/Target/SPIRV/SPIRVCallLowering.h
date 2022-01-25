@@ -25,11 +25,9 @@ class SPIRVCallLowering : public CallLowering {
 private:
   // Used to create and assign function, argument, and return type information
   SPIRVGlobalRegistry *GR;
-  SPIRVGeneralDuplicatesTracker *DT;
 
 public:
-  SPIRVCallLowering(const SPIRVTargetLowering &TLI, SPIRVGlobalRegistry *GR,
-                    SPIRVGeneralDuplicatesTracker *DT);
+  SPIRVCallLowering(const SPIRVTargetLowering &TLI, SPIRVGlobalRegistry *GR);
 
   // Built OpReturn or OpReturnValue
   bool lowerReturn(MachineIRBuilder &MIRBuiler, const Value *Val,

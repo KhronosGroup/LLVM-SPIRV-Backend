@@ -34,7 +34,7 @@ class SPIRVGlobalRegistry {
   // type-declaring ones)
   DenseMap<MachineFunction *, DenseMap<Register, SPIRVType *>> VRegToTypeMap;
 
-  SPIRVGeneralDuplicatesTracker &DT;
+  SPIRVGeneralDuplicatesTracker DT;
 
   DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
@@ -114,15 +114,42 @@ public:
     return InstrsToDelete.contains(MI);
   }
 
-  SPIRVGeneralDuplicatesTracker *getDT() const { return &DT; }
+  void add(const Constant *C, MachineFunction *MF, Register R) {
+    DT.add(C, MF, R);
+  }
+
+  void add(const GlobalValue *GV, MachineFunction *MF, Register R) {
+    DT.add(GV, MF, R);
+  }
+
+  void add(const Function *F, MachineFunction *MF, Register R) {
+    DT.add(F, MF, R);
+  }
+
+  bool find(const Constant *C, MachineFunction *MF, Register &R) {
+    return DT.find(C, MF, R);
+  }
+
+  bool find(const GlobalValue *GV, MachineFunction *MF, Register &R) {
+    return DT.find(GV, MF, R);
+  }
+
+  bool find(const Function *F, MachineFunction *MF, Register &R) {
+    return DT.find(F, MF, R);
+  }
+
+  template <typename T>
+  const MapVector<const T *, MapVector<MachineFunction *, Register>> &
+  getAllUses() {
+    return DT.get<T>()->getAllUses();
+  }
 
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
   SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
     return SpecialTypesAndConstsMap;
   }
 
-  SPIRVGlobalRegistry(SPIRVGeneralDuplicatesTracker &DT,
-                      unsigned int PointerSize);
+  SPIRVGlobalRegistry(unsigned int PointerSize);
 
   MachineFunction *CurMF;
 
