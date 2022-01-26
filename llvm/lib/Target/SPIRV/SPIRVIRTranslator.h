@@ -23,7 +23,6 @@ namespace llvm {
 class SPIRVIRTranslator : public IRTranslator {
 private:
   SPIRVGlobalRegistry *GR;
-  SPIRVGeneralDuplicatesTracker *DT;
 
   // Generate OpVariables with linkage data and their initializers if necessary
   //   bool buildGlobalValue(Register Reg, const GlobalValue *GV,

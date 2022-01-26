@@ -22,9 +22,8 @@
 #include "SPIRVUtils.h"
 
 using namespace llvm;
-SPIRVGlobalRegistry::SPIRVGlobalRegistry(SPIRVGeneralDuplicatesTracker &DT,
-                                         unsigned int PointerSize)
-    : DT(DT), PointerSize(PointerSize) {}
+SPIRVGlobalRegistry::SPIRVGlobalRegistry(unsigned int PointerSize)
+    : PointerSize(PointerSize) {}
 
 SPIRVType *
 SPIRVGlobalRegistry::assignTypeToVReg(const Type *Type, Register VReg,

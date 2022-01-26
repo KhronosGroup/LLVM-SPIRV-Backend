@@ -75,10 +75,9 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
   initAvailableExtInstSets(TT);
   initAvailableCapabilities(TT);
 
-  DT.reset(new SPIRVGeneralDuplicatesTracker());
-  GR.reset(new SPIRVGlobalRegistry(*DT.get(), PointerSize));
+  GR.reset(new SPIRVGlobalRegistry(PointerSize));
 
-  CallLoweringInfo.reset(new SPIRVCallLowering(TLInfo, GR.get(), DT.get()));
+  CallLoweringInfo.reset(new SPIRVCallLowering(TLInfo, GR.get()));
   Legalizer.reset(new SPIRVLegalizerInfo(*this));
 
   auto *RBI = new SPIRVRegisterBankInfo();

@@ -14,11 +14,11 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
 #include "SPIRVCallLowering.h"
-#include "SPIRVGlobalRegistry.h"
 #include "SPIRVEnums.h"
 #include "SPIRVExtInsts.h"
 #include "SPIRVExtensions.h"
 #include "SPIRVFrameLowering.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVRegisterBankInfo.h"
@@ -57,7 +57,6 @@ private:
   std::set<ExtInstSet> AvailableExtInstSets;
   std::set<Capability::Capability> AvailableCaps;
 
-  std::unique_ptr<SPIRVGeneralDuplicatesTracker> DT;
   std::unique_ptr<SPIRVGlobalRegistry> GR;
 
   SPIRVInstrInfo InstrInfo;
@@ -108,10 +107,6 @@ public:
   bool canUseExtInstSet(ExtInstSet E) const;
 
   SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
-
-  SPIRVGeneralDuplicatesTracker *getSPIRVDuplicatesTracker() const {
-    return DT.get();
-  }
 
   const CallLowering *getCallLowering() const override {
     return CallLoweringInfo.get();
