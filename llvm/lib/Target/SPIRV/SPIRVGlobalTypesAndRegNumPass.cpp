@@ -538,29 +538,32 @@ extractInstructionsWithGlobalRegsToMetablock(Module &M, MachineModuleInfo &MMI,
   extractInstructionsWithGlobalRegsToMetablockForMBB(*MBB, TII, GR);
 }
 
-// After all OpEntryPoint and OpDecorate instructions have been globally
-// extracted, we need to add all IDs with Import linkage as interface arguments
-// to all OpEntryPoints.
-//
-// Currently, this adds all Import linked IDs to all EntryPoints, rather than
-// walking the function CFG to see exactly which ones are used, so it may
-// declare more interface variables than strictly necessary.
-static void addEntryPointLinkageInterfaces(Module &M, MachineModuleInfo &MMI) {
-  // Find all IDs with Import linkage by examining OpDecorates.
-  MachineBasicBlock *DecMBB = getMetaMBB(MB_Annotations);
+// After all OpEntryPoint and OpVariable instructions have been globally
+// extracted, we need to add the entry point's interfaces. Interface is a list
+// of IDs of global OpVariable instructions. These declare the set of
+// global variables from a module that form the interface of this entry point.
+static void addEntryPointLinkageInterfaces(Module &M, MachineModuleInfo &MMI,
+                                           const SPIRVSubtarget &ST) {
+  // Find all OpVariable IDs with required StorageClass.
+  MachineBasicBlock *DecMBB = getMetaMBB(MB_TypeConstVars);
   SmallVector<Register, 4> InputLinkedIDs;
   for (MachineInstr &MI : *DecMBB) {
     const unsigned OpCode = MI.getOpcode();
-    const unsigned NumOps = MI.getNumOperands();
-    if (OpCode == SPIRV::OpDecorate &&
-        MI.getOperand(1).getImm() == Decoration::LinkageAttributes &&
-        MI.getOperand(NumOps - 1).getImm() == LinkageType::Import) {
-      const Register Target = MI.getOperand(0).getReg();
-      InputLinkedIDs.push_back(Target);
+    if (OpCode == SPIRV::OpVariable) {
+      auto SC =
+          static_cast<StorageClass::StorageClass>(MI.getOperand(2).getImm());
+      // Before version 1.4, the interface's storage classes are limited to
+      // the Input and Output storage classes. Starting with version 1.4,
+      // the interface's storage classes are all storage classes used in
+      // declaring all global variables referenced by the entry point call tree.
+      if (ST.getTargetSPIRVVersion() >= 14 || SC == StorageClass::Input ||
+          SC == StorageClass::Output) {
+        InputLinkedIDs.push_back(MI.getOperand(0).getReg());
+      }
     }
   }
 
-  // Add any Import linked IDs as interface args to all OpEntryPoints.
+  // Add IDs as an interface args to all OpEntryPoints.
   if (!InputLinkedIDs.empty()) {
     MachineBasicBlock *EntryMBB = getMetaMBB(MB_EntryPoints);
     for (MachineInstr &MI : *EntryMBB)
@@ -818,7 +821,7 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   // which all rely on globally numbered registers, which they forward-reference
   extractInstructionsWithGlobalRegsToMetablock(M, MMIWrapper.getMMI(), TII, GR);
 
-  addEntryPointLinkageInterfaces(M, MMIWrapper.getMMI());
+  addEntryPointLinkageInterfaces(M, MMIWrapper.getMMI(), ST);
 
   assignFunctionCallIDs(M, MMIWrapper.getMMI(), TII, GR);
 
