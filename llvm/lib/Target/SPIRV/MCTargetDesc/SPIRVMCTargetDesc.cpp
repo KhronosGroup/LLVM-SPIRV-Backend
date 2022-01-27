@@ -86,7 +86,7 @@ static MCInstrAnalysis *createSPIRVInstrAnalysis(const MCInstrInfo *Info) {
   return new SPIRVMCInstrAnalysis(Info);
 }
 
-extern "C" void LLVMInitializeSPIRVTargetMC() {
+extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTargetMC() {
   for (Target *T : {&getTheSPIRV32Target(), &getTheSPIRV64Target(),
                     &getTheSPIRVLogicalTarget()}) {
     RegisterMCAsmInfo<SPIRVMCAsmInfo> X(*T);
