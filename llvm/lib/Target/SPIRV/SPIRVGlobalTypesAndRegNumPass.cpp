@@ -589,7 +589,7 @@ static void numberRegistersInMBB(MachineBasicBlock &MBB,
 // the result in GR's register alias table.
 static void numberRegistersGlobally(Module &M, MachineModuleInfo &MMI,
                                     SPIRVGlobalRegistry *GR) {
-  unsigned int RegBaseIndex = 0;
+  unsigned int RegBaseIndex = getMetaMF()->getRegInfo().getNumVirtRegs();;
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
   for (MachineBasicBlock &MBB : *MF)
     numberRegistersInMBB(MBB, RegBaseIndex, MF->getRegInfo(), GR);
