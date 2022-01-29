@@ -70,7 +70,6 @@ enum MetaBlockType {
   MB_Annotations,           // OpDecorate, OpMemberDecorate etc.
   MB_TypeConstVars,         // OpTypeXXX, OpConstantXXX, and global OpVariables
   MB_ExtFuncDecls,          // OpFunction etc. to declare for external funcs
-  MB_TmpGlobalData,         // Tmp data in global vars processing
   NUM_META_BLOCKS           // Total number of sections requiring basic blocks
 };
 
@@ -522,9 +521,6 @@ extractInstructionsWithGlobalRegsToMetablockForMBB(MachineBasicBlock &MBB,
 // Some global instructions make reference to function-local ID vregs, so cannot
 // be hoisted until these registers are globally numbered and can be correctly
 // referenced from the instructions' new global context.
-//
-// This pass extracts and deduplicates these instructions assuming global VReg
-// numbers rather than using function-local alias tables like before.
 static void
 extractInstructionsWithGlobalRegsToMetablock(Module &M, MachineModuleInfo &MMI,
                                              const SPIRVInstrInfo *TII,
@@ -533,9 +529,6 @@ extractInstructionsWithGlobalRegsToMetablock(Module &M, MachineModuleInfo &MMI,
   for (MachineBasicBlock &MBB : *MF)
     extractInstructionsWithGlobalRegsToMetablockForMBB(MBB, TII, GR);
   END_FOR_MF_IN_MODULE()
-
-  MachineBasicBlock *MBB = getMetaMBB(MB_TmpGlobalData);
-  extractInstructionsWithGlobalRegsToMetablockForMBB(*MBB, TII, GR);
 }
 
 // After all OpEntryPoint and OpVariable instructions have been globally
@@ -592,24 +585,14 @@ static void numberRegistersInMBB(MachineBasicBlock &MBB,
   }
 }
 
-// Starting with the metablock, number all registers in all functions
-// globally from 0 onwards. Local registers aliasing results of OpType,
-// OpConstant etc. that were extracted to the metablock are now assigned
-// the correct global registers instead of the function-local ones.
+// Number all registers in all functions globally from 0 onwards and store
+// the result in GR's register alias table.
 static void numberRegistersGlobally(Module &M, MachineModuleInfo &MMI,
                                     SPIRVGlobalRegistry *GR) {
-  // Use raw index 0 - inf, and convert with index2VirtReg later
-  unsigned int RegBaseIndex = 0;
-  BEGIN_FOR_MF_IN_MODULE(M, MMI)
-  auto &MRI = MF->getRegInfo();
-  if (MFIndex == 0) {
-    RegBaseIndex = GR->getMetaMF()->getRegInfo().getNumVirtRegs();
-    MachineBasicBlock *MBB = getMetaMBB(MB_TmpGlobalData);
-    numberRegistersInMBB(*MBB, RegBaseIndex, MRI, GR);
-  } else {
-    for (MachineBasicBlock &MBB : *MF)
-      numberRegistersInMBB(MBB, RegBaseIndex, MRI, GR);
-  }
+  unsigned int RegBaseIndex = getMetaMF()->getRegInfo().getNumVirtRegs();;
+  BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
+  for (MachineBasicBlock &MBB : *MF)
+    numberRegistersInMBB(MBB, RegBaseIndex, MF->getRegInfo(), GR);
   END_FOR_MF_IN_MODULE()
 }
 
@@ -641,7 +624,7 @@ static void addExternalDeclarationsToIDMap(FuncNameToIDMap &FuncNameToOpID) {
 
 // Replace global value for the  Callee argument of OpFunctionCall with a
 // register number for the function ID now that all results of OpFunction are
-// globally numbered registers
+// globally numbered registers.
 static void assignFunctionCallIDs(Module &M, MachineModuleInfo &MMI,
                                   const SPIRVInstrInfo *TII,
                                   SPIRVGlobalRegistry *GR) {
@@ -728,66 +711,6 @@ static void addGlobalRequirements(const SPIRVRequirementHandler &Reqs,
   // TODO add a pseudo instr for version number
 }
 
-// Add all requirements needed for the given instruction.
-// Defined in SPIRVAddRequirementsPass.cpp
-extern void addInstrRequirements(const MachineInstr &MI,
-                                 SPIRVRequirementHandler &Reqs,
-                                 const SPIRVSubtarget &ST);
-
-// Process each unreferenced global variable so its type and initializer
-// will be emitted to MB_TmpGlobalData. Apply addInstrRequirements to it.
-// Substitute each created G_CONSTANT to OpConstantI.
-static void processGlobalUnrefVars(Module &M, MachineModuleInfo &MMI,
-                                   SPIRVRequirementHandler &Reqs,
-                                   SPIRVGlobalRegistry *GR,
-                                   const SPIRVSubtarget &ST) {
-  // Walk over each MF's DT and select all unreferenced global variables.
-  SmallVector<GlobalVariable *, 8> GlobalVarList;
-  auto Map = GR->getAllUses<GlobalValue>();
-  for (Module::global_iterator I = M.global_begin(), E = M.global_end();
-       I != E;) {
-    GlobalVariable *GV = &*I++;
-    auto AddrSpace = GV->getAddressSpace();
-    auto Storage = addressSpaceToStorageClass(AddrSpace);
-    if (Storage != StorageClass::Function) {
-      auto t = Map.find(GV);
-      if (t == Map.end())
-        // GV is not found in maps of all MFs so it's unreferenced.
-        GlobalVarList.push_back(GV);
-    }
-  }
-
-  // Walk over all created instructions and add requirement. Also convert all
-  // G_CONSTANTs (GR creates them) to OpConstantI.
-  // TODO: clean up this.
-  GR->setCurrentFunc(*getMetaMF());
-  setMetaBlock(MB_TmpGlobalData);
-  MachineBasicBlock *MBB = getMetaBlock();
-  for (MachineInstr &MI : *MBB) {
-    addInstrRequirements(MI, Reqs, ST);
-    auto Opcode = MI.getOpcode();
-    if (Opcode == TargetOpcode::G_CONSTANT ||
-        Opcode == TargetOpcode::G_FCONSTANT) {
-      Register Res = MI.getOperand(0).getReg();
-      APInt Imm;
-      if (Opcode == TargetOpcode::G_FCONSTANT) {
-        const auto FPImm = MI.getOperand(1).getFPImm();
-        Imm = FPImm->getValueAPF().bitcastToAPInt();
-      } else {
-        Imm = MI.getOperand(1).getCImm()->getValue();
-      }
-      SPIRVType *ResType = GR->getSPIRVTypeForVReg(Res);
-      auto MIB = buildInstrInCurrentMetaMBB(SPIRV::OpConstantI)
-                     .addDef(Res)
-                     .addUse(GR->getSPIRVTypeID(ResType))
-                     .addImm(Imm.getZExtValue());
-      // TODO: remove this call
-      constrainRegOperands(MIB);
-      GR->setSkipEmission(&MI);
-    }
-  }
-}
-
 // Add a meta function containing all OpType, OpConstant etc.
 // Extract all OpType, OpConst etc. into this meta block
 // Number registers globally, including references to global OpType etc.
@@ -804,9 +727,6 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   SPIRVRequirementHandler Reqs;
 
   addHeaderOps(M, Reqs, ST);
-
-  // Process global variables which are not referenced in all functions.
-  processGlobalUnrefVars(M, MMIWrapper.getMMI(), Reqs, GR, ST);
 
   addOpExtInstImports(M, MMIWrapper.getMMI(), TII, GR);
 
@@ -830,10 +750,6 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
     Reqs.addCapability(Capability::Linkage);
 
   addGlobalRequirements(Reqs, ST);
-
-  // Check that all instructions have been moved from the TmpGlobalData block.
-  assert(getMetaMBB(MB_TmpGlobalData)->empty() &&
-         "TmpGlobalData block is expected to be empty");
 
   return false;
 }
