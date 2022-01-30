@@ -171,7 +171,7 @@ static void addHeaderOps(Module &M, SPIRVRequirementHandler &Reqs,
 // It should have a series of empty basic blocks, one for each required
 // SPIR-V module section, so that subsequent users of the MachineFunction
 // can hoist instructions into the right places easily.
-static void initMetaBlockBuilder(Module &M, MachineModuleInfo &MMI) {
+static void initMetaFunction(Module &M, MachineModuleInfo &MMI) {
   // Add an empty placeholder function - MachineInstrs need to exist somewhere.
   auto VoidType = Type::getVoidTy(M.getContext());
   auto FType = FunctionType::get(VoidType, false);
@@ -179,7 +179,10 @@ static void initMetaBlockBuilder(Module &M, MachineModuleInfo &MMI) {
   Function *F = Function::Create(FType, Linkage, "GlobalStuff");
 
   // Add the function and a corresponding MachineFunction to the module
-  F->getBasicBlockList().push_back(BasicBlock::Create(M.getContext()));
+  LLVMContext &Ctx = M.getContext();
+  BasicBlock *BB = BasicBlock::Create(Ctx);
+  ReturnInst::Create(Ctx, BB);
+  F->getBasicBlockList().push_back(BB);
   M.getFunctionList().push_front(F);
 
   // Add the necessary basic blocks according to the MetaBlockTypes enum.
@@ -244,7 +247,10 @@ static void makeGlobalOp(Register Reg, Register MetaReg, MachineInstr *ToHoist,
       } else if (Op.isReg()) {
         Register MetaReg2 = GR->getRegisterAlias(MF, Op.getReg());
         assert(MetaReg2.isValid() && "No reg alias found");
-        MIB.addUse(MetaReg2);
+        if (Op.isDef())
+          MIB.addDef(MetaReg2);
+        else
+          MIB.addUse(MetaReg2);
       } else {
         errs() << *ToHoist;
         llvm_unreachable(
@@ -490,7 +496,10 @@ static void hoistMetaInstrWithGlobalRegs(MachineInstr &MI,
       // Add dummy regs to stop addUse crashing if Reg > max regs in func so far
       Register NewReg = GR->getRegisterAlias(MI.getMF(), Op.getReg());
       addDummyVRegsUpToIndex(NewReg.virtRegIndex(), MetaMRI);
-      MIB.addUse(NewReg);
+      if (Op.isDef())
+        MIB.addDef(NewReg);
+      else
+        MIB.addUse(NewReg);      
     } else {
       errs() << MI;
       llvm_unreachable("Unexpected operand type when copying spirv meta instr");
@@ -718,7 +727,7 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   MachineModuleInfoWrapperPass &MMIWrapper =
       getAnalysis<MachineModuleInfoWrapperPass>();
 
-  initMetaBlockBuilder(M, MMIWrapper.getMMI());
+  initMetaFunction(M, MMIWrapper.getMMI());
   const auto &ST = static_cast<const SPIRVSubtarget &>(MetaMF->getSubtarget());
   const SPIRVInstrInfo *TII = ST.getInstrInfo();
   SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
