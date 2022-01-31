@@ -711,6 +711,23 @@ static void addGlobalRequirements(const SPIRVRequirementHandler &Reqs,
   // TODO add a pseudo instr for version number
 }
 
+// If a register has no definition in the meta function, insert a dummy def in
+// the first MBB.
+static void insertDummyDefsInMetafunc(SPIRVGlobalRegistry *GR) {
+  setMetaBlock(MB_Capabilities);
+  MachineRegisterInfo &MetaMRI = getMetaMF()->getRegInfo();
+  unsigned NumRegs = MetaMRI.getNumVirtRegs();
+  for (unsigned int i = 0; i < NumRegs; i++) {
+    Register MetaReg = Register::index2VirtReg(i);
+    if (MetaMRI.getVRegDef(MetaReg) == nullptr) {
+      auto MIB = buildInstrInCurrentMetaMBB(SPIRV::OpUndef)
+                     .addDef(MetaReg)
+                     .addUse(Register::index2VirtReg(0));
+      GR->setSkipEmission(MIB);
+    }
+  }
+}
+
 // Add a meta function containing all OpType, OpConstant etc.
 // Extract all OpType, OpConst etc. into this meta block
 // Number registers globally, including references to global OpType etc.
@@ -751,7 +768,10 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
 
   addGlobalRequirements(Reqs, ST);
 
-  return false;
+  // Insert dummy defs to the meta function for registers with no definition.
+  insertDummyDefsInMetafunc(GR);
+
+  return true;
 }
 
 INITIALIZE_PASS(SPIRVGlobalTypesAndRegNum, DEBUG_TYPE,
