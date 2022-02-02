@@ -68,6 +68,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              ArrayRef<ArrayRef<Register>> VRegs,
                                              FunctionLoweringInfo &FLI) const {
   assert(GR && "Must initialize the SPIRV type registry before lowering args.");
+  GR->setCurrentFunc(MIRBuilder.getMF());
 
   // Assign types and names to all args, and store their types for later
   SmallVector<Register, 4> ArgTypeVRegs;
@@ -198,6 +199,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
   auto FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
   auto &MF = MIRBuilder.getMF();
+  GR->setCurrentFunc(MF);
 
   size_t n;
   int Status;

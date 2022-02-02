@@ -1,4 +1,4 @@
-//===-- SPIRVIRTranslator.cpp - Override IRTranslator for SPIR-V *- C++ -*-===//
+//===-- SPIRVPreLegalizer.cpp - prepare IR for legalization -----*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,14 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Overrides GlobalISel's IRTranslator to customize default lowering behavior.
-// This is mostly to stop aggregate types like Structs from getting expanded
-// into scalars, and to maintain type information required for SPIR-V using the
-// SPIRVGlobalRegistry before it gets discarded as LLVM IR is lowered to GMIR.
+// The pass prepares IR for legalization: it assigns SPIR-V types to registers
+// and removes intrinsics which holded these types during IR translation.
+// Also it processes constants and registers them in GR to avoid duplication.
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVIRTranslator.h"
 #include "SPIRV.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVUtils.h"
@@ -27,224 +25,20 @@
 
 #include <vector>
 
+#define DEBUG_TYPE "spirv-prelegalizer"
+
 using namespace llvm;
 
-// static bool buildOpConstantNull(const Constant &C, Register Reg,
-//                                 MachineIRBuilder &MIRBuilder,
-//                                 SPIRVGlobalRegistry *GR) {
-//   SPIRVType *type = GR->getOrCreateSPIRVType(C.getType(), MIRBuilder);
-//   auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantNull)
-//                  .addDef(Reg)
-//                  .addUse(GR->getSPIRVTypeID(type));
-//   return GR->constrainRegOperands(MIB);
-// }
-
-// static bool isConstantCompositeConstructible(const Constant &C) {
-//   if (isa<ConstantDataSequential>(C)) {
-//     return true;
-//   } else if (const auto *CV = dyn_cast<ConstantAggregate>(&C)) {
-//     return std::all_of(CV->op_begin(), CV->op_end(), [](const Use &operand) {
-//       const auto *constOp = cast_or_null<Constant>(operand);
-//       return constOp && (isa<ConstantData>(operand) ||
-//                          isConstantCompositeConstructible(*constOp));
-//     });
-//   }
-//   return false;
-// }
-
-// static bool buildOpConstantComposite(const Constant &C, Register Reg,
-//                                      const SmallVectorImpl<Register> &Ops,
-//                                      MachineIRBuilder &MIRBuilder,
-//                                      SPIRVGlobalRegistry *GR) {
-//   bool areAllConst = isConstantCompositeConstructible(C);
-//   SPIRVType *type = GR->getOrCreateSPIRVType(C.getType(), MIRBuilder);
-//   auto MIB = MIRBuilder
-//                  .buildInstr(areAllConst ? SPIRV::OpConstantComposite
-//                                          : SPIRV::OpCompositeConstruct)
-//                  .addDef(Reg)
-//                  .addUse(GR->getSPIRVTypeID(type));
-//   for (const auto &Op : Ops) {
-//     MIB.addUse(Op);
-//   }
-//   return GR->constrainRegOperands(MIB);
-// }
-
-// bool SPIRVIRTranslator::translate(const Instruction &Inst) {
-//   CurBuilder->setDebugLoc(Inst.getDebugLoc());
-//   // We only emit constants into the entry block from here. To prevent jumpy
-//   // debug behaviour set the line to 0.
-//   if (const DebugLoc &DL = Inst.getDebugLoc())
-//     EntryBuilder->setDebugLoc(
-//         DebugLoc::get(0, 0, DL.getScope(), DL.getInlinedAtScope()));
-//   else
-//     EntryBuilder->setDebugLoc(DebugLoc());
-
-//   if (translateInst(Inst, Inst.getOpcode()))
-//     return true;
-
-//   return IRTranslator::translate(Inst);
-// }
-
-// bool SPIRVIRTranslator::translate(const Constant &C, Register Reg) {
-//   if (auto GV = dyn_cast<GlobalValue>(&C)) {
-//     // Global OpVariables (possibly with constant initializers)
-//     return buildGlobalValue(Reg, GV, *EntryBuilder);
-//   } else if (auto CE = dyn_cast<ConstantExpr>(&C)) {
-//     if (translateInst(*CE, CE->getOpcode()))
-//       return true;
-//     return IRTranslator::translate(C, Reg);
-//   }
-
-//   bool Res = false;
-//   if (isa<ConstantPointerNull>(C) || isa<ConstantAggregateZero>(C)) {
-//     // Null (needs handled here to not loose the type info)
-//     Res = buildOpConstantNull(C, Reg, *EntryBuilder, GR);
-//   } else if (auto CV = dyn_cast<ConstantDataSequential>(&C)) {
-//     // Vectors or arrays via OpConstantComposite
-//     if (CV->getNumElements() == 1)
-//       return translate(*CV->getElementAsConstant(0), Reg);
-//     SmallVector<Register, 4> Ops;
-//     for (unsigned i = 0; i < CV->getNumElements(); ++i) {
-//       Ops.push_back(getOrCreateVReg(*CV->getElementAsConstant(i)));
-//     }
-//     Res = buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, GR);
-//   } else if (auto CV = dyn_cast<ConstantAggregate>(&C)) {
-//     // Structs via OpConstantComposite
-//     if (C.getNumOperands() == 1)
-//       Res = translate(*CV->getOperand(0), Reg);
-//     else {
-//       SmallVector<Register, 4> Ops;
-//       for (unsigned i = 0; i < C.getNumOperands(); ++i) {
-//         Ops.push_back(getOrCreateVReg(*C.getOperand(i)));
-//       }
-//       Res = buildOpConstantComposite(C, Reg, Ops, *EntryBuilder, GR);
-//     }
-//   }
-
-//   if (!Res)
-//     Res = IRTranslator::translate(C, Reg);
-//   DT->add(&C, MF, Reg);
-//   return Res;
-// }
-
-// bool SPIRVIRTranslator::translateInst(const User &Inst, unsigned OpCode) {
-//   switch (OpCode) {
-//   case Instruction::GetElementPtr:
-//     return translateGetElementPtr(Inst, *CurBuilder.get());
-//   case Instruction::ShuffleVector:
-//     return translateShuffleVector(Inst, *CurBuilder.get());
-//   case Instruction::ExtractValue:
-//     return translateExtractValue(Inst, *CurBuilder.get());
-//   case Instruction::InsertValue:
-//     return translateInsertValue(Inst, *CurBuilder.get());
-//   case Instruction::BitCast:
-//     return translateBitCast(Inst, *CurBuilder.get());
-//   case Instruction::Call: {
-//     const CallInst &CI = cast<CallInst>(Inst);
-//     auto TII = MF->getTarget().getIntrinsicInfo();
-//     const Function *F = CI.getCalledFunction();
-
-//     // FIXME: support Windows dllimport function calls.
-//     if (F && F->hasDLLImportStorageClass())
-//       return false;
-
-//     if (CI.isInlineAsm())
-//       return translateInlineAsm(CI, *CurBuilder);
-
-//     Intrinsic::ID ID = Intrinsic::not_intrinsic;
-//     if (F && F->isIntrinsic()) {
-//       ID = F->getIntrinsicID();
-//       if (TII && ID == Intrinsic::not_intrinsic)
-//         ID = static_cast<Intrinsic::ID>(TII->getIntrinsicID(F));
-//     }
-
-//     if (!F || !F->isIntrinsic() || ID == Intrinsic::not_intrinsic)
-//       return translateCall(CI, *CurBuilder);
-
-//     assert(ID != Intrinsic::not_intrinsic && "unknown intrinsic");
-
-//     switch (ID) {
-//     case Intrinsic::uadd_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_UADDO,
-//       *CurBuilder);
-//     case Intrinsic::sadd_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_SADDO,
-//       *CurBuilder);
-//     case Intrinsic::usub_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_USUBO,
-//       *CurBuilder);
-//     case Intrinsic::ssub_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_SSUBO,
-//       *CurBuilder);
-//     case Intrinsic::umul_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_UMULO,
-//       *CurBuilder);
-//     case Intrinsic::smul_with_overflow:
-//       return translateOverflowIntrinsic(CI, TargetOpcode::G_SMULO,
-//       *CurBuilder);
-//     default:
-//       return false;
-//     }
-//   }
-//   case Instruction::AtomicCmpXchg:
-//     return translateAtomicCmpXchg(Inst, *CurBuilder.get());
-//   default:
-//     return false;
-//   }
-// }
-
-// bool SPIRVIRTranslator::translateBitCast(const User &U,
-//                                          MachineIRBuilder &MIRBuilder) {
-//   // Maintain type info by always using G_BITCAST instead of just copying
-//   vreg return IRTranslator::translateCast(TargetOpcode::G_BITCAST, U,
-//   MIRBuilder);
-// }
-
-// ArrayRef<Register> SPIRVIRTranslator::getOrCreateVRegs(const Value &Val) {
-//   Type *Ty = Val.getType();
-
-//   // Ensure type definition appears before uses. This is especially important
-//   // for values like OpConstant which get hoisted alongside types later
-//   GR->getOrCreateSPIRVType(Ty, *EntryBuilder);
-//   const auto MRI = EntryBuilder->getMRI();
-
-//   ArrayRef<Register> ResVRegs;
-
-//   auto VRegsIt = VMap.findVRegs(Val);
-//   if (VRegsIt != VMap.vregs_end()) {
-//     ResVRegs = *VRegsIt->second;
-//   } else if (Ty->isVoidTy()) {
-//     ResVRegs = *VMap.getVRegs(Val);
-//   } else {
-//     assert(Ty->isSized() && "Cannot create unsized vreg");
-
-//     // Create entry for this type.
-//     auto *NewVRegs = VMap.getVRegs(Val);
-//     auto llt = getLLTForType(*Ty, *DL);
-//     Register vreg = MRI->createGenericVirtualRegister(llt);
-//     NewVRegs->push_back(vreg);
-
-//     if (auto C = dyn_cast<Constant>(&Val)) {
-//       bool success = translate(*C, vreg);
-//       assert(success && "Could not translate constant");
-//     }
-//     ResVRegs = *NewVRegs;
-//     assert(ResVRegs.size() == 1);
-
-//     // Add type and name metadata
-//     if (!GR->hasSPIRVTypeForVReg(ResVRegs[0])) {
-//       GR->assignTypeToVReg(Ty, ResVRegs[0], *EntryBuilder);
-//       if (Val.hasName())
-//         buildOpName(ResVRegs[0], Val.getName(), *EntryBuilder);
-//     }
-//   }
-//   // Make sure there's always at least 1 placeholder offset to avoid crashes
-//   auto *Offsets = VMap.getOffsets(Val);
-//   if (Offsets->empty()) {
-//     Offsets->push_back(0);
-//   }
-//   return ResVRegs;
-// }
+namespace {
+class SPIRVPreLegalizer : public MachineFunctionPass {
+public:
+  static char ID;
+  SPIRVPreLegalizer() : MachineFunctionPass(ID) {
+    initializeSPIRVPreLegalizerPass(*PassRegistry::getPassRegistry());
+  }
+  bool runOnMachineFunction(MachineFunction &MF) override;
+};
+} // namespace
 
 static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   auto &MRI = MF.getRegInfo();
@@ -394,12 +188,12 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
 Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
                            SPIRVGlobalRegistry *GR, MachineIRBuilder &MIB,
                            MachineRegisterInfo &MRI) {
-  auto *Def = MRI.getVRegDef(Reg);
+  MachineInstr *Def = MRI.getVRegDef(Reg);
   assert((Ty || SpirvTy) && "Either LLVM or SPIRV type is expected.");
   MIB.setInsertPt(*Def->getParent(),
                   (Def->getNextNode() ? Def->getNextNode()->getIterator()
                                       : Def->getParent()->end()));
-  auto NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
+  Register NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
   if (auto *RC = MRI.getRegClassOrNull(Reg))
     MRI.setRegClass(NewReg, RC);
   SpirvTy = SpirvTy ? SpirvTy : GR->getOrCreateSPIRVType(Ty, MIB);
@@ -502,18 +296,95 @@ static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
     MI->eraseFromParent();
 }
 
-bool SPIRVIRTranslator::runOnMachineFunction(MachineFunction &MF) {
+static std::pair<Register, unsigned>
+createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
+               const SPIRVGlobalRegistry &GR) {
+  auto NewT = LLT::scalar(32);
+  auto SpvType = GR.getSPIRVTypeForVReg(ValReg);
+  assert(SpvType && "VReg is expected to have SPIRV type");
+  bool IsFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
+  bool IsVectorFloat =
+      SpvType->getOpcode() == SPIRV::OpTypeVector &&
+      GR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
+          SPIRV::OpTypeFloat;
+  IsFloat |= IsVectorFloat;
+  auto GetIdOp = IsFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
+  auto DstClass = IsFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
+  if (MRI.getType(ValReg).isPointer()) {
+    NewT = LLT::pointer(0, 32);
+    GetIdOp = SPIRV::GET_pID;
+    DstClass = &SPIRV::pIDRegClass;
+  } else if (MRI.getType(ValReg).isVector()) {
+    NewT = LLT::fixed_vector(2, NewT);
+    GetIdOp = IsFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
+    DstClass = IsFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
+  }
+  auto IdReg = MRI.createGenericVirtualRegister(NewT);
+  MRI.setRegClass(IdReg, DstClass);
+  return {IdReg, GetIdOp};
+}
+
+static void processInstr(MachineInstr &MI, MachineIRBuilder &MIB,
+                         MachineRegisterInfo &MRI, SPIRVGlobalRegistry *GR) {
+  auto Opc = MI.getOpcode();
+  assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
+  MachineInstr &AssignTypeInst =
+      *(MRI.use_instr_begin(MI.getOperand(0).getReg()));
+  auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *GR).first;
+  AssignTypeInst.getOperand(1).setReg(NewReg);
+  // MRI.setRegClass(AssignTypeInst.getOperand(0).getReg(),
+  // MRI.getRegClass(NewReg));
+  MI.getOperand(0).setReg(NewReg);
+  MIB.setInsertPt(*MI.getParent(),
+                  (MI.getNextNode() ? MI.getNextNode()->getIterator()
+                                    : MI.getParent()->end()));
+  for (auto &Op : MI.operands()) {
+    if (!Op.isReg() || Op.isDef())
+      continue;
+    // if (Ids.count(&Op) > 0) {
+    //   Op.setReg(Ids.at(&Op));
+    //   // NewI.addUse(Ids.at(&Op));
+    // } else {
+    auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *GR);
+    MIB.buildInstr(IdOpInfo.second).addDef(IdOpInfo.first).addUse(Op.getReg());
+    // Ids[&Op] = IdOpInfo.first;
+    Op.setReg(IdOpInfo.first);
+    // }
+  }
+}
+
+// Defined in SPIRVLegalizerInfo.cpp
+extern bool isTypeFoldingSupported(unsigned Opcode);
+
+static void processInstrsWithTypeFolding(MachineFunction &MF,
+                                         SPIRVGlobalRegistry *GR) {
+  MachineIRBuilder MIB(MF);
+  auto &MRI = MF.getRegInfo();
+  for (auto &MBB : MF)
+    for (auto &MI : MBB)
+      if (isTypeFoldingSupported(MI.getOpcode()))
+        processInstr(MI, MIB, MRI, GR);
+}
+
+bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-  GR = ST->getSPIRVGlobalRegistry();
-
+  SPIRVGlobalRegistry *GR = ST->getSPIRVGlobalRegistry();
   GR->setCurrentFunc(MF);
 
-  // Run the regular IRTranslator
-  bool Success = IRTranslator::runOnMachineFunction(MF);
   addConstantsToTrack(MF, GR);
   foldConstantsIntoIntrinsics(MF);
   generateAssignInstrs(MF, GR);
+  processInstrsWithTypeFolding(MF, GR);
 
-  return Success;
+  return true;
+}
+
+INITIALIZE_PASS(SPIRVPreLegalizer, DEBUG_TYPE, "SPIRV pre legalizer", false,
+                false)
+
+char SPIRVPreLegalizer::ID = 0;
+
+FunctionPass *llvm::createSPIRVPreLegalizerPass() {
+  return new SPIRVPreLegalizer();
 }
