@@ -13,13 +13,13 @@
 #include "SPIRVTargetMachine.h"
 #include "SPIRV.h"
 #include "SPIRVCallLowering.h"
-#include "SPIRVIRTranslator.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetObjectFile.h"
 #include "SPIRVTargetTransformInfo.h"
-#include "SPIRVGlobalRegistry.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
+#include "llvm/CodeGen/GlobalISel/IRTranslator.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
@@ -50,6 +50,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
   initializeSPIRVBlockLabelerPass(PR);
   initializeSPIRVGlobalTypesAndRegNumPass(PR);
   initializeSPIRVAddRequirementsPass(PR);
+  initializeSPIRVPreLegalizerPass(PR);
 }
 
 static std::string computeDataLayout(const Triple &TT) {
@@ -108,6 +109,7 @@ public:
   void addISelPrepare() override;
 
   bool addIRTranslator() override;
+  void addPreLegalizeMachineIR() override;
   bool addLegalizeMachineIR() override;
   bool addRegBankSelect() override;
   void addPreGlobalInstructionSelect() override;
@@ -184,11 +186,13 @@ void SPIRVPassConfig::addPreEmitPass2() {
   addPass(createSPIRVGlobalTypesAndRegNumPass(), false);
 }
 
-// Use a customized subclass of IRTranslator, which avoids flattening aggregates
-// and maintains type information (see SPIRVIRTranslator.cpp).
 bool SPIRVPassConfig::addIRTranslator() {
-  addPass(new SPIRVIRTranslator());
+  addPass(new IRTranslator(getOptLevel()));
   return false;
+}
+
+void SPIRVPassConfig::addPreLegalizeMachineIR() {
+  addPass(createSPIRVPreLegalizerPass());
 }
 
 // Use a default legalizer
@@ -218,9 +222,6 @@ class SPIRVInstructionSelect : public InstructionSelect {
   // Init a SPIRVGlobalRegistry before and reset it after the default
   // parent code.
   bool runOnMachineFunction(MachineFunction &MF) override {
-    //const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    //auto *GR = ST->getSPIRVGlobalRegistry();
-    //GR->setCurrentFunc(MF);
     auto &MRI = MF.getRegInfo();
 
     // we need to rewrite dst types for ASSIGN_TYPE instrs

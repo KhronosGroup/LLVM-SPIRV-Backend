@@ -150,8 +150,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
                     v4s32, v4s64,  v8s1,   v8s8,  v8s16, v8s32, v8s64, v16s1,
                     v16s8, v16s16, v16s32, v16s64};
 
+  // TODO: add legalization rules for all opcodes
   for (auto Opc : TypeFoldingSupportingOpcs)
-    getActionDefinitionsBuilder(Opc).custom();
+    getActionDefinitionsBuilder(Opc).alwaysLegal();
 
   getActionDefinitionsBuilder(G_GLOBAL_VALUE).alwaysLegal();
 
@@ -327,34 +328,6 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   verify(*ST.getInstrInfo());
 }
 
-static std::pair<Register, unsigned>
-createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
-               const SPIRVGlobalRegistry &GR) {
-  auto NewT = LLT::scalar(32);
-  auto SpvType = GR.getSPIRVTypeForVReg(ValReg);
-  assert(SpvType && "VReg is expected to have SPIRV type");
-  bool IsFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
-  bool IsVectorFloat =
-      SpvType->getOpcode() == SPIRV::OpTypeVector &&
-      GR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
-          SPIRV::OpTypeFloat;
-  IsFloat |= IsVectorFloat;
-  auto GetIdOp = IsFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
-  auto DstClass = IsFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
-  if (MRI.getType(ValReg).isPointer()) {
-    NewT = LLT::pointer(0, 32);
-    GetIdOp = SPIRV::GET_pID;
-    DstClass = &SPIRV::pIDRegClass;
-  } else if (MRI.getType(ValReg).isVector()) {
-    NewT = LLT::fixed_vector(2, NewT);
-    GetIdOp = IsFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
-    DstClass = IsFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
-  }
-  auto IdReg = MRI.createGenericVirtualRegister(NewT);
-  MRI.setRegClass(IdReg, DstClass);
-  return {IdReg, GetIdOp};
-}
-
 static Register convertPtrToInt(Register Reg, LLT ConvTy, SPIRVType *SpirvType,
                                 LegalizerHelper &Helper,
                                 MachineRegisterInfo &MRI,
@@ -371,49 +344,23 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
                                         MachineInstr &MI) const {
   auto Opc = MI.getOpcode();
   MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
-  if (!isTypeFoldingSupported(Opc)) {
-    assert(Opc == TargetOpcode::G_ICMP);
-    assert(GR->getSPIRVTypeForVReg(MI.getOperand(0).getReg()));
-    auto &Op0 = MI.getOperand(2);
-    auto &Op1 = MI.getOperand(3);
-    Register Reg0 = Op0.getReg();
-    Register Reg1 = Op1.getReg();
-    CmpInst::Predicate Cond =
-        static_cast<CmpInst::Predicate>(MI.getOperand(1).getPredicate());
-    if ((!ST->canDirectlyComparePointers() ||
-         (Cond != CmpInst::ICMP_EQ && Cond != CmpInst::ICMP_NE)) &&
-        MRI.getType(Reg0).isPointer() && MRI.getType(Reg1).isPointer()) {
-      LLT ConvT = LLT::scalar(ST->getPointerSize());
-      Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
-                                      ST->getPointerSize());
-      SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
-      Op0.setReg(convertPtrToInt(Reg0, ConvT, SpirvTy, Helper, MRI, GR));
-      Op1.setReg(convertPtrToInt(Reg1, ConvT, SpirvTy, Helper, MRI, GR));
-    }
-    return true;
-  }
-  assert(MI.getNumDefs() > 0 && MRI.hasOneUse(MI.getOperand(0).getReg()));
-  MachineInstr &AssignTypeInst =
-      *(MRI.use_instr_begin(MI.getOperand(0).getReg()));
-  auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *GR).first;
-  AssignTypeInst.getOperand(1).setReg(NewReg);
-  // MRI.setRegClass(AssignTypeInst.getOperand(0).getReg(),
-  // MRI.getRegClass(NewReg));
-  MI.getOperand(0).setReg(NewReg);
-  for (auto &Op : MI.operands()) {
-    if (!Op.isReg() || Op.isDef())
-      continue;
-    // if (Ids.count(&Op) > 0) {
-    //   Op.setReg(Ids.at(&Op));
-    //   // NewI.addUse(Ids.at(&Op));
-    // } else {
-    auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *GR);
-    Helper.MIRBuilder.buildInstr(IdOpInfo.second)
-        .addDef(IdOpInfo.first)
-        .addUse(Op.getReg());
-    // Ids[&Op] = IdOpInfo.first;
-    Op.setReg(IdOpInfo.first);
-    // }
+  assert(Opc == TargetOpcode::G_ICMP);
+  assert(GR->getSPIRVTypeForVReg(MI.getOperand(0).getReg()));
+  auto &Op0 = MI.getOperand(2);
+  auto &Op1 = MI.getOperand(3);
+  Register Reg0 = Op0.getReg();
+  Register Reg1 = Op1.getReg();
+  CmpInst::Predicate Cond =
+      static_cast<CmpInst::Predicate>(MI.getOperand(1).getPredicate());
+  if ((!ST->canDirectlyComparePointers() ||
+       (Cond != CmpInst::ICMP_EQ && Cond != CmpInst::ICMP_NE)) &&
+      MRI.getType(Reg0).isPointer() && MRI.getType(Reg1).isPointer()) {
+    LLT ConvT = LLT::scalar(ST->getPointerSize());
+    Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
+                                    ST->getPointerSize());
+    SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+    Op0.setReg(convertPtrToInt(Reg0, ConvT, SpirvTy, Helper, MRI, GR));
+    Op1.setReg(convertPtrToInt(Reg1, ConvT, SpirvTy, Helper, MRI, GR));
   }
   return true;
 }
