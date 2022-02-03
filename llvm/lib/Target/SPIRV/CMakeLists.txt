@@ -28,13 +28,13 @@ add_llvm_target(SPIRVCodeGen
   SPIRVGlobalTypesAndRegNumPass.cpp
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp
-  SPIRVIRTranslator.cpp
   SPIRVISelLowering.cpp
   SPIRVLegalizerInfo.cpp
   SPIRVLowerConstExpr.cpp
   SPIRVMCInstLower.cpp
   SPIRVOCLRegularizer.cpp
   SPIRVOpenCLBIFs.cpp
+  SPIRVPreLegalizer.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
   SPIRVSubtarget.cpp
