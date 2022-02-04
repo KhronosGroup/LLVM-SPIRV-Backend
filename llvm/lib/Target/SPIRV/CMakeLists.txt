@@ -16,7 +16,6 @@ add_llvm_target(SPIRVCodeGen
   SPIRVAddRequirementsPass.cpp
   SPIRVAsmPrinter.cpp
   SPIRVBasicBlockDominance.cpp
-  SPIRVBlockLabeler.cpp
   SPIRVCallLowering.cpp
   SPIRVCapabilityUtils.cpp
   SPIRVDuplicatesTracker.cpp

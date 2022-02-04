@@ -603,6 +603,7 @@ static void numberRegistersGlobally(Module &M, MachineModuleInfo &MMI,
   for (MachineBasicBlock &MBB : *MF)
     numberRegistersInMBB(MBB, RegBaseIndex, MF->getRegInfo(), GR);
   END_FOR_MF_IN_MODULE()
+  GR->setMaxID(RegBaseIndex);
 }
 
 using FuncNameToIDMap = std::map<std::string, Register>;
