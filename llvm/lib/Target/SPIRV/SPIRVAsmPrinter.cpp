@@ -85,9 +85,9 @@ void SPIRVAsmPrinter::emitFunctionBodyEnd() {
   if (MF == GR->getMetaMF())
     return;
 
-  MCInst LabelInst;
-  LabelInst.setOpcode(SPIRV::OpFunctionEnd);
-  EmitToStreamer(*OutStreamer, LabelInst);
+  MCInst FunctionEndInst;
+  FunctionEndInst.setOpcode(SPIRV::OpFunctionEnd);
+  EmitToStreamer(*OutStreamer, FunctionEndInst);
 
   BBNumToRegMap.clear();
 }
@@ -185,6 +185,7 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   MCInstLowering.Lower(MI, TmpInst, GR);
   EmitToStreamer(*OutStreamer, TmpInst);
 
+  // Output OpLabel after OpFunction and OpFunctionParameter in the first MMB.
   if (MF == GR->getMetaMF())
     return;
 

@@ -323,6 +323,7 @@ static void hoistGlobalOpsFunction(SPIRVGlobalRegistry *GR) {
         Reg = ToHoist->getOperand(0).getReg();
       }
     }
+    // TODO: perhaps we need to move this to emitting stage.
     buildInstrInCurrentMetaMBB(SPIRV::OpFunctionEnd);
   }
 }

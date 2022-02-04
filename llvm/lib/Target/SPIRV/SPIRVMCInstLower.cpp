@@ -19,6 +19,7 @@
 
 using namespace llvm;
 
+// Defined in SPIRVAsmPrinter.cpp
 extern Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
                                        SPIRVGlobalRegistry *GR);
 
