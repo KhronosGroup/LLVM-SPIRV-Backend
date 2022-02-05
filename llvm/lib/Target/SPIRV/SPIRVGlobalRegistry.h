@@ -18,6 +18,7 @@
 
 #include "SPIRVDuplicatesTracker.h"
 #include "SPIRVEnums.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace AQ = AccessQualifier;
@@ -34,8 +35,10 @@ class SPIRVGlobalRegistry {
   // type-declaring ones)
   DenseMap<MachineFunction *, DenseMap<Register, SPIRVType *>> VRegToTypeMap;
 
+public:
   SPIRVGeneralDuplicatesTracker DT;
 
+private:
   DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
   using SPIRVInstrGroup = DenseMap<MachineFunction *, const MachineInstr *>;
@@ -139,7 +142,7 @@ public:
   }
 
   template <typename T>
-  const MapVector<const T *, MapVector<MachineFunction *, Register>> &
+  const DenseMap<const T *, DTSortableEntry> &
   getAllUses() {
     return DT.get<T>()->getAllUses();
   }

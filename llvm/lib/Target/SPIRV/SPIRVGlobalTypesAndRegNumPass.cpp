@@ -43,6 +43,7 @@ struct SPIRVGlobalTypesAndRegNum : public ModulePass {
     initializeSPIRVGlobalTypesAndRegNumPass(*PassRegistry::getPassRegistry());
   }
 
+  std::vector<DTSortableEntry*> DepsGraph;
 public:
   // Perform passes such as hoisting global instructions and numbering vregs.
   // See end of file for details
@@ -295,6 +296,37 @@ static void hoistGlobalOps(SPIRVGlobalRegistry *GR, MetaBlockType MBType) {
   }
 }
 
+// TODO: currently not able to deal with functions due to
+// the current approach to params hoisting
+static void hoistEverything(SPIRVGlobalRegistry *GR,
+                            std::vector<DTSortableEntry *> &DepsGraph,
+                            MetaBlockType MBType) {
+  setMetaBlock(MBType);
+  std::set<DTSortableEntry *> Visited;
+  for (auto *E : DepsGraph) {
+    std::function<void(DTSortableEntry *)> RecHoistUtil;
+    // NOTE: here we prefer recursive approach over iterative because
+    // we don't expect depchains long enough to cause SO
+    RecHoistUtil = [&Visited, &GR, &RecHoistUtil](DTSortableEntry *E) {
+      if (Visited.count(E) || E->IsFunc)
+        return;
+      Visited.insert(E);
+      for (auto *S : E->Deps)
+        RecHoistUtil(S);
+
+      for (auto &U : *E) {
+        auto *MF = U.first;
+        auto Reg = U.second;
+        // Some instructions may be deleted during global isel, so hoist only
+        // those that exist in current IR.
+        if (auto *MI = MF->getRegInfo().getVRegDef(Reg))
+          hoistGlobalOp(Reg, MF, GR);
+      }
+    };
+    RecHoistUtil(E);
+  }
+}
+
 // We need this specialization as for function decls we want to not only hoist
 // OpFunctions but OpFunctionParameters too.
 //
@@ -340,7 +372,9 @@ static void hoistGlobalOpsFunction(SPIRVGlobalRegistry *GR) {
 // allCaps lists instead of hoisting right now. This allows capabilities added
 // later, such as the Linkage capability for files with no OpEntryPoints, and
 // still get deduplicated before the global OpCapability instructions are added.
-static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
+static void hoistInstrsToMetablock(Module &M,
+                                   std::vector<DTSortableEntry *> &DepsGraph,
+                                   MachineModuleInfo &MMI,
                                    SPIRVGlobalRegistry *GR,
                                    SPIRVRequirementHandler &Reqs) {
   // OpTypes and OpConstants can have cross references so at first we create
@@ -351,8 +385,9 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
   fillLocalAliasTables<Constant>(GR, MB_TypeConstVars);
   fillLocalAliasTables<GlobalValue>(GR, MB_TypeConstVars);
 
-  hoistGlobalOps<Type>(GR, MB_TypeConstVars);
-  hoistGlobalOps<Constant>(GR, MB_TypeConstVars);
+  hoistEverything(GR, DepsGraph, MB_TypeConstVars);
+  // hoistGlobalOps<Type>(GR, MB_TypeConstVars);
+  // hoistGlobalOps<Constant>(GR, MB_TypeConstVars);
 
   BEGIN_FOR_MF_IN_MODULE_EXCEPT_FIRST(M, MMI)
   // Iterate through and hoist any instructions we can at this stage.
@@ -373,7 +408,7 @@ static void hoistInstrsToMetablock(Module &M, MachineModuleInfo &MMI,
   }
   END_FOR_MF_IN_MODULE()
 
-  hoistGlobalOps<GlobalValue>(GR, MB_TypeConstVars);
+  // hoistGlobalOps<GlobalValue>(GR, MB_TypeConstVars);
   fillLocalAliasTables<Function>(GR, MB_ExtFuncDecls);
   hoistGlobalOpsFunction(GR);
 }
@@ -750,6 +785,8 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
   SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
   GR->setMetaMF(getMetaMF());
 
+  GR->DT.buildDepsGraph(DepsGraph);
+
   SPIRVRequirementHandler Reqs;
 
   addHeaderOps(M, Reqs, ST);
@@ -758,7 +795,7 @@ bool SPIRVGlobalTypesAndRegNum::runOnModule(Module &M) {
 
   // Extract type instructions to the top MetaMBB and keep track of which local
   // VRegs the correspond to with functionLocalAliasTables
-  hoistInstrsToMetablock(M, MMIWrapper.getMMI(), GR, Reqs);
+  hoistInstrsToMetablock(M, DepsGraph, MMIWrapper.getMMI(), GR, Reqs);
 
   // Number registers from 0 onwards, and fix references to global OpType etc
   numberRegistersGlobally(M, MMIWrapper.getMMI(), GR);

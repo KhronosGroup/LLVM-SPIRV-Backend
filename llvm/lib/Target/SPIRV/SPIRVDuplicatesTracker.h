@@ -17,28 +17,33 @@
 #include "SPIRVEnums.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
-
-#include <map>
 
 namespace llvm {
 
+struct DTSortableEntry : public DenseMap<MachineFunction *, Register> {
+  std::vector<DTSortableEntry *> Deps;
+  // NOTE: temporary flag since common hoisting utility doesn't support
+  // function because their hoisting require hoisting of params as well
+  bool IsFunc = false;
+};
+
 template <typename T> class SPIRVDuplicatesTracker {
+
   using StorageKeyTy = const T *;
-  using StorageValueTy = Register;
   // TODO: consider replacing MapVector with DenseMap which
   // requires topological sorting of the storage contents
   // (e.g. to handle dependencies of const composites to its
   // elements)
   // Currently we rely on the order of insertion to be correct
   using StorageTy =
-      MapVector<StorageKeyTy, MapVector<MachineFunction *, StorageValueTy>>;
+      DenseMap<StorageKeyTy, DTSortableEntry>;
 
-protected:
   StorageTy Storage;
 
 public:
   SPIRVDuplicatesTracker() {}
+
+  friend class SPIRVGeneralDuplicatesTracker;
 
   void add(const T *V, MachineFunction *MF, Register R) {
     Register OldReg;
@@ -47,6 +52,8 @@ public:
       return;
     }
     Storage[V][MF] = R;
+    if (std::is_same<Function, T>())
+      Storage[V].IsFunc = true;
   }
 
   bool find(const T *V, MachineFunction *MF, Register& R) {
@@ -63,6 +70,9 @@ public:
   }
 
   const StorageTy &getAllUses() const { return Storage; }
+
+private:
+  StorageTy &getAllUses() { return Storage; }
 };
 
 using SPIRVTypeTracker = SPIRVDuplicatesTracker<Type>;
@@ -76,8 +86,61 @@ class SPIRVGeneralDuplicatesTracker {
   SPIRVGlobalValueTracker GT;
   SPIRVFuncDeclsTracker FT;
 
+  // NOTE: using MOs instead of regs to get rid of MF dependency
+  // to be able to use flat data structure
+  using Reg2EntryTy = DenseMap<MachineOperand*, DTSortableEntry*>;
+
+private:
+  template <typename T>
+  void prebuildReg2Entry(SPIRVDuplicatesTracker<T> &DT,
+                         Reg2EntryTy &Reg2Entry) {
+    for (auto &TPair : DT.getAllUses()) {
+      for (auto &RegPair : TPair.second) {
+        auto *MF = RegPair.first;
+        auto R = RegPair.second;
+        auto *MI = MF->getRegInfo().getVRegDef(R);
+        if (!MI)
+          continue;
+
+        Reg2Entry[&MI->getOperand(0)] = &TPair.second;
+      }
+    }
+  }
+
 public:
-  void add(const Type *T, MachineFunction *MF, Register R) { TT.add(T, MF, R); }
+  void buildDepsGraph(std::vector<DTSortableEntry *> &Graph) {
+    Reg2EntryTy Reg2Entry;
+    prebuildReg2Entry(TT, Reg2Entry);
+    prebuildReg2Entry(CT, Reg2Entry);
+    prebuildReg2Entry(GT, Reg2Entry);
+    prebuildReg2Entry(FT, Reg2Entry);
+
+    for (auto &Op2E: Reg2Entry) {
+      auto *E = Op2E.second;
+      Graph.push_back(E);
+      for (auto &U : *E) {
+        auto *MF = U.first;
+        auto R = U.second;
+
+        auto *MI = MF->getRegInfo().getVRegDef(R);
+        if (!MI)
+          continue;
+        assert(MI && MI->getParent() && "No MachineInstr created yet");
+        for (auto i = MI->getNumDefs(); i < MI->getNumOperands(); i++) {
+          auto Op = MI->getOperand(i);
+          if (!Op.isReg())
+            continue;
+          auto &RegOp = MF->getRegInfo().getVRegDef(Op.getReg())->getOperand(0);
+          assert(Reg2Entry.count(&RegOp));
+          E->Deps.push_back(Reg2Entry[&RegOp]);
+        }
+      }
+    }
+  }
+
+  void add(const Type *T, MachineFunction *MF, Register R) {
+    TT.add(T, MF, R);
+  }
 
   void add(const Constant *C, MachineFunction *MF, Register R) {
     CT.add(C, MF, R);
