@@ -19,6 +19,10 @@
 
 using namespace llvm;
 
+// Defined in SPIRVAsmPrinter.cpp
+extern Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
+                                       SPIRVGlobalRegistry *GR);
+
 void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
                              SPIRVGlobalRegistry *GR) const {
   OutMI.setOpcode(MI->getOpcode());
@@ -32,6 +36,9 @@ void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
     default:
       MI->print(errs());
       llvm_unreachable("unknown operand type");
+    case MachineOperand::MO_MachineBasicBlock:
+      MCOp = MCOperand::createReg(getOrCreateMBBRegister(*MO.getMBB(), GR));
+      break;
     case MachineOperand::MO_Register: {
       Register NewReg = GR->getRegisterAlias(MF, MO.getReg());
       bool IsOldReg = IsMetaFunc || !NewReg.isValid();

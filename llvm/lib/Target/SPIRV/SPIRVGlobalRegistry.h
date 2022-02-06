@@ -86,6 +86,9 @@ class SPIRVGlobalRegistry {
   // but will not be finally emitted.
   DenseSet<MachineInstr *> InstrsToDelete;
 
+  // The counter holds the maximum ID we have in the module.
+  unsigned MaxID;
+
 public:
   void setMetaMF(const MachineFunction *MF) { MetaMF = MF; }
   const MachineFunction *getMetaMF() { return MetaMF; }
@@ -199,6 +202,10 @@ public:
     assert(SpirvType && "Attempting to get type id for nullptr type.");
     return SpirvType->defs().begin()->getReg();
   }
+
+  unsigned getMaxID() { return MaxID; }
+  unsigned getNextID() { return MaxID++; }
+  void setMaxID(unsigned N) { MaxID = N; }
 
   void setCurrentFunc(MachineFunction &MF) { CurMF = &MF; }
 

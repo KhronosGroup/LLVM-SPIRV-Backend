@@ -28,9 +28,7 @@ namespace {
 class SPIRVBasicBlockDominance : public FunctionPass {
 public:
   static char ID;
-  SPIRVBasicBlockDominance() : FunctionPass(ID) {
-    initializeSPIRVBlockLabelerPass(*PassRegistry::getPassRegistry());
-  }
+  SPIRVBasicBlockDominance() : FunctionPass(ID) {}
   bool runOnFunction(Function &F) override;
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();

@@ -17,6 +17,7 @@
 #include "SPIRVMCInstLower.h"
 #include "SPIRVTargetMachine.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -39,8 +40,14 @@ class SPIRVAsmPrinter : public AsmPrinter {
 public:
   explicit SPIRVAsmPrinter(TargetMachine &TM,
                            std::unique_ptr<MCStreamer> Streamer)
-      : AsmPrinter(TM, std::move(Streamer)) {}
-
+      : AsmPrinter(TM, std::move(Streamer)) {
+    const auto *ST =
+        static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
+    GR = ST->getSPIRVGlobalRegistry();
+    TII = ST->getInstrInfo();
+  }
+  SPIRVGlobalRegistry *GR;
+  const SPIRVInstrInfo *TII;
   StringRef getPassName() const override { return "SPIRV Assembly Printer"; }
   void printOperand(const MachineInstr *MI, int OpNum, raw_ostream &O);
 
@@ -52,9 +59,11 @@ public:
   void emitFunctionEntryLabel() override {}
   void emitFunctionHeader() override;
   void emitFunctionBodyStart() override {}
-  void emitBasicBlockStart(const MachineBasicBlock &MBB) override {}
+  void emitFunctionBodyEnd() override;
+  void emitBasicBlockStart(const MachineBasicBlock &MBB) override;
   void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
   void emitGlobalVariable(const GlobalVariable *GV) override {}
+  void emitOpLabel(const MachineBasicBlock &MBB);
 };
 } // namespace
 
@@ -68,6 +77,58 @@ void SPIRVAsmPrinter::emitFunctionHeader() {
 
   auto Section = getObjFileLowering().SectionForGlobal(&F, TM);
   MF->setSection(Section);
+}
+
+// The table maps MMB number to SPIR-V unique ID register.
+static DenseMap<int, Register> BBNumToRegMap;
+
+// Emit OpFunctionEnd at the end of MF and clear BBNumToRegMap.
+void SPIRVAsmPrinter::emitFunctionBodyEnd() {
+  if (MF == GR->getMetaMF())
+    return;
+
+  MCInst FunctionEndInst;
+  FunctionEndInst.setOpcode(SPIRV::OpFunctionEnd);
+  EmitToStreamer(*OutStreamer, FunctionEndInst);
+
+  BBNumToRegMap.clear();
+}
+
+static bool hasMBBRegister(const MachineBasicBlock &MBB) {
+  return BBNumToRegMap.find(MBB.getNumber()) != BBNumToRegMap.end();
+}
+
+// Convert MBB's number to correspnding ID register.
+Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
+                                SPIRVGlobalRegistry *GR) {
+  auto f = BBNumToRegMap.find(MBB.getNumber());
+  if (f != BBNumToRegMap.end())
+    return f->second;
+  Register NewReg = Register::index2VirtReg(GR->getNextID());
+  BBNumToRegMap[MBB.getNumber()] = NewReg;
+  return NewReg;
+}
+
+void SPIRVAsmPrinter::emitOpLabel(const MachineBasicBlock &MBB) {
+  MCInst LabelInst;
+  LabelInst.setOpcode(SPIRV::OpLabel);
+  LabelInst.addOperand(MCOperand::createReg(getOrCreateMBBRegister(MBB, GR)));
+  EmitToStreamer(*OutStreamer, LabelInst);
+}
+
+void SPIRVAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
+  if (MF == GR->getMetaMF())
+    return;
+
+  // If it's the first MBB in MF, it has OpFunction and OpFunctionParameter, so
+  // OpLabel should be output after them.
+  if (MBB.getNumber() == MF->front().getNumber()) {
+    for (const MachineInstr &MI : MBB)
+      if (MI.getOpcode() == SPIRV::OpFunction)
+        return;
+    llvm_unreachable("OpFunction is expected in the front MBB of MF");
+  }
+  emitOpLabel(MBB);
 }
 
 void SPIRVAsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
@@ -121,18 +182,31 @@ bool SPIRVAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   return false;
 }
 
-void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
-  const auto *MF = MI->getMF();
-  const auto &ST = static_cast<const SPIRVSubtarget &>(MF->getSubtarget());
-  SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
+static bool isFuncOrHeaderInstr(const MachineInstr *MI,
+                                const SPIRVInstrInfo *TII) {
+  return TII->isHeaderInstr(*MI) || MI->getOpcode() == SPIRV::OpFunction ||
+         MI->getOpcode() == SPIRV::OpFunctionParameter;
+}
 
-  if (GR->getSkipEmission(MI))
+void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
+  if (!GR->getSkipEmission(MI)) {
+    SPIRVMCInstLower MCInstLowering;
+    MCInst TmpInst;
+    MCInstLowering.Lower(MI, TmpInst, GR);
+    EmitToStreamer(*OutStreamer, TmpInst);
+  }
+
+  // Output OpLabel after OpFunction and OpFunctionParameter in the first MMB.
+  if (MF == GR->getMetaMF())
     return;
 
-  SPIRVMCInstLower MCInstLowering;
-  MCInst TmpInst;
-  MCInstLowering.Lower(MI, TmpInst, GR);
-  EmitToStreamer(*OutStreamer, TmpInst);
+  const MachineInstr *NextMI = MI->getNextNode();
+  if (!hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
+      (!NextMI || !isFuncOrHeaderInstr(NextMI, TII))) {
+    assert(MI->getParent()->getNumber() == MF->front().getNumber() &&
+           "OpFunction is not in the front MBB of MF");
+    emitOpLabel(*MI->getParent());
+  }
 }
 
 // Force static initialization.

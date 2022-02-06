@@ -323,6 +323,7 @@ static void hoistGlobalOpsFunction(SPIRVGlobalRegistry *GR) {
         Reg = ToHoist->getOperand(0).getReg();
       }
     }
+    // TODO: perhaps we need to move this to emitting stage.
     buildInstrInCurrentMetaMBB(SPIRV::OpFunctionEnd);
   }
 }
@@ -603,6 +604,7 @@ static void numberRegistersGlobally(Module &M, MachineModuleInfo &MMI,
   for (MachineBasicBlock &MBB : *MF)
     numberRegistersInMBB(MBB, RegBaseIndex, MF->getRegInfo(), GR);
   END_FOR_MF_IN_MODULE()
+  GR->setMaxID(RegBaseIndex);
 }
 
 using FuncNameToIDMap = std::map<std::string, Register>;
