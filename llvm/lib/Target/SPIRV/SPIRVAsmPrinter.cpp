@@ -44,8 +44,10 @@ public:
     const auto *ST =
         static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
     GR = ST->getSPIRVGlobalRegistry();
+    TII = ST->getInstrInfo();
   }
   SPIRVGlobalRegistry *GR;
+  const SPIRVInstrInfo *TII;
   StringRef getPassName() const override { return "SPIRV Assembly Printer"; }
   void printOperand(const MachineInstr *MI, int OpNum, raw_ostream &O);
 
@@ -90,6 +92,10 @@ void SPIRVAsmPrinter::emitFunctionBodyEnd() {
   EmitToStreamer(*OutStreamer, FunctionEndInst);
 
   BBNumToRegMap.clear();
+}
+
+static bool hasMBBRegister(const MachineBasicBlock &MBB) {
+  return BBNumToRegMap.find(MBB.getNumber()) != BBNumToRegMap.end();
 }
 
 // Convert MBB's number to correspnding ID register.
@@ -176,23 +182,27 @@ bool SPIRVAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   return false;
 }
 
-void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
-  if (GR->getSkipEmission(MI))
-    return;
+static bool isFuncOrHeaderInstr(const MachineInstr *MI,
+                                const SPIRVInstrInfo *TII) {
+  return TII->isHeaderInstr(*MI) || MI->getOpcode() == SPIRV::OpFunction ||
+         MI->getOpcode() == SPIRV::OpFunctionParameter;
+}
 
-  SPIRVMCInstLower MCInstLowering;
-  MCInst TmpInst;
-  MCInstLowering.Lower(MI, TmpInst, GR);
-  EmitToStreamer(*OutStreamer, TmpInst);
+void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
+  if (!GR->getSkipEmission(MI)) {
+    SPIRVMCInstLower MCInstLowering;
+    MCInst TmpInst;
+    MCInstLowering.Lower(MI, TmpInst, GR);
+    EmitToStreamer(*OutStreamer, TmpInst);
+  }
 
   // Output OpLabel after OpFunction and OpFunctionParameter in the first MMB.
   if (MF == GR->getMetaMF())
     return;
 
   const MachineInstr *NextMI = MI->getNextNode();
-  if ((MI->getOpcode() == SPIRV::OpFunction ||
-       MI->getOpcode() == SPIRV::OpFunctionParameter) &&
-      (!NextMI || NextMI->getOpcode() != SPIRV::OpFunctionParameter)) {
+  if (!hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
+      (!NextMI || !isFuncOrHeaderInstr(NextMI, TII))) {
     assert(MI->getParent()->getNumber() == MF->front().getNumber() &&
            "OpFunction is not in the front MBB of MF");
     emitOpLabel(*MI->getParent());
