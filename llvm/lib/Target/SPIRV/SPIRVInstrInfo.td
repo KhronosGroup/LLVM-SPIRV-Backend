@@ -222,7 +222,7 @@ def ConstPseudoNull: IntImmLeaf<i64, [{ return Imm.isNullValue(); }]>;
 multiclass IntFPImm<bits<16> opCode, string name> {
   def I: Op<opCode, (outs ID:$dst), (ins TYPE:$type, ID:$src, variable_ops),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstI:$src, TYPE:$type))]>;
-  def F: Op<opCode, (outs ID:$dst), (ins TYPE:$type, fID:$src),
+  def F: Op<opCode, (outs ID:$dst), (ins TYPE:$type, fID:$src, variable_ops),
                   "$dst = "#name#" $type $src", [(set ID:$dst, (assigntype PseudoConstF:$src, TYPE:$type))]>;
 }
 

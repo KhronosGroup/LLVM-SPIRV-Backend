@@ -173,8 +173,12 @@ Register SPIRVGlobalRegistry::buildConstantIntVector(
 Register SPIRVGlobalRegistry::buildConstantSampler(
     Register ResReg, unsigned int AddrMode, unsigned int Param,
     unsigned int FilerMode, MachineIRBuilder &MIRBuilder, SPIRVType *SpvType) {
-  SPIRVType *SampTy =
-      getOrCreateSPIRVType(getTypeForSPIRVType(SpvType), MIRBuilder);
+  SPIRVType *SampTy;
+  if (SpvType)
+    SampTy = getOrCreateSPIRVType(getTypeForSPIRVType(SpvType), MIRBuilder);
+  else
+    SampTy = getOrCreateSPIRVTypeByName("opencl.sampler_t", MIRBuilder);
+
   auto Sampler =
       ResReg.isValid()
           ? ResReg
@@ -670,6 +674,8 @@ SPIRVGlobalRegistry::getOrCreateSPIRVTypeByName(StringRef TypeStr,
   } else if (TypeStr.startswith("half")) {
     Type = Type::getHalfTy(Ctx);
     TypeStr = TypeStr.substr(strlen("half"));
+  } else if (TypeStr.startswith("opencl.sampler_t")) {
+    Type = StructType::create(Ctx, "opencl.sampler_t");
   } else
     llvm_unreachable("Unable to recognize SPIRV type name.");
   if (TypeStr.startswith(" vector[")) {

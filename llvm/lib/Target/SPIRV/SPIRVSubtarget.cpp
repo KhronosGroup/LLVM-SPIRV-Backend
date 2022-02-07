@@ -162,7 +162,7 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
   } else {
     // Add the min requirements for different OpenCL and SPIR-V versions
     addCaps(AvailableCaps, {Addresses, Float16Buffer, Int16, Int8, Kernel,
-                            Linkage, Vector16, Groups});
+                            Linkage, Vector16, Groups, GenericPointer, Shader});
     if (OpenCLFullProfile) {
       addCaps(AvailableCaps, {Int64, Int64Atomics});
     }
