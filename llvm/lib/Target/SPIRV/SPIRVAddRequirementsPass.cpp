@@ -238,6 +238,7 @@ void addInstrRequirements(const MachineInstr &MI,
     }
     break;
   }
+  case SPIRV::OpBitReverse:
   case SPIRV::OpTypeRuntimeArray:
     reqs.addCapability(Shader);
     break;

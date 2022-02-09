@@ -71,13 +71,10 @@ void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB, bool IsFloat) {
     MIB.addImm(Imm.getZExtValue());
     break;
   case 64: {
-    if (!IsFloat) {
-      uint64_t FullImm = Imm.getZExtValue();
-      uint32_t LowBits = FullImm & 0xffffffff;
-      uint32_t HighBits = (FullImm >> 32) & 0xffffffff;
-      MIB.addImm(LowBits).addImm(HighBits);
-    } else
-      MIB.addImm(Imm.getZExtValue());
+    uint64_t FullImm = Imm.getZExtValue();
+    uint32_t LowBits = FullImm & 0xffffffff;
+    uint32_t HighBits = (FullImm >> 32) & 0xffffffff;
+    MIB.addImm(LowBits).addImm(HighBits);
     break;
   }
   default:

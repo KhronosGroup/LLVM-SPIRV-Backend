@@ -156,8 +156,8 @@ static void addHeaderOps(Module &M, SPIRVRequirementHandler &Reqs,
     unsigned MinorNum = getMetadataUInt(VersionMD, 1);
     unsigned RevNum = getMetadataUInt(VersionMD, 2);
     OpenCLVersion = 0 | (MajorNum << 16) | (MinorNum << 8) | RevNum;
-    setMetaBlock(MB_DebugSourceAndStrings);
   }
+  setMetaBlock(MB_DebugSourceAndStrings);
 
   // Build the OpSource
   auto SrcLang = SourceLanguage::OpenCL_C;

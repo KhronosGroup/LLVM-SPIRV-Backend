@@ -485,7 +485,7 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
   Register sampler = OrigArgs[1];
 
   if (!GR->isScalarOfType(OrigArgs[1], SPIRV::OpTypeSampler)) {
-    MachineInstr *samplerInstr = MRI->getVRegDef(sampler);
+    MachineInstr *samplerInstr = getDefInstrMaybeConstant(sampler, MRI);;
     if (samplerInstr->getOperand(1).isCImm()) {
       auto sampMask = getIConstVal(OrigArgs[1], MRI);
       Register res;
@@ -503,27 +503,33 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
                                      MIRBuilder);
   // OpImageSampleExplicitLod always returns 4-element vector.
   SPIRVType *tmpType = retType;
-  if (tmpType->getOpcode() != SPIRV::OpTypeVector)
+  bool NeedExtract = false;
+  if (tmpType->getOpcode() != SPIRV::OpTypeVector) {
     tmpType = GR->getOrCreateSPIRVVectorType(retType, 4, MIRBuilder);
+    NeedExtract = true;
+  }
   auto llt = LLT::scalar(GR->getScalarOrVectorBitWidth(tmpType));
   Register tmpReg = MRI->createGenericVirtualRegister(llt);
   GR->assignSPIRVTypeToVReg(tmpType, tmpReg, MIRBuilder);
 
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageSampleExplicitLod)
-                 .addDef(tmpReg)
+                 .addDef(NeedExtract ? tmpReg : resVReg)
                  .addUse(GR->getSPIRVTypeID(tmpType))
                  .addUse(sampledImage)
                  .addUse(coord)
                  .addImm(ImageOperand::Lod)
                  .addUse(lod);
-  constrainRegOperands(MIB);
+  bool Result = constrainRegOperands(MIB);
 
-  MIB = MIRBuilder.buildInstr(SPIRV::OpCompositeExtract)
+  if (NeedExtract) {
+    MIB = MIRBuilder.buildInstr(SPIRV::OpCompositeExtract)
                  .addDef(resVReg)
                  .addUse(GR->getSPIRVTypeID(retType))
                  .addUse(tmpReg)
                  .addImm(0);
-  return constrainRegOperands(MIB);
+    Result = constrainRegOperands(MIB);
+  }
+  return Result;
 }
 
 static bool genReadImageMSAA(MachineIRBuilder &MIRBuilder, Register resVReg,
