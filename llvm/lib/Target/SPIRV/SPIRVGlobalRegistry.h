@@ -160,7 +160,8 @@ public:
   // and map it to the given VReg by creating an ASSIGN_TYPE instruction.
   SPIRVType *assignTypeToVReg(const Type *Type, Register VReg,
                               MachineIRBuilder &MIRBuilder,
-                              AQ::AccessQualifier AccessQual = AQ::ReadWrite);
+                              AQ::AccessQualifier AccessQual = AQ::ReadWrite,
+                              bool EmitIR = true);
 
   // In cases where the SPIR-V type is already known, this function can be
   // used to map it to the given VReg via an ASSIGN_TYPE instruction.
@@ -302,7 +303,7 @@ public:
   Register buildConstantFP(APFloat Val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *SpvType = nullptr);
   Register buildConstantIntVector(uint64_t Val, MachineIRBuilder &MIRBuilder,
-                                  SPIRVType *SpvType);
+                                  SPIRVType *SpvType, bool EmitIR = true);
   Register buildConstantSampler(Register Res, unsigned int AddrMode,
                                 unsigned int Param, unsigned int FilerMode,
                                 MachineIRBuilder &MIRBuilder,

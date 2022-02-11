@@ -1142,30 +1142,21 @@ bool SPIRVInstructionSelector::selectFCmp(Register ResVReg,
 Register
 SPIRVInstructionSelector::buildZerosVal(const SPIRVType *ResType,
                                         MachineIRBuilder &MIRBuilder) const {
-  return buildI32Constant(0, MIRBuilder, ResType);
+  if (ResType->getOpcode() == SPIRV::OpTypeVector)
+    return GR.buildConstantIntVector(0, MIRBuilder, ResType, false);
+  return GR.buildConstantInt(0, MIRBuilder, ResType, false);
 }
 
 Register
 SPIRVInstructionSelector::buildOnesVal(bool AllOnes, const SPIRVType *ResType,
                                        MachineIRBuilder &MIRBuilder) const {
-  auto MRI = MIRBuilder.getMRI();
   unsigned BitWidth = GR.getScalarOrVectorBitWidth(ResType);
   APInt One = AllOnes ? APInt::getAllOnesValue(BitWidth)
                       : APInt::getOneBitSet(BitWidth, 0);
-  Register OneReg = buildI32Constant(One.getZExtValue(), MIRBuilder, ResType);
-  if (ResType->getOpcode() == SPIRV::OpTypeVector) {
-    const unsigned NumEles = ResType->getOperand(2).getImm();
-    Register OneVec = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantComposite)
-                   .addDef(OneVec)
-                   .addUse(GR.getSPIRVTypeID(ResType));
-    for (unsigned i = 0; i < NumEles; ++i) {
-      MIB.addUse(OneReg);
-    }
-    constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
-    return OneVec;
-  }
-  return OneReg;
+  if (ResType->getOpcode() == SPIRV::OpTypeVector)
+    return GR.buildConstantIntVector(One.getZExtValue(), MIRBuilder, ResType,
+                                     false);
+  return GR.buildConstantInt(One.getZExtValue(), MIRBuilder, ResType, false);
 }
 
 bool SPIRVInstructionSelector::selectSelect(
