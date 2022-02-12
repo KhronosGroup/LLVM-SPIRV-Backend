@@ -35,12 +35,12 @@
 ; SPV-DAG: %[[int_64:[0-9]+]] = OpTypeInt 64 0
 ; SPV-DAG: %[[zero_32:[0-9]+]] = OpConstant %[[int_32]] 0
 ; SPV-DAG: %[[one_32:[0-9]+]] = OpConstant %[[int_32]] 1
-; SPV-DAG: %[[zero_8:[0-9]+]] = OpConstant %[[int_8]] 0
+; SPV-DAG: %[[zero_8:[0-9]+]] = OpConstantNull %[[int_8]]
 ; SPV-DAG: %[[mone_8:[0-9]+]] = OpConstant %[[int_8]] 255
-; SPV-DAG: %[[zero_16:[0-9]+]] = OpConstant %[[int_16]] 0
+; SPV-DAG: %[[zero_16:[0-9]+]] = OpConstantNull %[[int_16]]
 ; SPV-DAG: %[[mone_16:[0-9]+]] = OpConstant %[[int_16]] 65535
 ; SPV-DAG: %[[mone_32:[0-9]+]] = OpConstant %[[int_32]] 4294967295
-; SPV-DAG: %[[zero_64:[0-9]+]] = OpConstant %[[int_64]] 0 0
+; SPV-DAG: %[[zero_64:[0-9]+]] = OpConstantNull %[[int_64]]
 ; SPV-DAG: %[[mone_64:[0-9]+]] = OpConstant %[[int_64]] 4294967295 4294967295
 ; SPV-DAG: %[[one_8:[0-9]+]] = OpConstant %[[int_8]] 1
 ; SPV-DAG: %[[one_16:[0-9]+]] = OpConstant %[[int_16]] 1
