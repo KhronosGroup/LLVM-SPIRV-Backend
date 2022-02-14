@@ -9,18 +9,24 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVMCINSTLOWER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMCINSTLOWER_H
 
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
 class MCInst;
 class MachineInstr;
+class MachineFunction;
 class SPIRVGlobalRegistry;
+class Register;
 
 // This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
 public:
   void Lower(const MachineInstr *MI, MCInst &OutMI,
-             SPIRVGlobalRegistry *GR) const;
+             SPIRVGlobalRegistry *GR, const MachineFunction *CurMF,
+             StringMap<Register> &FuncNameMap,
+             DenseMap<unsigned, Register> ExtInstSetMap) const;
 };
 } // namespace llvm
 

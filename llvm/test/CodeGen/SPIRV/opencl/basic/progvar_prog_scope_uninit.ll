@@ -2,10 +2,13 @@
 
 target triple = "spirv64-unknown-unknown"
 
-; CHECK: OpEntryPoint Kernel %[[f1:[0-9]+]] "global_check" %[[var:[0-9]+]]
-; CHECK: OpEntryPoint Kernel %[[f2:[0-9]+]] "writer" %[[var]]
-; CHECK: OpEntryPoint Kernel %[[f3:[0-9]+]] "reader" %[[var]]
-; CHECK: OpName %[[var]] "var"
+; CHECK: OpEntryPoint Kernel %[[f1:[0-9]+]] "global_check" %[[var0:[0-9]+]] %[[var1:[0-9]+]] %[[var2:[0-9]+]] %[[var3:[0-9]+]]
+; CHECK: OpEntryPoint Kernel %[[f2:[0-9]+]] "writer" %[[var0:[0-9]+]] %[[var1:[0-9]+]] %[[var2:[0-9]+]] %[[var3:[0-9]+]]
+; CHECK: OpEntryPoint Kernel %[[f3:[0-9]+]] "reader" %[[var0:[0-9]+]] %[[var1:[0-9]+]] %[[var2:[0-9]+]] %[[var3:[0-9]+]]
+; CHECK-DAG: OpName %[[var0]]
+; CHECK-DAG: OpName %[[var1]]
+; CHECK-DAG: OpName %[[var2]]
+; CHECK-DAG: OpName %[[var3]]
 @var = addrspace(1) global <2 x i8> zeroinitializer, align 2
 @g_var = addrspace(1) global <2 x i8> zeroinitializer, align 2
 @a_var = addrspace(1) global [2 x <2 x i8>] zeroinitializer, align 2

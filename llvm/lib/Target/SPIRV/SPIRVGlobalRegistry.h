@@ -69,8 +69,6 @@ class SPIRVGlobalRegistry {
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
 
-  const MachineFunction *MetaMF;
-
   // Maps a local register to the corresponding global aliases in meta-function.
   using LocalToGlobalRegTable = std::map<Register, Register>;
   using RegisterAliasMapTy =
@@ -90,9 +88,6 @@ class SPIRVGlobalRegistry {
   unsigned MaxID;
 
 public:
-  void setMetaMF(const MachineFunction *MF) { MetaMF = MF; }
-  const MachineFunction *getMetaMF() { return MetaMF; }
-
   void setRegisterAlias(const MachineFunction *MF, Register Reg,
                         Register AliasReg) {
     RegisterAliasTable[MF][Reg] = AliasReg;
