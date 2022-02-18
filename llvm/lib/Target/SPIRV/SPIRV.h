@@ -23,7 +23,6 @@ ModulePass *createSPIRVPreTranslationLegalizerPass(SPIRVTargetMachine *TM);
 FunctionPass *createSPIRVOCLRegularizerPass();
 FunctionPass *createSPIRVBasicBlockDominancePass();
 FunctionPass *createSPIRVAddRequirementsPass();
-ModulePass *createSPIRVGlobalTypesAndRegNumPass();
 ModulePass *createSPIRVLowerConstExprLegacyPass();
 MachineFunctionPass *createSPIRVGenerateDecorationsPass();
 FunctionPass *createSPIRVPreLegalizerPass();
@@ -35,7 +34,7 @@ createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
 
 void initializeSPIRVBasicBlockDominancePass(PassRegistry &);
 void initializeSPIRVAddRequirementsPass(PassRegistry &);
-void initializeSPIRVGlobalTypesAndRegNumPass(PassRegistry &);
+void initializeSPIRVModuleAnalysisPass(PassRegistry &);
 void initializeSPIRVGenerateDecorationsPass(PassRegistry &);
 void initializeSPIRVPreLegalizerPass(PassRegistry &);
 } // namespace llvm

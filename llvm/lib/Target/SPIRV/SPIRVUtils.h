@@ -24,6 +24,7 @@
 // Add the given string as a series of integer operand, inserting null
 // terminators and padding to make sure the operands all have 32-bit
 // little-endian words.
+void addStringImm(const llvm::StringRef &Str, llvm::MCInst &Inst);
 void addStringImm(const llvm::StringRef &Str, llvm::MachineInstrBuilder &MIB);
 void addStringImm(const llvm::StringRef &Str, llvm::IRBuilder<> &B,
                   std::vector<llvm::Value *> &Args);

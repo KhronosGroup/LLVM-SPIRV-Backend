@@ -13,7 +13,7 @@ target triple = "spirv64-unknown-unknown"
 ; CHECK: %[[func_ty:[0-9]+]] = OpTypeFunction %[[void_ty]] %[[iptr_ty]]
 ; CHECK: %[[int64_ty:[0-9]+]] = OpTypeInt 64 0
 ; CHECK: %[[vec_ty:[0-9]+]] = OpTypeVector %[[int64_ty]] 3
-; CHECK: %[[func2_ty:[0-9]+]] = OpTypeFunction %7
+; CHECK: %[[func2_ty:[0-9]+]] = OpTypeFunction %[[vec_ty]]
 ; TODO: add 64-bit constant defs
 ; CHECK: %[[f2_decl]] = OpFunction %[[vec_ty]] Pure %[[func2_ty]]
 ; CHECK: OpFunctionEnd
