@@ -96,8 +96,8 @@ struct ModuleAnalysisInfo {
     return RegisterAliasTable[MF][Reg];
   }
   bool hasRegisterAlias(const MachineFunction *MF, Register Reg) {
-    assert(RegisterAliasTable.find(MF) != RegisterAliasTable.end());
-    return RegisterAliasTable[MF].find(Reg) != RegisterAliasTable[MF].end();
+    return RegisterAliasTable.find(MF) != RegisterAliasTable.end() &&
+           RegisterAliasTable[MF].find(Reg) != RegisterAliasTable[MF].end();
   }
   unsigned getNextID() { return MaxID++; }
 };

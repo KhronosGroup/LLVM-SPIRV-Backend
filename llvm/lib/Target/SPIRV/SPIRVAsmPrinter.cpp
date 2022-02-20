@@ -76,6 +76,7 @@ public:
   void outputModuleSections();
 
   void emitInstruction(const MachineInstr *MI) override;
+  void emitFunctionEntryLabel() override {}
   void emitFunctionHeader() override;
   void emitFunctionBodyStart() override {}
   void emitFunctionBodyEnd() override;
@@ -88,7 +89,6 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
   ModuleAnalysisInfo *MAI;
-  SPIRVModuleAnalysis *MA;
 };
 } // namespace
 

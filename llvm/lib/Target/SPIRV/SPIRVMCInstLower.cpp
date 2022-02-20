@@ -14,7 +14,6 @@
 #include "SPIRVMCInstLower.h"
 #include "SPIRV.h"
 #include "SPIRVModuleAnalysis.h"
-#include "SPIRVSubtarget.h"
 #include "SPIRVUtils.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/IR/Constants.h"

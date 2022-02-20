@@ -9,15 +9,13 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVMCINSTLOWER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMCINSTLOWER_H
 
-#include "SPIRVModuleAnalysis.h"
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
 class MCInst;
 class MachineInstr;
 class MachineFunction;
-class SPIRVGlobalRegistry;
-class Register;
+class ModuleAnalysisInfo;
 
 // This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
