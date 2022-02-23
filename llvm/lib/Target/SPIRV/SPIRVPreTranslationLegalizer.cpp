@@ -435,6 +435,19 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       IEI->eraseFromParent();
       I = NewIEI;
       I->setName(InstName);
+    } else if (auto *BCI = dyn_cast<BitCastInst>(I)) {
+      auto *IntrFn = Intrinsic::getDeclaration(
+          F->getParent(), Intrinsic::spv_bitcast,
+          {BCI->getType(), BCI->getOperand(0)->getType()});
+      std::vector<Value *> Args;
+      for (auto &Op : BCI->operands())
+        Args.push_back(Op);
+      auto *NewBCI = B.CreateCall(IntrFn, {Args});
+      StringRef InstName = I->hasName() ? I->getName() : "";
+      BCI->replaceAllUsesWith(NewBCI);
+      BCI->eraseFromParent();
+      I = NewBCI;
+      I->setName(InstName);
     } else if (isa<AllocaInst>(I))
       TrackConstants = false;
 

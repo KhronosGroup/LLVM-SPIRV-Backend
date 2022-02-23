@@ -731,7 +731,7 @@ bool SPIRVInstructionSelector::selectMemOperation(
     addMemoryOperands(*I.memoperands_begin(), MIB);
   }
   bool Result = MIB.constrainAllUses(TII, TRI, RBI);
-  if (ResVReg != MIB->getOperand(0).getReg()) {
+  if (ResVReg.isValid() && ResVReg != MIB->getOperand(0).getReg()) {
     MIRBuilder.buildCopy(ResVReg, MIB->getOperand(0).getReg());
   }
   return Result;

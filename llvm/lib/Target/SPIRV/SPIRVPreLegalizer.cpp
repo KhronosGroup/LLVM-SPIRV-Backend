@@ -40,14 +40,20 @@ public:
 };
 } // namespace
 
+static bool isSpvIntrinsic(MachineInstr &MI, Intrinsic::ID IntrinsicID) {
+  if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+      MI.getIntrinsicID() == IntrinsicID)
+    return true;
+  return false;
+}
+
 static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   auto &MRI = MF.getRegInfo();
   DenseMap<MachineInstr *, Register> RegsAlreadyAddedToDT;
   std::vector<MachineInstr *> ToErase, ToEraseComposites;
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
-      if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-          MI.getIntrinsicID() == Intrinsic::spv_track_constant) {
+      if (isSpvIntrinsic(MI, Intrinsic::spv_track_constant)) {
         ToErase.push_back(&MI);
         auto *Const =
             cast<Constant>(cast<ConstantAsMetadata>(
@@ -76,10 +82,7 @@ static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
             // const_composite, it will be unused and should be removed too.
             assert(MI.getOperand(2).isReg() && "Reg operand is expected");
             MachineInstr *SrcMI = MRI.getVRegDef(MI.getOperand(2).getReg());
-            if (SrcMI &&
-                SrcMI->getOpcode() ==
-                    TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-                SrcMI->getIntrinsicID() == Intrinsic::spv_const_composite)
+            if (SrcMI && isSpvIntrinsic(*SrcMI, Intrinsic::spv_const_composite))
               ToEraseComposites.push_back(SrcMI);
           }
         }
@@ -126,6 +129,21 @@ static void foldConstantsIntoIntrinsics(MachineFunction &MF) {
       }
     }
   }
+  for (auto *MI : ToErase)
+    MI->eraseFromParent();
+}
+
+static void insertBitcasts(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
+  std::vector<MachineInstr *> ToErase;
+  MachineIRBuilder MIB(MF);
+  for (auto &MBB : MF)
+    for (auto &MI : MBB)
+      if (isSpvIntrinsic(MI, Intrinsic::spv_bitcast)) {
+        assert(MI.getOperand(2).isReg());
+        MIB.setInsertPt(*MI.getParent(), MI);
+        MIB.buildBitcast(MI.getOperand(0).getReg(), MI.getOperand(2).getReg());
+        ToErase.push_back(&MI);
+      }
   for (auto *MI : ToErase)
     MI->eraseFromParent();
 }
@@ -224,9 +242,7 @@ static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
          !ReachedBegin;) {
       MachineInstr &MI = *MII;
 
-      if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-          MI.getOperand(0).isIntrinsicID() &&
-          MI.getOperand(0).getIntrinsicID() == Intrinsic::spv_assign_type) {
+      if (isSpvIntrinsic(MI, Intrinsic::spv_assign_type)) {
         auto Reg = MI.getOperand(1).getReg();
         auto *Ty =
             cast<ValueAsMetadata>(MI.getOperand(2).getMetadata()->getOperand(0))
@@ -246,15 +262,12 @@ static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
         // %rctmp = G_CONSTANT ty Val
         // %rc = ASSIGN_TYPE %rctmp, %cty
         auto Reg = MI.getOperand(0).getReg();
-        if (MRI.hasOneUse(Reg) &&
-            MRI.use_instr_begin(Reg)->getOpcode() ==
-                TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-            (MRI.use_instr_begin(Reg)->getIntrinsicID() ==
-                 Intrinsic::spv_assign_type ||
-             MRI.use_instr_begin(Reg)->getIntrinsicID() ==
-                 Intrinsic::spv_assign_name))
-          continue;
-
+        if (MRI.hasOneUse(Reg)) {
+          MachineInstr &UseMI = *MRI.use_instr_begin(Reg);
+          if (isSpvIntrinsic(UseMI, Intrinsic::spv_assign_type) ||
+              isSpvIntrinsic(UseMI, Intrinsic::spv_assign_name))
+            continue;
+        }
         auto &MRI = MF.getRegInfo();
         Type *Ty = nullptr;
         if (MI.getOpcode() == TargetOpcode::G_CONSTANT)
@@ -371,9 +384,9 @@ bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
   SPIRVGlobalRegistry *GR = ST->getSPIRVGlobalRegistry();
   GR->setCurrentFunc(MF);
-
   addConstantsToTrack(MF, GR);
   foldConstantsIntoIntrinsics(MF);
+  insertBitcasts(MF, GR);
   generateAssignInstrs(MF, GR);
   processInstrsWithTypeFolding(MF, GR);
 
