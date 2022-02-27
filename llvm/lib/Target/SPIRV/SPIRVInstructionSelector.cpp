@@ -1358,7 +1358,7 @@ bool SPIRVInstructionSelector::selectGEP(Register ResVReg,
   // do we to stay compliant with its test and more importantly consumers
   unsigned Opcode = I.getOperand(2).getImm() ? SPIRV::OpInBoundsPtrAccessChain
                                              : SPIRV::OpPtrAccessChain;
-  auto &Res = MIRBuilder.buildInstr(Opcode)
+  auto Res = MIRBuilder.buildInstr(Opcode)
                   .addDef(ResVReg)
                   .addUse(GR.getSPIRVTypeID(ResType))
                   // object to get a pointer to

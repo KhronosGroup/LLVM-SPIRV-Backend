@@ -225,12 +225,15 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder);
       }
-      return generateOpenCLBuiltinCall(
+      bool Result = generateOpenCLBuiltinCall(
           DoubleUnderscore ? FuncName : DemangledName, MIRBuilder, ResVReg,
           Info.OrigRet.Ty, ArgVRegs, GR);
+      free(DemangledName);
+      return Result;
     }
-    report_fatal_error("Unable to handle this environment's built-in funcs.");
+    llvm_unreachable("Unable to handle this environment's built-in funcs.");
   } else {
+    free(DemangledName);
     // Emit a regular OpFunctionCall. If it's an externally declared function,
     // be sure to emit its type and function declaration here. It will be
     // hoisted globally later.
