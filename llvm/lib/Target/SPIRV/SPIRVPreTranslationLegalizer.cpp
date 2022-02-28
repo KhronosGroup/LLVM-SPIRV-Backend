@@ -417,7 +417,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       Args.push_back(EEI->getVectorOperand());
       Args.push_back(EEI->getIndexOperand());
       auto *NewEEI = B.CreateCall(IntrFn, {Args});
-      StringRef InstName = I->hasName() ? I->getName() : "";
+      std::string InstName = I->hasName() ? I->getName().str() : "";
       EEI->replaceAllUsesWith(NewEEI);
       EEI->eraseFromParent();
       I = NewEEI;
@@ -430,7 +430,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       for (auto &Op : IEI->operands())
         Args.push_back(Op);
       auto *NewIEI = B.CreateCall(IntrFn, {Args});
-      StringRef InstName = I->hasName() ? I->getName() : "";
+      std::string InstName = I->hasName() ? I->getName().str() : "";
       IEI->replaceAllUsesWith(NewIEI);
       IEI->eraseFromParent();
       I = NewIEI;
@@ -443,7 +443,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       for (auto &Op : BCI->operands())
         Args.push_back(Op);
       auto *NewBCI = B.CreateCall(IntrFn, {Args});
-      StringRef InstName = I->hasName() ? I->getName() : "";
+      std::string InstName = I->hasName() ? I->getName().str() : "";
       BCI->replaceAllUsesWith(NewBCI);
       BCI->eraseFromParent();
       I = NewBCI;
