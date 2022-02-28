@@ -640,9 +640,10 @@ SPIRVGlobalRegistry::checkSpecialInstrMap(const MachineInstr *NewInstr,
   }
   // It's new instruction with no existent group, so create a group,
   // insert the instruction to the group and insert the group to the map.
-  auto *NewInstrGroup = new SPIRVInstrGroup;
-  (*NewInstrGroup)[const_cast<MachineFunction *>(NewInstr->getMF())] = NewInstr;
-  InstrMap[NewInstr->getOpcode()].push_back(*NewInstrGroup);
+  InstrMap[NewInstr->getOpcode()].push_back(SPIRVInstrGroup());
+  MachineFunction *MF = const_cast<MachineFunction *>(NewInstr->getMF());
+  std::pair<MachineFunction *, const MachineInstr *> Pair(MF, NewInstr);
+  InstrMap[NewInstr->getOpcode()].back().insert(Pair);
   return NewInstr;
 }
 
