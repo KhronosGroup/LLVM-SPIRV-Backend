@@ -13,9 +13,15 @@
 
 #include "MCTargetDesc/SPIRVInstPrinter.h"
 #include "SPIRV.h"
+#include "SPIRVCapabilityUtils.h"
+#include "SPIRVEnumRequirements.h"
+#include "SPIRVGlobalRegistry.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVMCInstLower.h"
+#include "SPIRVModuleAnalysis.h"
+#include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
+#include "SPIRVUtils.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/AsmPrinter.h"
@@ -30,32 +36,46 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "asm-printer"
 
 namespace {
 class SPIRVAsmPrinter : public AsmPrinter {
+  const MCSubtargetInfo *STI;
 
 public:
   explicit SPIRVAsmPrinter(TargetMachine &TM,
                            std::unique_ptr<MCStreamer> Streamer)
-      : AsmPrinter(TM, std::move(Streamer)) {
-    const auto *ST =
-        static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
+      : AsmPrinter(TM, std::move(Streamer)), STI(TM.getMCSubtargetInfo()) {
+    ST = static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
     GR = ST->getSPIRVGlobalRegistry();
     TII = ST->getInstrInfo();
   }
+  bool ModuleSectionsEmitted;
+  const SPIRVSubtarget *ST;
   SPIRVGlobalRegistry *GR;
   const SPIRVInstrInfo *TII;
+
   StringRef getPassName() const override { return "SPIRV Assembly Printer"; }
   void printOperand(const MachineInstr *MI, int OpNum, raw_ostream &O);
-
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                        const char *ExtraCode, raw_ostream &O) override;
 
-  void emitInstruction(const MachineInstr *MI) override;
+  void outputMCInst(MCInst &Inst);
+  void outputInstruction(const MachineInstr *MI);
+  void outputModuleSection(ModuleSectionType MSType);
+  void outputGlobalRequirements();
+  void outputEntryPoints();
+  void outputDebugSourceAndStrings(const Module &M);
+  void outputOpExtInstImports(const Module &M);
+  void outputOpMemoryModel();
+  void outputOpFunctionEnd();
+  void outputExtFuncDecls();
+  void outputModuleSections();
 
+  void emitInstruction(const MachineInstr *MI) override;
   void emitFunctionEntryLabel() override {}
   void emitFunctionHeader() override;
   void emitFunctionBodyStart() override {}
@@ -64,10 +84,35 @@ public:
   void emitBasicBlockEnd(const MachineBasicBlock &MBB) override {}
   void emitGlobalVariable(const GlobalVariable *GV) override {}
   void emitOpLabel(const MachineBasicBlock &MBB);
+  void emitEndOfAsmFile(Module &M) override;
+  bool doInitialization(Module &M) override;
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+  ModuleAnalysisInfo *MAI;
 };
 } // namespace
 
+void SPIRVAsmPrinter::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<SPIRVModuleAnalysis>();
+  AU.addPreserved<SPIRVModuleAnalysis>();
+  AsmPrinter::getAnalysisUsage(AU);
+}
+
+// If the module has no functions, we need output global info anyway.
+void SPIRVAsmPrinter::emitEndOfAsmFile(Module &M) {
+  if (ModuleSectionsEmitted == false) {
+    MAI = &SPIRVModuleAnalysis::MAI;
+    outputModuleSections();
+    ModuleSectionsEmitted = true;
+  }
+}
+
 void SPIRVAsmPrinter::emitFunctionHeader() {
+  if (ModuleSectionsEmitted == false) {
+    MAI = &SPIRVModuleAnalysis::MAI;
+    outputModuleSections();
+    ModuleSectionsEmitted = true;
+  }
   const Function &F = MF->getFunction();
 
   if (isVerbose())
@@ -82,15 +127,15 @@ void SPIRVAsmPrinter::emitFunctionHeader() {
 // The table maps MMB number to SPIR-V unique ID register.
 static DenseMap<int, Register> BBNumToRegMap;
 
-// Emit OpFunctionEnd at the end of MF and clear BBNumToRegMap.
-void SPIRVAsmPrinter::emitFunctionBodyEnd() {
-  if (MF == GR->getMetaMF())
-    return;
-
+void SPIRVAsmPrinter::outputOpFunctionEnd() {
   MCInst FunctionEndInst;
   FunctionEndInst.setOpcode(SPIRV::OpFunctionEnd);
-  EmitToStreamer(*OutStreamer, FunctionEndInst);
+  outputMCInst(FunctionEndInst);
+}
 
+// Emit OpFunctionEnd at the end of MF and clear BBNumToRegMap.
+void SPIRVAsmPrinter::emitFunctionBodyEnd() {
+  outputOpFunctionEnd();
   BBNumToRegMap.clear();
 }
 
@@ -100,11 +145,11 @@ static bool hasMBBRegister(const MachineBasicBlock &MBB) {
 
 // Convert MBB's number to correspnding ID register.
 Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
-                                SPIRVGlobalRegistry *GR) {
+                                ModuleAnalysisInfo *MAI) {
   auto f = BBNumToRegMap.find(MBB.getNumber());
   if (f != BBNumToRegMap.end())
     return f->second;
-  Register NewReg = Register::index2VirtReg(GR->getNextID());
+  Register NewReg = Register::index2VirtReg(MAI->getNextID());
   BBNumToRegMap[MBB.getNumber()] = NewReg;
   return NewReg;
 }
@@ -112,14 +157,11 @@ Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
 void SPIRVAsmPrinter::emitOpLabel(const MachineBasicBlock &MBB) {
   MCInst LabelInst;
   LabelInst.setOpcode(SPIRV::OpLabel);
-  LabelInst.addOperand(MCOperand::createReg(getOrCreateMBBRegister(MBB, GR)));
-  EmitToStreamer(*OutStreamer, LabelInst);
+  LabelInst.addOperand(MCOperand::createReg(getOrCreateMBBRegister(MBB, MAI)));
+  outputMCInst(LabelInst);
 }
 
 void SPIRVAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
-  if (MF == GR->getMetaMF())
-    return;
-
   // If it's the first MBB in MF, it has OpFunction and OpFunctionParameter, so
   // OpLabel should be output after them.
   if (MBB.getNumber() == MF->front().getNumber()) {
@@ -188,18 +230,22 @@ static bool isFuncOrHeaderInstr(const MachineInstr *MI,
          MI->getOpcode() == SPIRV::OpFunctionParameter;
 }
 
+void SPIRVAsmPrinter::outputMCInst(MCInst &Inst) {
+  (*OutStreamer).emitInstruction(Inst, *STI);
+}
+
+void SPIRVAsmPrinter::outputInstruction(const MachineInstr *MI) {
+  SPIRVMCInstLower MCInstLowering;
+  MCInst TmpInst;
+  MCInstLowering.Lower(MI, TmpInst, MF, MAI);
+  outputMCInst(TmpInst);
+}
+
 void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
-  if (!GR->getSkipEmission(MI)) {
-    SPIRVMCInstLower MCInstLowering;
-    MCInst TmpInst;
-    MCInstLowering.Lower(MI, TmpInst, GR);
-    EmitToStreamer(*OutStreamer, TmpInst);
-  }
+  if (!MAI->getSkipEmission(MI))
+    outputInstruction(MI);
 
   // Output OpLabel after OpFunction and OpFunctionParameter in the first MMB.
-  if (MF == GR->getMetaMF())
-    return;
-
   const MachineInstr *NextMI = MI->getNextNode();
   if (!hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
       (!NextMI || !isFuncOrHeaderInstr(NextMI, TII))) {
@@ -207,6 +253,150 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
            "OpFunction is not in the front MBB of MF");
     emitOpLabel(*MI->getParent());
   }
+}
+
+void SPIRVAsmPrinter::outputModuleSection(ModuleSectionType MSType) {
+  for (MachineInstr *MI : MAI->getMSInstrs(MSType))
+    outputInstruction(MI);
+}
+
+void SPIRVAsmPrinter::outputDebugSourceAndStrings(const Module &M) {
+  // Output OpSource.
+  MCInst Inst;
+  Inst.setOpcode(SPIRV::OpSource);
+  Inst.addOperand(MCOperand::createImm(MAI->SrcLang));
+  Inst.addOperand(MCOperand::createImm(MAI->SrcLangVersion));
+  outputMCInst(Inst);
+}
+
+void SPIRVAsmPrinter::outputOpExtInstImports(const Module &M) {
+  for (auto &CU : MAI->ExtInstSetMap) {
+    unsigned Set = CU.first;
+    Register Reg = CU.second;
+    MCInst Inst;
+    Inst.setOpcode(SPIRV::OpExtInstImport);
+    Inst.addOperand(MCOperand::createReg(Reg));
+    addStringImm(getExtInstSetName(static_cast<ExtInstSet>(Set)), Inst);
+    outputMCInst(Inst);
+  }
+}
+
+void SPIRVAsmPrinter::outputOpMemoryModel() {
+  MCInst Inst;
+  Inst.setOpcode(SPIRV::OpMemoryModel);
+  Inst.addOperand(MCOperand::createImm(MAI->Addr));
+  Inst.addOperand(MCOperand::createImm(MAI->Mem));
+  outputMCInst(Inst);
+}
+
+// Before the OpEntryPoints' output, we need to add the entry point's
+// interfaces. The interface is a list of IDs of global OpVariable instructions.
+// These declare the set of global variables from a module that form
+// the interface of this entry point.
+void SPIRVAsmPrinter::outputEntryPoints() {
+  // Find all OpVariable IDs with required StorageClass.
+  DenseSet<Register> InterfaceIDs;
+  for (MachineInstr *MI : MAI->GlobalVarList) {
+    assert(MI->getOpcode() == SPIRV::OpVariable);
+    auto SC =
+        static_cast<StorageClass::StorageClass>(MI->getOperand(2).getImm());
+    // Before version 1.4, the interface's storage classes are limited to
+    // the Input and Output storage classes. Starting with version 1.4,
+    // the interface's storage classes are all storage classes used in
+    // declaring all global variables referenced by the entry point call tree.
+    if (ST->getTargetSPIRVVersion() >= 14 || SC == StorageClass::Input ||
+        SC == StorageClass::Output) {
+      MachineFunction *MF = MI->getMF();
+      Register Reg = MAI->getRegisterAlias(MF, MI->getOperand(0).getReg());
+      InterfaceIDs.insert(Reg);
+    }
+  }
+
+  // Output OpEntryPoints adding interface args to all of them.
+  for (MachineInstr *MI : MAI->getMSInstrs(MB_EntryPoints)) {
+    SPIRVMCInstLower MCInstLowering;
+    MCInst TmpInst;
+    MCInstLowering.Lower(MI, TmpInst, MF, MAI);
+    for (Register Reg : InterfaceIDs) {
+      assert(Reg.isValid());
+      TmpInst.addOperand(MCOperand::createReg(Reg));
+    }
+    outputMCInst(TmpInst);
+  }
+}
+
+// Create global OpCapability instructions for the required capabilities
+void SPIRVAsmPrinter::outputGlobalRequirements() {
+  // Abort here if not all requirements can be satisfied
+  MAI->Reqs.checkSatisfiable(*ST);
+
+  for (const auto &Cap : MAI->Reqs.getMinimalCapabilities()) {
+    MCInst Inst;
+    Inst.setOpcode(SPIRV::OpCapability);
+    Inst.addOperand(MCOperand::createImm(Cap));
+    outputMCInst(Inst);
+  }
+
+  // Generate the final OpExtensions with strings instead of enums
+  for (const auto &Ext : MAI->Reqs.getExtensions()) {
+    MCInst Inst;
+    Inst.setOpcode(SPIRV::OpExtension);
+    addStringImm(getExtensionName(Ext), Inst);
+    outputMCInst(Inst);
+  }
+  // TODO add a pseudo instr for version number
+}
+
+void SPIRVAsmPrinter::outputExtFuncDecls() {
+  // Insert OpFunctionEnd after each declaration.
+  SmallVectorImpl<MachineInstr *>::iterator
+      I = MAI->getMSInstrs(MB_ExtFuncDecls).begin(),
+      E = MAI->getMSInstrs(MB_ExtFuncDecls).end();
+  for (; I != E; ++I) {
+    outputInstruction(*I);
+    if ((I + 1) == E || (*(I + 1))->getOpcode() == SPIRV::OpFunction)
+      outputOpFunctionEnd();
+  }
+}
+
+void SPIRVAsmPrinter::outputModuleSections() {
+  const Module *M = MMI->getModule();
+  assert(MAI && M && "Module analysis is required");
+  // Output instructions according to the Logical Layout of a Module:
+  // 1,2. All OpCapability instructions, then optional OpExtension instructions.
+  outputGlobalRequirements();
+  // 3. Optional OpExtInstImport instructions.
+  outputOpExtInstImports(*M);
+  // 4. The single required OpMemoryModel instruction.
+  outputOpMemoryModel();
+  // 5. All entry point declarations, using OpEntryPoint.
+  outputEntryPoints();
+  // 6. Execution-mode declarations, using OpExecutionMode or OpExecutionModeId.
+  // TODO:
+  // 7a. Debug: all OpString, OpSourceExtension, OpSource, and
+  // OpSourceContinued, without forward references.
+  outputDebugSourceAndStrings(*M);
+  // 7b. Debug: all OpName and all OpMemberName.
+  outputModuleSection(MB_DebugNames);
+  // 7c. Debug: all OpModuleProcessed instructions.
+  outputModuleSection(MB_DebugModuleProcessed);
+  // 8. All annotation instructions (all decorations).
+  outputModuleSection(MB_Annotations);
+  // 9. All type declarations (OpTypeXXX instructions), all constant
+  // instructions, and all global variable declarations. This section is
+  // the first section to allow use of: OpLine and OpNoLine debug information;
+  // non-semantic instructions with OpExtInst.
+  outputModuleSection(MB_TypeConstVars);
+  // 10. All function declarations (functions without a body).
+  outputExtFuncDecls();
+  // 11. All function definitions (functions with a body).
+  // This is done in regular function output.
+}
+
+bool SPIRVAsmPrinter::doInitialization(Module &M) {
+  ModuleSectionsEmitted = false;
+  // We need to call the parent's one explicitly.
+  return AsmPrinter::doInitialization(M);
 }
 
 // Force static initialization.

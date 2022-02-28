@@ -23,7 +23,7 @@
 
 using namespace llvm;
 SPIRVGlobalRegistry::SPIRVGlobalRegistry(unsigned int PointerSize)
-    : PointerSize(PointerSize), MaxID(0) {}
+    : PointerSize(PointerSize) {}
 
 SPIRVType *SPIRVGlobalRegistry::assignTypeToVReg(const Type *Type,
                                                  Register VReg,
