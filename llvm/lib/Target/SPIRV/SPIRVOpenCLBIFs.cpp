@@ -1004,6 +1004,8 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
   if (isMemBarrier) {
     auto memOrd = static_cast<CLMemOrder>(getIConstVal(OrigArgs[1], MRI));
     memSem = getSPIRVMemSemantics(memOrd) | memSem;
+  } else {
+    memSem |= MemorySemantics::SequentiallyConsistent;
   }
 
   Register memSemReg;
@@ -1015,14 +1017,16 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
 
   Register scopeReg;
   auto scope = Scope::Workgroup;
+  auto MemScope = scope;
   if (OrigArgs.size() >= 2) {
     assert(((!isMemBarrier && OrigArgs.size() == 2) ||
             (isMemBarrier && OrigArgs.size() == 3)) &&
           "Extra args for explicitly scoped barrier");
     auto scopeArg = isMemBarrier ? OrigArgs[2] : OrigArgs[1];
     auto clScope = static_cast<CLMemScope>(getIConstVal(scopeArg, MRI));
+    MemScope = getSPIRVScope(clScope);
     if (!(memFlags & CLK_LOCAL_MEM_FENCE) || isMemBarrier) {
-      scope = getSPIRVScope(clScope);
+      scope = MemScope;
     }
     if (clScope == static_cast<unsigned>(scope))
       scopeReg = OrigArgs[1];
@@ -1032,7 +1036,7 @@ static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
 
   auto MIB = MIRBuilder.buildInstr(opcode).addUse(scopeReg);
   if (!isMemBarrier)
-    MIB.addUse(scopeReg);
+    MIB.addUse(GR->buildConstantInt(MemScope, MIRBuilder, I32Ty));
   MIB.addUse(memSemReg);
   return constrainRegOperands(MIB);
 }
@@ -1335,8 +1339,8 @@ static bool genOpenCLExtInst(OpenCL_std::OpenCL_std extInstID,
 static std::string modifyBINameForLookup(StringRef nameNoArgs, SPIRVType *retTy,
     char firstArgC) {
   std::string modifiedName = nameNoArgs.str();
-  if (nameNoArgs.startswith("sub_group_")
-      || nameNoArgs.startswith("work_group_")) {
+  if ((nameNoArgs.startswith("sub_group_")
+       || nameNoArgs.startswith("work_group_")) && retTy) {
     if (nameNoArgs.contains("group_all")
         || nameNoArgs.contains("group_any")
         || nameNoArgs.startswith("sub_group_shuffle")
