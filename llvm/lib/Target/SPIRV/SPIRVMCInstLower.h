@@ -14,13 +14,14 @@
 namespace llvm {
 class MCInst;
 class MachineInstr;
-class SPIRVGlobalRegistry;
+class MachineFunction;
+class ModuleAnalysisInfo;
 
 // This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
 public:
   void Lower(const MachineInstr *MI, MCInst &OutMI,
-             SPIRVGlobalRegistry *GR) const;
+             const MachineFunction *CurMF, ModuleAnalysisInfo *MAI) const;
 };
 } // namespace llvm
 

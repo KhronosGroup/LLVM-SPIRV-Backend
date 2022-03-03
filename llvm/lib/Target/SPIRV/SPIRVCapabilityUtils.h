@@ -39,6 +39,13 @@ private:
 
 public:
   SPIRVRequirementHandler() : minVersion(0), maxVersion(0) {}
+  void clear() {
+    minimalCaps.clear();
+    allCaps.clear();
+    allExtensions.clear();
+    minVersion = 0;
+    maxVersion = 0;
+  }
   uint32_t getMinVersion() const { return minVersion; }
   uint32_t getMaxVersion() const { return maxVersion; }
   const CapabilityList &getMinimalCapabilities() const { return minimalCaps; };

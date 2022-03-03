@@ -39,6 +39,14 @@ static size_t getPaddedLen(const StringRef &Str) {
   return (Len % 4 == 0) ? Len : Len + (4 - (Len % 4));
 }
 
+void addStringImm(const StringRef &Str, MCInst &Inst) {
+  const size_t PaddedLen = getPaddedLen(Str);
+  for (unsigned i = 0; i < PaddedLen; i += 4) {
+    // Add an operand for the 32-bits of chars or padding
+    Inst.addOperand(MCOperand::createImm(convertCharsToWord(Str, i)));
+  }
+}
+
 void addStringImm(const StringRef &Str, MachineInstrBuilder &MIB) {
   const size_t PaddedLen = getPaddedLen(Str);
   for (unsigned i = 0; i < PaddedLen; i += 4) {
