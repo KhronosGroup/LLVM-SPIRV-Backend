@@ -25,8 +25,8 @@ target triple = "spirv32-unknown-unknown"
 %opencl.sampler_t = type opaque
 
 ; CHECK-SPIRV: OpCapability LiteralSampler
-; CHECK-SPIRV: OpEntryPoint Kernel %[[sample_kernel_float:[0-9]+]] "sample_kernel_float"
-; CHECK-SPIRV: OpEntryPoint Kernel %[[sample_kernel_int:[0-9]+]] "sample_kernel_int"
+; CHECK-SPIRV: OpName %[[sample_kernel_float:[0-9]+]] "sample_kernel_float"
+; CHECK-SPIRV: OpName %[[sample_kernel_int:[0-9]+]] "sample_kernel_int"
 
 ; CHECK-SPIRV: %[[TypeSampler:[0-9]+]] = OpTypeSampler
 ; CHECK-SPIRV-DAG: %[[SampledImageTy:[0-9]+]] = OpTypeSampledImage

@@ -23,14 +23,14 @@ target triple = "spirv32-unknown-unknown"
 
 %struct.ndrange_t = type { i32 }
 
-; CHECK-SPIRV: OpEntryPoint {{.*}} %[[BlockKer1:[0-9]+]] "__device_side_enqueue_block_invoke_kernel"
-; CHECK-SPIRV: OpEntryPoint {{.*}} %[[BlockKer2:[0-9]+]] "__device_side_enqueue_block_invoke_2_kernel"
-; CHECK-SPIRV: OpEntryPoint {{.*}} %[[BlockKer3:[0-9]+]] "__device_side_enqueue_block_invoke_3_kernel"
-; CHECK-SPIRV: OpEntryPoint {{.*}} %[[BlockKer4:[0-9]+]] "__device_side_enqueue_block_invoke_4_kernel"
 ; CHECK-SPIRV: OpName %[[BlockGlb1:[0-9]+]] "__block_literal_global"
 ; CHECK-SPIRV: OpName %[[BlockGlb2:[0-9]+]] "__block_literal_global.1"
 ; CHECK-SPIRV: OpName %[[BlockGlb3:[0-9]+]] "__block_literal_global.2"
 ; CHECK-SPIRV: OpName %[[BlockGlb4:[0-9]+]] "__block_literal_global.3"
+; CHECK-SPIRV: OpName %[[BlockKer1:[0-9]+]] "__device_side_enqueue_block_invoke_kernel"
+; CHECK-SPIRV: OpName %[[BlockKer2:[0-9]+]] "__device_side_enqueue_block_invoke_2_kernel"
+; CHECK-SPIRV: OpName %[[BlockKer3:[0-9]+]] "__device_side_enqueue_block_invoke_3_kernel"
+; CHECK-SPIRV: OpName %[[BlockKer4:[0-9]+]] "__device_side_enqueue_block_invoke_4_kernel"
 
 %1 = type <{ i32, i32 }>
 

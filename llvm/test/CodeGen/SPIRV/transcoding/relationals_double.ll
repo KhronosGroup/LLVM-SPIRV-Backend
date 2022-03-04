@@ -1,59 +1,213 @@
 ; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
-; CHECK-SPIRV: %[[IntTypeID:[0-9]+]] = OpTypeInt 64
-; CHECK-SPIRV: %[[Int64VectorTypeID:[0-9]+]] = OpTypeVector %[[IntTypeID]] 2
+; This test checks following SYCL relational builtins with double and double2
+; types:
+;   isfinite, isinf, isnan, isnormal, signbit, isequal, isnotequal, isgreater
+;   isgreaterequal, isless, islessequal, islessgreater, isordered, isunordered
 
-; CHECK-SPIRV: OpSelect %[[Int64VectorTypeID]]
-; CHECK-SPIRV: OpSelect %[[Int64VectorTypeID]]
-; CHECK-SPIRV: OpSelect %[[Int64VectorTypeID]]
-; CHECK-SPIRV: OpSelect %[[Int64VectorTypeID]]
+; CHECK-SPIRV: %[[BoolTypeID:[0-9]+]] = OpTypeBool
+; CHECK-SPIRV: %[[BoolVectorTypeID:[0-9]+]] = OpTypeVector %[[BoolTypeID]] 2
+
+; CHECK-SPIRV: OpIsFinite %[[BoolTypeID]]
+; CHECK-SPIRV: OpIsInf %[[BoolTypeID]]
+; CHECK-SPIRV: OpIsNan %[[BoolTypeID]]
+; CHECK-SPIRV: OpIsNormal %[[BoolTypeID]]
+; CHECK-SPIRV: OpSignBitSet %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdEqual %[[BoolTypeID]]
+; CHECK-SPIRV: OpFUnordNotEqual %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdGreaterThan %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdGreaterThanEqual %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdLessThan %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdLessThanEqual %[[BoolTypeID]]
+; CHECK-SPIRV: OpFOrdNotEqual %[[BoolTypeID]]
+; CHECK-SPIRV: OpOrdered %[[BoolTypeID]]
+; CHECK-SPIRV: OpUnordered %[[BoolTypeID]]
+
+; CHECK-SPIRV: OpIsFinite %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpIsInf %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpIsNan %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpIsNormal %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpSignBitSet %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdEqual %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFUnordNotEqual %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdGreaterThan %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdGreaterThanEqual %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdLessThan %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdLessThanEqual %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpFOrdNotEqual %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpOrdered %[[BoolVectorTypeID]]
+; CHECK-SPIRV: OpUnordered %[[BoolVectorTypeID]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
 
-; Function Attrs: nounwind
-define spir_kernel void @test_vector_double(<2 x i64> addrspace(1)* nocapture %out, <2 x double> %in) #0 !kernel_arg_addr_space !1 !kernel_arg_access_qual !2 !kernel_arg_type !3 !kernel_arg_base_type !4 !kernel_arg_type_qual !5 {
-  %1 = tail call spir_func <2 x i64> @_Z5isinfDv2_d(<2 x double> %in) #2
-  %2 = tail call spir_func <2 x i64> @_Z5isnanDv2_d(<2 x double> %in) #2
-  %3 = add <2 x i64> %1, %2
-  %4 = tail call spir_func <2 x i64> @_Z8isnormalDv2_d(<2 x double> %in) #2
-  %5 = add <2 x i64> %3, %4
-  %6 = tail call spir_func <2 x i64> @_Z8isfiniteDv2_d(<2 x double> %in) #2
-  %7 = add <2 x i64> %5, %6
-  store <2 x i64> %7, <2 x i64> addrspace(1)* %out, align 16, !tbaa !11
+; Function Attrs: convergent mustprogress nofree norecurse nounwind willreturn writeonly
+define dso_local spir_func void @test_scalar(i32 addrspace(4)* nocapture writeonly %out, double %d) local_unnamed_addr #0 {
+entry:
+  %call = tail call spir_func i32 @_Z8isfinited(double %d) #3
+  %call1 = tail call spir_func i32 @_Z5isinfd(double %d) #3
+  %add = add nsw i32 %call1, %call
+  %call2 = tail call spir_func i32 @_Z5isnand(double %d) #3
+  %add3 = add nsw i32 %add, %call2
+  %call4 = tail call spir_func i32 @_Z8isnormald(double %d) #3
+  %add5 = add nsw i32 %add3, %call4
+  %call6 = tail call spir_func i32 @_Z7signbitd(double %d) #3
+  %add7 = add nsw i32 %add5, %call6
+  %call8 = tail call spir_func i32 @_Z7isequaldd(double %d, double %d) #3
+  %add9 = add nsw i32 %add7, %call8
+  %call10 = tail call spir_func i32 @_Z10isnotequaldd(double %d, double %d) #3
+  %add11 = add nsw i32 %add9, %call10
+  %call12 = tail call spir_func i32 @_Z9isgreaterdd(double %d, double %d) #3
+  %add13 = add nsw i32 %add11, %call12
+  %call14 = tail call spir_func i32 @_Z14isgreaterequaldd(double %d, double %d) #3
+  %add15 = add nsw i32 %add13, %call14
+  %call16 = tail call spir_func i32 @_Z6islessdd(double %d, double %d) #3
+  %add17 = add nsw i32 %add15, %call16
+  %call18 = tail call spir_func i32 @_Z11islessequaldd(double %d, double %d) #3
+  %add19 = add nsw i32 %add17, %call18
+  %call20 = tail call spir_func i32 @_Z13islessgreaterdd(double %d, double %d) #3
+  %add21 = add nsw i32 %add19, %call20
+  %call22 = tail call spir_func i32 @_Z9isordereddd(double %d, double %d) #3
+  %add23 = add nsw i32 %add21, %call22
+  %call24 = tail call spir_func i32 @_Z11isunordereddd(double %d, double %d) #3
+  %add25 = add nsw i32 %add23, %call24
+  store i32 %add25, i32 addrspace(4)* %out, align 4, !tbaa !3
   ret void
 }
 
-declare spir_func <2 x i64> @_Z5isinfDv2_d(<2 x double>) #1
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z8isfinited(double) local_unnamed_addr #1
 
-declare spir_func <2 x i64> @_Z5isnanDv2_d(<2 x double>) #1
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z5isinfd(double) local_unnamed_addr #1
 
-declare spir_func <2 x i64> @_Z8isnormalDv2_d(<2 x double>) #1
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z5isnand(double) local_unnamed_addr #1
 
-declare spir_func <2 x i64> @_Z8isfiniteDv2_d(<2 x double>) #1
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z8isnormald(double) local_unnamed_addr #1
 
-attributes #0 = { nounwind "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-realign-stack" "stack-protector-buffer-size"="8" "unsafe-fp-math"="false" "use-soft-float"="false" }
-attributes #1 = { "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-realign-stack" "stack-protector-buffer-size"="8" "unsafe-fp-math"="false" "use-soft-float"="false" }
-attributes #2 = { nounwind }
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z7signbitd(double) local_unnamed_addr #1
 
-!opencl.enable.FP_CONTRACT = !{}
-!opencl.spir.version = !{!6}
-!opencl.ocl.version = !{!7}
-!opencl.used.extensions = !{!8}
-!opencl.used.optional.core.features = !{!9}
-!opencl.compiler.options = !{!8}
-!llvm.ident = !{!10}
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z7isequaldd(double, double) local_unnamed_addr #1
 
-!1 = !{i32 1, i32 0}
-!2 = !{!"none", !"none"}
-!3 = !{!"long2*", !"double2"}
-!4 = !{!"long2*", !"double2"}
-!5 = !{!"", !""}
-!6 = !{i32 1, i32 2}
-!7 = !{i32 2, i32 0}
-!8 = !{}
-!9 = !{!"cl_doubles"}
-!10 = !{!"clang version 3.6.1 "}
-!11 = !{!12, !12, i64 0}
-!12 = !{!"omnipotent char", !13, i64 0}
-!13 = !{!"Simple C/C++ TBAA"}
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z10isnotequaldd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z9isgreaterdd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z14isgreaterequaldd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z6islessdd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z11islessequaldd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z13islessgreaterdd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z9isordereddd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func i32 @_Z11isunordereddd(double, double) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree norecurse nounwind willreturn writeonly
+define dso_local spir_func void @test_vector(<2 x i64> addrspace(4)* nocapture writeonly %out, <2 x double> %d) local_unnamed_addr #2 {
+entry:
+  %call = tail call spir_func <2 x i64> @_Z8isfiniteDv2_d(<2 x double> %d) #3
+  %call1 = tail call spir_func <2 x i64> @_Z5isinfDv2_d(<2 x double> %d) #3
+  %add = add <2 x i64> %call1, %call
+  %call2 = tail call spir_func <2 x i64> @_Z5isnanDv2_d(<2 x double> %d) #3
+  %add3 = add <2 x i64> %add, %call2
+  %call4 = tail call spir_func <2 x i64> @_Z8isnormalDv2_d(<2 x double> %d) #3
+  %add5 = add <2 x i64> %add3, %call4
+  %call6 = tail call spir_func <2 x i64> @_Z7signbitDv2_d(<2 x double> %d) #3
+  %add7 = add <2 x i64> %add5, %call6
+  %call8 = tail call spir_func <2 x i64> @_Z7isequalDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add9 = add <2 x i64> %add7, %call8
+  %call10 = tail call spir_func <2 x i64> @_Z10isnotequalDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add11 = add <2 x i64> %add9, %call10
+  %call12 = tail call spir_func <2 x i64> @_Z9isgreaterDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add13 = add <2 x i64> %add11, %call12
+  %call14 = tail call spir_func <2 x i64> @_Z14isgreaterequalDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add15 = add <2 x i64> %add13, %call14
+  %call16 = tail call spir_func <2 x i64> @_Z6islessDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add17 = add <2 x i64> %add15, %call16
+  %call18 = tail call spir_func <2 x i64> @_Z11islessequalDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add19 = add <2 x i64> %add17, %call18
+  %call20 = tail call spir_func <2 x i64> @_Z13islessgreaterDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add21 = add <2 x i64> %add19, %call20
+  %call22 = tail call spir_func <2 x i64> @_Z9isorderedDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add23 = add <2 x i64> %add21, %call22
+  %call24 = tail call spir_func <2 x i64> @_Z11isunorderedDv2_dS_(<2 x double> %d, <2 x double> %d) #3
+  %add25 = add <2 x i64> %add23, %call24
+  store <2 x i64> %add25, <2 x i64> addrspace(4)* %out, align 16, !tbaa !7
+  ret void
+}
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z8isfiniteDv2_d(<2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z5isinfDv2_d(<2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z5isnanDv2_d(<2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z8isnormalDv2_d(<2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z7signbitDv2_d(<2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z7isequalDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z10isnotequalDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z9isgreaterDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z14isgreaterequalDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z6islessDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z11islessequalDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z13islessgreaterDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z9isorderedDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
+declare spir_func <2 x i64> @_Z11isunorderedDv2_dS_(<2 x double>, <2 x double>) local_unnamed_addr #1
+
+attributes #0 = { convergent mustprogress nofree norecurse nounwind willreturn writeonly "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }
+attributes #1 = { convergent mustprogress nofree nounwind readnone willreturn "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }
+attributes #2 = { convergent mustprogress nofree norecurse nounwind willreturn writeonly "frame-pointer"="none" "min-legal-vector-width"="128" "no-trapping-math"="true" "stack-protector-buffer-size"="8" }
+attributes #3 = { convergent nounwind readnone willreturn }
+
+!llvm.module.flags = !{!0}
+!opencl.ocl.version = !{!1}
+!opencl.spir.version = !{!1}
+!llvm.ident = !{!2}
+
+!0 = !{i32 1, !"wchar_size", i32 4}
+!1 = !{i32 2, i32 0}
+!2 = !{!"clang version 14.0.0"}
+!3 = !{!4, !4, i64 0}
+!4 = !{!"int", !5, i64 0}
+!5 = !{!"omnipotent char", !6, i64 0}
+!6 = !{!"Simple C/C++ TBAA"}
+!7 = !{!5, !5, i64 0}
