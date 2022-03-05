@@ -2,7 +2,8 @@
 
 ; CHECK-SPIRV-DAG: OpCapability ImageReadWrite
 ; CHECK-SPIRV-DAG: OpCapability LiteralSampler
-; CHECK-SPIRV-DAG: %[[TyImageID:[0-9]+]] = OpTypeImage %{{[0-9]+}} 1D 0 0 0 0 Unknown ReadWrite 
+; CHECK-SPIRV-DAG: %[[TyVoid:[0-9]+]] = OpTypeVoid
+; CHECK-SPIRV-DAG: %[[TyImageID:[0-9]+]] = OpTypeImage %[[TyVoid]] 1D 0 0 0 0 Unknown ReadWrite 
 ; CHECK-SPIRV-DAG: %[[TySampledImageID:[0-9]+]] = OpTypeSampledImage %[[TyImageID]]
 
 ; CHECK-SPIRV-DAG: %[[ResID:[0-9]+]] = OpSampledImage %[[TySampledImageID]]
