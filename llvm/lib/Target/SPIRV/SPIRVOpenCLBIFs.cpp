@@ -1074,7 +1074,7 @@ static bool genConvertInstr(MachineIRBuilder &MIRBuilder,
     buildOpDecorate(ret, MIRBuilder, Decoration::SaturatedConversion, {});
   if (isRounded)
     buildOpDecorate(ret, MIRBuilder, Decoration::FPRoundingMode,
-                               {roundingMode});
+                               {static_cast<uint32_t>(roundingMode)});
   if (isFromInt) {
     if (isToInt) { // I -> I
       auto op = dstSign ? OpUConvert : OpSConvert;

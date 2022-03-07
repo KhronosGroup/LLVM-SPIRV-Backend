@@ -315,11 +315,12 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
 
   if (HasLinkageTy)
     buildOpDecorate(Reg, MIRBuilder, Decoration::LinkageAttributes,
-                    {LinkageType}, Name);
+                    {static_cast<uint32_t>(LinkageType)}, Name);
 
   BuiltIn::BuiltIn BuiltInId;
   if (getSpirvBuiltInIdByName(Name, BuiltInId))
-    buildOpDecorate(Reg, MIRBuilder, Decoration::BuiltIn, {BuiltInId});
+    buildOpDecorate(Reg, MIRBuilder, Decoration::BuiltIn,
+                    {static_cast<uint32_t>(BuiltInId)});
 
   return Reg;
 }

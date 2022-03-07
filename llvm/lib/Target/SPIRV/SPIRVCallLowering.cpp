@@ -189,7 +189,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
     buildOpDecorate(FuncVReg, MIRBuilder, Decoration::LinkageAttributes,
-                    {LnkTy}, F.getGlobalIdentifier());
+                    {static_cast<uint32_t>(LnkTy)}, F.getGlobalIdentifier());
   }
 
   return true;
