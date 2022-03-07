@@ -15,7 +15,7 @@ namespace llvm {
 class MCInst;
 class MachineInstr;
 class MachineFunction;
-class ModuleAnalysisInfo;
+struct ModuleAnalysisInfo;
 
 // This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
