@@ -80,9 +80,12 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
   }
   // Update required capabilities for this memory model, addressing model and
   // source language.
-  MAI.Reqs.addRequirements(getMemoryModelRequirements(MAI.Mem, *ST));
-  MAI.Reqs.addRequirements(getSourceLanguageRequirements(MAI.SrcLang, *ST));
-  MAI.Reqs.addRequirements(getAddressingModelRequirements(MAI.Addr, *ST));
+  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
+      OperandCategory::MemoryModelOperand, MAI.Mem, *ST));
+  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
+      OperandCategory::SourceLanguageOperand, MAI.SrcLang, *ST));
+  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
+      OperandCategory::AddressingModelOperand, MAI.Addr, *ST));
 
   // TODO: check if it's required by default.
   MAI.ExtInstSetMap[static_cast<unsigned>(ExtInstSet::OpenCL_std)] =

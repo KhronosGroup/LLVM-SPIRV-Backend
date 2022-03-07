@@ -17,6 +17,7 @@
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRV.h"
 #include "SPIRVOpenCLBIFs.h"
+#include "SPIRVSymbolicOperands.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "SPIRVUtils.h"
@@ -317,7 +318,7 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
                     {LinkageType}, Name);
 
   BuiltIn::BuiltIn BuiltInId;
-  if (getSpirvBuilInIdByName(Name, BuiltInId))
+  if (getSpirvBuiltInIdByName(Name, BuiltInId))
     buildOpDecorate(Reg, MIRBuilder, Decoration::BuiltIn, {BuiltInId});
 
   return Reg;

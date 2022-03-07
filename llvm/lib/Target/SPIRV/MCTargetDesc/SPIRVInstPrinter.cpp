@@ -21,9 +21,9 @@
 #include "llvm/Support/FormattedStream.h"
 
 #include "SPIRV.h"
-#include "SPIRVEnums.h"
 #include "SPIRVExtInsts.h"
 #include "SPIRVStringReader.h"
+#include "SPIRVSymbolicOperands.h"
 
 using namespace llvm;
 
@@ -94,7 +94,8 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         switch (OpCode) {
         case SPIRV::OpTypeImage:
           OS << ' ';
-          printAccessQualifier(MI, FirstVariableIndex, OS);
+          printSymbolicOperand<OperandCategory::AccessQualifierOperand>(
+              MI, FirstVariableIndex, OS);
           break;
         case SPIRV::OpVariable:
           OS << ' ';
@@ -123,7 +124,8 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         case SPIRV::OpLoad:
         case SPIRV::OpStore:
           OS << ' ';
-          printMemoryOperand(MI, FirstVariableIndex, OS);
+          printSymbolicOperand<OperandCategory::MemoryOperandOperand>(
+              MI, FirstVariableIndex, OS);
           printRemainingVariableOps(MI, FirstVariableIndex + 1, OS);
           break;
         case SPIRV::OpImageSampleImplicitLod:
@@ -145,7 +147,8 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
         case SPIRV::OpImageSparseRead:
         case SPIRV::OpImageSampleFootprintNV:
           OS << ' ';
-          printImageOperand(MI, FirstVariableIndex, OS);
+          printSymbolicOperand<OperandCategory::ImageOperandOperand>(
+              MI, FirstVariableIndex, OS);
           printRemainingVariableOps(MI, NumFixedOps + 1, OS);
           break;
         case SPIRV::OpCopyMemory:
@@ -153,7 +156,8 @@ void SPIRVInstPrinter::printInst(const MCInst *MI, uint64_t Address,
           const unsigned int NumOps = MI->getNumOperands();
           for (unsigned int i = NumFixedOps; i < NumOps; ++i) {
             OS << ' ';
-            printMemoryOperand(MI, i, OS);
+            printSymbolicOperand<OperandCategory::MemoryOperandOperand>(MI, i,
+                                                                        OS);
             if (MI->getOperand(i).getImm() & MemoryOperand::Aligned) {
               assert(i + 1 < NumOps && "Missing alignment operand");
               OS << ' ';
@@ -202,7 +206,8 @@ void SPIRVInstPrinter::printOpExtInst(const MCInst *MI, raw_ostream &O) {
         printOperand(MI, i, O);
         O << ' ';
       }
-      printFPRoundingMode(MI, NumOps - 1, O);
+      printSymbolicOperand<OperandCategory::FPRoundingModeOperand>(
+          MI, NumOps - 1, O);
       break;
     }
     default:
@@ -227,19 +232,22 @@ void SPIRVInstPrinter::printOpDecorate(const MCInst *MI, raw_ostream &O) {
 
     switch (Dec) {
     case Decoration::BuiltIn:
-      printBuiltIn(MI, NumFixedOps, O);
+      printSymbolicOperand<OperandCategory::BuiltInOperand>(MI, NumFixedOps, O);
       break;
     case Decoration::UniformId:
-      printScope(MI, NumFixedOps, O);
+      printSymbolicOperand<OperandCategory::ScopeOperand>(MI, NumFixedOps, O);
       break;
     case Decoration::FuncParamAttr:
-      printFunctionParameterAttribute(MI, NumFixedOps, O);
+      printSymbolicOperand<OperandCategory::FunctionParameterAttributeOperand>(
+          MI, NumFixedOps, O);
       break;
     case Decoration::FPRoundingMode:
-      printFPRoundingMode(MI, NumFixedOps, O);
+      printSymbolicOperand<OperandCategory::FPRoundingModeOperand>(
+          MI, NumFixedOps, O);
       break;
     case Decoration::FPFastMathMode:
-      printFPFastMathMode(MI, NumFixedOps, O);
+      printSymbolicOperand<OperandCategory::FPFastMathModeOperand>(
+          MI, NumFixedOps, O);
       break;
     case Decoration::LinkageAttributes:
       printStringImm(MI, NumFixedOps, O);
@@ -312,48 +320,25 @@ void SPIRVInstPrinter::printStringImm(const MCInst *MI, unsigned OpNo,
     if (MI->getOpcode() == SPIRV::OpDecorate &&
         MI->getOperand(1).getImm() == Decoration::LinkageAttributes) {
       O << ' ';
-      printLinkageType(MI, StrStartIndex, O);
+      printSymbolicOperand<OperandCategory::LinkageTypeOperand>(
+          MI, StrStartIndex, O);
       break;
     }
   }
 }
 
-void SPIRVInstPrinter::printExtInst(const MCInst *MI, unsigned OpNo,
-                                    raw_ostream &O) {
+void SPIRVInstPrinter::printExtension(const MCInst *MI, unsigned OpNo,
+                                      raw_ostream &O) {
   auto SetReg = MI->getOperand(2).getReg();
   auto Set = ExtInstSetIDs[SetReg];
   auto Op = MI->getOperand(OpNo).getImm();
   O << getExtInstName(Set, Op);
 }
 
-// Methods for printing textual names of SPIR-V enums (see SPIRVEnums.h)
-GEN_INSTR_PRINTER_IMPL(Capability)
-GEN_INSTR_PRINTER_IMPL(SourceLanguage)
-GEN_INSTR_PRINTER_IMPL(ExecutionModel)
-GEN_INSTR_PRINTER_IMPL(AddressingModel)
-GEN_INSTR_PRINTER_IMPL(MemoryModel)
-GEN_INSTR_PRINTER_IMPL(ExecutionMode)
-GEN_INSTR_PRINTER_IMPL(StorageClass)
-GEN_INSTR_PRINTER_IMPL(Dim)
-GEN_INSTR_PRINTER_IMPL(SamplerAddressingMode)
-GEN_INSTR_PRINTER_IMPL(SamplerFilterMode)
-GEN_INSTR_PRINTER_IMPL(ImageFormat)
-GEN_INSTR_PRINTER_IMPL(ImageChannelOrder)
-GEN_INSTR_PRINTER_IMPL(ImageChannelDataType)
-GEN_INSTR_PRINTER_IMPL(ImageOperand)
-GEN_INSTR_PRINTER_IMPL(FPFastMathMode)
-GEN_INSTR_PRINTER_IMPL(FPRoundingMode)
-GEN_INSTR_PRINTER_IMPL(LinkageType)
-GEN_INSTR_PRINTER_IMPL(AccessQualifier)
-GEN_INSTR_PRINTER_IMPL(FunctionParameterAttribute)
-GEN_INSTR_PRINTER_IMPL(Decoration)
-GEN_INSTR_PRINTER_IMPL(BuiltIn)
-GEN_INSTR_PRINTER_IMPL(SelectionControl)
-GEN_INSTR_PRINTER_IMPL(LoopControl)
-GEN_INSTR_PRINTER_IMPL(FunctionControl)
-GEN_INSTR_PRINTER_IMPL(MemorySemantics)
-GEN_INSTR_PRINTER_IMPL(MemoryOperand)
-GEN_INSTR_PRINTER_IMPL(Scope)
-GEN_INSTR_PRINTER_IMPL(GroupOperation)
-GEN_INSTR_PRINTER_IMPL(KernelEnqueueFlags)
-GEN_INSTR_PRINTER_IMPL(KernelProfilingInfo)
+template <OperandCategory::OperandCategory category>
+void SPIRVInstPrinter::printSymbolicOperand(const MCInst *MI, unsigned OpNo,
+                                            raw_ostream &O) {
+  if (OpNo < MI->getNumOperands()) {
+    O << getSymbolicOperandMnemonic(category, MI->getOperand(OpNo).getImm());
+  }
+}

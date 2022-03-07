@@ -594,11 +594,15 @@ static void handleIntegerWrapFlags(const MachineInstr &I, Register Target,
                                    MachineIRBuilder &MIRBuilder,
                                    SPIRVGlobalRegistry &GR) {
   if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && canUseNSW(NewOpcode) &&
-      canUseDecoration(Decoration::NoSignedWrap, ST))
+      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
+                                     Decoration::NoSignedWrap, ST)
+          .isSatisfiable)
     buildOpDecorate(Target, MIRBuilder, Decoration::NoSignedWrap, {});
 
   if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && canUseNUW(NewOpcode) &&
-      canUseDecoration(Decoration::NoUnsignedWrap, ST))
+      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
+                                     Decoration::NoUnsignedWrap, ST)
+          .isSatisfiable)
     buildOpDecorate(Target, MIRBuilder, Decoration::NoUnsignedWrap, {});
 }
 

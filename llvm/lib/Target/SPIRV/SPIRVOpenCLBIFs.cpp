@@ -13,8 +13,8 @@
 
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRV.h"
-#include "SPIRVEnums.h"
 #include "SPIRVExtInsts.h"
+#include "SPIRVSymbolicOperands.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVUtils.h"
 
@@ -156,12 +156,6 @@ static StringMap<BuiltIn::BuiltIn> OpenCLBIToBuiltInVarMap({
 #undef _SPIRV_OP
 });
 
-static StringMap<BuiltIn::BuiltIn> SpirvBuiltInNameToBuiltInVarMap({
-#define MAKE_BUILTIN_NAME_MAP(Enum, Var, Val, Caps, Exts, MinVer, MaxVer) \
-  {"__spirv_BuiltIn" #Var, BuiltIn::Var},
-  DEF_BuiltIn(BuiltIn, MAKE_BUILTIN_NAME_MAP)
-});
-
 static StringMap<GroupOperation::GroupOperation> GroupOperationMap({
 #define _SPIRV_OP(x, y) {#x, GroupOperation::y},
   _SPIRV_OP(reduce, Reduce)
@@ -183,14 +177,6 @@ static StringMap<GroupOperation::GroupOperation> GroupOperationMap({
 
 static bool genBarrier(MachineIRBuilder &MIRBuilder, unsigned opcode,
     const SmallVectorImpl<Register> &OrigArgs, SPIRVGlobalRegistry *GR);
-
-bool llvm::getSpirvBuilInIdByName(StringRef Name, BuiltIn::BuiltIn &BI) {
-  if (SpirvBuiltInNameToBuiltInVarMap.count(Name)) {
-    BI = SpirvBuiltInNameToBuiltInVarMap.lookup(Name);
-    return true;
-  }
-  return false;
-}
 
 static SamplerAddressingMode::SamplerAddressingMode
 getSamplerAddressingModeFromBitmask(unsigned int bitmask) {
@@ -338,7 +324,7 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
 
   // Set up the global OpVariable with the necessary builtin decorations
   Register Var = GR->buildGlobalVariable(NewReg, PtrTy,
-      getLinkStrForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
+      getLinkStringForBuiltIn(builtIn), nullptr, StorageClass::Input, nullptr,
       true, true, LinkageType::Import, MIRBuilder, false);
 
   // Load the value from the global variable

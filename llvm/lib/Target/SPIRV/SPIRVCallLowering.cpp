@@ -13,10 +13,10 @@
 
 #include "SPIRVCallLowering.h"
 #include "SPIRV.h"
-#include "SPIRVEnums.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
+#include "SPIRVSymbolicOperands.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVUtils.h"

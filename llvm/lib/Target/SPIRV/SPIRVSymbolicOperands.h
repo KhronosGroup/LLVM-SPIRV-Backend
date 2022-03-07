@@ -1,0 +1,204 @@
+//===-- SPIRVSymbolicOperands.h - Top level SPIRV definitions ---*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains TableGen generated enum definitions, mnemonic lookup 
+// functions, versioning/capabilities/extensions getters for symbolic/named
+// operands for various SPIR-V instructions.
+//
+//===----------------------------------------------------------------------===//
+
+
+#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H
+#define LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H
+
+#include "llvm/ADT/StringRef.h"
+
+#include <string>
+#include <vector>
+
+namespace OperandCategory {
+#define GET_OperandCategory_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace Extension {
+#define GET_Extension_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace Capability {
+#define GET_Capability_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace SourceLanguage {
+#define GET_SourceLanguage_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace AddressingModel {
+#define GET_AddressingModel_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ExecutionModel {
+#define GET_ExecutionModel_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace MemoryModel {
+#define GET_MemoryModel_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ExecutionMode {
+#define GET_ExecutionMode_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace StorageClass {
+#define GET_StorageClass_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace Dim {
+#define GET_Dim_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace SamplerAddressingMode {
+#define GET_SamplerAddressingMode_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace SamplerFilterMode {
+#define GET_SamplerFilterMode_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ImageFormat {
+#define GET_ImageFormat_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ImageChannelOrder {
+#define GET_ImageChannelOrder_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ImageChannelDataType {
+#define GET_ImageChannelDataType_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace ImageOperand {
+#define GET_ImageOperand_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace FPFastMathMode {
+#define GET_FPFastMathMode_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace FPRoundingMode {
+#define GET_FPRoundingMode_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace LinkageType {
+#define GET_LinkageType_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace AccessQualifier {
+#define GET_AccessQualifier_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace FunctionParameterAttribute {
+#define GET_FunctionParameterAttribute_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace Decoration {
+#define GET_Decoration_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace BuiltIn {
+#define GET_BuiltIn_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace SelectionControl {
+#define GET_SelectionControl_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace LoopControl {
+#define GET_LoopControl_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace FunctionControl {
+#define GET_FunctionControl_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace MemorySemantics {
+#define GET_MemorySemantics_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace MemoryOperand {
+#define GET_MemoryOperand_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace Scope {
+#define GET_Scope_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace GroupOperation {
+#define GET_GroupOperation_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace KernelEnqueueFlags {
+#define GET_KernelEnqueueFlags_DECL
+#include "SPIRVGenTables.inc"
+}
+
+namespace KernelProfilingInfo {
+#define GET_KernelProfilingInfo_DECL
+#include "SPIRVGenTables.inc"
+}
+
+std::string
+getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
+                           int32_t Value);
+uint32_t
+getSymbolicOperandMinVersion(::OperandCategory::OperandCategory Category,
+                             uint32_t Value);
+uint32_t
+getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
+                             uint32_t Value);
+std::vector<::Capability::Capability>
+getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
+                               uint32_t Value);
+std::vector<::Extension::Extension>
+getSymbolicOperandExtensions(::OperandCategory::OperandCategory Category,
+                             uint32_t Value);
+std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue);
+
+// TODO: Remove function after new SPIRVOpenCLBIFs is merged
+bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI);
+
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H

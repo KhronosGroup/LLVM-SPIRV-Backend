@@ -341,7 +341,9 @@ void SPIRVAsmPrinter::outputGlobalRequirements() {
   for (const auto &Ext : MAI->Reqs.getExtensions()) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtension);
-    addStringImm(getExtensionName(Ext), Inst);
+    addStringImm(
+        getSymbolicOperandMnemonic(OperandCategory::ExtensionOperand, Ext),
+        Inst);
     outputMCInst(Inst);
   }
   // TODO add a pseudo instr for version number
