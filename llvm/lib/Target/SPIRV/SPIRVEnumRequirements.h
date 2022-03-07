@@ -14,7 +14,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_ENUMREQUIREMENTS_H
 #define LLVM_LIB_TARGET_SPIRV_ENUMREQUIREMENTS_H
 
-#include "SPIRVEnums.h"
+#include "SPIRVSymbolicOperands.h"
 #include "llvm/ADT/Optional.h"
 
 namespace llvm {
@@ -39,64 +39,8 @@ public:
       : SPIRVRequirements(true, {cap}) {}
 };
 
-#define DEF_CAPABILITY_FUNC_HEADER(EnumName)                                   \
-  const std::vector<Capability::Capability> get##EnumName##Capabilities(       \
-      EnumName::EnumName e);
-
-#define DEF_EXTENSION_FUNC_HEADER(EnumName)                                    \
-  const std::vector<Extension::Extension> get##EnumName##Extensions(           \
-      EnumName::EnumName e);
-
-#define DEF_MIN_VERSION_FUNC_HEADER(EnumName)                                  \
-  uint32_t get##EnumName##MinVersion(EnumName::EnumName e);
-
-#define DEF_MAX_VERSION_FUNC_HEADER(EnumName)                                  \
-  uint32_t get##EnumName##MaxVersion(EnumName::EnumName e);
-
-#define DEF_REQUIREMENTS_FUNC_HEADER(EnumName)                                 \
-  SPIRVRequirements get##EnumName##Requirements(                               \
-      uint32_t i, const llvm::SPIRVSubtarget &ST);
-
-#define DEF_CAN_USE_FUNC_HEADER(EnumName)                                      \
-  bool canUse##EnumName(EnumName::EnumName e, const llvm::SPIRVSubtarget &ST);
-
-#define GEN_ENUM_REQS_HEADER(EnumName)                                         \
-  DEF_CAPABILITY_FUNC_HEADER(EnumName)                                         \
-  DEF_EXTENSION_FUNC_HEADER(EnumName)                                          \
-  DEF_MIN_VERSION_FUNC_HEADER(EnumName)                                        \
-  DEF_MAX_VERSION_FUNC_HEADER(EnumName)                                        \
-  DEF_REQUIREMENTS_FUNC_HEADER(EnumName)                                       \
-  DEF_CAN_USE_FUNC_HEADER(EnumName)
-
-GEN_ENUM_REQS_HEADER(Capability)
-GEN_ENUM_REQS_HEADER(SourceLanguage)
-GEN_ENUM_REQS_HEADER(ExecutionModel)
-GEN_ENUM_REQS_HEADER(AddressingModel)
-GEN_ENUM_REQS_HEADER(MemoryModel)
-GEN_ENUM_REQS_HEADER(ExecutionMode)
-GEN_ENUM_REQS_HEADER(StorageClass)
-GEN_ENUM_REQS_HEADER(Dim)
-GEN_ENUM_REQS_HEADER(SamplerAddressingMode)
-GEN_ENUM_REQS_HEADER(SamplerFilterMode)
-GEN_ENUM_REQS_HEADER(ImageFormat)
-GEN_ENUM_REQS_HEADER(ImageChannelOrder)
-GEN_ENUM_REQS_HEADER(ImageChannelDataType)
-GEN_ENUM_REQS_HEADER(ImageOperand)
-GEN_ENUM_REQS_HEADER(FPFastMathMode)
-GEN_ENUM_REQS_HEADER(FPRoundingMode)
-GEN_ENUM_REQS_HEADER(LinkageType)
-GEN_ENUM_REQS_HEADER(AccessQualifier)
-GEN_ENUM_REQS_HEADER(FunctionParameterAttribute)
-GEN_ENUM_REQS_HEADER(Decoration)
-GEN_ENUM_REQS_HEADER(BuiltIn)
-GEN_ENUM_REQS_HEADER(SelectionControl)
-GEN_ENUM_REQS_HEADER(LoopControl)
-GEN_ENUM_REQS_HEADER(FunctionControl)
-GEN_ENUM_REQS_HEADER(MemorySemantics)
-GEN_ENUM_REQS_HEADER(MemoryOperand)
-GEN_ENUM_REQS_HEADER(Scope)
-GEN_ENUM_REQS_HEADER(GroupOperation)
-GEN_ENUM_REQS_HEADER(KernelEnqueueFlags)
-GEN_ENUM_REQS_HEADER(KernelProfilingInfo)
+SPIRVRequirements
+getSymbolicOperandRequirements(OperandCategory::OperandCategory Category,
+                               uint32_t i, const llvm::SPIRVSubtarget &ST);
 
 #endif

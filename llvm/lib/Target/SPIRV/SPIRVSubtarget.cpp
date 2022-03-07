@@ -145,7 +145,8 @@ static void addCaps(std::set<Capability::Capability> &Caps,
                     const std::vector<Capability::Capability> &ToAdd) {
   for (const auto cap : ToAdd) {
     if (Caps.insert(cap).second) {
-      addCaps(Caps, getCapabilityCapabilities(cap));
+      addCaps(Caps, getSymbolicOperandCapabilities(
+                        OperandCategory::CapabilityOperand, cap));
     }
   }
 }

@@ -17,7 +17,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
 
 #include "SPIRVDuplicatesTracker.h"
-#include "SPIRVEnums.h"
+#include "SPIRVSymbolicOperands.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace AQ = AccessQualifier;

@@ -106,12 +106,14 @@ static void addOpDecorateReqs(const MachineInstr &MI, unsigned int decIndex,
                               const SPIRVSubtarget &ST) {
   auto decOp = MI.getOperand(decIndex).getImm();
   auto dec = static_cast<Decoration::Decoration>(decOp);
-  reqs.addRequirements(getDecorationRequirements(dec, ST));
+  reqs.addRequirements(getSymbolicOperandRequirements(
+      OperandCategory::DecorationOperand, dec, ST));
 
   if (dec == Decoration::BuiltIn) {
     auto builtInOp = MI.getOperand(decIndex + 1).getImm();
     auto builtIn = static_cast<BuiltIn::BuiltIn>(builtInOp);
-    reqs.addRequirements(getBuiltInRequirements(builtIn, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::BuiltInOperand, builtIn, ST));
   }
 }
 
@@ -128,7 +130,8 @@ static void addOpTypeImageReqs(const MachineInstr &MI,
   // the MachineInstr follows as well.
   auto imgFormatOp = MI.getOperand(7).getImm();
   auto imgFormat = static_cast<ImageFormat::ImageFormat>(imgFormatOp);
-  reqs.addRequirements(getImageFormatRequirements(imgFormat, ST));
+  reqs.addRequirements(getSymbolicOperandRequirements(
+      OperandCategory::ImageFormatOperand, imgFormat, ST));
 
   bool isArrayed = MI.getOperand(4).getImm() == 1;
   bool isMultisampled = MI.getOperand(5).getImm() == 1;
@@ -179,20 +182,24 @@ void addInstrRequirements(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   case SPIRV::OpMemoryModel: {
     auto addr = MI.getOperand(0).getImm();
-    reqs.addRequirements(getAddressingModelRequirements(addr, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::AddressingModelOperand, addr, ST));
     auto mem = MI.getOperand(1).getImm();
-    reqs.addRequirements(getMemoryModelRequirements(mem, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::MemoryModelOperand, mem, ST));
     break;
   }
   case SPIRV::OpEntryPoint: {
     auto exe = MI.getOperand(0).getImm();
-    reqs.addRequirements(getExecutionModelRequirements(exe, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::ExecutionModelOperand, exe, ST));
     break;
   }
   case SPIRV::OpExecutionMode:
   case SPIRV::OpExecutionModeId: {
     auto exe = MI.getOperand(1).getImm();
-    reqs.addRequirements(getExecutionModeRequirements(exe, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::ExecutionModeOperand, exe, ST));
     break;
   }
   case SPIRV::OpTypeMatrix:
@@ -227,7 +234,8 @@ void addInstrRequirements(const MachineInstr &MI,
   }
   case SPIRV::OpTypePointer: {
     auto sc = MI.getOperand(1).getImm();
-    reqs.addRequirements(getStorageClassRequirements(sc, ST));
+    reqs.addRequirements(getSymbolicOperandRequirements(
+        OperandCategory::StorageClassOperand, sc, ST));
     // If it's a type of pointer to float16, add Float16Buffer capability.
     auto targetType = MI.getOperand(2).getReg();
     auto &MRI = MI.getMF()->getRegInfo();

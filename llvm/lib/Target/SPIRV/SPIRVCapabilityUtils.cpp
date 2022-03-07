@@ -31,7 +31,8 @@ void SPIRVRequirementHandler::pruneCapabilities(const CapabilityList &toPrune) {
     if (foundIndex != minimalCaps.end()) {
       minimalCaps.erase(foundIndex);
     }
-    CapabilityList implicitDeclares = getCapabilityCapabilities(cap);
+    CapabilityList implicitDeclares =
+        getSymbolicOperandCapabilities(OperandCategory::CapabilityOperand, cap);
     pruneCapabilities(implicitDeclares);
   }
 }
@@ -43,7 +44,8 @@ void SPIRVRequirementHandler::addCapabilities(const CapabilityList &toAdd) {
   for (const auto &cap : toAdd) {
     bool isNewlyInserted = allCaps.insert(cap).second;
     if (isNewlyInserted) { // Don't re-add if it's already been declared
-      CapabilityList implicitDeclares = getCapabilityCapabilities(cap);
+      CapabilityList implicitDeclares = getSymbolicOperandCapabilities(
+          OperandCategory::CapabilityOperand, cap);
       pruneCapabilities(implicitDeclares);
       minimalCaps.push_back(cap);
     }
@@ -125,14 +127,20 @@ void SPIRVRequirementHandler::checkSatisfiable(
 
   for (auto cap : minimalCaps) {
     if (!ST.canUseCapability(cap)) {
-      errs() << "Capability not supported: " << getCapabilityName(cap) << "\n";
+      errs() << "Capability not supported: "
+             << getSymbolicOperandMnemonic(OperandCategory::CapabilityOperand,
+                                           cap)
+             << "\n";
       isSatisfiable = false;
     }
   }
 
   for (auto ext : allExtensions) {
     if (!ST.canUseExtension(ext)) {
-      errs() << "Extension not suported: " << getExtensionName(ext) << "\n";
+      errs() << "Extension not suported: "
+             << getSymbolicOperandMnemonic(OperandCategory::ExtensionOperand,
+                                           ext)
+             << "\n";
       isSatisfiable = false;
     }
   }

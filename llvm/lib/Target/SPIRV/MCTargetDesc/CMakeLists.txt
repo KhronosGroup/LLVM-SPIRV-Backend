@@ -6,7 +6,7 @@ add_llvm_component_library(LLVMSPIRVDesc
   SPIRVMCCodeEmitter.cpp
   SPIRVObjectTargetWriter.cpp
   SPIRVInstPrinter.cpp
-  ../SPIRVEnums.cpp
+  ../SPIRVSymbolicOperands.cpp
   ../SPIRVExtInsts.cpp
 
   LINK_COMPONENTS

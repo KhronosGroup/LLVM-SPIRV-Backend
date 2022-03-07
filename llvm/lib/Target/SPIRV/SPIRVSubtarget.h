@@ -14,9 +14,8 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
 #include "SPIRVCallLowering.h"
-#include "SPIRVEnums.h"
+#include "SPIRVSymbolicOperands.h"
 #include "SPIRVExtInsts.h"
-#include "SPIRVExtensions.h"
 #include "SPIRVFrameLowering.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
