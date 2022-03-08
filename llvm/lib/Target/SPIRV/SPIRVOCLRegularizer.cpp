@@ -48,8 +48,8 @@ private:
 
 char SPIRVOCLRegularizer::ID = 0;
 
-INITIALIZE_PASS(SPIRVOCLRegularizer, "spirv-decor-generation",
-                "SPIRV Decorations Generation", false, false)
+INITIALIZE_PASS(SPIRVOCLRegularizer, "spirv-ocl-regularizer",
+                "SPIRV OpenCL Regularizer", false, false)
 
 void SPIRVOCLRegularizer::visitCallInst(CallInst &CI) {
   auto F = CI.getCalledFunction();

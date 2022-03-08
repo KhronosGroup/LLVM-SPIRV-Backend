@@ -19,7 +19,6 @@
 #include "SPIRVInstrInfo.h"
 #include "SPIRVRegisterBankInfo.h"
 #include "SPIRVRegisterInfo.h"
-#include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "SPIRVUtils.h"
 #include "llvm/ADT/APFloat.h"
@@ -1363,10 +1362,10 @@ bool SPIRVInstructionSelector::selectGEP(Register ResVReg,
   unsigned Opcode = I.getOperand(2).getImm() ? SPIRV::OpInBoundsPtrAccessChain
                                              : SPIRV::OpPtrAccessChain;
   auto Res = MIRBuilder.buildInstr(Opcode)
-                  .addDef(ResVReg)
-                  .addUse(GR.getSPIRVTypeID(ResType))
-                  // object to get a pointer to
-                  .addUse(I.getOperand(3).getReg());
+                 .addDef(ResVReg)
+                 .addUse(GR.getSPIRVTypeID(ResType))
+                 // object to get a pointer to
+                 .addUse(I.getOperand(3).getReg());
   // adding indices
   for (unsigned i = 4; i < I.getNumExplicitOperands(); ++i)
     Res.addUse(I.getOperand(i).getReg());

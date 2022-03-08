@@ -16,9 +16,9 @@
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
-#include "SPIRVSymbolicOperands.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
+#include "SPIRVSymbolicOperands.h"
 #include "SPIRVUtils.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/Demangle/Demangle.h"
@@ -63,6 +63,15 @@ static uint32_t getFunctionControl(const Function &F) {
   return FuncControl;
 }
 
+static ConstantInt *getConstInt(MDNode *MD, unsigned NumOp) {
+  if (MD->getNumOperands() > NumOp) {
+    auto *CMeta = dyn_cast<ConstantAsMetadata>(MD->getOperand(NumOp));
+    if (CMeta)
+      return dyn_cast<ConstantInt>(CMeta->getValue());
+  }
+  return nullptr;
+}
+
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
@@ -105,6 +114,36 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
         buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
                         {FunctionParameterAttribute::Zext});
       }
+      if (Arg.hasAttribute(Attribute::NoAlias)) {
+        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
+                        {FunctionParameterAttribute::NoAlias});
+      }
+
+      auto Node = F.getMetadata("kernel_arg_type_qual");
+      if (Node && i < Node->getNumOperands()) {
+        StringRef TypeQual = cast<MDString>(Node->getOperand(i))->getString();
+        if (TypeQual.compare("volatile") == 0)
+          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Volatile, {});
+      }
+      Node = F.getMetadata("spirv.ParameterDecorations");
+      if (Node && i < Node->getNumOperands() &&
+          isa<MDNode>(Node->getOperand(i))) {
+        MDNode *MD = cast<MDNode>(Node->getOperand(i));
+        for (const MDOperand &MDOp : MD->operands()) {
+          MDNode *MD2 = dyn_cast<MDNode>(MDOp);
+          assert(MD2 && "Metadata operand is expected");
+          ConstantInt *Const = getConstInt(MD2, 0);
+          assert(Const && "MDOperand should be ConstantInt");
+          auto Dec = static_cast<Decoration::Decoration>(Const->getZExtValue());
+          std::vector<uint32_t> DecVec;
+          for (unsigned int j = 1; j < MD2->getNumOperands(); j++) {
+            ConstantInt *Const = getConstInt(MD2, j);
+            assert(Const && "MDOperand should be ConstantInt");
+            DecVec.push_back(static_cast<uint32_t>(Const->getZExtValue()));
+          }
+          buildOpDecorate(VRegs[i][0], MIRBuilder, Dec, DecVec);
+        }
+      }
       ++i;
     }
   }
@@ -133,17 +172,16 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
     if (ThisFuncMDIt != NamedMD->op_end()) {
       auto *ThisFuncMD = *ThisFuncMDIt;
-      // TODO: improve readability and get rid of the unchecked casts
-      if (cast<ConstantInt>(
-              cast<ConstantAsMetadata>(
-                  cast<MDNode>(ThisFuncMD->getOperand(1))->getOperand(0))
-                  ->getValue())
-              // TODO: currently -1 indicates return value, support this types
-              // renaming for arguments as well
-              ->getSExtValue() == -1)
-        RetTy = cast<ConstantAsMetadata>(
-                    cast<MDNode>(ThisFuncMD->getOperand(1))->getOperand(1))
-                    ->getType();
+      MDNode *MD = dyn_cast<MDNode>(ThisFuncMD->getOperand(1));
+      assert(MD && "MDNode operand is expected");
+      ConstantInt *Const = getConstInt(MD, 0);
+      // TODO: currently -1 indicates return value, support this types
+      // renaming for arguments as well
+      if (Const && Const->getSExtValue() == -1) {
+        auto *CMeta = dyn_cast<ConstantAsMetadata>(MD->getOperand(1));
+        assert(CMeta && "ConstantAsMetadata operand is expected");
+        RetTy = CMeta->getType();
+      }
     }
 
     for (auto &Arg : F.args())
