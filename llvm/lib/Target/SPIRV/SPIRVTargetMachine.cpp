@@ -209,49 +209,6 @@ class SPIRVInstructionSelect : public InstructionSelect {
     return InstructionSelect::getRequiredProperties().reset(
         MachineFunctionProperties::Property::RegBankSelected);
   }
-
-  // Init a SPIRVGlobalRegistry before and reset it after the default
-  // parent code.
-  bool runOnMachineFunction(MachineFunction &MF) override {
-    auto &MRI = MF.getRegInfo();
-
-    // we need to rewrite dst types for ASSIGN_TYPE instrs
-    // to be able to perform tblgen'erated selection
-    // and we can't do that on Legalizer as it operates on gMIR only
-    // TODO: consider redesigning this approach
-    for (auto &MBB : MF) {
-      for (auto &MI : MBB) {
-        if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
-          auto &SrcOp = MI.getOperand(1);
-          if (isTypeFoldingSupported(
-                  MRI.getVRegDef(SrcOp.getReg())->getOpcode())) {
-            if (MRI.getType(MI.getOperand(0).getReg()).isVector())
-              MRI.setRegClass(MI.getOperand(0).getReg(), &SPIRV::IDRegClass);
-            MRI.setType(MI.getOperand(0).getReg(), LLT::scalar(32));
-          }
-        }
-      }
-    }
-
-    bool Success = InstructionSelect::runOnMachineFunction(MF);
-    std::vector<MachineInstr *> ToRemove;
-    for (auto &MBB : MF) {
-      for (auto &MI : MBB) {
-        if (MI.getOpcode() == SPIRV::GET_ID ||
-            MI.getOpcode() == SPIRV::GET_fID ||
-            MI.getOpcode() == SPIRV::GET_pID ||
-            MI.getOpcode() == SPIRV::GET_vfID ||
-            MI.getOpcode() == SPIRV::GET_vID) {
-          MRI.replaceRegWith(MI.getOperand(0).getReg(),
-                             MI.getOperand(1).getReg());
-          ToRemove.push_back(&MI);
-        }
-      }
-    }
-    for (auto *MI : ToRemove)
-      MI->eraseFromParent();
-    return Success;
-  }
 };
 } // namespace
 
