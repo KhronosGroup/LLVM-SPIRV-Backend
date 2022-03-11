@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVSymbolicOperands.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVEnumRequirements.h"
 #include "SPIRVSubtarget.h"
 

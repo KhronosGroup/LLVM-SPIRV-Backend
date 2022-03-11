@@ -14,9 +14,9 @@
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRV.h"
 #include "SPIRVExtInsts.h"
-#include "SPIRVSymbolicOperands.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVUtils.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 
 #include "llvm/IR/IntrinsicsSPIRV.h"
 

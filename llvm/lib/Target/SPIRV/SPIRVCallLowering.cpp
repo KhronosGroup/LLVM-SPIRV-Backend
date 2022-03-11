@@ -12,13 +12,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVCallLowering.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRV.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
-#include "SPIRVSymbolicOperands.h"
 #include "SPIRVUtils.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/Demangle/Demangle.h"

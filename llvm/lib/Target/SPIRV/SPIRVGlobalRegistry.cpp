@@ -17,7 +17,6 @@
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRV.h"
 #include "SPIRVOpenCLBIFs.h"
-#include "SPIRVSymbolicOperands.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "SPIRVUtils.h"
