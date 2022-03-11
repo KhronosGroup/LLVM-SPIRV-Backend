@@ -11,7 +11,7 @@
 ; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: %[[X:[0-9]+]] = OpFunctionParameter %{{[0-9]+}}
-; CHECK-SPIRV: OpSwitch %[[X]] %[[DEFAULT:[0-9]+]] {{$}}
+; CHECK-SPIRV: OpSwitch %[[X]] %[[DEFAULT:[0-9]+]]{{$}}
 ; CHECK-SPIRV: %[[DEFAULT]] = OpLabel
 
 ; ModuleID = 'test/SPIRV/OpSwitchEmpty.ll'

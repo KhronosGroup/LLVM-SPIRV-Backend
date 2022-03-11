@@ -124,7 +124,7 @@ void SPIRVAsmPrinter::emitFunctionHeader() {
   MF->setSection(Section);
 }
 
-// The table maps MMB number to SPIR-V unique ID register.
+// The table maps MBB number to SPIR-V unique ID register.
 static DenseMap<int, Register> BBNumToRegMap;
 
 void SPIRVAsmPrinter::outputOpFunctionEnd() {
@@ -155,6 +155,8 @@ Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
 }
 
 void SPIRVAsmPrinter::emitOpLabel(const MachineBasicBlock &MBB) {
+  if (MAI->MBBsToSkip.contains(&MBB))
+    return;
   MCInst LabelInst;
   LabelInst.setOpcode(SPIRV::OpLabel);
   LabelInst.addOperand(MCOperand::createReg(getOrCreateMBBRegister(MBB, MAI)));
@@ -245,7 +247,7 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   if (!MAI->getSkipEmission(MI))
     outputInstruction(MI);
 
-  // Output OpLabel after OpFunction and OpFunctionParameter in the first MMB.
+  // Output OpLabel after OpFunction and OpFunctionParameter in the first MBB.
   const MachineInstr *NextMI = MI->getNextNode();
   if (!hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
       (!NextMI || !isFuncOrHeaderInstr(NextMI, TII))) {

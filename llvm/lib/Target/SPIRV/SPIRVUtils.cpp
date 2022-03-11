@@ -13,6 +13,7 @@
 #include "SPIRVUtils.h"
 #include "SPIRV.h"
 #include "SPIRVStringReader.h"
+#include "llvm/IR/IntrinsicsSPIRV.h"
 
 using namespace llvm;
 
@@ -176,4 +177,24 @@ bool constrainRegOperands(MachineInstrBuilder &MIB, MachineFunction *MF) {
   const RegisterBankInfo *RBI = Subtarget.getRegBankInfo();
 
   return constrainSelectedInstRegOperands(*MIB, *TII, *TRI, *RBI);
+}
+
+MachineInstr *getDefInstrMaybeConstant(Register &ConstReg,
+                                       const MachineRegisterInfo *MRI) {
+  MachineInstr *ConstInstr = MRI->getVRegDef(ConstReg);
+  if (ConstInstr->getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+      ConstInstr->getIntrinsicID() == Intrinsic::spv_track_constant) {
+    ConstReg = ConstInstr->getOperand(2).getReg();
+    ConstInstr = MRI->getVRegDef(ConstReg);
+  } else if (ConstInstr->getOpcode() == SPIRV::ASSIGN_TYPE) {
+    ConstReg = ConstInstr->getOperand(1).getReg();
+    ConstInstr = MRI->getVRegDef(ConstReg);
+  }
+  return ConstInstr;
+}
+
+uint64_t getIConstVal(Register ConstReg, const MachineRegisterInfo *MRI) {
+  const MachineInstr *MI = getDefInstrMaybeConstant(ConstReg, MRI);
+  assert(MI && MI->getOpcode() == TargetOpcode::G_CONSTANT);
+  return MI->getOperand(1).getCImm()->getValue().getZExtValue();
 }
