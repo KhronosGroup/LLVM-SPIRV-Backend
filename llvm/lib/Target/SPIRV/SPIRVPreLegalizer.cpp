@@ -386,7 +386,23 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   DenseSet<Register> SwitchRegs;
   auto &MRI = MF.getRegInfo();
   MachineIRBuilder MIB(MF);
-
+  // Before IRTranslator pass, spv_switch calls are inserted before each
+  // switch instruction. IRTranslator lowers switches to ICMP+CBr+Br triples.
+  // A switch with two cases may be translated to this MIR sequesnce:
+  //   intrinsic(@llvm.spv.switch), %CmpReg, %Const0, %Const1
+  //   %Dst0 = G_ICMP intpred(eq), %CmpReg, %Const0
+  //   G_BRCOND %Dst0, %bb.2
+  //   G_BR %bb.5
+  // bb.5.entry:
+  //   %Dst1 = G_ICMP intpred(eq), %CmpReg, %Const1
+  //   G_BRCOND %Dst1, %bb.3
+  //   G_BR %bb.4
+  // bb.2.sw.bb:
+  //   ...
+  // bb.3.sw.bb1:
+  //   ...
+  // bb.4.sw.epilog:
+  //   ...
   // Walk MIs and collect information about destination MBBs to update
   // spv_switch call. We assume that all spv_switch precede corresponding ICMPs.
   for (auto &MBB : MF) {
@@ -429,14 +445,18 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
         MachineBasicBlock *NextMBB = NextMI->getOperand(0).getMBB();
         assert(NextMBB != nullptr);
         // The default MBB is not started by ICMP with switch's cmp register.
-        if (NextMBB->instr_front().getOpcode() != SPIRV::G_ICMP ||
-            (NextMBB->instr_front().getOperand(2).isReg() &&
-             NextMBB->instr_front().getOperand(2).getReg() != CmpReg))
+        if (NextMBB->front().getOpcode() != SPIRV::G_ICMP ||
+            (NextMBB->front().getOperand(2).isReg() &&
+             NextMBB->front().getOperand(2).getReg() != CmpReg))
           DefaultMBBs[CmpReg] = NextMBB;
       }
     }
   }
-  // Modify spv_switch's operands by collected values.
+  // Modify spv_switch's operands by collected values. For the example above,
+  // the result will be like this:
+  //   intrinsic(@llvm.spv.switch), %CmpReg, %bb.4, i32 0, %bb.2, i32 1, %bb.3
+  // Note that ICMP+CBr+Br sequences are not removed, but ModuleAnalysis marks
+  // them as skipped and AsmPrinter does not output them.
   for (auto &MBB : MF)
     for (auto &MI : MBB)
       if (isSpvIntrinsic(MI, Intrinsic::spv_switch)) {
