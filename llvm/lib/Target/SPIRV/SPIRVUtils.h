@@ -61,4 +61,15 @@ bool constrainRegOperands(llvm::MachineInstrBuilder &MIB,
 
 MemorySemantics::MemorySemantics
 getMemSemanticsForStorageClass(StorageClass::StorageClass sc);
+
+// Find def instruction for the given ConstReg, walking through
+// spv_track_constant and ASSIGN_TYPE instructions. Updates ConstReg by def
+// of OpConstant instruction.
+llvm::MachineInstr *
+getDefInstrMaybeConstant(llvm::Register &ConstReg,
+                         const llvm::MachineRegisterInfo *MRI);
+
+// Get constant integer value of the given ConstReg.
+uint64_t getIConstVal(llvm::Register ConstReg,
+                      const llvm::MachineRegisterInfo *MRI);
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H

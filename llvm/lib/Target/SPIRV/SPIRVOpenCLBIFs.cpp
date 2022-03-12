@@ -294,24 +294,6 @@ static Register buildOpSampledImage(Register res, Register image,
   return sampledImage;
 }
 
-static MachineInstr *getDefInstrMaybeConstant(Register &constVReg,
-                                      const MachineRegisterInfo *MRI) {
-  MachineInstr *constInstr = MRI->getVRegDef(constVReg);
-  if (constInstr->getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-      constInstr->getIntrinsicID() == Intrinsic::spv_track_constant) {
-    constVReg = constInstr->getOperand(2).getReg();
-    constInstr = MRI->getVRegDef(constVReg);
-  }
-  return constInstr;
-}
-
-static uint64_t getIConstVal(Register constReg,
-                             const MachineRegisterInfo *MRI) {
-  const auto c = getDefInstrMaybeConstant(constReg, MRI);
-  assert(c && c->getOpcode() == TargetOpcode::G_CONSTANT);
-  return c->getOperand(1).getCImm()->getValue().getZExtValue();
-}
-
 static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
                               SPIRVType *varType,
                               SPIRVGlobalRegistry *GR, BuiltIn::BuiltIn builtIn,

@@ -379,6 +379,109 @@ static void processInstrsWithTypeFolding(MachineFunction &MF,
         processInstr(MI, MIB, MRI, GR);
 }
 
+static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
+  DenseMap<Register, SmallDenseMap<uint64_t, MachineBasicBlock *>>
+      SwitchRegToMBB;
+  DenseMap<Register, MachineBasicBlock *> DefaultMBBs;
+  DenseSet<Register> SwitchRegs;
+  auto &MRI = MF.getRegInfo();
+  MachineIRBuilder MIB(MF);
+  // Before IRTranslator pass, spv_switch calls are inserted before each
+  // switch instruction. IRTranslator lowers switches to ICMP+CBr+Br triples.
+  // A switch with two cases may be translated to this MIR sequesnce:
+  //   intrinsic(@llvm.spv.switch), %CmpReg, %Const0, %Const1
+  //   %Dst0 = G_ICMP intpred(eq), %CmpReg, %Const0
+  //   G_BRCOND %Dst0, %bb.2
+  //   G_BR %bb.5
+  // bb.5.entry:
+  //   %Dst1 = G_ICMP intpred(eq), %CmpReg, %Const1
+  //   G_BRCOND %Dst1, %bb.3
+  //   G_BR %bb.4
+  // bb.2.sw.bb:
+  //   ...
+  // bb.3.sw.bb1:
+  //   ...
+  // bb.4.sw.epilog:
+  //   ...
+  // Walk MIs and collect information about destination MBBs to update
+  // spv_switch call. We assume that all spv_switch precede corresponding ICMPs.
+  for (auto &MBB : MF) {
+    for (auto &MI : MBB) {
+      if (isSpvIntrinsic(MI, Intrinsic::spv_switch)) {
+        assert(MI.getOperand(1).isReg());
+        Register Reg = MI.getOperand(1).getReg();
+        SwitchRegs.insert(Reg);
+        // Set the first successor as default MBB to support empty switches.
+        DefaultMBBs[Reg] = *MBB.succ_begin();
+      }
+      // Process only ICMPs that relate to spv_switches.
+      if (MI.getOpcode() == TargetOpcode::G_ICMP && MI.getOperand(2).isReg() &&
+          SwitchRegs.contains(MI.getOperand(2).getReg())) {
+        assert(MI.getOperand(0).isReg() && MI.getOperand(1).isPredicate() &&
+               MI.getOperand(3).isReg());
+        Register Dst = MI.getOperand(0).getReg();
+        // Set type info for destination register of switch's ICMP instruction.
+        if (GR->getSPIRVTypeForVReg(Dst) == nullptr) {
+          MIB.setInsertPt(*MI.getParent(), MI);
+          Type *LLVMTy = IntegerType::get(MF.getFunction().getContext(), 1);
+          SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, MIB);
+          MRI.setRegClass(Dst, &SPIRV::IDRegClass);
+          GR->assignSPIRVTypeToVReg(SpirvTy, Dst, MIB);
+        }
+        Register CmpReg = MI.getOperand(2).getReg();
+        auto PredOp = MI.getOperand(1);
+        const auto CC = static_cast<CmpInst::Predicate>(PredOp.getPredicate());
+        assert(CC == CmpInst::ICMP_EQ && MRI.hasOneUse(Dst) &&
+               MRI.hasOneDef(CmpReg));
+        uint64_t Val = getIConstVal(MI.getOperand(3).getReg(), &MRI);
+        MachineInstr *CBr = MRI.use_begin(Dst)->getParent();
+        assert(CBr->getOpcode() == SPIRV::G_BRCOND &&
+               CBr->getOperand(1).isMBB());
+        SwitchRegToMBB[CmpReg][Val] = CBr->getOperand(1).getMBB();
+        // The next MI is always BR to either the next case or the default.
+        MachineInstr *NextMI = CBr->getNextNode();
+        assert(NextMI->getOpcode() == SPIRV::G_BR &&
+               NextMI->getOperand(0).isMBB());
+        MachineBasicBlock *NextMBB = NextMI->getOperand(0).getMBB();
+        assert(NextMBB != nullptr);
+        // The default MBB is not started by ICMP with switch's cmp register.
+        if (NextMBB->front().getOpcode() != SPIRV::G_ICMP ||
+            (NextMBB->front().getOperand(2).isReg() &&
+             NextMBB->front().getOperand(2).getReg() != CmpReg))
+          DefaultMBBs[CmpReg] = NextMBB;
+      }
+    }
+  }
+  // Modify spv_switch's operands by collected values. For the example above,
+  // the result will be like this:
+  //   intrinsic(@llvm.spv.switch), %CmpReg, %bb.4, i32 0, %bb.2, i32 1, %bb.3
+  // Note that ICMP+CBr+Br sequences are not removed, but ModuleAnalysis marks
+  // them as skipped and AsmPrinter does not output them.
+  for (auto &MBB : MF)
+    for (auto &MI : MBB)
+      if (isSpvIntrinsic(MI, Intrinsic::spv_switch)) {
+        assert(MI.getOperand(1).isReg());
+        Register Reg = MI.getOperand(1).getReg();
+        unsigned NumOp = MI.getNumExplicitOperands();
+        SmallVector<const ConstantInt *, 3> Vals;
+        SmallVector<MachineBasicBlock *, 3> MBBs;
+        for (unsigned i = 2; i < NumOp; i++) {
+          Register CReg = MI.getOperand(i).getReg();
+          uint64_t Val = getIConstVal(CReg, &MRI);
+          MachineInstr *ConstInstr = getDefInstrMaybeConstant(CReg, &MRI);
+          Vals.push_back(ConstInstr->getOperand(1).getCImm());
+          MBBs.push_back(SwitchRegToMBB[Reg][Val]);
+        }
+        for (unsigned i = MI.getNumExplicitOperands() - 1; i > 1; i--)
+          MI.RemoveOperand(i);
+        MI.addOperand(MachineOperand::CreateMBB(DefaultMBBs[Reg]));
+        for (unsigned i = 0; i < Vals.size(); i++) {
+          MI.addOperand(MachineOperand::CreateCImm(Vals[i]));
+          MI.addOperand(MachineOperand::CreateMBB(MBBs[i]));
+        }
+      }
+}
+
 bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
   const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
@@ -389,6 +492,7 @@ bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   insertBitcasts(MF, GR);
   generateAssignInstrs(MF, GR);
   processInstrsWithTypeFolding(MF, GR);
+  processSwitches(MF, GR);
 
   return true;
 }

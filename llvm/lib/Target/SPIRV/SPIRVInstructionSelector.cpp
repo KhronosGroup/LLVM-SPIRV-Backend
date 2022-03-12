@@ -1434,6 +1434,20 @@ bool SPIRVInstructionSelector::selectIntrinsic(
     }
     return MIB.constrainAllUses(TII, TRI, RBI);
   } break;
+  case Intrinsic::spv_switch: {
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpSwitch);
+    for (unsigned i = 1; i < I.getNumExplicitOperands(); ++i) {
+      if (I.getOperand(i).isReg())
+        MIB.addReg(I.getOperand(i).getReg());
+      else if (I.getOperand(i).isCImm())
+        addNumImm(I.getOperand(i).getCImm()->getValue(), MIB);
+      else if (I.getOperand(i).isMBB())
+        MIB.addMBB(I.getOperand(i).getMBB());
+      else
+        llvm_unreachable("Unexpected OpSwitch operand");
+    }
+    return MIB.constrainAllUses(TII, TRI, RBI);
+  } break;
   default:
     llvm_unreachable("Intrinsic selection not implemented");
   }

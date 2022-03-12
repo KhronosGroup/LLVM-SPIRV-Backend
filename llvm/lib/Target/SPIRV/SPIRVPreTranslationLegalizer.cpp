@@ -448,6 +448,15 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
       BCI->eraseFromParent();
       I = NewBCI;
       I->setName(InstName);
+    } else if (auto *SI = dyn_cast<SwitchInst>(I)) {
+      auto *IntrFn = Intrinsic::getDeclaration(
+          F->getParent(), Intrinsic::spv_switch,
+          {SI->getOperand(0)->getType()});
+      std::vector<Value *> Args;
+      for (auto &Op : SI->operands())
+        if (Op.get()->getType()->isSized())
+          Args.push_back(Op);
+      B.CreateCall(IntrFn, {Args});
     } else if (isa<AllocaInst>(I))
       TrackConstants = false;
 
@@ -475,7 +484,7 @@ bool SPIRVPreTranslationLegalizer::runOnFunction(Function *F) {
     }
     for (const auto &Op : I->operands()) {
       if ((isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy()) ||
-           isa<PHINode>(I))
+           isa<PHINode>(I) || isa<SwitchInst>(I))
         TrackConstants = false;
       if (isa<ConstantData>(Op) && TrackConstants) {
         auto OpNo = Op.getOperandNo();
