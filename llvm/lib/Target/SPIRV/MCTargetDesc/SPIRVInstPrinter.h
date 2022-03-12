@@ -13,8 +13,8 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_INSTPRINTER_SPIRVINSTPRINTER_H
 #define LLVM_LIB_TARGET_SPIRV_INSTPRINTER_SPIRVINSTPRINTER_H
 
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVExtInsts.h"
-#include "SPIRVSymbolicOperands.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/MC/MCInstPrinter.h"
 

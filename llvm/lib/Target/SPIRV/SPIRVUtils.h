@@ -13,7 +13,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
 
-#include "SPIRVSymbolicOperands.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"

@@ -13,13 +13,13 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVCallLowering.h"
 #include "SPIRVExtInsts.h"
 #include "SPIRVFrameLowering.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVInstrInfo.h"
-#include "SPIRVSymbolicOperands.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"

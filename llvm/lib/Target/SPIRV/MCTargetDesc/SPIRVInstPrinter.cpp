@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVInstPrinter.h"
+#include "SPIRV.h"
+#include "SPIRVBaseInfo.h"
+#include "SPIRVExtInsts.h"
+#include "SPIRVStringReader.h"
 #include "llvm/CodeGen/Register.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
@@ -19,11 +23,6 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
-
-#include "SPIRV.h"
-#include "SPIRVExtInsts.h"
-#include "SPIRVStringReader.h"
-#include "SPIRVSymbolicOperands.h"
 
 using namespace llvm;
 

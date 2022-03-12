@@ -1,4 +1,4 @@
-//===-- SPIRVSymbolicOperands.cpp - Top level SPIRV definitions -*- C++ -*-===//
+//===-- SPIRVBaseInfo.cpp - Top level SPIRV definitions ---------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,8 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SPIRVSymbolicOperands.h"
-
+#include "SPIRVBaseInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 

@@ -14,7 +14,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVDUPLICATESTRACKER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVDUPLICATESTRACKER_H
 
-#include "SPIRVSymbolicOperands.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"

@@ -14,7 +14,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_ENUMREQUIREMENTS_H
 #define LLVM_LIB_TARGET_SPIRV_ENUMREQUIREMENTS_H
 
-#include "SPIRVSymbolicOperands.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "llvm/ADT/Optional.h"
 
 namespace llvm {
