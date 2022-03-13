@@ -69,7 +69,7 @@ std::string getStringImm(const MachineInstr &MI, unsigned int StartIndex) {
   return getSPIRVStringOperand(MI, StartIndex);
 }
 
-void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB, bool IsFloat) {
+void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB) {
   const auto Bitwidth = Imm.getBitWidth();
   switch (Bitwidth) {
   case 1:
