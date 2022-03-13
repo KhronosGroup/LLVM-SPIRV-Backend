@@ -384,6 +384,7 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
       SwitchRegToMBB;
   DenseMap<Register, MachineBasicBlock *> DefaultMBBs;
   DenseSet<Register> SwitchRegs;
+  SmallVector<MachineInstr *, 3> Switches;
   auto &MRI = MF.getRegInfo();
   MachineIRBuilder MIB(MF);
   // Before IRTranslator pass, spv_switch calls are inserted before each
@@ -413,6 +414,7 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
         SwitchRegs.insert(Reg);
         // Set the first successor as default MBB to support empty switches.
         DefaultMBBs[Reg] = *MBB.succ_begin();
+        Switches.push_back(&MI);
       }
       // Process only ICMPs that relate to spv_switches.
       if (MI.getOpcode() == TargetOpcode::G_ICMP && MI.getOperand(2).isReg() &&
@@ -457,29 +459,36 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   //   intrinsic(@llvm.spv.switch), %CmpReg, %bb.4, i32 0, %bb.2, i32 1, %bb.3
   // Note that ICMP+CBr+Br sequences are not removed, but ModuleAnalysis marks
   // them as skipped and AsmPrinter does not output them.
-  for (auto &MBB : MF)
-    for (auto &MI : MBB)
-      if (isSpvIntrinsic(MI, Intrinsic::spv_switch)) {
-        assert(MI.getOperand(1).isReg());
-        Register Reg = MI.getOperand(1).getReg();
-        unsigned NumOp = MI.getNumExplicitOperands();
-        SmallVector<const ConstantInt *, 3> Vals;
-        SmallVector<MachineBasicBlock *, 3> MBBs;
-        for (unsigned i = 2; i < NumOp; i++) {
-          Register CReg = MI.getOperand(i).getReg();
-          uint64_t Val = getIConstVal(CReg, &MRI);
-          MachineInstr *ConstInstr = getDefInstrMaybeConstant(CReg, &MRI);
-          Vals.push_back(ConstInstr->getOperand(1).getCImm());
-          MBBs.push_back(SwitchRegToMBB[Reg][Val]);
-        }
-        for (unsigned i = MI.getNumExplicitOperands() - 1; i > 1; i--)
-          MI.RemoveOperand(i);
-        MI.addOperand(MachineOperand::CreateMBB(DefaultMBBs[Reg]));
-        for (unsigned i = 0; i < Vals.size(); i++) {
-          MI.addOperand(MachineOperand::CreateCImm(Vals[i]));
-          MI.addOperand(MachineOperand::CreateMBB(MBBs[i]));
-        }
-      }
+  for (MachineInstr *MI : Switches) {
+    assert(isSpvIntrinsic(*MI, Intrinsic::spv_switch) &&
+           MI->getOperand(1).isReg());
+    Register Reg = MI->getOperand(1).getReg();
+    unsigned NumOp = MI->getNumExplicitOperands();
+    // No register in SwitchRegToMBB normally means that ICMP+CBr+Br sequences
+    // were fully optmized out. In this case just delete OpSwitch.
+    // TODO: generate OpSwitch like SPIRV Translator does.
+    if (NumOp > 2 && SwitchRegToMBB.find(Reg) == SwitchRegToMBB.end()) {
+      MI->eraseFromParent();
+      continue;
+    }
+    SmallVector<const ConstantInt *, 3> Vals;
+    SmallVector<MachineBasicBlock *, 3> MBBs;
+    for (unsigned i = 2; i < NumOp; i++) {
+      Register CReg = MI->getOperand(i).getReg();
+      uint64_t Val = getIConstVal(CReg, &MRI);
+      MachineInstr *ConstInstr = getDefInstrMaybeConstant(CReg, &MRI);
+      Vals.push_back(ConstInstr->getOperand(1).getCImm());
+      assert(SwitchRegToMBB[Reg].find(Val) != SwitchRegToMBB[Reg].end());
+      MBBs.push_back(SwitchRegToMBB[Reg][Val]);
+    }
+    for (unsigned i = MI->getNumExplicitOperands() - 1; i > 1; i--)
+      MI->RemoveOperand(i);
+    MI->addOperand(MachineOperand::CreateMBB(DefaultMBBs[Reg]));
+    for (unsigned i = 0; i < Vals.size(); i++) {
+      MI->addOperand(MachineOperand::CreateCImm(Vals[i]));
+      MI->addOperand(MachineOperand::CreateMBB(MBBs[i]));
+    }
+  }
 }
 
 bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
