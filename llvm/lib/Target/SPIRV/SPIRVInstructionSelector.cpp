@@ -1093,7 +1093,7 @@ void SPIRVInstructionSelector::renderFImm32(MachineInstrBuilder &MIB,
   assert(I.getOpcode() == TargetOpcode::G_FCONSTANT && OpIdx == -1 &&
          "Expected G_FCONSTANT");
   const ConstantFP *FPImm = I.getOperand(1).getFPImm();
-  addNumImm(FPImm->getValueAPF().bitcastToAPInt(), MIB, true);
+  addNumImm(FPImm->getValueAPF().bitcastToAPInt(), MIB);
 }
 
 void SPIRVInstructionSelector::renderImm32(MachineInstrBuilder &MIB,

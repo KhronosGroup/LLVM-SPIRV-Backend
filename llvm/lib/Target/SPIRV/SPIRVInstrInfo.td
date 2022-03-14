@@ -17,7 +17,7 @@
 include "SPIRVInstrFormats.td"
 include "SPIRVSymbolicOperands.td"
 
-//Codegen only metadata instructions
+// Codegen only metadata instructions
 let isCodeGenOnly=1 in {
   def ASSIGN_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
   def DECL_TYPE: Pseudo<(outs ANYID:$dst_id), (ins ANYID:$src_id, TYPE:$src_ty)>;
@@ -28,9 +28,9 @@ let isCodeGenOnly=1 in {
   def GET_vfID: Pseudo<(outs vfID:$dst_id), (ins ANYID:$src)>;
 }
 
-def SPVTypeBin   : SDTypeProfile<1, 2, []>;
+def SPVTypeBin : SDTypeProfile<1, 2, []>;
 
-def assigntype: SDNode<"SPIRVISD::AssignType", SPVTypeBin>;
+def assigntype : SDNode<"SPIRVISD::AssignType", SPVTypeBin>;
 
 def : GINodeEquiv<ASSIGN_TYPE, assigntype>;
 
