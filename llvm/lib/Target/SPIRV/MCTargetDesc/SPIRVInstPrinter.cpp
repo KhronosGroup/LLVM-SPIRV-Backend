@@ -263,10 +263,9 @@ static void printExpr(const MCExpr *Expr, raw_ostream &O) {
   const MCSymbolRefExpr *SRE;
 
   if (const MCBinaryExpr *BE = dyn_cast<MCBinaryExpr>(Expr))
-    SRE = dyn_cast<MCSymbolRefExpr>(BE->getLHS());
+    SRE = cast<MCSymbolRefExpr>(BE->getLHS());
   else
-    SRE = dyn_cast<MCSymbolRefExpr>(Expr);
-  assert(SRE && "Unexpected MCExpr type.");
+    SRE = cast<MCSymbolRefExpr>(Expr);
 
   MCSymbolRefExpr::VariantKind Kind = SRE->getKind();
 
@@ -280,16 +279,16 @@ void SPIRVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   assert((Modifier == 0 || Modifier[0] == 0) && "No modifiers supported");
   if (OpNo < MI->getNumOperands()) {
     const MCOperand &Op = MI->getOperand(OpNo);
-    if (Op.isReg()) {
-      O << "%" << (Register::virtReg2Index(Op.getReg()) + 1);
-    } else if (Op.isImm()) {
+    if (Op.isReg())
+      O << '%' << (Register::virtReg2Index(Op.getReg()) + 1);
+    else if (Op.isImm())
       O << formatImm((int64_t)Op.getImm());
-    } else if (Op.isDFPImm()) {
+    else if (Op.isDFPImm())
       O << formatImm((double)Op.getDFPImm());
-    } else {
-      assert(Op.isExpr() && "Expected an expression");
+    else if (Op.isExpr())
       printExpr(Op.getExpr(), O);
-    }
+    else
+      llvm_unreachable("Unexpected operand type");
   }
 }
 
