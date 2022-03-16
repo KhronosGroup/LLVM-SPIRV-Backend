@@ -159,13 +159,14 @@ TargetPassConfig *SPIRVTargetMachine::createPassConfig(PassManagerBase &PM) {
 
 void SPIRVPassConfig::addIRPasses() {
   TargetPassConfig::addIRPasses();
-  auto *TM = &getTM<SPIRVTargetMachine>();
   addPass(createSPIRVLowerConstExprLegacyPass());
   addPass(createSPIRVOCLRegularizerPass());
-  addPass(createSPIRVPreTranslationLegalizerPass(TM));
+  addPass(createSPIRVPreTranslationLegalizerPass());
 }
 
 void SPIRVPassConfig::addISelPrepare() {
+  auto *TM = &getTM<SPIRVTargetMachine>();
+  addPass(createSPIRVEmitIntrinsicsPass(TM));
   TargetPassConfig::addISelPrepare();
   addPass(createSPIRVBasicBlockDominancePass());
 }
