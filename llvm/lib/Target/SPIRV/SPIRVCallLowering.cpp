@@ -276,8 +276,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     // be sure to emit its type and function declaration here. It will be
     // hoisted globally later.
     if (Info.Callee.isGlobal()) {
-      const Function *CF =
-          static_cast<const Function *>(Info.Callee.getGlobal());
+      const Function *CF = cast<const Function>(Info.Callee.getGlobal());
       Register FuncVReg;
       if (CF->isDeclaration() &&
           (GR->find(CF, &MIRBuilder.getMF(), FuncVReg) == false)) {
