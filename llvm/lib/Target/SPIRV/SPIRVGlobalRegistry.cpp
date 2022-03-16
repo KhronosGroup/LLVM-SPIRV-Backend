@@ -247,21 +247,19 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
     bool IsInstSelector) {
   const GlobalVariable *GVar = nullptr;
   if (GV)
-    GVar = dyn_cast<const GlobalVariable>(GV);
+    GVar = cast<const GlobalVariable>(GV);
   else {
     // If GV is not passed explicitly, use the name to find or construct
     // the global variable.
-    auto *Module = MIRBuilder.getMBB().getBasicBlock()->getModule();
-    GVar = Module->getGlobalVariable(Name);
+    Module *M = MIRBuilder.getMF().getFunction().getParent();
+    GVar = M->getGlobalVariable(Name);
     if (GVar == nullptr) {
-      auto Ty = getTypeForSPIRVType(BaseType); // TODO check type
-      GVar = new GlobalVariable(
-          *const_cast<llvm::Module *>(Module), const_cast<Type *>(Ty), false,
+      const Type *Ty = getTypeForSPIRVType(BaseType); // TODO: check type.
+      GVar = new GlobalVariable(*M, const_cast<Type *>(Ty), false,
           GlobalValue::ExternalLinkage, nullptr, Twine(Name));
     }
     GV = GVar;
   }
-  assert(GV && "Global variable is expected");
   Register Reg;
   if (DT.find(GV, &MIRBuilder.getMF(), Reg)) {
     if (Reg != ResVReg)
