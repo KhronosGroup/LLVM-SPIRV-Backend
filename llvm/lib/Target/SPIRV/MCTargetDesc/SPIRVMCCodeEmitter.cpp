@@ -90,7 +90,7 @@ static void emitOperand(const MCOperand &Op, EndianWriter &OSE) {
   } else if (Op.isImm()) {
     OSE.write<uint32_t>(Op.getImm());
   } else {
-    llvm_unreachable("Error: Unexpected operand type in VReg");
+    llvm_unreachable("Unexpected operand type in VReg");
   }
 }
 
