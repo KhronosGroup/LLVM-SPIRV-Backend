@@ -219,12 +219,12 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   // This is to make it convenient for Legalizer to get the SPIRVType
   // when processing the actual MI (i.e. not pseudo one).
   GR->assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB);
-  auto NewMI = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-                   .addDef(Reg)
-                   .addUse(NewReg)
-                   .addUse(GR->getSPIRVTypeID(SpirvTy));
+  MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+      .addDef(Reg)
+      .addUse(NewReg)
+      .addUse(GR->getSPIRVTypeID(SpirvTy));
   Def->getOperand(0).setReg(NewReg);
-  constrainRegOperands(NewMI, &MIB.getMF());
+  MRI.setRegClass(Reg, &SPIRV::ANYIDRegClass);
   return NewReg;
 }
 

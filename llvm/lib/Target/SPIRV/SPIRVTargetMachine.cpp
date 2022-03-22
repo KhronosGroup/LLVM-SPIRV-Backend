@@ -46,7 +46,6 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
   // Register all custom passes so we can use "-stop-after" etc.
   PassRegistry &PR = *PassRegistry::getPassRegistry();
   initializeGlobalISel(PR);
-  initializeSPIRVAddRequirementsPass(PR);
   initializeSPIRVModuleAnalysisPass(PR);
   initializeSPIRVPreLegalizerPass(PR);
 }
@@ -118,8 +117,6 @@ public:
   void addOptimizedRegAlloc() override {}
 
   void addPostRegAlloc() override;
-
-  void addPreEmitPass2() override;
 };
 } // namespace
 
@@ -169,13 +166,6 @@ void SPIRVPassConfig::addISelPrepare() {
   addPass(createSPIRVEmitIntrinsicsPass(TM));
   TargetPassConfig::addISelPrepare();
   addPass(createSPIRVBasicBlockDominancePass());
-}
-
-// Add custom passes right before emitting asm/obj files. Global VReg numbering
-// is added here, as it emits invalid MIR, so no subsequent passes would work
-void SPIRVPassConfig::addPreEmitPass2() {
-  // Add all required OpCapability instructions locally (to be hoisted later)
-  addPass(createSPIRVAddRequirementsPass());
 }
 
 bool SPIRVPassConfig::addIRTranslator() {
