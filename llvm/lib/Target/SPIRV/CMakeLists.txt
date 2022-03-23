@@ -14,7 +14,6 @@ tablegen(LLVM SPIRVGenTables.inc -gen-searchable-tables)
 add_public_tablegen_target(SPIRVCommonTableGen)
 
 add_llvm_target(SPIRVCodeGen
-  SPIRVAddRequirementsPass.cpp
   SPIRVAsmPrinter.cpp
   SPIRVBasicBlockDominance.cpp
   SPIRVCallLowering.cpp

@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVUtils.h"
+#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRV.h"
-#include "SPIRVStringReader.h"
 #include "llvm/IR/IntrinsicsSPIRV.h"
 
 using namespace llvm;

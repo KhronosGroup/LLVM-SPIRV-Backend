@@ -22,12 +22,10 @@ class InstructionSelector;
 ModulePass *createSPIRVPreTranslationLegalizerPass();
 FunctionPass *createSPIRVOCLRegularizerPass();
 FunctionPass *createSPIRVBasicBlockDominancePass();
-FunctionPass *createSPIRVAddRequirementsPass();
 ModulePass *createSPIRVLowerConstExprLegacyPass();
 MachineFunctionPass *createSPIRVGenerateDecorationsPass();
 FunctionPass *createSPIRVPreLegalizerPass();
 FunctionPass *createSPIRVEmitIntrinsicsPass(SPIRVTargetMachine *TM);
-
 
 InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
@@ -35,7 +33,6 @@ createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                const SPIRVRegisterBankInfo &RBI);
 
 void initializeSPIRVBasicBlockDominancePass(PassRegistry &);
-void initializeSPIRVAddRequirementsPass(PassRegistry &);
 void initializeSPIRVModuleAnalysisPass(PassRegistry &);
 void initializeSPIRVGenerateDecorationsPass(PassRegistry &);
 void initializeSPIRVPreLegalizerPass(PassRegistry &);

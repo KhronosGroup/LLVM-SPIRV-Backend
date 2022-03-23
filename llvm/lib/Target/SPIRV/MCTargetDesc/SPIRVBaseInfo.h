@@ -200,4 +200,31 @@ std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue);
 // TODO: Remove function after new SPIRVOpenCLBIFs is merged
 bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI);
 
+// Return a string representation of the operands from startIndex onwards.
+// Templated to allow both MachineInstr and MCInst to use the same logic.
+template <class InstType>
+std::string getSPIRVStringOperand(const InstType &MI, unsigned int StartIndex) {
+  std::string s; // Iteratively append to this string
+
+  const unsigned int NumOps = MI.getNumOperands();
+  bool IsFinished = false;
+  for (unsigned int i = StartIndex; i < NumOps && !IsFinished; ++i) {
+    const auto &Op = MI.getOperand(i);
+    if (!Op.isImm()) // Stop if we hit a register operand
+      break;
+    assert((Op.getImm() >> 32) == 0 && "Imm operand should be i32 word");
+    const uint32_t Imm = Op.getImm(); // Each i32 word is up to 4 characters
+    for (unsigned ShiftAmount = 0; ShiftAmount < 32; ShiftAmount += 8) {
+      char c = (Imm >> ShiftAmount) & 0xff;
+      if (c == 0) { // Stop if we hit a null-terminator character
+        IsFinished = true;
+        break;
+      } else {
+        s += c; // Otherwise, append the character to the result string
+      }
+    }
+  }
+  return s;
+}
+
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H
