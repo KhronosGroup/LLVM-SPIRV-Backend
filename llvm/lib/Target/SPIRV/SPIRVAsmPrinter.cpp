@@ -73,6 +73,8 @@ public:
   void outputOpMemoryModel();
   void outputOpFunctionEnd();
   void outputExtFuncDecls();
+  void outputExecutionModeFromMDNode(Register Reg, MDNode *Node, unsigned EM);
+  void outputExecutionMode(const Module &M);
   void outputModuleSections();
 
   void emitInstruction(const MachineInstr *MI) override;
@@ -364,6 +366,97 @@ void SPIRVAsmPrinter::outputExtFuncDecls() {
   }
 }
 
+// Encode LLVM type by SPIR-V execution mode VecTypeHint.
+static unsigned encodeVecTypeHint(Type *Ty) {
+  if (Ty->isHalfTy())
+    return 4;
+  if (Ty->isFloatTy())
+    return 5;
+  if (Ty->isDoubleTy())
+    return 6;
+  if (IntegerType *IntTy = dyn_cast<IntegerType>(Ty)) {
+    switch (IntTy->getIntegerBitWidth()) {
+    case 8:
+      return 0;
+    case 16:
+      return 1;
+    case 32:
+      return 2;
+    case 64:
+      return 3;
+    default:
+      llvm_unreachable("invalid integer type");
+    }
+  }
+  if (FixedVectorType *VecTy = dyn_cast<FixedVectorType>(Ty)) {
+    Type *EleTy = VecTy->getElementType();
+    unsigned Size = VecTy->getNumElements();
+    return Size << 16 | encodeVecTypeHint(EleTy);
+  }
+  llvm_unreachable("invalid type");
+}
+
+static void addOpsFromMDNode(MDNode *MDN, MCInst &Inst,
+                             ModuleAnalysisInfo *MAI) {
+  for (const MDOperand &MDOp : MDN->operands()) {
+    if (auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp)) {
+      Constant *C = CMeta->getValue();
+      if (ConstantInt *Const = dyn_cast<ConstantInt>(C)) {
+        auto EM = Const->getZExtValue();
+        Inst.addOperand(MCOperand::createImm(EM));
+      } else if (auto *CE = dyn_cast<Function>(C)) {
+        Register FuncReg = MAI->getFuncReg(CE->getName().str());
+        assert(FuncReg.isValid());
+        Inst.addOperand(MCOperand::createReg(FuncReg));
+      }
+    }
+  }
+}
+
+void SPIRVAsmPrinter::outputExecutionModeFromMDNode(Register Reg, MDNode *Node,
+                                                    unsigned EM) {
+  MCInst Inst;
+  Inst.setOpcode(SPIRV::OpExecutionMode);
+  Inst.addOperand(MCOperand::createReg(Reg));
+  Inst.addOperand(MCOperand::createImm(EM));
+  addOpsFromMDNode(Node, Inst, MAI);
+  outputMCInst(Inst);
+}
+
+void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
+  auto Node = M.getNamedMetadata("spirv.ExecutionMode");
+  if (Node) {
+    for (unsigned int i = 0; i < Node->getNumOperands(); i++) {
+      MCInst Inst;
+      Inst.setOpcode(SPIRV::OpExecutionMode);
+      addOpsFromMDNode(cast<MDNode>(Node->getOperand(i)), Inst, MAI);
+      outputMCInst(Inst);
+    }
+  }
+  for (auto FI = M.begin(), E = M.end(); FI != E; ++FI) {
+    const Function &F = *FI;
+    if (F.isDeclaration())
+      continue;
+    Register FReg = MAI->getFuncReg(F.getGlobalIdentifier());
+    assert(FReg.isValid());
+    if (MDNode *Node = F.getMetadata("reqd_work_group_size"))
+      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::LocalSize);
+    if (MDNode *Node = F.getMetadata("work_group_size_hint"))
+      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::LocalSizeHint);
+    if (MDNode *Node = F.getMetadata("intel_reqd_sub_group_size"))
+      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::SubgroupSize);
+    if (MDNode *Node = F.getMetadata("vec_type_hint")) {
+      MCInst Inst;
+      Inst.setOpcode(SPIRV::OpExecutionMode);
+      Inst.addOperand(MCOperand::createReg(FReg));
+      Inst.addOperand(MCOperand::createImm(ExecutionMode::VecTypeHint));
+      unsigned TypeCode = encodeVecTypeHint(getMDOperandAsType(Node, 0));
+      Inst.addOperand(MCOperand::createImm(TypeCode));
+      outputMCInst(Inst);
+    }
+  }
+}
+
 void SPIRVAsmPrinter::outputModuleSections() {
   const Module *M = MMI->getModule();
   assert(MAI && M && "Module analysis is required");
@@ -377,7 +470,7 @@ void SPIRVAsmPrinter::outputModuleSections() {
   // 5. All entry point declarations, using OpEntryPoint.
   outputEntryPoints();
   // 6. Execution-mode declarations, using OpExecutionMode or OpExecutionModeId.
-  // TODO:
+  outputExecutionMode(*M);
   // 7a. Debug: all OpString, OpSourceExtension, OpSource, and
   // OpSourceContinued, without forward references.
   outputDebugSourceAndStrings(*M);

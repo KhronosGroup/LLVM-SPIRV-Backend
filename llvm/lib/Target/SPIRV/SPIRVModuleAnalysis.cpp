@@ -729,8 +729,9 @@ void addInstrRequirements(const MachineInstr &MI, SPIRVRequirementHandler &Reqs,
   }
 }
 
-static void collectInstrReqs(const Module &M, ModuleAnalysisInfo &MAI,
-                             MachineModuleInfo *MMI, const SPIRVSubtarget &ST) {
+static void collectReqs(const Module &M, ModuleAnalysisInfo &MAI,
+                        MachineModuleInfo *MMI, const SPIRVSubtarget &ST) {
+  // Collect requirements for existing instructions.
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
     if (MF) {
@@ -738,6 +739,42 @@ static void collectInstrReqs(const Module &M, ModuleAnalysisInfo &MAI,
         for (const MachineInstr &MI : MBB)
           addInstrRequirements(MI, MAI.Reqs, ST);
     }
+  }
+  // Collect requirements for OpExecutionMode instructions.
+  auto Node = M.getNamedMetadata("spirv.ExecutionMode");
+  if (Node) {
+    for (unsigned int i = 0; i < Node->getNumOperands(); i++) {
+      MDNode *MDN = cast<MDNode>(Node->getOperand(i));
+      const MDOperand &MDOp = MDN->getOperand(1);
+      if (auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp)) {
+        Constant *C = CMeta->getValue();
+        if (ConstantInt *Const = dyn_cast<ConstantInt>(C)) {
+          auto EM = Const->getZExtValue();
+          MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
+              OperandCategory::ExecutionModeOperand, EM, ST));
+        }
+      }
+    }
+  }
+  for (auto FI = M.begin(), E = M.end(); FI != E; ++FI) {
+    const Function &F = *FI;
+    if (F.isDeclaration())
+      continue;
+    if (F.getMetadata("reqd_work_group_size"))
+      MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
+          OperandCategory::ExecutionModeOperand, ExecutionMode::LocalSize, ST));
+    if (F.getMetadata("work_group_size_hint"))
+      MAI.Reqs.addRequirements(
+          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
+                                         ExecutionMode::LocalSizeHint, ST));
+    if (F.getMetadata("intel_reqd_sub_group_size"))
+      MAI.Reqs.addRequirements(
+          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
+                                         ExecutionMode::SubgroupSize, ST));
+    if (F.getMetadata("vec_type_hint"))
+      MAI.Reqs.addRequirements(
+          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
+                                         ExecutionMode::VecTypeHint, ST));
   }
 }
 
@@ -760,7 +797,7 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
 
   setBaseInfo(M);
 
-  collectInstrReqs(M, MAI, MMI, *ST);
+  collectReqs(M, MAI, MMI, *ST);
 
   processSwitches(M, MAI, MMI);
 

@@ -198,3 +198,7 @@ uint64_t getIConstVal(Register ConstReg, const MachineRegisterInfo *MRI) {
   assert(MI && MI->getOpcode() == TargetOpcode::G_CONSTANT);
   return MI->getOperand(1).getCImm()->getValue().getZExtValue();
 }
+
+Type *getMDOperandAsType(const MDNode *N, unsigned I) {
+  return cast<ValueAsMetadata>(N->getOperand(I))->getType();
+}
