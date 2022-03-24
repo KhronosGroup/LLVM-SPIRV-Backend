@@ -244,9 +244,7 @@ static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
 
       if (isSpvIntrinsic(MI, Intrinsic::spv_assign_type)) {
         auto Reg = MI.getOperand(1).getReg();
-        auto *Ty =
-            cast<ValueAsMetadata>(MI.getOperand(2).getMetadata()->getOperand(0))
-                ->getType();
+        auto *Ty = getMDOperandAsType(MI.getOperand(2).getMetadata(), 0);
         auto *Def = MRI.getVRegDef(Reg);
         assert(Def && "Expecting an instruction that defines the register");
         // G_GLOBAL_VALUE already has type info.

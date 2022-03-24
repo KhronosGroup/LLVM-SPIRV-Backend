@@ -71,4 +71,7 @@ getDefInstrMaybeConstant(llvm::Register &ConstReg,
 // Get constant integer value of the given ConstReg.
 uint64_t getIConstVal(llvm::Register ConstReg,
                       const llvm::MachineRegisterInfo *MRI);
+
+// Get type of i-th operand of the metadata node.
+llvm::Type *getMDOperandAsType(const llvm::MDNode *N, unsigned I);
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H

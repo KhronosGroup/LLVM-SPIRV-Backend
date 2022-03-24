@@ -185,6 +185,10 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
                GroupNonUniformBallot, GroupNonUniformClustered,
                GroupNonUniformShuffle, GroupNonUniformShuffleRelative});
     }
+    if (isAtLeastVer(TargetSPIRVVersion, 14))
+      addCaps(AvailableCaps,
+              {DenormPreserve, DenormFlushToZero, SignedZeroInfNanPreserve,
+               RoundingModeRTE, RoundingModeRTZ});
 
     // TODO Remove this - it's only here because the tests assume it's supported
     addCaps(AvailableCaps, {Float16, Float64});
