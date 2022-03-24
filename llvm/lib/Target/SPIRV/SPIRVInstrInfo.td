@@ -453,6 +453,7 @@ def OpCopyLogical: UnOp<"OpCopyLogical", 400>;
 
 def OpSNegate: UnOp<"OpSNegate", 126>;
 def OpFNegate: UnOpTyped<"OpFNegate", 127, fID, fneg>;
+def OpFNegateV: UnOpTyped<"OpFNegate", 127, vfID, fneg>;
 defm OpIAdd: BinOpTypedGen<"OpIAdd", 128, add, 0, 1>;
 defm OpFAdd: BinOpTypedGen<"OpFAdd", 129, fadd, 1, 1>;
 
