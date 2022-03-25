@@ -248,6 +248,7 @@ void SPIRVInstPrinter::printOpDecorate(const MCInst *MI, raw_ostream &O) {
           MI, NumFixedOps, O);
       break;
     case Decoration::LinkageAttributes:
+    case Decoration::UserSemantic:
       printStringImm(MI, NumFixedOps, O);
       break;
     default:

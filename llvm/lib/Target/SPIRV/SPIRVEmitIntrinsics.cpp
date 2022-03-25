@@ -319,6 +319,9 @@ Instruction *SPIRVEmitIntrinsics::visitAllocaInst(AllocaInst &I) {
 }
 
 void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
+  // Skip special artifical variable llvm.global.annotations.
+  if (GV.getName() == "llvm.global.annotations")
+    return;
   if (GV.hasInitializer() && !isa<UndefValue>(GV.getInitializer())) {
     Constant *Init = GV.getInitializer();
     Type *Ty = isAggrToReplace(Init) ? IRB->getInt32Ty() : Init->getType();

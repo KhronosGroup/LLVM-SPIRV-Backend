@@ -1533,8 +1533,8 @@ bool SPIRVInstructionSelector::selectGlobalValue(
       GR.getOrCreateSPIRVType(GV->getType(), MIRBuilder, AQ::ReadWrite, false);
 
   std::string GlobalIdent = GV->getGlobalIdentifier();
-  // TODO: suport @llvm.global.annotations
   auto GlobalVar = cast<GlobalVariable>(GV);
+  assert(GlobalVar->getName() != "llvm.global.annotations");
 
   bool HasInit = GlobalVar->hasInitializer() &&
                  !isa<UndefValue>(GlobalVar->getInitializer());
