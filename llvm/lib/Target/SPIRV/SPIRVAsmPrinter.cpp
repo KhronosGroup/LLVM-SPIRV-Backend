@@ -24,6 +24,7 @@
 #include "SPIRVUtils.h"
 #include "TargetInfo/SPIRVTargetInfo.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -75,6 +76,7 @@ public:
   void outputExtFuncDecls();
   void outputExecutionModeFromMDNode(Register Reg, MDNode *Node, unsigned EM);
   void outputExecutionMode(const Module &M);
+  void outputAnnotations(const Module &M);
   void outputModuleSections();
 
   void emitInstruction(const MachineInstr *MI) override;
@@ -457,6 +459,43 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
   }
 }
 
+void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
+  outputModuleSection(MB_Annotations);
+  // Process llvm.global.annotations special global variable.
+  for (auto F = M.global_begin(), E = M.global_end(); F != E; ++F) {
+    if ((*F).getName() == "llvm.global.annotations") {
+      const GlobalVariable *V = &(*F);
+      const ConstantArray *CA = cast<ConstantArray>(V->getOperand(0));
+      for (Value *Op : CA->operands()) {
+        ConstantStruct *CS = cast<ConstantStruct>(Op);
+        // The first field of the struct contains a pointer to
+        // annotated variable.
+        Value *AnnotatedVar = CS->getOperand(0)->stripPointerCasts();
+        Register Reg;
+        if (isa<Function>(AnnotatedVar)) {
+          auto *Func = cast<Function>(AnnotatedVar);
+          Reg = MAI->getFuncReg(Func->getGlobalIdentifier());
+        } else {
+          llvm_unreachable("Unsupported value in llvm.global.annotations");
+        }
+
+        // The second field contains a pointer to a global annotation string.
+        GlobalVariable *GV =
+            cast<GlobalVariable>(CS->getOperand(1)->stripPointerCasts());
+
+        StringRef AnnotationString;
+        getConstantStringInfo(GV, AnnotationString);
+        MCInst Inst;
+        Inst.setOpcode(SPIRV::OpDecorate);
+        Inst.addOperand(MCOperand::createReg(Reg));
+        Inst.addOperand(MCOperand::createImm(Decoration::UserSemantic));
+        addStringImm(AnnotationString, Inst);
+        outputMCInst(Inst);
+      }
+    }
+  }
+}
+
 void SPIRVAsmPrinter::outputModuleSections() {
   const Module *M = MMI->getModule();
   assert(MAI && M && "Module analysis is required");
@@ -479,7 +518,7 @@ void SPIRVAsmPrinter::outputModuleSections() {
   // 7c. Debug: all OpModuleProcessed instructions.
   outputModuleSection(MB_DebugModuleProcessed);
   // 8. All annotation instructions (all decorations).
-  outputModuleSection(MB_Annotations);
+  outputAnnotations(*M);
   // 9. All type declarations (OpTypeXXX instructions), all constant
   // instructions, and all global variable declarations. This section is
   // the first section to allow use of: OpLine and OpNoLine debug information;
