@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
+#include "SPIRVInstrInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -42,6 +43,11 @@ void buildOpName(llvm::Register Target, const llvm::StringRef &Name,
 
 // Add an OpDecorate instruction for the given Reg.
 void buildOpDecorate(llvm::Register Reg, llvm::MachineIRBuilder &MIRBuilder,
+                     Decoration::Decoration Dec,
+                     const std::vector<uint32_t> &DecArgs,
+                     llvm::StringRef StrImm = "");
+void buildOpDecorate(llvm::Register Reg, llvm::MachineInstr &I,
+                     const llvm::SPIRVInstrInfo &TII,
                      Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs,
                      llvm::StringRef StrImm = "");

@@ -44,12 +44,10 @@ using namespace llvm;
 
 namespace {
 class SPIRVAsmPrinter : public AsmPrinter {
-  const MCSubtargetInfo *STI;
-
 public:
   explicit SPIRVAsmPrinter(TargetMachine &TM,
                            std::unique_ptr<MCStreamer> Streamer)
-      : AsmPrinter(TM, std::move(Streamer)), STI(TM.getMCSubtargetInfo()) {
+      : AsmPrinter(TM, std::move(Streamer)) {
     ST = static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
     GR = ST->getSPIRVGlobalRegistry();
     TII = ST->getInstrInfo();
@@ -129,9 +127,6 @@ void SPIRVAsmPrinter::emitFunctionHeader() {
   MF->setSection(Section);
 }
 
-// The table maps MBB number to SPIR-V unique ID register.
-static DenseMap<int, Register> BBNumToRegMap;
-
 void SPIRVAsmPrinter::outputOpFunctionEnd() {
   MCInst FunctionEndInst;
   FunctionEndInst.setOpcode(SPIRV::OpFunctionEnd);
@@ -141,22 +136,7 @@ void SPIRVAsmPrinter::outputOpFunctionEnd() {
 // Emit OpFunctionEnd at the end of MF and clear BBNumToRegMap.
 void SPIRVAsmPrinter::emitFunctionBodyEnd() {
   outputOpFunctionEnd();
-  BBNumToRegMap.clear();
-}
-
-static bool hasMBBRegister(const MachineBasicBlock &MBB) {
-  return BBNumToRegMap.find(MBB.getNumber()) != BBNumToRegMap.end();
-}
-
-// Convert MBB's number to correspnding ID register.
-Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
-                                ModuleAnalysisInfo *MAI) {
-  auto f = BBNumToRegMap.find(MBB.getNumber());
-  if (f != BBNumToRegMap.end())
-    return f->second;
-  Register NewReg = Register::index2VirtReg(MAI->getNextID());
-  BBNumToRegMap[MBB.getNumber()] = NewReg;
-  return NewReg;
+  MAI->BBNumToRegMap.clear();
 }
 
 void SPIRVAsmPrinter::emitOpLabel(const MachineBasicBlock &MBB) {
@@ -164,7 +144,7 @@ void SPIRVAsmPrinter::emitOpLabel(const MachineBasicBlock &MBB) {
     return;
   MCInst LabelInst;
   LabelInst.setOpcode(SPIRV::OpLabel);
-  LabelInst.addOperand(MCOperand::createReg(getOrCreateMBBRegister(MBB, MAI)));
+  LabelInst.addOperand(MCOperand::createReg(MAI->getOrCreateMBBRegister(MBB)));
   outputMCInst(LabelInst);
 }
 
@@ -175,7 +155,8 @@ void SPIRVAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
     for (const MachineInstr &MI : MBB)
       if (MI.getOpcode() == SPIRV::OpFunction)
         return;
-    llvm_unreachable("OpFunction is expected in the front MBB of MF");
+    // TODO: this case should be checked by the verifier.
+    report_fatal_error("OpFunction is expected in the front MBB of MF");
   }
   emitOpLabel(MBB);
 }
@@ -238,7 +219,7 @@ static bool isFuncOrHeaderInstr(const MachineInstr *MI,
 }
 
 void SPIRVAsmPrinter::outputMCInst(MCInst &Inst) {
-  (*OutStreamer).emitInstruction(Inst, *STI);
+  OutStreamer->emitInstruction(Inst, *OutContext.getSubtargetInfo());
 }
 
 void SPIRVAsmPrinter::outputInstruction(const MachineInstr *MI) {
@@ -254,7 +235,7 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   // Output OpLabel after OpFunction and OpFunctionParameter in the first MBB.
   const MachineInstr *NextMI = MI->getNextNode();
-  if (!hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
+  if (!MAI->hasMBBRegister(*MI->getParent()) && isFuncOrHeaderInstr(MI, TII) &&
       (!NextMI || !isFuncOrHeaderInstr(NextMI, TII))) {
     assert(MI->getParent()->getNumber() == MF->front().getNumber() &&
            "OpFunction is not in the front MBB of MF");

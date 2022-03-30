@@ -99,14 +99,30 @@ void buildOpName(Register Target, const StringRef &Name,
   }
 }
 
-void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
-                     Decoration::Decoration Dec,
-                     const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(Reg).addImm(Dec);
+static void finishBuildOpDecorate(MachineInstrBuilder &MIB,
+                                  const std::vector<uint32_t> &DecArgs,
+                                  StringRef StrImm) {
   if (!StrImm.empty())
     addStringImm(StrImm, MIB);
   for (const auto &DecArg : DecArgs)
     MIB.addImm(DecArg);
+}
+
+void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
+                     Decoration::Decoration Dec,
+                     const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(Reg).addImm(Dec);
+  finishBuildOpDecorate(MIB, DecArgs, StrImm);
+}
+
+void buildOpDecorate(Register Reg, MachineInstr &I, const SPIRVInstrInfo &TII,
+                     Decoration::Decoration Dec,
+                     const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
+  MachineBasicBlock &MBB = *I.getParent();
+  auto MIB = BuildMI(MBB, I, I.getDebugLoc(), TII.get(SPIRV::OpDecorate))
+                 .addUse(Reg)
+                 .addImm(Dec);
+  finishBuildOpDecorate(MIB, DecArgs, StrImm);
 }
 
 // TODO: maybe the following two functions should be handled in the subtarget

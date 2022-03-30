@@ -77,6 +77,8 @@ struct ModuleAnalysisInfo {
   unsigned MaxID;
   // The array contains lists of MIs for each module section.
   InstrList MS[NUM_MODULE_SECTIONS];
+  // The table maps MBB number to SPIR-V unique ID register.
+  DenseMap<int, Register> BBNumToRegMap;
 
   Register getFuncReg(std::string FuncName) {
     auto FuncReg = FuncNameMap.find(FuncName);
@@ -105,6 +107,18 @@ struct ModuleAnalysisInfo {
            RegisterAliasTable[MF].find(Reg) != RegisterAliasTable[MF].end();
   }
   unsigned getNextID() { return MaxID++; }
+  bool hasMBBRegister(const MachineBasicBlock &MBB) {
+    return BBNumToRegMap.find(MBB.getNumber()) != BBNumToRegMap.end();
+  }
+  // Convert MBB's number to corresponding ID register.
+  Register getOrCreateMBBRegister(const MachineBasicBlock &MBB) {
+    auto f = BBNumToRegMap.find(MBB.getNumber());
+    if (f != BBNumToRegMap.end())
+      return f->second;
+    Register NewReg = Register::index2VirtReg(getNextID());
+    BBNumToRegMap[MBB.getNumber()] = NewReg;
+    return NewReg;
+  }
 };
 
 struct SPIRVModuleAnalysis : public ModulePass {

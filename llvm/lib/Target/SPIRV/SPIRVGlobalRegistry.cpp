@@ -49,6 +49,12 @@ static Register createTypeVReg(MachineIRBuilder &MIRBuilder) {
   return Res;
 }
 
+static Register createTypeVReg(MachineRegisterInfo &MRI) {
+  auto Res = MRI.createGenericVirtualRegister(LLT::scalar(32));
+  MRI.setRegClass(Res, &SPIRV::TYPERegClass);
+  return Res;
+}
+
 SPIRVType *SPIRVGlobalRegistry::getOpTypeBool(MachineIRBuilder &MIRBuilder) {
   return MIRBuilder.buildInstr(SPIRV::OpTypeBool)
       .addDef(createTypeVReg(MIRBuilder));
@@ -256,7 +262,8 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
     if (GVar == nullptr) {
       const Type *Ty = getTypeForSPIRVType(BaseType); // TODO: check type.
       GVar = new GlobalVariable(*M, const_cast<Type *>(Ty), false,
-          GlobalValue::ExternalLinkage, nullptr, Twine(Name));
+                                GlobalValue::ExternalLinkage, nullptr,
+                                Twine(Name));
     }
     GV = GVar;
   }
@@ -817,6 +824,26 @@ SPIRVGlobalRegistry::getOrCreateSPIRVIntegerType(unsigned BitWidth,
   return getOrCreateSPIRVType(
       IntegerType::get(MIRBuilder.getMF().getFunction().getContext(), BitWidth),
       MIRBuilder);
+}
+
+SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVIntegerType(
+    unsigned BitWidth, MachineInstr &I, const SPIRVInstrInfo &TII) {
+  Type *LLVMTy = IntegerType::get(CurMF->getFunction().getContext(), BitWidth);
+  Register Reg;
+  if (DT.find(LLVMTy, CurMF, Reg)) {
+    return getSPIRVTypeForVReg(Reg);
+  }
+  MachineBasicBlock &BB = *I.getParent();
+  auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeInt))
+                 .addDef(createTypeVReg(CurMF->getRegInfo()))
+                 .addImm(BitWidth)
+                 .addImm(0);
+  SPIRVType *SpirvType = MIB;
+
+  VRegToTypeMap[CurMF][getSPIRVTypeID(SpirvType)] = SpirvType;
+  SPIRVToLLVMType[SpirvType] = LLVMTy;
+  DT.add(LLVMTy, CurMF, getSPIRVTypeID(SpirvType));
+  return SpirvType;
 }
 
 SPIRVType *
