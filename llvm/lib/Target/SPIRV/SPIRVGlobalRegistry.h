@@ -18,6 +18,7 @@
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVDuplicatesTracker.h"
+#include "SPIRVInstrInfo.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace AQ = AccessQualifier;
@@ -267,6 +268,8 @@ public:
   // Convenient helpers for getting types with check for duplicates.
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
                                          MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth, MachineInstr &I,
+                                         const SPIRVInstrInfo &TII);
   SPIRVType *getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder);
   SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
                                         unsigned NumElements,

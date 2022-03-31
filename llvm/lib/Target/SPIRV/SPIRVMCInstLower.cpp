@@ -20,10 +20,6 @@
 
 using namespace llvm;
 
-// Defined in SPIRVAsmPrinter.cpp
-extern Register getOrCreateMBBRegister(const MachineBasicBlock &MBB,
-                                       ModuleAnalysisInfo *MAI);
-
 void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
                              const MachineFunction *CurMF,
                              ModuleAnalysisInfo *MAI) const {
@@ -44,7 +40,7 @@ void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
       break;
     }
     case MachineOperand::MO_MachineBasicBlock:
-      MCOp = MCOperand::createReg(getOrCreateMBBRegister(*MO.getMBB(), MAI));
+      MCOp = MCOperand::createReg(MAI->getOrCreateMBBRegister(*MO.getMBB()));
       break;
     case MachineOperand::MO_Register: {
       Register NewReg = MAI->getRegisterAlias(MF, MO.getReg());

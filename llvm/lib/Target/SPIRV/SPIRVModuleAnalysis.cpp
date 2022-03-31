@@ -315,29 +315,30 @@ static void collectOtherInstr(MachineInstr &MI, ModuleAnalysisInfo &MAI,
 // be correctly collected until these registers are globally numbered.
 void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
+    if ((*F).isDeclaration())
+      continue;
     MachineFunction *MF = MMI->getMachineFunction(*F);
-    if (MF) {
-      for (MachineBasicBlock &MBB : *MF)
-        for (MachineInstr &MI : MBB) {
-          if (MAI.getSkipEmission(&MI))
-            continue;
-          const unsigned OpCode = MI.getOpcode();
-          if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
-            collectOtherInstr(MI, MAI, MB_DebugNames);
-          } else if (OpCode == SPIRV::OpEntryPoint) {
-            collectOtherInstr(MI, MAI, MB_EntryPoints);
-          } else if (TII->isDecorationInstr(MI)) {
-            collectOtherInstr(MI, MAI, MB_Annotations);
-            collectFuncNames(MI, *F);
-          } else if (TII->isConstantInstr(MI)) {
-            // Now OpSpecConstant*s are not in DT,
-            // but they need to be collected anyway.
-            collectOtherInstr(MI, MAI, MB_TypeConstVars);
-          } else if (OpCode == SPIRV::OpFunction) {
-            collectFuncNames(MI, *F);
-          }
+    assert(MF);
+    for (MachineBasicBlock &MBB : *MF)
+      for (MachineInstr &MI : MBB) {
+        if (MAI.getSkipEmission(&MI))
+          continue;
+        const unsigned OpCode = MI.getOpcode();
+        if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
+          collectOtherInstr(MI, MAI, MB_DebugNames);
+        } else if (OpCode == SPIRV::OpEntryPoint) {
+          collectOtherInstr(MI, MAI, MB_EntryPoints);
+        } else if (TII->isDecorationInstr(MI)) {
+          collectOtherInstr(MI, MAI, MB_Annotations);
+          collectFuncNames(MI, *F);
+        } else if (TII->isConstantInstr(MI)) {
+          // Now OpSpecConstant*s are not in DT,
+          // but they need to be collected anyway.
+          collectOtherInstr(MI, MAI, MB_TypeConstVars);
+        } else if (OpCode == SPIRV::OpFunction) {
+          collectFuncNames(MI, *F);
         }
-    }
+      }
   }
 }
 
@@ -346,24 +347,25 @@ void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
 // numbered in makeRegisterAliases.
 void SPIRVModuleAnalysis::numberRegistersGlobally(const Module &M) {
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
+    if ((*F).isDeclaration())
+      continue;
     MachineFunction *MF = MMI->getMachineFunction(*F);
-    if (MF) {
-      for (MachineBasicBlock &MBB : *MF) {
-        for (MachineInstr &MI : MBB) {
-          for (MachineOperand &Op : MI.operands()) {
-            if (Op.isReg()) {
-              Register Reg = Op.getReg();
-              if (!MAI.hasRegisterAlias(MF, Reg)) {
-                Register NewReg = Register::index2VirtReg(MAI.getNextID());
-                MAI.setRegisterAlias(MF, Reg, NewReg);
-              }
+    assert(MF);
+    for (MachineBasicBlock &MBB : *MF) {
+      for (MachineInstr &MI : MBB) {
+        for (MachineOperand &Op : MI.operands()) {
+          if (Op.isReg()) {
+            Register Reg = Op.getReg();
+            if (!MAI.hasRegisterAlias(MF, Reg)) {
+              Register NewReg = Register::index2VirtReg(MAI.getNextID());
+              MAI.setRegisterAlias(MF, Reg, NewReg);
             }
           }
-          if (MI.getOpcode() == SPIRV::OpExtInst) {
-            auto Set = MI.getOperand(2).getImm();
-            if (MAI.ExtInstSetMap.find(Set) == MAI.ExtInstSetMap.end())
-              MAI.ExtInstSetMap[Set] = Register::index2VirtReg(MAI.getNextID());
-          }
+        }
+        if (MI.getOpcode() == SPIRV::OpExtInst) {
+          auto Set = MI.getOperand(2).getImm();
+          if (MAI.ExtInstSetMap.find(Set) == MAI.ExtInstSetMap.end())
+            MAI.ExtInstSetMap[Set] = Register::index2VirtReg(MAI.getNextID());
         }
       }
     }
