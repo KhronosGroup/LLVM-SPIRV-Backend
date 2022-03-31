@@ -1153,7 +1153,6 @@ bool SPIRVInstructionSelector::selectIToF(Register ResVReg,
   if (GR.isScalarOrVectorOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool)) {
     unsigned BitWidth = GR.getScalarOrVectorBitWidth(ResType);
     SPIRVType *TmpType = GR.getOrCreateSPIRVIntegerType(BitWidth, I, TII);
-    ;
     if (ResType->getOpcode() == SPIRV::OpTypeVector) {
       const unsigned NumElts = ResType->getOperand(2).getImm();
       TmpType = GR.getOrCreateSPIRVVectorType(TmpType, NumElts, MIRBuilder);
