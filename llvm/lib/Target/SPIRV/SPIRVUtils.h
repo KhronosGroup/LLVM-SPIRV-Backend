@@ -14,13 +14,20 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
-#include "SPIRVInstrInfo.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
-#include "llvm/CodeGen/MachineInstr.h"
-#include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/IR/IRBuilder.h"
 #include <string>
+
+namespace llvm {
+class MCInst;
+class MachineFunction;
+class MachineInstr;
+class MachineInstrBuilder;
+class MachineIRBuilder;
+class MachineRegisterInfo;
+class Register;
+class StringRef;
+class SPIRVInstrInfo;
+} // namespace llvm
 
 // Add the given string as a series of integer operand, inserting null
 // terminators and padding to make sure the operands all have 32-bit

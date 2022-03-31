@@ -191,7 +191,7 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
         break;
       }
       if (SpirvTy)
-        GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+        GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB.getMF());
       if (!MRI.getRegClassOrNull(Reg))
         MRI.setRegClass(Reg, &SPIRV::IDRegClass);
     }
@@ -215,10 +215,10 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   if (auto *RC = MRI.getRegClassOrNull(Reg))
     MRI.setRegClass(NewReg, RC);
   SpirvTy = SpirvTy ? SpirvTy : GR->getOrCreateSPIRVType(Ty, MIB);
-  GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB);
+  GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB.getMF());
   // This is to make it convenient for Legalizer to get the SPIRVType
   // when processing the actual MI (i.e. not pseudo one).
-  GR->assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB);
+  GR->assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB.getMF());
   MIB.buildInstr(SPIRV::ASSIGN_TYPE)
       .addDef(Reg)
       .addUse(NewReg)
@@ -424,7 +424,7 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
           Type *LLVMTy = IntegerType::get(MF.getFunction().getContext(), 1);
           SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, MIB);
           MRI.setRegClass(Dst, &SPIRV::IDRegClass);
-          GR->assignSPIRVTypeToVReg(SpirvTy, Dst, MIB);
+          GR->assignSPIRVTypeToVReg(SpirvTy, Dst, MIB.getMF());
         }
         Register CmpReg = MI.getOperand(2).getReg();
         auto PredOp = MI.getOperand(1);
@@ -482,8 +482,8 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
 
 bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry
-  const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-  SPIRVGlobalRegistry *GR = ST->getSPIRVGlobalRegistry();
+  const SPIRVSubtarget &ST = MF.getSubtarget<SPIRVSubtarget>();
+  SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
   GR->setCurrentFunc(MF);
   addConstantsToTrack(MF, GR);
   foldConstantsIntoIntrinsics(MF);

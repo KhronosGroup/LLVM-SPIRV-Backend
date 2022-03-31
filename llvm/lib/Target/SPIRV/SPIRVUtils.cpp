@@ -12,8 +12,13 @@
 
 #include "SPIRVUtils.h"
 #include "MCTargetDesc/SPIRVBaseInfo.h"
+#include "SPIRVInstrInfo.h"
 #include "SPIRV.h"
 #include "llvm/IR/IntrinsicsSPIRV.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineInstrBuilder.h"
 
 using namespace llvm;
 

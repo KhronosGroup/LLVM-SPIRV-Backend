@@ -116,11 +116,16 @@ public:
                               MachineIRBuilder &MIRBuilder,
                               AQ::AccessQualifier AccessQual = AQ::ReadWrite,
                               bool EmitIR = true);
+  SPIRVType *assignIntTypeToVReg(unsigned BitWidth, Register VReg,
+                                 MachineInstr &I, const SPIRVInstrInfo &TII);
+  SPIRVType *assignVectTypeToVReg(SPIRVType *BaseType, unsigned NumElements,
+                                  Register VReg, MachineInstr &I,
+                                  const SPIRVInstrInfo &TII);
 
   // In cases where the SPIR-V type is already known, this function can be
   // used to map it to the given VReg via an ASSIGN_TYPE instruction.
   void assignSPIRVTypeToVReg(SPIRVType *Type, Register VReg,
-                             MachineIRBuilder &MIRBuilder);
+                             MachineFunction &MF);
 
   // Either generate a new OpTypeXXX instruction or return an existing one
   // corresponding to the given LLVM IR type.
@@ -247,13 +252,23 @@ private:
   generateSPIRVOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
                           AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
+  std::tuple<Register, ConstantInt *, bool> getOrCreateConstIntReg(
+      uint64_t Val, SPIRVType *SpvType, MachineIRBuilder *MIRBuilder,
+      MachineInstr *I = nullptr, const SPIRVInstrInfo *TII = nullptr);
+  SPIRVType *restOfCreateSPIRVType(Type *LLVMTy, SPIRVType *SpirvType);
+
 public:
   Register buildConstantInt(uint64_t Val, MachineIRBuilder &MIRBuilder,
                             SPIRVType *SpvType = nullptr, bool EmitIR = true);
+  Register getOrCreateConstInt(uint64_t Val, MachineInstr &I,
+                               SPIRVType *SpvType, const SPIRVInstrInfo &TII);
   Register buildConstantFP(APFloat Val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *SpvType = nullptr);
   Register buildConstantIntVector(uint64_t Val, MachineIRBuilder &MIRBuilder,
                                   SPIRVType *SpvType, bool EmitIR = true);
+  Register getOrCreateConsIntVector(uint64_t Val, MachineInstr &I,
+                                    SPIRVType *SpvType,
+                                    const SPIRVInstrInfo &TII);
   Register buildConstantSampler(Register Res, unsigned int AddrMode,
                                 unsigned int Param, unsigned int FilerMode,
                                 MachineIRBuilder &MIRBuilder,
@@ -274,9 +289,16 @@ public:
   SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
                                         unsigned NumElements,
                                         MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
+                                        unsigned NumElements, MachineInstr &I,
+                                        const SPIRVInstrInfo &TII);
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
       StorageClass::StorageClass SClass = StorageClass::Function);
+  SPIRVType *getOrCreateSPIRVPointerType(
+      SPIRVType *BaseType, MachineInstr &I, const SPIRVInstrInfo &TII,
+      StorageClass::StorageClass SC = StorageClass::Function);
+
   SPIRVType *getOrCreateSPIRVSampledImageType(SPIRVType *ImageType,
                                               MachineIRBuilder &MIRBuilder);
 };
