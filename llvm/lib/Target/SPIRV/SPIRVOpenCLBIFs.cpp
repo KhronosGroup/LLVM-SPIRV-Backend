@@ -264,7 +264,7 @@ static Register buildLoad(SPIRVType *BaseType, Register PtrVReg,
   if (!dstReg.isValid()) {
     dstReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
     MRI->setType(dstReg, LLT::scalar(32));
-    GR->assignSPIRVTypeToVReg(BaseType, dstReg, MIRBuilder);
+    GR->assignSPIRVTypeToVReg(BaseType, dstReg, MIRBuilder.getMF());
   }
 
   // TODO: consider using correct address space and alignment
@@ -302,7 +302,7 @@ static Register buildBuiltInLoad(MachineIRBuilder &MIRBuilder,
   MIRBuilder.getMRI()->setType(NewReg, LLT::pointer(0, GR->getPointerSize()));
   SPIRVType *PtrTy =
       GR->getOrCreateSPIRVPointerType(varType, MIRBuilder, StorageClass::Input);
-  GR->assignSPIRVTypeToVReg(PtrTy, NewReg, MIRBuilder);
+  GR->assignSPIRVTypeToVReg(PtrTy, NewReg, MIRBuilder.getMF());
 
   // Set up the global OpVariable with the necessary builtin decorations
   Register Var = GR->buildGlobalVariable(NewReg, PtrTy,
@@ -376,10 +376,10 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     Register defaultReg = resVReg;
     if (ptrSize != resWidth) {
       defaultReg = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-      GR->assignSPIRVTypeToVReg(PtrSizeTy, defaultReg, MIRBuilder);
+      GR->assignSPIRVTypeToVReg(PtrSizeTy, defaultReg, MIRBuilder.getMF());
       toTruncate = defaultReg;
     }
-    auto newReg = GR->buildConstantInt(defaultVal, MIRBuilder, PtrSizeTy, true);
+    auto newReg = GR->buildConstantInt(defaultVal, MIRBuilder, PtrSizeTy);
     MIRBuilder.buildCopy(defaultReg, newReg);
   } else { // If it could be in range, we need to load from the given builtin
 
@@ -391,7 +391,7 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
     Register extr = resVReg;
     if (!isConstantIndex || ptrSize != resWidth) {
       extr = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-      GR->assignSPIRVTypeToVReg(PtrSizeTy, extr, MIRBuilder);
+      GR->assignSPIRVTypeToVReg(PtrSizeTy, extr, MIRBuilder.getMF());
     }
 
     // Use Intrinsic::spv_extractelt so dynamic vs static extraction is
@@ -409,21 +409,21 @@ static bool genWorkgroupQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
       auto boolTy = GR->getOrCreateSPIRVBoolType(MIRBuilder);
 
       Register cmpReg = MRI->createGenericVirtualRegister(LLT::scalar(1));
-      GR->assignSPIRVTypeToVReg(boolTy, cmpReg, MIRBuilder);
+      GR->assignSPIRVTypeToVReg(boolTy, cmpReg, MIRBuilder.getMF());
 
       // Use G_ICMP to check if idxVReg < 3
-      Register three =  GR->buildConstantInt(3, MIRBuilder, idxTy, true);
+      Register three =  GR->buildConstantInt(3, MIRBuilder, idxTy);
       MIRBuilder.buildICmp(CmpInst::ICMP_ULT, cmpReg, idxVReg, three);
 
       // Get constant for the default value (0 or 1 depending on which function)
       Register defaultReg = GR->buildConstantInt(defaultVal, MIRBuilder,
-                                                 PtrSizeTy, true);
+                                                 PtrSizeTy);
 
       // Get a register for the selection result (possibly a new temporary one)
       Register selRes = resVReg;
       if (ptrSize != resWidth) {
         selRes = MRI->createGenericVirtualRegister(LLT::scalar(ptrSize));
-        GR->assignSPIRVTypeToVReg(PtrSizeTy, selRes, MIRBuilder);
+        GR->assignSPIRVTypeToVReg(PtrSizeTy, selRes, MIRBuilder.getMF());
       }
 
       // Create the final G_SELECT to return the extracted value or the default
@@ -478,7 +478,7 @@ static bool genSampledReadImage(MachineIRBuilder &MIRBuilder, Register resVReg,
   }
   auto llt = LLT::scalar(GR->getScalarOrVectorBitWidth(tmpType));
   Register tmpReg = MRI->createGenericVirtualRegister(llt);
-  GR->assignSPIRVTypeToVReg(tmpType, tmpReg, MIRBuilder);
+  GR->assignSPIRVTypeToVReg(tmpType, tmpReg, MIRBuilder.getMF());
 
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpImageSampleExplicitLod)
                  .addDef(NeedExtract ? tmpReg : resVReg)
@@ -599,7 +599,7 @@ static bool genImageSizeQuery(MachineIRBuilder &MIRBuilder, Register resVReg,
   if (numTempComps != numRetComps) {
     sizeVec = MRI->createGenericVirtualRegister(LLT::fixed_vector(numTempComps, 32));
     sizeVecTy = GR->getOrCreateSPIRVVectorType(I32Ty, numTempComps, MIRBuilder);
-    GR->assignSPIRVTypeToVReg(sizeVecTy, sizeVec, MIRBuilder);
+    GR->assignSPIRVTypeToVReg(sizeVecTy, sizeVec, MIRBuilder.getMF());
   }
   auto dim = static_cast<Dim::Dim>(imgType->getOperand(2).getImm());
   MachineInstrBuilder MIB;
@@ -721,7 +721,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
     scopeReg = args[1];
   } else {
     auto scope = Scope::Device;
-    scopeReg = GR->buildConstantInt(scope, MIRBuilder, I32Ty, true);
+    scopeReg = GR->buildConstantInt(scope, MIRBuilder, I32Ty);
   }
 
   Register memSemReg;
@@ -731,7 +731,7 @@ static bool genAtomicLoad(Register resVReg, const SPIRVType* resType,
   } else {
     auto scSm = getMemSemanticsForStorageClass(GR->getPointerStorageClass(ptr));
     auto memSem = MemorySemantics::SequentiallyConsistent | scSm;
-    memSemReg = GR->buildConstantInt(memSem, MIRBuilder, I32Ty, true);
+    memSemReg = GR->buildConstantInt(memSem, MIRBuilder, I32Ty);
   }
 
   auto MIB = MIRBuilder.buildInstr(OpAtomicLoad)
@@ -754,7 +754,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
   Register scopeReg;
   auto scope = Scope::Device;
   if (!scopeReg.isValid())
-    scopeReg = GR->buildConstantInt(scope, MIRBuilder, I32Ty, true);
+    scopeReg = GR->buildConstantInt(scope, MIRBuilder, I32Ty);
 
   auto ptr = OrigArgs[0];
   auto scSem = getMemSemanticsForStorageClass(GR->getPointerStorageClass(ptr));
@@ -762,7 +762,7 @@ static bool genAtomicStore(MachineIRBuilder &MIRBuilder,
   Register memSemReg;
   auto memSem = MemorySemantics::SequentiallyConsistent | scSem;
   if (!memSemReg.isValid())
-    memSemReg = GR->buildConstantInt(memSem, MIRBuilder, I32Ty, true);
+    memSemReg = GR->buildConstantInt(memSem, MIRBuilder, I32Ty);
 
   auto MIB = MIRBuilder.buildInstr(OpAtomicStore)
                  .addUse(ptr)
@@ -839,7 +839,7 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   MRI->setType(expected, desiredLLT);
   Register tmp = !isCmpxchg ? MRI->createGenericVirtualRegister(desiredLLT) :
                               resVReg;
-  GR->assignSPIRVTypeToVReg(spvDesiredTy, tmp, MIRBuilder);
+  GR->assignSPIRVTypeToVReg(spvDesiredTy, tmp, MIRBuilder.getMF());
   auto MIB = MIRBuilder.buildInstr(OpAtomicCompareExchange)
                  .addDef(tmp)
                  .addUse(GR->getSPIRVTypeID(spvObjectTy))
@@ -1132,7 +1132,7 @@ static Register buildScalarOrVectorBoolReg(MachineIRBuilder &MIRBuilder,
   }
   const auto MRI = MIRBuilder.getMRI();
   auto resReg = MRI->createGenericVirtualRegister(lltTy);
-  GR->assignSPIRVTypeToVReg(boolTy, resReg, MIRBuilder);
+  GR->assignSPIRVTypeToVReg(boolTy, resReg, MIRBuilder.getMF());
   return resReg;
 }
 

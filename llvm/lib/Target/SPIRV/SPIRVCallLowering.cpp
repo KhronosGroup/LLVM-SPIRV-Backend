@@ -261,7 +261,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
         ArgVRegs.push_back(Arg.Regs[0]);
         auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
-        GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder);
+        GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
       }
       bool Result = generateOpenCLBuiltinCall(
           DoubleUnderscore ? FuncName : DemangledName, MIRBuilder, ResVReg,
