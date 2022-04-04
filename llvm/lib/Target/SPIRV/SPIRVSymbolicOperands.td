@@ -163,6 +163,7 @@ def ScopeOperand : OperandCategory;
 def GroupOperationOperand : OperandCategory;
 def KernelEnqueueFlagsOperand : OperandCategory;
 def KernelProfilingInfoOperand : OperandCategory;
+def OpcodeOperand : OperandCategory;
 
 //===----------------------------------------------------------------------===//
 // Multiclass used to define Extesions enum values and at the same time
@@ -1507,3 +1508,27 @@ multiclass KernelProfilingInfoOperand<bits<32> value, bits<32> minVersion, bits<
 
 defm None : KernelProfilingInfoOperand<0x0, 0, 0, [], []>;
 defm CmdExecTime : KernelProfilingInfoOperand<0x1, 0, 0, [], [Kernel]>;
+
+//===----------------------------------------------------------------------===//
+// Multiclass used to define Opcode enum values and at the same time
+// SymbolicOperand entries with string mnemonics and capabilities.
+//===----------------------------------------------------------------------===//
+
+def Opcode : GenericEnum, Operand<i32> {
+  let FilterClass = "Opcode";
+  let NameField = "Name";
+  let ValueField = "Value";
+  let PrintMethod = !strconcat("printSymbolicOperand<OperandCategory::", FilterClass, "Operand>");
+}
+
+class Opcode<string name, bits<32> value> {
+  string Name = name;
+  bits<32> Value = value;
+}
+
+multiclass OpcodeOperand<bits<32> value> {
+  def : Opcode<NAME, value>;
+  defm : SymbolicOperandWithRequirements<OpcodeOperand, value, NAME, 0, 0, [], []>;
+}
+// TODO: implement other mnemonics.
+defm InBoundsPtrAccessChain : OpcodeOperand<70>;

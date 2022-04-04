@@ -61,9 +61,9 @@ static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
                                ->getValue());
         Register Reg;
         if (auto *GV = dyn_cast<GlobalValue>(Const)) {
-          if (GR->find(GV, &MF, Reg) == false) {
+          if (GR->find(GV, &MF, Reg) == false)
             GR->add(GV, &MF, MI.getOperand(2).getReg());
-          } else
+          else
             RegsAlreadyAddedToDT[&MI] = Reg;
         } else {
           if (GR->find(Const, &MF, Reg) == false) {
@@ -133,9 +133,9 @@ static void foldConstantsIntoIntrinsics(MachineFunction &MF) {
     MI->eraseFromParent();
 }
 
-static void insertBitcasts(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
+static void insertBitcasts(MachineFunction &MF, SPIRVGlobalRegistry *GR,
+                           MachineIRBuilder MIB) {
   std::vector<MachineInstr *> ToErase;
-  MachineIRBuilder MIB(MF);
   for (auto &MBB : MF)
     for (auto &MI : MBB)
       if (isSpvIntrinsic(MI, Intrinsic::spv_bitcast)) {
@@ -228,8 +228,8 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   return NewReg;
 }
 
-static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
-  MachineIRBuilder MIB(MF);
+static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR,
+                                 MachineIRBuilder MIB) {
   MachineRegisterInfo &MRI = MF.getRegInfo();
   std::vector<MachineInstr *> ToDelete;
 
@@ -368,8 +368,8 @@ static void processInstr(MachineInstr &MI, MachineIRBuilder &MIB,
 extern bool isTypeFoldingSupported(unsigned Opcode);
 
 static void processInstrsWithTypeFolding(MachineFunction &MF,
-                                         SPIRVGlobalRegistry *GR) {
-  MachineIRBuilder MIB(MF);
+                                         SPIRVGlobalRegistry *GR,
+                                         MachineIRBuilder MIB) {
   auto &MRI = MF.getRegInfo();
   for (auto &MBB : MF)
     for (auto &MI : MBB)
@@ -377,13 +377,13 @@ static void processInstrsWithTypeFolding(MachineFunction &MF,
         processInstr(MI, MIB, MRI, GR);
 }
 
-static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
+static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR,
+                            MachineIRBuilder MIB) {
   DenseMap<Register, SmallDenseMap<uint64_t, MachineBasicBlock *>>
       SwitchRegToMBB;
   DenseMap<Register, MachineBasicBlock *> DefaultMBBs;
   DenseSet<Register> SwitchRegs;
   auto &MRI = MF.getRegInfo();
-  MachineIRBuilder MIB(MF);
   // Before IRTranslator pass, spv_switch calls are inserted before each
   // switch instruction. IRTranslator lowers switches to ICMP+CBr+Br triples.
   // A switch with two cases may be translated to this MIR sequesnce:
@@ -485,12 +485,13 @@ bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   const SPIRVSubtarget &ST = MF.getSubtarget<SPIRVSubtarget>();
   SPIRVGlobalRegistry *GR = ST.getSPIRVGlobalRegistry();
   GR->setCurrentFunc(MF);
+  MachineIRBuilder MIB(MF);
   addConstantsToTrack(MF, GR);
   foldConstantsIntoIntrinsics(MF);
-  insertBitcasts(MF, GR);
-  generateAssignInstrs(MF, GR);
-  processInstrsWithTypeFolding(MF, GR);
-  processSwitches(MF, GR);
+  insertBitcasts(MF, GR, MIB);
+  generateAssignInstrs(MF, GR, MIB);
+  processInstrsWithTypeFolding(MF, GR, MIB);
+  processSwitches(MF, GR, MIB);
 
   return true;
 }

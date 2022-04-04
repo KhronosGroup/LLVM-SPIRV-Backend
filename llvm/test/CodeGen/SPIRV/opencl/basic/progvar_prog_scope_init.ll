@@ -2,9 +2,18 @@
 
 target triple = "spirv64-unknown-unknown"
 
-; CHECK: OpEntryPoint Kernel %[[f1:[0-9]+]] "writer" %[[var:[0-9]+]]
-; CHECK: OpEntryPoint Kernel %[[f2:[0-9]+]] "reader" %[[var]]
-; CHECK: OpName %[[var]] "var"
+; CHECK: OpEntryPoint Kernel %[[f1:[0-9]+]] "writer"
+; CHECK: OpEntryPoint Kernel %[[f2:[0-9]+]] "reader"
+; CHECK-DAG: OpName %[[a_var:[0-9]+]] "a_var"
+; CHECK-DAG: OpName %[[p_var:[0-9]+]] "p_var"
+; CHECK-DAG: %[[uchar:[0-9]+]] = OpTypeInt 8 0
+; CHECK-DAG: %[[pt1:[0-9]+]] = OpTypePointer CrossWorkgroup %[[uchar]]
+; CHECK-DAG: %[[arr2:[0-9]+]] = OpTypeArray %[[uchar]]
+; CHECK-DAG: %[[pt2:[0-9]+]] = OpTypePointer CrossWorkgroup %[[arr2]]
+; CHECK-DAG: %[[pt3:[0-9]+]] = OpTypePointer CrossWorkgroup %[[pt1]]
+; CHECK-DAG: %[[a_var]] = OpVariable %[[pt2]] CrossWorkgroup
+; CHECK-DAG: %[[const:[0-9]+]] = OpSpecConstantOp %[[pt1]] 70 %[[a_var]]
+; CHECK-DAG: %[[p_var]] = OpVariable %[[pt3]] CrossWorkgroup %[[const]]
 @var = addrspace(1) global i8 0, align 1
 @g_var = addrspace(1) global i8 1, align 1
 @a_var = addrspace(1) global [2 x i8] c"\01\01", align 1

@@ -447,6 +447,19 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     return selectUnOp(ResVReg, ResType, I, SPIRV::OpBitcast);
   case TargetOpcode::G_ADDRSPACE_CAST:
     return selectAddrSpaceCast(ResVReg, ResType, I);
+  case TargetOpcode::G_PTR_ADD: {
+    const SPIRVType *SpvI32Ty = GR.getOrCreateSPIRVIntegerType(32, I, TII);
+    Register Idx = buildZerosVal(SpvI32Ty, I);
+    MachineBasicBlock &BB = *I.getParent();
+    auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
+                   .addDef(ResVReg)
+                   .addUse(GR.getSPIRVTypeID(ResType))
+                   .addImm(Opcode::InBoundsPtrAccessChain)
+                   .addUse(I.getOperand(1).getReg())
+                   .addUse(Idx)
+                   .addUse(I.getOperand(2).getReg());
+    return MIB.constrainAllUses(TII, TRI, RBI);
+  }
 
   case TargetOpcode::G_ATOMICRMW_OR:
     return selectAtomicRMW(ResVReg, ResType, I, SPIRV::OpAtomicOr);

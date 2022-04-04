@@ -180,6 +180,11 @@ namespace KernelProfilingInfo {
 #include "SPIRVGenTables.inc"
 } // namespace KernelProfilingInfo
 
+namespace Opcode {
+#define GET_Opcode_DECL
+#include "SPIRVGenTables.inc"
+} // namespace Opcode
+
 std::string
 getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
                            int32_t Value);
