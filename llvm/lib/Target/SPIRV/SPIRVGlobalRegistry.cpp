@@ -658,37 +658,36 @@ bool SPIRVGlobalRegistry::isScalarOrVectorOfType(
 
 unsigned
 SPIRVGlobalRegistry::getScalarOrVectorBitWidth(const SPIRVType *Type) const {
-  if (Type && Type->getOpcode() == SPIRV::OpTypeVector) {
+  assert(Type && "Invalid Type pointer");
+  if (Type->getOpcode() == SPIRV::OpTypeVector) {
     auto EleTypeReg = Type->getOperand(1).getReg();
     Type = getSPIRVTypeForVReg(EleTypeReg);
   }
-  if (Type && (Type->getOpcode() == SPIRV::OpTypeInt ||
-               Type->getOpcode() == SPIRV::OpTypeFloat))
+  if (Type->getOpcode() == SPIRV::OpTypeInt ||
+      Type->getOpcode() == SPIRV::OpTypeFloat)
     return Type->getOperand(1).getImm();
-  if (Type && Type->getOpcode() == SPIRV::OpTypeBool)
+  if (Type->getOpcode() == SPIRV::OpTypeBool)
     return 1;
   llvm_unreachable("Attempting to get bit width of non-integer/float type.");
 }
 
 bool SPIRVGlobalRegistry::isScalarOrVectorSigned(const SPIRVType *Type) const {
-  if (Type && Type->getOpcode() == SPIRV::OpTypeVector) {
+  assert(Type && "Invalid Type pointer");
+  if (Type->getOpcode() == SPIRV::OpTypeVector) {
     auto EleTypeReg = Type->getOperand(1).getReg();
     Type = getSPIRVTypeForVReg(EleTypeReg);
   }
-  if (Type && Type->getOpcode() == SPIRV::OpTypeInt) {
+  if (Type->getOpcode() == SPIRV::OpTypeInt)
     return Type->getOperand(2).getImm() != 0;
-  }
   llvm_unreachable("Attempting to get sign of non-integer type.");
 }
 
 StorageClass::StorageClass
 SPIRVGlobalRegistry::getPointerStorageClass(Register VReg) const {
   SPIRVType *Type = getSPIRVTypeForVReg(VReg);
-  if (Type && Type->getOpcode() == SPIRV::OpTypePointer) {
-    auto scOp = Type->getOperand(1).getImm();
-    return static_cast<StorageClass::StorageClass>(scOp);
-  }
-  llvm_unreachable("Attempting to get storage class of non-pointer type.");
+  assert(Type && Type->getOpcode() == SPIRV::OpTypePointer &&
+         Type->getOperand(1).isImm() && "Pointer type is expected");
+  return static_cast<StorageClass::StorageClass>(Type->getOperand(1).getImm());
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOpTypeImage(
