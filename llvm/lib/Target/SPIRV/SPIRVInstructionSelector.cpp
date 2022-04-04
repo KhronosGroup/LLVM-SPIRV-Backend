@@ -448,6 +448,10 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
   case TargetOpcode::G_ADDRSPACE_CAST:
     return selectAddrSpaceCast(ResVReg, ResType, I);
   case TargetOpcode::G_PTR_ADD: {
+    // Currently, we get G_PTR_ADD only as a result of translating
+    // global variables, initialized with constant expressions (see test
+    // opencl/basic/progvar_prog_scope_init.ll).
+    // TODO: extend the handler once we have other cases.
     const SPIRVType *SpvI32Ty = GR.getOrCreateSPIRVIntegerType(32, I, TII);
     Register Idx = buildZerosVal(SpvI32Ty, I);
     MachineBasicBlock &BB = *I.getParent();
