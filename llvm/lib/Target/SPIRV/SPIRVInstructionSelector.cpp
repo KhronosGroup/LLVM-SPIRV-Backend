@@ -216,6 +216,8 @@ void SPIRVInstructionSelector::setupMF(MachineFunction &MF, GISelKnownBits *KB,
   InstructionSelector::setupMF(MF, KB, CoverageInfo, PSI, BFI);
 }
 
+static bool isImm(const MachineOperand &MO, MachineRegisterInfo *MRI);
+
 // Defined in SPIRVLegalizerInfo.cpp
 extern bool isTypeFoldingSupported(unsigned Opcode);
 
@@ -447,6 +449,28 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     return selectUnOp(ResVReg, ResType, I, SPIRV::OpBitcast);
   case TargetOpcode::G_ADDRSPACE_CAST:
     return selectAddrSpaceCast(ResVReg, ResType, I);
+  case TargetOpcode::G_PTR_ADD: {
+    // Currently, we get G_PTR_ADD only as a result of translating
+    // global variables, initialized with constant expressions like GV + Const
+    // (see test opencl/basic/progvar_prog_scope_init.ll).
+    // TODO: extend the handler once we have other cases.
+    assert(I.getOperand(1).isReg() && I.getOperand(2).isReg());
+    Register GV = I.getOperand(1).getReg();
+    MachineRegisterInfo::def_instr_iterator II = MRI->def_instr_begin(GV);
+    assert(((*II).getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
+            (*II).getOpcode() == SPIRV::OpVariable) &&
+           isImm(I.getOperand(2), MRI));
+    Register Idx = buildZerosVal(GR.getOrCreateSPIRVIntegerType(32, I, TII), I);
+    MachineBasicBlock &BB = *I.getParent();
+    auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
+                   .addDef(ResVReg)
+                   .addUse(GR.getSPIRVTypeID(ResType))
+                   .addImm(Opcode::InBoundsPtrAccessChain)
+                   .addUse(GV)
+                   .addUse(Idx)
+                   .addUse(I.getOperand(2).getReg());
+    return MIB.constrainAllUses(TII, TRI, RBI);
+  }
 
   case TargetOpcode::G_ATOMICRMW_OR:
     return selectAtomicRMW(ResVReg, ResType, I, SPIRV::OpAtomicOr);
@@ -1236,9 +1260,11 @@ bool SPIRVInstructionSelector::selectOpUndef(Register ResVReg,
 }
 
 static bool isImm(const MachineOperand &MO, MachineRegisterInfo *MRI) {
+  assert(MO.isReg());
   const SPIRVType *TypeInst = MRI->getVRegDef(MO.getReg());
   if (TypeInst->getOpcode() != SPIRV::ASSIGN_TYPE)
     return false;
+  assert(TypeInst->getOperand(1).isReg());
   MachineInstr *ImmInst = MRI->getVRegDef(TypeInst->getOperand(1).getReg());
   return ImmInst->getOpcode() == TargetOpcode::G_CONSTANT;
 }

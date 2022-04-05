@@ -352,7 +352,9 @@ void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
     buildIntrWithMD(Intrinsic::spv_assign_type, {Ty}, Const, I);
   }
   for (const auto &Op : I->operands()) {
-    if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op)) {
+    if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op) ||
+        // Check GetElementPtrConstantExpr case.
+        (isa<ConstantExpr>(Op) && isa<GEPOperator>(Op))) {
       IRB->SetInsertPoint(I);
       buildIntrWithMD(Intrinsic::spv_assign_type, {Op->getType()}, Op, Op);
     }
