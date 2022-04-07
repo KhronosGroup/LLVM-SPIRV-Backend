@@ -824,6 +824,8 @@ SPIRVGlobalRegistry::generateOpenCLOpaqueType(const StructType *Ty,
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeQueue);
   else if (TypeName.startswith("event_t"))
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeEvent);
+  else if (TypeName.startswith("reserve_id_t"))
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeReserveId);
 
   report_fatal_error("Cannot generate OpenCL type: " + Name);
 }
