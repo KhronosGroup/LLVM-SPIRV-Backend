@@ -39,9 +39,9 @@ void initializeSPIRVModuleAnalysisPass(PassRegistry &);
 INITIALIZE_PASS(SPIRVModuleAnalysis, DEBUG_TYPE, "SPIRV module analysis", true,
                 true)
 
-// Retrieve an unsigned int from an MDNode with a list of them as operands.
-static unsigned int getMetadataUInt(MDNode *MdNode, unsigned int OpIndex,
-                                    unsigned int DefaultVal = 0) {
+// Retrieve an unsigned from an MDNode with a list of them as operands.
+static unsigned getMetadataUInt(MDNode *MdNode, unsigned OpIndex,
+                                unsigned DefaultVal = 0) {
   if (MdNode && OpIndex < MdNode->getNumOperands()) {
     const auto &Op = MdNode->getOperand(OpIndex);
     return mdconst::extract<ConstantInt>(Op)->getZExtValue();
@@ -64,9 +64,9 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
   MAI.Mem = MemoryModel::OpenCL;
   MAI.SrcLang = SourceLanguage::OpenCL_C;
   unsigned PtrSize = ST->getPointerSize();
-  MAI.Addr = PtrSize == 32 ? AddressingModel::Physical32
-                           : PtrSize == 64 ? AddressingModel::Physical64
-                                           : AddressingModel::Logical;
+  MAI.Addr = PtrSize == 32   ? AddressingModel::Physical32
+             : PtrSize == 64 ? AddressingModel::Physical64
+                             : AddressingModel::Logical;
   // Get the OpenCL version number from metadata.
   // TODO: support other source languages.
   MAI.SrcLangVersion = 0;
@@ -173,7 +173,6 @@ template <typename T> void SPIRVModuleAnalysis::collectTypesConstsVars() {
 
 // We need to process this separately as for function decls we want to not only
 // collect OpFunctions but OpFunctionParameters too.
-//
 // TODO: maybe consider replacing this with explicit OpFunctionParameter
 // generation here instead handling it in CallLowering.
 static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
@@ -224,7 +223,7 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
       for (MachineBasicBlock &MBB : *MF) {
         for (MachineInstr &MI : MBB) {
           if (MI.getOpcode() == SPIRV::OpExtension) {
-            // Here, OpExtension just has a single enum operand, not a string
+            // Here, OpExtension just has a single enum operand, not a string.
             auto Ext = Extension::Extension(MI.getOperand(0).getImm());
             MAI.Reqs.addExtension(Ext);
             MAI.setSkipEmission(&MI);
@@ -248,9 +247,9 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
 // TODO: maybe it needs to check Opcodes too.
 static bool findSameInstrInMS(const MachineInstr &A, ModuleSectionType MSType,
                               ModuleAnalysisInfo &MAI,
-                              unsigned int StartOpIndex = 0) {
+                              unsigned StartOpIndex = 0) {
   for (const auto *B : MAI.MS[MSType]) {
-    const unsigned int NumAOps = A.getNumOperands();
+    const unsigned NumAOps = A.getNumOperands();
     if (NumAOps == B->getNumOperands() && A.getNumDefs() == B->getNumDefs()) {
       bool AllOpsMatch = true;
       for (unsigned i = StartOpIndex; i < NumAOps && AllOpsMatch; ++i) {
@@ -277,7 +276,7 @@ static bool findSameInstrInMS(const MachineInstr &A, ModuleSectionType MSType,
 void SPIRVModuleAnalysis::collectFuncNames(MachineInstr &MI,
                                            const Function &F) {
   if (MI.getOpcode() == SPIRV::OpDecorate) {
-    // If it's got Import linkage
+    // If it's got Import linkage.
     auto Dec = MI.getOperand(1).getImm();
     if (Dec == Decoration::LinkageAttributes) {
       auto Lnk = MI.getOperand(MI.getNumOperands() - 1).getImm();
@@ -306,7 +305,7 @@ static void collectOtherInstr(MachineInstr &MI, ModuleAnalysisInfo &MAI,
                               ModuleSectionType MSType) {
   MAI.setSkipEmission(&MI);
   if (findSameInstrInMS(MI, MSType, MAI))
-    return; // Found a duplicate, so don't add it
+    return; // Found a duplicate, so don't add it.
   // No duplicates, so add it.
   MAI.MS[MSType].push_back(&MI);
 }
@@ -421,7 +420,7 @@ static void addVariablePtrInstrReqs(const MachineInstr &MI,
 
 // Add the required capabilities from a decoration instruction (including
 // BuiltIns).
-static void addOpDecorateReqs(const MachineInstr &MI, unsigned int DecIndex,
+static void addOpDecorateReqs(const MachineInstr &MI, unsigned DecIndex,
                               SPIRVRequirementHandler &Reqs,
                               const SPIRVSubtarget &ST) {
   int64_t DecOp = MI.getOperand(DecIndex).getImm();
@@ -745,7 +744,7 @@ static void collectReqs(const Module &M, ModuleAnalysisInfo &MAI,
   // Collect requirements for OpExecutionMode instructions.
   auto Node = M.getNamedMetadata("spirv.ExecutionMode");
   if (Node) {
-    for (unsigned int i = 0; i < Node->getNumOperands(); i++) {
+    for (unsigned i = 0; i < Node->getNumOperands(); i++) {
       MDNode *MDN = cast<MDNode>(Node->getOperand(i));
       const MDOperand &MDOp = MDN->getOperand(1);
       if (auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp)) {

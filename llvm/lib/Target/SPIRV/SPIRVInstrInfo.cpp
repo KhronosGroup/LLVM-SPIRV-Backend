@@ -152,8 +152,8 @@ bool SPIRVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 // removed instructions.
 unsigned SPIRVInstrInfo::removeBranch(MachineBasicBlock &MBB,
                                       int *BytesRemoved) const {
-  llvm_unreachable("Branch removal not supported, as MBB info not propagated "
-                   "to OpPhi instructions. Try using -O0 instead.");
+  report_fatal_error("Branch removal not supported, as MBB info not propagated"
+                     " to OpPhi instructions. Try using -O0 instead.");
 }
 
 // Insert branch code into the end of the specified MachineBasicBlock. The
@@ -172,9 +172,9 @@ unsigned SPIRVInstrInfo::removeBranch(MachineBasicBlock &MBB,
 unsigned SPIRVInstrInfo::insertBranch(
     MachineBasicBlock &MBB, MachineBasicBlock *TBB, MachineBasicBlock *FBB,
     ArrayRef<MachineOperand> Cond, const DebugLoc &DL, int *BytesAdded) const {
-
-  llvm_unreachable("Branch insertion not supported, as MBB info not propagated "
-                   "to OpPhi instructions. Try using -O0 instead.");
+  report_fatal_error("Branch insertion not supported, as MBB info not "
+                     "propagated to OpPhi instructions. Try using "
+                     "-O0 instead.");
 
   MachineIRBuilder MIRBuilder;
   MIRBuilder.setMF(*MBB.getParent());

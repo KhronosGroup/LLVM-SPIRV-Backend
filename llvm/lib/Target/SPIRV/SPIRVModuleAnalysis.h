@@ -25,19 +25,19 @@ namespace llvm {
 
 // The enum contains logical module sections for instruction callection.
 enum ModuleSectionType {
-  //  MB_Capabilities,   // All OpCapability instructions
-  //  MB_Extensions,     // Optional OpExtension instructions
-  //  MB_ExtInstImports, // Any language extension imports via OpExtInstImport
-  //  MB_MemoryModel,    // A single required OpMemoryModel instruction
-  MB_EntryPoints, // All OpEntryPoint instructions (if any)
-  //  MB_ExecutionModes, // All OpExecutionMode or OpExecutionModeId instrs
+  //  MB_Capabilities,   // All OpCapability instructions.
+  //  MB_Extensions,     // Optional OpExtension instructions.
+  //  MB_ExtInstImports, // Any language extension imports via OpExtInstImport.
+  //  MB_MemoryModel,    // A single required OpMemoryModel instruction.
+  MB_EntryPoints, // All OpEntryPoint instructions (if any).
+  //  MB_ExecutionModes, // All OpExecutionMode or OpExecutionModeId instrs.
   //  MB_DebugSourceAndStrings, // OpString, OpSource, OpSourceExtension etc.
-  MB_DebugNames,           // All OpName and OpMemberName intrs.
+  MB_DebugNames,           // All OpName and OpMemberName instrs.
   MB_DebugModuleProcessed, // All OpModuleProcessed instructions.
   MB_Annotations,          // OpDecorate, OpMemberDecorate etc.
-  MB_TypeConstVars,        // OpTypeXXX, OpConstantXXX, and global OpVariables
-  MB_ExtFuncDecls,         // OpFunction etc. to declare for external funcs
-  NUM_MODULE_SECTIONS      // Total number of sections requiring basic blocks
+  MB_TypeConstVars,        // OpTypeXXX, OpConstantXXX, and global OpVariables.
+  MB_ExtFuncDecls,         // OpFunction etc. to declare for external funcs.
+  NUM_MODULE_SECTIONS      // Total number of sections requiring basic blocks.
 };
 
 class MachineFunction;
@@ -56,7 +56,7 @@ struct ModuleAnalysisInfo {
   MemoryModel::MemoryModel Mem;
   AddressingModel::AddressingModel Addr;
   SourceLanguage::SourceLanguage SrcLang;
-  unsigned int SrcLangVersion;
+  unsigned SrcLangVersion;
   // Maps ExtInstSet to corresponding ID register.
   DenseMap<unsigned, Register> ExtInstSetMap;
   // Contains the list of all global OpVariables in the module.

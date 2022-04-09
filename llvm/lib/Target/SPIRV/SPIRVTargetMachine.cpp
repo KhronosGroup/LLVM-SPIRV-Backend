@@ -32,10 +32,6 @@
 #include "llvm/Target/TargetOptions.h"
 
 using namespace llvm;
-InstructionSelector *
-createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
-                               SPIRVSubtarget &Subtarget,
-                               SPIRVRegisterBankInfo &RBI);
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSPIRVTarget() {
   // Register the target.

@@ -39,7 +39,7 @@ void addStringImm(const llvm::StringRef &Str, llvm::IRBuilder<> &B,
 
 // Read the series of integer operands back as a null-terminated string using
 // the reverse of the logic in addStringImm.
-std::string getStringImm(const llvm::MachineInstr &MI, unsigned int StartIndex);
+std::string getStringImm(const llvm::MachineInstr &MI, unsigned StartIndex);
 
 // Add the given numerical immediate to MIB.
 void addNumImm(const llvm::APInt &Imm, llvm::MachineInstrBuilder &MIB);
@@ -60,14 +60,14 @@ void buildOpDecorate(llvm::Register Reg, llvm::MachineInstr &I,
                      llvm::StringRef StrImm = "");
 
 // Convert a SPIR-V storage class to the corresponding LLVM IR address space.
-unsigned int storageClassToAddressSpace(StorageClass::StorageClass SC);
+unsigned storageClassToAddressSpace(StorageClass::StorageClass SC);
 
 // Convert an LLVM IR address space to a SPIR-V storage class.
-StorageClass::StorageClass addressSpaceToStorageClass(unsigned int AddrSpace);
+StorageClass::StorageClass addressSpaceToStorageClass(unsigned AddrSpace);
 
 // Utility method to constrain an instruction's operands to the correct
 // register classes, and return true if this worked.
-// TODO: get rid of using this function
+// TODO: get rid of using this function.
 bool constrainRegOperands(llvm::MachineInstrBuilder &MIB,
                           llvm::MachineFunction *MF = nullptr);
 

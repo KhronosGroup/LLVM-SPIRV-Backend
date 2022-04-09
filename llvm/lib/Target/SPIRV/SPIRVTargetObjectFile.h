@@ -17,25 +17,23 @@ namespace llvm {
 
 class SPIRVTargetObjectFile : public TargetLoweringObjectFile {
 public:
-  SPIRVTargetObjectFile() : TargetLoweringObjectFile() {}
-
   ~SPIRVTargetObjectFile() override;
 
   void Initialize(MCContext &ctx, const TargetMachine &TM) override {
     TargetLoweringObjectFile::Initialize(ctx, TM);
   }
-
+  // All words in a SPIR-V module (excepting the first 5 ones) are a linear
+  // sequence of instructions in a specific order. We put all the instructions
+  // in the single text section.
   MCSection *getSectionForConstant(const DataLayout &DL, SectionKind Kind,
                                    const Constant *C,
                                    Align &Alignment) const override {
     return TextSection;
   }
-
   MCSection *getExplicitSectionGlobal(const GlobalObject *GO, SectionKind Kind,
                                       const TargetMachine &TM) const override {
     return TextSection;
   }
-
   MCSection *SelectSectionForGlobal(const GlobalObject *GO, SectionKind Kind,
                                     const TargetMachine &TM) const override {
     return TextSection;

@@ -45,7 +45,7 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
   return true;
 }
 
-// Based on the LLVM function attributes, get a SPIR-V FunctionControl
+// Based on the LLVM function attributes, get a SPIR-V FunctionControl.
 static uint32_t getFunctionControl(const Function &F) {
   uint32_t FuncControl = FunctionControl::None;
   if (F.hasFnAttribute(Attribute::AttrKind::AlwaysInline)) {
@@ -79,10 +79,10 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   assert(GR && "Must initialize the SPIRV type registry before lowering args.");
   GR->setCurrentFunc(MIRBuilder.getMF());
 
-  // Assign types and names to all args, and store their types for later
+  // Assign types and names to all args, and store their types for later.
   SmallVector<Register, 4> ArgTypeVRegs;
   if (VRegs.size() > 0) {
-    unsigned int i = 0;
+    unsigned i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
       // auto *SpirvTy = GR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
@@ -136,7 +136,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
           assert(Const && "MDOperand should be ConstantInt");
           auto Dec = static_cast<Decoration::Decoration>(Const->getZExtValue());
           std::vector<uint32_t> DecVec;
-          for (unsigned int j = 1; j < MD2->getNumOperands(); j++) {
+          for (unsigned j = 1; j < MD2->getNumOperands(); j++) {
             ConstantInt *Const = getConstInt(MD2, j);
             assert(Const && "MDOperand should be ConstantInt");
             DecVec.push_back(static_cast<uint32_t>(Const->getZExtValue()));
@@ -148,7 +148,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     }
   }
 
-  // Generate a SPIR-V type for the function
+  // Generate a SPIR-V type for the function.
   auto MRI = MIRBuilder.getMRI();
   Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
   if (F.isDeclaration())
@@ -176,7 +176,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       assert(MD && "MDNode operand is expected");
       ConstantInt *Const = getConstInt(MD, 0);
       // TODO: currently -1 indicates return value, support this types
-      // renaming for arguments as well
+      // renaming for arguments as well.
       if (Const && Const->getSExtValue() == -1) {
         auto *CMeta = dyn_cast<ConstantAsMetadata>(MD->getOperand(1));
         assert(CMeta && "ConstantAsMetadata operand is expected");
@@ -192,7 +192,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   auto FuncTy = GR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
 
-  // Build the OpTypeFunction declaring it
+  // Build the OpTypeFunction declaring it.
   Register ReturnTypeID = FuncTy->getOperand(1).getReg();
   uint32_t FuncControl = getFunctionControl(F);
 
@@ -202,9 +202,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       .addImm(FuncControl)
       .addUse(GR->getSPIRVTypeID(FuncTy));
 
-  // Add OpFunctionParameters
-  const unsigned int NumArgs = ArgTypeVRegs.size();
-  for (unsigned int i = 0; i < NumArgs; ++i) {
+  // Add OpFunctionParameters.
+  const unsigned NumArgs = ArgTypeVRegs.size();
+  for (unsigned i = 0; i < NumArgs; ++i) {
     assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
     MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
     MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
@@ -212,11 +212,11 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
         .addUse(ArgTypeVRegs[i]);
   }
 
-  // Name the function
+  // Name the function.
   if (F.hasName())
     buildOpName(FuncVReg, F.getName(), MIRBuilder);
 
-  // Handle entry points and function linkage
+  // Handle entry points and function linkage.
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
     auto ExecModel = ExecutionModel::Kernel;
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpEntryPoint)
@@ -251,11 +251,11 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   bool DoubleUnderscore =
       SingleUnderscore && FuncName.size() >= 2 && FuncName[1] == '_';
   // FIXME: OCL builtin checks should be the same as in clang
-  //        or SPIRV-LLVM translator
+  //        or SPIRV-LLVM translator.
   if ((Status == demangle_success && SingleUnderscore) || DoubleUnderscore) {
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
-      // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp
+      // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp.
       SmallVector<Register, 8> ArgVRegs;
       for (auto Arg : Info.OrigArgs) {
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
@@ -310,7 +310,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     SPIRVType *RetType =
         GR->assignTypeToVReg(Info.OrigRet.Ty, ResVReg, MIRBuilder);
 
-    // Emit the OpFunctionCall and its args
+    // Emit the OpFunctionCall and its args.
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
                    .addDef(ResVReg)
                    .addUse(GR->getSPIRVTypeID(RetType))
