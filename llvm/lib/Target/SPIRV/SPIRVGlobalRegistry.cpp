@@ -394,7 +394,7 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
     GV = GVar;
   }
   Register Reg;
-  if (DT.find(GV, &MIRBuilder.getMF(), Reg)) {
+  if (DT.find(GVar, &MIRBuilder.getMF(), Reg)) {
     if (Reg != ResVReg)
       MIRBuilder.buildCopy(ResVReg, Reg);
     return ResVReg;
@@ -418,7 +418,7 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
                                      *Subtarget.getRegBankInfo());
   }
   Reg = MIB->getOperand(0).getReg();
-  DT.add(GV, &MIRBuilder.getMF(), Reg);
+  DT.add(GVar, &MIRBuilder.getMF(), Reg);
 
   // Set to Reg the same type as ResVReg has.
   auto MRI = MIRBuilder.getMRI();

@@ -32,8 +32,8 @@ const SPIRVConstantTracker *SPIRVGeneralDuplicatesTracker::get(Constant *Arg) {
 }
 
 template <>
-const SPIRVGlobalValueTracker *
-SPIRVGeneralDuplicatesTracker::get(GlobalValue *Arg) {
+const SPIRVGlobalVariableTracker *
+SPIRVGeneralDuplicatesTracker::get(GlobalVariable *Arg) {
   return &GT;
 }
 

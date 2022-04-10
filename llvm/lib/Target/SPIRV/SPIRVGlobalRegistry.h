@@ -19,6 +19,7 @@
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVDuplicatesTracker.h"
 #include "SPIRVInstrInfo.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace AQ = AccessQualifier;
@@ -83,7 +84,7 @@ public:
     DT.add(C, MF, R);
   }
 
-  void add(const GlobalValue *GV, MachineFunction *MF, Register R) {
+  void add(const GlobalVariable *GV, MachineFunction *MF, Register R) {
     DT.add(GV, MF, R);
   }
 
@@ -95,7 +96,7 @@ public:
     return DT.find(C, MF, R);
   }
 
-  bool find(const GlobalValue *GV, MachineFunction *MF, Register &R) {
+  bool find(const GlobalVariable *GV, MachineFunction *MF, Register &R) {
     return DT.find(GV, MF, R);
   }
 
@@ -104,8 +105,7 @@ public:
   }
 
   template <typename T>
-  const MapVector<const T *, MapVector<MachineFunction *, Register>> &
-  getAllUses() {
+  const DenseMap<const T *, DTSortableEntry> &getAllUses() {
     return DT.get<T>()->getAllUses();
   }
 
@@ -169,6 +169,10 @@ public:
   Register getSPIRVTypeID(const SPIRVType *SpirvType) const;
 
   void setCurrentFunc(MachineFunction &MF) { CurMF = &MF; }
+
+  void buildDepsGraph(std::vector<DTSortableEntry *> &Graph) {
+    DT.buildDepsGraph(Graph);
+  }
 
   // Whether the given VReg has an OpTypeXXX instruction mapped to it with the
   // given opcode (e.g. OpTypeFloat).
