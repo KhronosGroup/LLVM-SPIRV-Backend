@@ -32,7 +32,7 @@ class SPIRVGlobalRegistry {
   // Do not confuse this with DuplicatesTracker as DT maps Type* to <MF, Reg>
   // where Reg = OpType...
   // while VRegToTypeMap tracks SPIR-V type assigned to other regs (i.e. not
-  // type-declaring ones)
+  // type-declaring ones).
   DenseMap<MachineFunction *, DenseMap<Register, SPIRVType *>> VRegToTypeMap;
 
   SPIRVGeneralDuplicatesTracker DT;
@@ -41,7 +41,7 @@ class SPIRVGlobalRegistry {
 
   using SPIRVInstrGroup = DenseMap<MachineFunction *, const MachineInstr *>;
   using VectorOfSPIRVInstrGroups = SmallVector<SPIRVInstrGroup>;
-  using SpecialInstrMapTy = MapVector<unsigned int, VectorOfSPIRVInstrGroups>;
+  using SpecialInstrMapTy = MapVector<unsigned, VectorOfSPIRVInstrGroups>;
 
   // Builtin types may be represented in two ways while translating to SPIR-V:
   // in OpenCL form and in SPIR-V form. We have to keep only one type for such
@@ -63,9 +63,9 @@ class SPIRVGlobalRegistry {
                                            SpecialInstrMapTy &InstrMap);
 
   // Number of bits pointers and size_t integers require.
-  const unsigned int PointerSize;
+  const unsigned PointerSize;
 
-  // Add a new OpTypeXXX instruction without checking for duplicates
+  // Add a new OpTypeXXX instruction without checking for duplicates.
   SPIRVType *createSPIRVType(const Type *Type, MachineIRBuilder &MIRBuilder,
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
@@ -106,7 +106,7 @@ public:
     return SpecialTypesAndConstsMap;
   }
 
-  SPIRVGlobalRegistry(unsigned int PointerSize);
+  SPIRVGlobalRegistry(unsigned PointerSize);
 
   MachineFunction *CurMF;
 
@@ -131,7 +131,7 @@ public:
   // corresponding to the given LLVM IR type.
   // EmitIR controls if we emit GMIR or SPV constants (e.g. for array sizes)
   // because this method may be called from InstructionSelector and we don't
-  // want to emit extra IR instructions there
+  // want to emit extra IR instructions there.
   SPIRVType *
   getOrCreateSPIRVType(const Type *Type, MachineIRBuilder &MIRBuilder,
                        AQ::AccessQualifier accessQual = AQ::ReadWrite,
@@ -157,7 +157,7 @@ public:
     return getSPIRVTypeForVReg(VReg) != nullptr;
   }
 
-  // Return the VReg holding the result of the given OpTypeXXX instruction
+  // Return the VReg holding the result of the given OpTypeXXX instruction.
   Register getSPIRVTypeID(const SPIRVType *SpirvType) const {
     assert(SpirvType && "Attempting to get type id for nullptr type.");
     return SpirvType->defs().begin()->getReg();
@@ -167,20 +167,20 @@ public:
 
   // Whether the given VReg has an OpTypeXXX instruction mapped to it with the
   // given opcode (e.g. OpTypeFloat).
-  bool isScalarOfType(Register VReg, unsigned int TypeOpcode) const;
+  bool isScalarOfType(Register VReg, unsigned TypeOpcode) const;
 
   // Return true if the given VReg's assigned SPIR-V type is either a scalar
   // matching the given opcode, or a vector with an element type matching that
   // opcode (e.g. OpTypeBool, or OpTypeVector %x 4, where %x is OpTypeBool).
-  bool isScalarOrVectorOfType(Register VReg, unsigned int TypeOpcode) const;
+  bool isScalarOrVectorOfType(Register VReg, unsigned TypeOpcode) const;
 
-  // For vectors or scalars of ints or floats, return the scalar type's bitwidth
+  // For vectors or scalars of ints/floats, return the scalar type's bitwidth.
   unsigned getScalarOrVectorBitWidth(const SPIRVType *Type) const;
 
-  // For integer vectors or scalars, return whether the integers are signed
+  // For integer vectors or scalars, return whether the integers are signed.
   bool isScalarOrVectorSigned(const SPIRVType *Type) const;
 
-  // Gets the storage class of the pointer type assigned to this vreg
+  // Gets the storage class of the pointer type assigned to this vreg.
   StorageClass::StorageClass getPointerStorageClass(Register VReg) const;
 
   // Return the number of bits SPIR-V pointers and size_t variables require.
@@ -188,7 +188,7 @@ public:
 
 private:
   // Internal methods for creating types which are unsafe in duplications
-  // check sense hence can only be called within getOrCreateSPIRVType callstack
+  // check sense hence can only be called within getOrCreateSPIRVType callstack.
   SPIRVType *getSamplerType(MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getSampledImageType(SPIRVType *ImageType,
@@ -233,8 +233,7 @@ private:
   SPIRVType *getOpTypePipe(MachineIRBuilder &MIRBuilder,
                            AQ::AccessQualifier AccQual);
 
-  SPIRVType *getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
-                               unsigned int Opcode);
+  SPIRVType *getOpTypeByOpcode(MachineIRBuilder &MIRBuilder, unsigned Opcode);
 
   SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
                                  MachineIRBuilder &MIRBuilder,
@@ -269,8 +268,8 @@ public:
   Register getOrCreateConsIntVector(uint64_t Val, MachineInstr &I,
                                     SPIRVType *SpvType,
                                     const SPIRVInstrInfo &TII);
-  Register buildConstantSampler(Register Res, unsigned int AddrMode,
-                                unsigned int Param, unsigned int FilerMode,
+  Register buildConstantSampler(Register Res, unsigned AddrMode, unsigned Param,
+                                unsigned FilerMode,
                                 MachineIRBuilder &MIRBuilder,
                                 SPIRVType *SpvType);
   Register

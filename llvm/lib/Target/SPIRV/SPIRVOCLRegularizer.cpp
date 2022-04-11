@@ -62,7 +62,7 @@ void SPIRVOCLRegularizer::visitCallInst(CallInst &CI) {
   char *NameStr = itaniumDemangle(F->getName().data(), nullptr, &n, &status);
   StringRef DemangledName(NameStr);
 
-  // TODO: add support for other builtins
+  // TODO: add support for other builtins.
   if (DemangledName.startswith("fmin") || DemangledName.startswith("fmax") ||
       DemangledName.startswith("min") || DemangledName.startswith("max"))
     visitCallScalToVec(&CI, MangledName, DemangledName);
@@ -83,8 +83,8 @@ void SPIRVOCLRegularizer::visitCallScalToVec(CallInst *CI,
     return;
   }
 
-  std::vector<unsigned int> VecPos;
-  std::vector<unsigned int> ScalarPos;
+  std::vector<unsigned> VecPos;
+  std::vector<unsigned> ScalarPos;
   VecPos.push_back(0);
   ScalarPos.push_back(1);
 

@@ -51,8 +51,9 @@ public:
 
 private:
   FeatureBitset computeAvailableFeatures(const FeatureBitset &FB) const;
-  void verifyInstructionPredicates(
-      const MCInst &MI, const FeatureBitset &AvailableFeatures) const;
+  void
+  verifyInstructionPredicates(const MCInst &MI,
+                              const FeatureBitset &AvailableFeatures) const;
 };
 
 } // end anonymous namespace
@@ -71,9 +72,9 @@ using EndianWriter = support::endian::Writer;
 static bool hasType(const MCInst &MI, const MCInstrInfo &MII,
                     const MCRegisterInfo &MRI) {
   MCInstrDesc MCDesc = MII.get(MI.getOpcode());
-  // If we define an output, and have at least one other argument
+  // If we define an output, and have at least one other argument.
   if (MCDesc.getNumDefs() == 1 && MCDesc.getNumOperands() >= 2) {
-    // Check if we define an ID, and take a type as operand 1
+    // Check if we define an ID, and take a type as operand 1.
     auto DefOpInfo = MCDesc.opInfo_begin();
     auto FirstArgOpInfo = MCDesc.opInfo_begin() + 1;
     return (DefOpInfo->RegClass == SPIRV::IDRegClassID ||
@@ -97,10 +98,10 @@ static void emitOperand(const MCOperand &Op, EndianWriter &OSE) {
 // Emit the type in operand 1 before the ID in operand 0 it defines, and all
 // remaining operands in the order they come naturally.
 static void emitTypedInstrOperands(const MCInst &MI, EndianWriter &OSE) {
-  unsigned int NumOps = MI.getNumOperands();
+  unsigned NumOps = MI.getNumOperands();
   emitOperand(MI.getOperand(1), OSE);
   emitOperand(MI.getOperand(0), OSE);
-  for (unsigned int i = 2; i < NumOps; ++i)
+  for (unsigned i = 2; i < NumOps; ++i)
     emitOperand(MI.getOperand(i), OSE);
 }
 

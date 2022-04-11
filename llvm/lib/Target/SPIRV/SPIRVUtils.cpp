@@ -12,13 +12,13 @@
 
 #include "SPIRVUtils.h"
 #include "MCTargetDesc/SPIRVBaseInfo.h"
-#include "SPIRVInstrInfo.h"
 #include "SPIRV.h"
-#include "llvm/IR/IntrinsicsSPIRV.h"
+#include "SPIRVInstrInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/IR/IntrinsicsSPIRV.h"
 
 using namespace llvm;
 
@@ -27,11 +27,11 @@ using namespace llvm;
 // when making string comparisons in compiler passes.
 // SPIR-V requires null-terminated UTF-8 strings padded to 32-bit alignment.
 static uint32_t convertCharsToWord(const StringRef &Str, unsigned i) {
-  uint32_t Word = 0u; // Build up this 32-bit word from 4 8-bit chars
+  uint32_t Word = 0u; // Build up this 32-bit word from 4 8-bit chars.
   for (unsigned WordIndex = 0; WordIndex < 4; ++WordIndex) {
     unsigned StrIndex = i + WordIndex;
-    uint8_t CharToAdd = 0;       // Initilize char as padding/null
-    if (StrIndex < Str.size()) { // If it's within the string, get a real char
+    uint8_t CharToAdd = 0;       // Initilize char as padding/null.
+    if (StrIndex < Str.size()) { // If it's within the string, get a real char.
       CharToAdd = Str[StrIndex];
     }
     Word |= (CharToAdd << (WordIndex * 8));
@@ -48,7 +48,7 @@ static size_t getPaddedLen(const StringRef &Str) {
 void addStringImm(const StringRef &Str, MCInst &Inst) {
   const size_t PaddedLen = getPaddedLen(Str);
   for (unsigned i = 0; i < PaddedLen; i += 4) {
-    // Add an operand for the 32-bits of chars or padding
+    // Add an operand for the 32-bits of chars or padding.
     Inst.addOperand(MCOperand::createImm(convertCharsToWord(Str, i)));
   }
 }
@@ -56,7 +56,7 @@ void addStringImm(const StringRef &Str, MCInst &Inst) {
 void addStringImm(const StringRef &Str, MachineInstrBuilder &MIB) {
   const size_t PaddedLen = getPaddedLen(Str);
   for (unsigned i = 0; i < PaddedLen; i += 4) {
-    // Add an operand for the 32-bits of chars or padding
+    // Add an operand for the 32-bits of chars or padding.
     MIB.addImm(convertCharsToWord(Str, i));
   }
 }
@@ -65,12 +65,12 @@ void addStringImm(const StringRef &Str, IRBuilder<> &B,
                   std::vector<Value *> &Args) {
   const size_t PaddedLen = getPaddedLen(Str);
   for (unsigned i = 0; i < PaddedLen; i += 4) {
-    // Add a vector element for the 32-bits of chars or padding
+    // Add a vector element for the 32-bits of chars or padding.
     Args.push_back(B.getInt32(convertCharsToWord(Str, i)));
   }
 }
 
-std::string getStringImm(const MachineInstr &MI, unsigned int StartIndex) {
+std::string getStringImm(const MachineInstr &MI, unsigned StartIndex) {
   return getSPIRVStringOperand(MI, StartIndex);
 }
 
@@ -78,7 +78,7 @@ void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB) {
   const auto Bitwidth = Imm.getBitWidth();
   switch (Bitwidth) {
   case 1:
-    break; // Already handled
+    break; // Already handled.
   case 8:
   case 16:
   case 32:
@@ -132,7 +132,7 @@ void buildOpDecorate(Register Reg, MachineInstr &I, const SPIRVInstrInfo &TII,
 
 // TODO: maybe the following two functions should be handled in the subtarget
 // to allow for different OpenCL vs Vulkan handling.
-unsigned int storageClassToAddressSpace(StorageClass::StorageClass SC) {
+unsigned storageClassToAddressSpace(StorageClass::StorageClass SC) {
   switch (SC) {
   case StorageClass::Function:
     return 0;
@@ -151,7 +151,7 @@ unsigned int storageClassToAddressSpace(StorageClass::StorageClass SC) {
   }
 }
 
-StorageClass::StorageClass addressSpaceToStorageClass(unsigned int AddrSpace) {
+StorageClass::StorageClass addressSpaceToStorageClass(unsigned AddrSpace) {
   switch (AddrSpace) {
   case 0:
     return StorageClass::Function;

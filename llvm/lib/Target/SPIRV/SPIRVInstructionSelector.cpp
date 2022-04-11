@@ -47,14 +47,14 @@ class SPIRVInstructionSelector : public InstructionSelector {
   const SPIRVSubtarget &STI;
   const SPIRVInstrInfo &TII;
   const SPIRVRegisterInfo &TRI;
-  const SPIRVRegisterBankInfo &RBI;
+  const RegisterBankInfo &RBI;
   SPIRVGlobalRegistry &GR;
   MachineRegisterInfo *MRI;
 
 public:
   SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                            const SPIRVSubtarget &ST,
-                           const SPIRVRegisterBankInfo &RBI);
+                           const RegisterBankInfo &RBI);
   void setupMF(MachineFunction &MF, GISelKnownBits *KB,
                CodeGenCoverage &CoverageInfo, ProfileSummaryInfo *PSI,
                BlockFrequencyInfo *BFI) override;
@@ -193,9 +193,9 @@ private:
 #include "SPIRVGenGlobalISel.inc"
 #undef GET_GLOBALISEL_IMPL
 
-SPIRVInstructionSelector::SPIRVInstructionSelector(
-    const SPIRVTargetMachine &TM, const SPIRVSubtarget &ST,
-    const SPIRVRegisterBankInfo &RBI)
+SPIRVInstructionSelector::SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
+                                                   const SPIRVSubtarget &ST,
+                                                   const RegisterBankInfo &RBI)
     : InstructionSelector(), STI(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI), GR(*ST.getSPIRVGlobalRegistry()),
 #define GET_GLOBALISEL_PREDICATES_INIT
@@ -909,7 +909,7 @@ bool SPIRVInstructionSelector::selectOverflowOp(Register ResVReg,
 }
 #endif
 
-static unsigned int getFCmpOpcode(unsigned PredNum) {
+static unsigned getFCmpOpcode(unsigned PredNum) {
   auto Pred = static_cast<CmpInst::Predicate>(PredNum);
   switch (Pred) {
   case CmpInst::FCMP_OEQ:
@@ -945,7 +945,7 @@ static unsigned int getFCmpOpcode(unsigned PredNum) {
   }
 }
 
-static unsigned int getICmpOpcode(unsigned PredNum) {
+static unsigned getICmpOpcode(unsigned PredNum) {
   auto Pred = static_cast<CmpInst::Predicate>(PredNum);
   switch (Pred) {
   case CmpInst::ICMP_EQ:
@@ -973,7 +973,7 @@ static unsigned int getICmpOpcode(unsigned PredNum) {
   }
 }
 
-static unsigned int getPtrCmpOpcode(unsigned Pred) {
+static unsigned getPtrCmpOpcode(unsigned Pred) {
   switch (static_cast<CmpInst::Predicate>(Pred)) {
   case CmpInst::ICMP_EQ:
     return SPIRV::OpPtrEqual;
@@ -985,7 +985,7 @@ static unsigned int getPtrCmpOpcode(unsigned Pred) {
 }
 
 // Return the logical operation, or abort if none exists
-static unsigned int getBoolCmpOpcode(unsigned PredNum) {
+static unsigned getBoolCmpOpcode(unsigned PredNum) {
   auto Pred = static_cast<CmpInst::Predicate>(PredNum);
   switch (Pred) {
   case CmpInst::ICMP_EQ:
@@ -1118,7 +1118,7 @@ SPIRVInstructionSelector::buildI32Constant(uint32_t Val, MachineInstr &I,
 bool SPIRVInstructionSelector::selectFCmp(Register ResVReg,
                                           const SPIRVType *ResType,
                                           MachineInstr &I) const {
-  unsigned int CmpOp = getFCmpOpcode(I.getOperand(1).getPredicate());
+  unsigned CmpOp = getFCmpOpcode(I.getOperand(1).getPredicate());
   return selectCmp(ResVReg, ResType, CmpOp, I);
 }
 
@@ -1480,7 +1480,7 @@ bool SPIRVInstructionSelector::selectBranchCond(MachineInstr &I) const {
   // Must be relying on implicit block fallthrough, so generate an
   // OpBranchConditional with the "next" basic block as the "false" target.
   MachineBasicBlock &MBB = *I.getParent();
-  unsigned int NextMBBNum = MBB.getNextNode()->getNumber();
+  unsigned NextMBBNum = MBB.getNextNode()->getNumber();
   MachineBasicBlock *NextMBB = I.getMF()->getBlockNumbered(NextMBBNum);
   return BuildMI(MBB, I, I.getDebugLoc(), TII.get(SPIRV::OpBranchConditional))
       .addUse(I.getOperand(0).getReg())
@@ -1495,9 +1495,9 @@ bool SPIRVInstructionSelector::selectPhi(Register ResVReg,
   auto MIB = BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(SPIRV::OpPhi))
                  .addDef(ResVReg)
                  .addUse(GR.getSPIRVTypeID(ResType));
-  const unsigned int NumOps = I.getNumOperands();
+  const unsigned NumOps = I.getNumOperands();
   assert((NumOps % 2 == 1) && "Require odd number of operands for G_PHI");
-  for (unsigned int i = 1; i < NumOps; i += 2) {
+  for (unsigned i = 1; i < NumOps; i += 2) {
     MIB.addUse(I.getOperand(i + 0).getReg());
     MIB.addMBB(I.getOperand(i + 1).getMBB());
   }
@@ -1541,7 +1541,7 @@ namespace llvm {
 InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                const SPIRVSubtarget &Subtarget,
-                               const SPIRVRegisterBankInfo &RBI) {
+                               const RegisterBankInfo &RBI) {
   return new SPIRVInstructionSelector(TM, Subtarget, RBI);
 }
 } // namespace llvm

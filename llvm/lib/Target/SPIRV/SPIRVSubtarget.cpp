@@ -41,6 +41,7 @@ static bool isAtLeastVer(uint32_t Target, uint32_t VerToCompareTo) {
 static unsigned computePointerSize(const Triple &TT) {
   const auto Arch = TT.getArch();
   // TODO: unify this with pointers legalization
+  assert(TT.isSPIRV());
   return Arch == Triple::spirv32 ? 32 : Arch == Triple::spirv64 ? 64 : 8;
 }
 
@@ -76,14 +77,12 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
   initAvailableExtInstSets(TT);
   initAvailableCapabilities(TT);
 
-  GR.reset(new SPIRVGlobalRegistry(PointerSize));
-
-  CallLoweringInfo.reset(new SPIRVCallLowering(TLInfo, GR.get()));
-  Legalizer.reset(new SPIRVLegalizerInfo(*this));
-
-  auto *RBI = new SPIRVRegisterBankInfo();
-  RegBankInfo.reset(RBI);
-  InstSelector.reset(createSPIRVInstructionSelector(TM, *this, *RBI));
+  GR = std::make_unique<SPIRVGlobalRegistry>(PointerSize);
+  CallLoweringInfo = std::make_unique<SPIRVCallLowering>(TLInfo, GR.get());
+  Legalizer = std::make_unique<SPIRVLegalizerInfo>(*this);
+  RegBankInfo = std::make_unique<SPIRVRegisterBankInfo>();
+  InstSelector.reset(
+      createSPIRVInstructionSelector(TM, *this, *RegBankInfo.get()));
 }
 
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,

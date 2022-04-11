@@ -313,9 +313,9 @@ void SPIRVAsmPrinter::outputEntryPoints() {
   }
 }
 
-// Create global OpCapability instructions for the required capabilities
+// Create global OpCapability instructions for the required capabilities.
 void SPIRVAsmPrinter::outputGlobalRequirements() {
-  // Abort here if not all requirements can be satisfied
+  // Abort here if not all requirements can be satisfied.
   MAI->Reqs.checkSatisfiable(*ST);
 
   for (const auto &Cap : MAI->Reqs.getMinimalCapabilities()) {
@@ -325,7 +325,7 @@ void SPIRVAsmPrinter::outputGlobalRequirements() {
     outputMCInst(Inst);
   }
 
-  // Generate the final OpExtensions with strings instead of enums
+  // Generate the final OpExtensions with strings instead of enums.
   for (const auto &Ext : MAI->Reqs.getExtensions()) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtension);
@@ -334,7 +334,7 @@ void SPIRVAsmPrinter::outputGlobalRequirements() {
         Inst);
     outputMCInst(Inst);
   }
-  // TODO add a pseudo instr for version number
+  // TODO add a pseudo instr for version number.
 }
 
 void SPIRVAsmPrinter::outputExtFuncDecls() {
@@ -409,7 +409,7 @@ void SPIRVAsmPrinter::outputExecutionModeFromMDNode(Register Reg, MDNode *Node,
 void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
   auto Node = M.getNamedMetadata("spirv.ExecutionMode");
   if (Node) {
-    for (unsigned int i = 0; i < Node->getNumOperands(); i++) {
+    for (unsigned i = 0; i < Node->getNumOperands(); i++) {
       MCInst Inst;
       Inst.setOpcode(SPIRV::OpExecutionMode);
       addOpsFromMDNode(cast<MDNode>(Node->getOperand(i)), Inst, MAI);

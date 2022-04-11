@@ -22,7 +22,7 @@
 #include "SPIRVUtils.h"
 
 using namespace llvm;
-SPIRVGlobalRegistry::SPIRVGlobalRegistry(unsigned int PointerSize)
+SPIRVGlobalRegistry::SPIRVGlobalRegistry(unsigned PointerSize)
     : PointerSize(PointerSize) {}
 
 SPIRVType *SPIRVGlobalRegistry::assignIntTypeToVReg(unsigned BitWidth,
@@ -347,8 +347,8 @@ SPIRVGlobalRegistry::buildConstantIntVector(uint64_t Val,
 }
 
 Register SPIRVGlobalRegistry::buildConstantSampler(
-    Register ResReg, unsigned int AddrMode, unsigned int Param,
-    unsigned int FilerMode, MachineIRBuilder &MIRBuilder, SPIRVType *SpvType) {
+    Register ResReg, unsigned AddrMode, unsigned Param, unsigned FilerMode,
+    MachineIRBuilder &MIRBuilder, SPIRVType *SpvType) {
   SPIRVType *SampTy;
   if (SpvType)
     SampTy = getOrCreateSPIRVType(getTypeForSPIRVType(SpvType), MIRBuilder);
@@ -555,7 +555,7 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
   }
 
   if (auto IType = dyn_cast<IntegerType>(Ty)) {
-    const unsigned int Width = IType->getBitWidth();
+    const unsigned Width = IType->getBitWidth();
     return Width == 1 ? getOpTypeBool(MIRBuilder)
                       : getOpTypeInt(Width, MIRBuilder, false);
   }
@@ -594,7 +594,7 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
     Type *ElemType = PType->getPointerElementType();
 
     // Some OpenCL and SPIRV builtins like image2d_t are passed in as pointers,
-    // but should be treated as custom types like OpTypeImage
+    // but should be treated as custom types like OpTypeImage.
     if (auto SType = dyn_cast<StructType>(ElemType)) {
       if (isOpenCLBuiltinType(SType))
         return handleOpenCLBuiltin(SType, MIRBuilder, AccQual);
@@ -602,7 +602,7 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
         return handleSPIRVBuiltin(SType, MIRBuilder, AccQual);
     }
 
-    // Otherwise, treat it as a regular pointer type
+    // Otherwise, treat it as a regular pointer type.
     auto SC = addressSpaceToStorageClass(PType->getAddressSpace());
     SPIRVType *SpvElementType =
         getOrCreateSPIRVType(ElemType, MIRBuilder, AQ::ReadWrite, EmitIR);
@@ -636,14 +636,14 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVType(
 }
 
 bool SPIRVGlobalRegistry::isScalarOfType(Register VReg,
-                                         unsigned int TypeOpcode) const {
+                                         unsigned TypeOpcode) const {
   SPIRVType *Type = getSPIRVTypeForVReg(VReg);
   assert(Type && "isScalarOfType VReg has no type assigned");
   return Type->getOpcode() == TypeOpcode;
 }
 
-bool SPIRVGlobalRegistry::isScalarOrVectorOfType(
-    Register VReg, unsigned int TypeOpcode) const {
+bool SPIRVGlobalRegistry::isScalarOrVectorOfType(Register VReg,
+                                                 unsigned TypeOpcode) const {
   SPIRVType *Type = getSPIRVTypeForVReg(VReg);
   assert(Type && "isScalarOrVectorOfType VReg has no type assigned");
   if (Type->getOpcode() == TypeOpcode)
@@ -737,7 +737,7 @@ SPIRVGlobalRegistry::getSampledImageType(SPIRVType *ImageType,
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
-                                                  unsigned int Opcode) {
+                                                  unsigned Opcode) {
   Register ResVReg = createTypeVReg(MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(Opcode).addDef(ResVReg);
   constrainRegOperands(MIB);
@@ -797,9 +797,10 @@ SPIRVGlobalRegistry::generateOpenCLOpaqueType(const StructType *Ty,
       AccessQual = AQ::ReadWrite;
     char DimC = TypeName[strlen("image")];
     if (DimC >= '1' && DimC <= '3') {
-      auto Dim =
-          DimC == '1' ? Dim::DIM_1D : DimC == '2' ? Dim::DIM_2D : Dim::DIM_3D;
-      unsigned int Arrayed = 0;
+      auto Dim = DimC == '1'   ? Dim::DIM_1D
+                 : DimC == '2' ? Dim::DIM_2D
+                               : Dim::DIM_3D;
+      unsigned Arrayed = 0;
       if (TypeName.contains("buffer"))
         Dim = Dim::DIM_Buffer;
       if (TypeName.contains("array"))
@@ -892,7 +893,7 @@ SPIRVGlobalRegistry::generateSPIRVOpaqueType(const StructType *Ty,
   if (TypeName.startswith("Image.")) {
     // Parse SPIRV ImageType which has following format in LLVM:
     // Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
-    // e.g. %spirv.Image._void_1_0_0_0_0_0_0
+    // e.g. %spirv.Image._void_1_0_0_0_0_0_0.
     auto TypeLiteralStr = TypeName.substr(strlen("Image."));
     SmallVector<StringRef> TypeLiterals;
     SplitString(TypeLiteralStr, TypeLiterals, "_");

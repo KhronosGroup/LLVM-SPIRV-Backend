@@ -15,9 +15,9 @@
 
 namespace llvm {
 class SPIRVTargetMachine;
-class SPIRVRegisterBankInfo;
 class SPIRVSubtarget;
 class InstructionSelector;
+class RegisterBankInfo;
 
 ModulePass *createSPIRVPreTranslationLegalizerPass();
 FunctionPass *createSPIRVOCLRegularizerPass();
@@ -30,7 +30,7 @@ FunctionPass *createSPIRVEmitIntrinsicsPass(SPIRVTargetMachine *TM);
 InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                const SPIRVSubtarget &Subtarget,
-                               const SPIRVRegisterBankInfo &RBI);
+                               const RegisterBankInfo &RBI);
 
 void initializeSPIRVBasicBlockDominancePass(PassRegistry &);
 void initializeSPIRVModuleAnalysisPass(PassRegistry &);
