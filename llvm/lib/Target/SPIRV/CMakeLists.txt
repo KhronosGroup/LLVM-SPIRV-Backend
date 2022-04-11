@@ -52,6 +52,7 @@ add_llvm_target(SPIRVCodeGen
   SelectionDAG
   Support
   Target
+  TransformUtils
   GlobalISel
   Demangle
 
