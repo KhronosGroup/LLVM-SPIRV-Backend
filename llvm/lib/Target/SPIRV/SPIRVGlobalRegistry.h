@@ -61,6 +61,8 @@ class SPIRVGlobalRegistry {
   // if it's found, otherwise insert newType to the map and return the type.
   const MachineInstr *checkSpecialInstrMap(const MachineInstr *NewInstr,
                                            SpecialInstrMapTy &InstrMap);
+  SmallPtrSet<const Type *, 4> TypesInProcessing;
+  DenseMap<const Type *, SPIRVType *> ForwardPointerTypes;
 
   // Number of bits pointers and size_t integers require.
   const unsigned PointerSize;
@@ -69,6 +71,12 @@ class SPIRVGlobalRegistry {
   SPIRVType *createSPIRVType(const Type *Type, MachineIRBuilder &MIRBuilder,
                              AQ::AccessQualifier accessQual = AQ::ReadWrite,
                              bool EmitIR = true);
+  SPIRVType *findSPIRVType(const Type *Ty, MachineIRBuilder &MIRBuilder,
+                           AQ::AccessQualifier accessQual = AQ::ReadWrite,
+                           bool EmitIR = true);
+  SPIRVType *restOfCreateSPIRVType(const Type *Type,
+                                   MachineIRBuilder &MIRBuilder,
+                                   AQ::AccessQualifier AccessQual, bool EmitIR);
 
 public:
   void add(const Constant *C, MachineFunction *MF, Register R) {
@@ -158,10 +166,7 @@ public:
   }
 
   // Return the VReg holding the result of the given OpTypeXXX instruction.
-  Register getSPIRVTypeID(const SPIRVType *SpirvType) const {
-    assert(SpirvType && "Attempting to get type id for nullptr type.");
-    return SpirvType->defs().begin()->getReg();
-  }
+  Register getSPIRVTypeID(const SPIRVType *SpirvType) const;
 
   void setCurrentFunc(MachineFunction &MF) { CurMF = &MF; }
 
@@ -216,8 +221,11 @@ private:
                              bool EmitIR = true);
 
   SPIRVType *getOpTypePointer(StorageClass::StorageClass SC,
-                              SPIRVType *ElemType,
-                              MachineIRBuilder &MIRBuilder);
+                              SPIRVType *ElemType, MachineIRBuilder &MIRBuilder,
+                              Register Reg);
+
+  SPIRVType *getOpTypeForwardPointer(StorageClass::StorageClass SC,
+                                     MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypeFunction(SPIRVType *RetType,
                                const SmallVectorImpl<SPIRVType *> &ArgTypes,

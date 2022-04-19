@@ -302,12 +302,15 @@ void SPIRVModuleAnalysis::collectFuncNames(MachineInstr &MI,
 // numbering has already occurred by this point. We can directly compare reg
 // arguments when detecting duplicates.
 static void collectOtherInstr(MachineInstr &MI, ModuleAnalysisInfo &MAI,
-                              ModuleSectionType MSType) {
+                              ModuleSectionType MSType, bool Append = true) {
   MAI.setSkipEmission(&MI);
   if (findSameInstrInMS(MI, MSType, MAI))
     return; // Found a duplicate, so don't add it.
   // No duplicates, so add it.
-  MAI.MS[MSType].push_back(&MI);
+  if (Append)
+    MAI.MS[MSType].push_back(&MI);
+  else
+    MAI.MS[MSType].insert(MAI.MS[MSType].begin(), &MI);
 }
 
 // Some global instructions make reference to function-local ID regs, so cannot
@@ -336,6 +339,8 @@ void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
           collectOtherInstr(MI, MAI, MB_TypeConstVars);
         } else if (OpCode == SPIRV::OpFunction) {
           collectFuncNames(MI, *F);
+        } else if (OpCode == SPIRV::OpTypeForwardPointer) {
+          collectOtherInstr(MI, MAI, MB_TypeConstVars, false);
         }
       }
   }
@@ -353,13 +358,13 @@ void SPIRVModuleAnalysis::numberRegistersGlobally(const Module &M) {
     for (MachineBasicBlock &MBB : *MF) {
       for (MachineInstr &MI : MBB) {
         for (MachineOperand &Op : MI.operands()) {
-          if (Op.isReg()) {
-            Register Reg = Op.getReg();
-            if (!MAI.hasRegisterAlias(MF, Reg)) {
-              Register NewReg = Register::index2VirtReg(MAI.getNextID());
-              MAI.setRegisterAlias(MF, Reg, NewReg);
-            }
-          }
+          if (!Op.isReg())
+            continue;
+          Register Reg = Op.getReg();
+          if (MAI.hasRegisterAlias(MF, Reg))
+            continue;
+          Register NewReg = Register::index2VirtReg(MAI.getNextID());
+          MAI.setRegisterAlias(MF, Reg, NewReg);
         }
         if (MI.getOpcode() == SPIRV::OpExtInst) {
           auto Set = MI.getOperand(2).getImm();

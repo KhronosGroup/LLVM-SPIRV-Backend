@@ -38,11 +38,11 @@
 ; CHECK-NOT: OpVariable
 ; CHECK-NOT: OpFunction
 
-; CHECK: %[[AFwdPtr:[0-9]+]] = OpTypeForwardPointer
+; CHECK-DAG: OpTypeForwardPointer %[[AFwdPtr:[0-9]+]]
 ; CHECK: %[[TypeInt:[0-9]+]] = OpTypeInt
+; CHECK-DAG: %[[TPointer:[0-9]+]] = OpTypePointer
 ; CHECK: %[[Two:[0-9]+]] = OpConstant %[[TypeInt]] 2
-; CHECK: %[[TPointer:[0-9]+]] = OpTypePointer
-; CHECK: %[[SConstOpType:[0-9]+]] = OpTypePointer
+; CHECK-DAG: %[[SConstOpType:[0-9]+]] = OpTypePointer
 ; CHECK: %[[TypeFloat:[0-9]+]] = OpTypeFloat
 ; CHECK: %[[TypeArray:[0-9]+]] = OpTypeArray %[[TypeFloat]] %[[Two]]
 ; CHECK: %[[TypeVectorInt3:[0-9]+]] = OpTypeVector %[[TypeInt]] 3
