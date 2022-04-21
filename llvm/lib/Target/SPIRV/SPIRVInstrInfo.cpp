@@ -47,12 +47,13 @@ bool SPIRVInstrInfo::isConstantInstr(const MachineInstr &MI) const {
 }
 
 bool SPIRVInstrInfo::isTypeDeclInstr(const MachineInstr &MI) const {
+  // TODO: maybe implement it in the same way as other is***Instr checkers.
   auto &MRI = MI.getMF()->getRegInfo();
   if (MI.getNumDefs() >= 1 && MI.getOperand(0).isReg()) {
     auto DefRegClass = MRI.getRegClassOrNull(MI.getOperand(0).getReg());
     return DefRegClass && DefRegClass->getID() == SPIRV::TYPERegClass.getID();
   } else {
-    return false;
+    return MI.getOpcode() == SPIRV::OpTypeForwardPointer;
   }
 }
 
