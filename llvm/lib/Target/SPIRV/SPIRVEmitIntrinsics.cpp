@@ -37,13 +37,13 @@
 // - emits intrinsics to keep track of original LLVM types of the values
 //   to be able to emit proper SPIR-V types eventually.
 //
-// TODO: consider removing spv.track.constant in favor of spv.assign.type
+// TODO: consider removing spv.track.constant in favor of spv.assign.type.
 
 using namespace llvm;
 
 namespace llvm {
 void initializeSPIRVEmitIntrinsicsPass(PassRegistry &);
-}
+} // namespace llvm
 
 namespace {
 class SPIRVEmitIntrinsics
@@ -113,7 +113,6 @@ static bool isMemInstrToReplace(Instruction *I) {
 
 static bool isAggrToReplace(const Value *V) {
   return isa<ConstantAggregate>(V) || isa<ConstantDataArray>(V) ||
-         // isa<ConstantDataVector>(V) ||
          (isa<ConstantAggregateZero>(V) && !V->getType()->isVectorTy());
 }
 
@@ -177,11 +176,6 @@ void SPIRVEmitIntrinsics::preprocessCompositeConstants() {
       if (auto *AggrC = dyn_cast<ConstantAggregate>(Op)) {
         SmallVector<Value *> Args(AggrC->op_begin(), AggrC->op_end());
         BuildCompositeIntrinsic(AggrC, Args);
-        // } else if (auto *AggrC = dyn_cast<ConstantDataVector>(Op)) {
-        //   std::vector<Value *> Args;
-        //   for (int i = 0; i < AggrC->getNumElements(); ++i)
-        //     Args.push_back(AggrC->getElementAsConstant(i));
-        //   BuildCompositeIntrinsic(AggrC, Args);
       } else if (auto *AggrC = dyn_cast<ConstantDataArray>(Op)) {
         SmallVector<Value *> Args;
         for (unsigned i = 0; i < AggrC->getNumElements(); ++i)
@@ -331,9 +325,8 @@ void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
     InitInst->setArgOperand(1, Init);
   }
   if ((!GV.hasInitializer() || isa<UndefValue>(GV.getInitializer())) &&
-      GV.getNumUses() == 0) {
+      GV.getNumUses() == 0)
     buildIntrCall(Intrinsic::spv_unref_global, GV.getType(), &GV);
-  }
 }
 
 void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
