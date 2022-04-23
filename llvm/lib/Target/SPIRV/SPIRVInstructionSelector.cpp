@@ -259,7 +259,7 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
     if (HasDefs) { // Make all vregs 32 bits (for SPIR-V IDs)
       MRI->setType(ResVReg, LLT::scalar(32));
     }
-    I.removeFromParent();
+    I.eraseFromParentAndMarkDBGValuesForRemoval();
     return true;
   }
   return false;
