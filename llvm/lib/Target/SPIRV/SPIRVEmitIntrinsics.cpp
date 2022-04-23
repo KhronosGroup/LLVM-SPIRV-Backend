@@ -54,6 +54,7 @@ class SPIRVEmitIntrinsics
   Function *F = nullptr;
   bool TrackConstants = true;
   DenseMap<Instruction *, Constant *> AggrConsts;
+  DenseSet<Instruction *> AggrStores;
   void preprocessCompositeConstants();
   CallInst *buildIntrCall(Intrinsic::ID IntrID, ArrayRef<Type *> Types,
                           ArrayRef<Value *> Args) {
@@ -298,8 +299,7 @@ Instruction *SPIRVEmitIntrinsics::visitLoadInst(LoadInst &I) {
 }
 
 Instruction *SPIRVEmitIntrinsics::visitStoreInst(StoreInst &I) {
-  PointerType *PTy = cast<PointerType>(I.getOperand(1)->getType());
-  if (!PTy->getPointerElementType()->isAggregateType())
+  if (!AggrStores.contains(&I))
     return &I;
   TrackConstants = false;
   const auto *TLI = TM->getSubtargetImpl()->getTargetLowering();
@@ -359,6 +359,11 @@ void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
       buildIntrWithMD(Intrinsic::spv_assign_type, {Op->getType()}, Op, Op);
     }
   }
+  // StoreInst's operand type can be changed in the next stage so we need to
+  // store it in the set.
+  if (isa<StoreInst>(I) &&
+      cast<StoreInst>(I)->getValueOperand()->getType()->isAggregateType())
+    AggrStores.insert(I);
 }
 
 void SPIRVEmitIntrinsics::processInstrAfterVisit(Instruction *I) {
@@ -403,6 +408,7 @@ bool SPIRVEmitIntrinsics::runOnFunction(Function &Func) {
   F = &Func;
   IRB = new IRBuilder<>(Func.getContext());
   AggrConsts.clear();
+  AggrStores.clear();
 
   IRB->SetInsertPoint(&Func.getEntryBlock().front());
 

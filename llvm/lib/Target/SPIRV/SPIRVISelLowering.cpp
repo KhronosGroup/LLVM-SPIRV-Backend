@@ -58,6 +58,7 @@ bool SPIRVTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
     Info.flags = static_cast<MachineMemOperand::Flags>(
         cast<ConstantInt>(I.getOperand(AlignIdx - 1))->getZExtValue());
     Info.memVT = MVT::i64;
+    // TODO: take into account opaque pointers (don't use getElementType).
     // MVT::getVT(PtrTy->getElementType());
     return true;
     break;

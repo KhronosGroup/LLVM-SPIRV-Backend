@@ -623,20 +623,29 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
     return getOpTypeFunction(RetTy, ParamTypes, MIRBuilder);
   }
   if (auto PType = dyn_cast<PointerType>(Ty)) {
-    Type *ElemType = PType->getPointerElementType();
+    SPIRVType *SpvElementType;
+    // At the moment, all opaque pointers correspond to i8 element type.
+    // TODO: change the implementation once opaque pointers are supported
+    // in the SPIR-V specification. Use getNonOpaquePointerElementType()
+    // instead of getPointerElementType() once llvm is rebased to 15.
+    if (PType->isOpaque()) {
+      SpvElementType = getOrCreateSPIRVIntegerType(8, MIRBuilder);
+    } else {
+      Type *ElemType = PType->getPointerElementType();
 
-    // Some OpenCL and SPIRV builtins like image2d_t are passed in as pointers,
-    // but should be treated as custom types like OpTypeImage.
-    if (auto SType = dyn_cast<StructType>(ElemType)) {
-      if (isOpenCLBuiltinType(SType))
-        return handleOpenCLBuiltin(SType, MIRBuilder, AccQual);
-      if (isSPIRVBuiltinType(SType))
-        return handleSPIRVBuiltin(SType, MIRBuilder, AccQual);
+      // Some OpenCL and SPIRV builtins like image2d_t are passed in as
+      // pointers, but should be treated as custom types like OpTypeImage.
+      if (auto SType = dyn_cast<StructType>(ElemType)) {
+        if (isOpenCLBuiltinType(SType))
+          return handleOpenCLBuiltin(SType, MIRBuilder, AccQual);
+        if (isSPIRVBuiltinType(SType))
+          return handleSPIRVBuiltin(SType, MIRBuilder, AccQual);
+      }
+      // Otherwise, treat it as a regular pointer type.
+      SpvElementType =
+          findSPIRVType(ElemType, MIRBuilder, AQ::ReadWrite, EmitIR);
     }
-    // Otherwise, treat it as a regular pointer type.
     auto SC = addressSpaceToStorageClass(PType->getAddressSpace());
-    SPIRVType *SpvElementType =
-        findSPIRVType(ElemType, MIRBuilder, AQ::ReadWrite, EmitIR);
     // Null pointer means we have a loop in type definitions, make and
     // return corresponding OpTypeForwardPointer.
     if (SpvElementType == nullptr) {
