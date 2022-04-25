@@ -37,13 +37,13 @@
 // - emits intrinsics to keep track of original LLVM types of the values
 //   to be able to emit proper SPIR-V types eventually.
 //
-// TODO: consider removing spv.track.constant in favor of spv.assign.type
+// TODO: consider removing spv.track.constant in favor of spv.assign.type.
 
 using namespace llvm;
 
 namespace llvm {
 void initializeSPIRVEmitIntrinsicsPass(PassRegistry &);
-}
+} // namespace llvm
 
 namespace {
 class SPIRVEmitIntrinsics
@@ -331,9 +331,8 @@ void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
     InitInst->setArgOperand(1, Init);
   }
   if ((!GV.hasInitializer() || isa<UndefValue>(GV.getInitializer())) &&
-      GV.getNumUses() == 0) {
+      GV.getNumUses() == 0)
     buildIntrCall(Intrinsic::spv_unref_global, GV.getType(), &GV);
-  }
 }
 
 void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
