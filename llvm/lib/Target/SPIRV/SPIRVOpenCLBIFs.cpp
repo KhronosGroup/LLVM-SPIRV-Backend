@@ -281,7 +281,7 @@ static Register buildOpSampledImage(Register res, Register image,
   const auto MRI = MIRBuilder.getMRI();
   SPIRVType *imageType = GR->getSPIRVTypeForVReg(image);
   SPIRVType *sampImTy =
-      GR->getOrCreateSPIRVSampledImageType(imageType, MIRBuilder);
+      GR->getOrCreateOpTypeSampledImage(imageType, MIRBuilder);
 
   Register sampledImage = res.isValid() ? res
       : MRI->createVirtualRegister(&SPIRV::IDRegClass);

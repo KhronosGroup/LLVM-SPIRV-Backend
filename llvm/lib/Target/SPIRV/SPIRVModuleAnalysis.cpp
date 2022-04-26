@@ -92,19 +92,6 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
       Register::index2VirtReg(MAI.getNextID());
 }
 
-static void makeRegisterAliasesFunc(SPIRVGlobalRegistry *GR,
-                                    ModuleAnalysisInfo &MAI) {
-  // Make global registers for entries of DT.
-  for (auto &CU : GR->getAllUses<Function>()) {
-    Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
-    for (auto &U : CU.second) {
-      auto *MF = U.first;
-      auto Reg = U.second;
-      MAI.setRegisterAlias(MF, Reg, GlobalReg);
-    }
-  }
-}
-
 static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
                                 std::vector<DTSortableEntry *> &DepsGraph,
                                 ModuleAnalysisInfo &MAI) {
@@ -114,7 +101,7 @@ static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
     // NOTE: here we prefer recursive approach over iterative because
     // we don't expect depchains long enough to cause SO
     RecHoistUtil = [&Visited, &RecHoistUtil, &MAI](DTSortableEntry *E) {
-      if (Visited.count(E) || E->getIsFunc())
+      if (Visited.count(E))
         return;
       Visited.insert(E);
       for (auto *S : E->getDeps())
@@ -128,17 +115,6 @@ static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
       }
     };
     RecHoistUtil(E);
-  }
-  for (auto &CU : GR->getSpecialTypesAndConstsMap()) {
-    for (auto &TypeGroup : CU.second) {
-      Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
-      for (auto &t : TypeGroup) {
-        MachineFunction *MF = t.first;
-        assert(t.second->getOperand(0).isReg());
-        Register Reg = t.second->getOperand(0).getReg();
-        MAI.setRegisterAlias(MF, Reg, GlobalReg);
-      }
-    }
   }
 }
 
@@ -157,7 +133,7 @@ static void insertInstrToMS(Register GlobalReg, MachineInstr *MI,
   }
 }
 // Collect MI which defines the register in the given machine function.
-static void collectDefInstr(Register Reg, MachineFunction *MF,
+static void collectDefInstr(Register Reg, const MachineFunction *MF,
                             ModuleAnalysisInfo *MAI, ModuleSectionType MSType) {
   assert(MAI->hasRegisterAlias(MF, Reg) && "Cannot find register alias");
   Register GlobalReg = MAI->getRegisterAlias(MF, Reg);
@@ -189,17 +165,6 @@ void SPIRVModuleAnalysis::collectTypesConstsVars() {
       }
     };
     RecHoistUtil(E);
-  }
-  // Hoist special types and constants collected in the map.
-  for (auto &CU : GR->getSpecialTypesAndConstsMap()) {
-    for (auto &TypeGroup : CU.second) {
-      for (auto &t : TypeGroup) {
-        MachineFunction *MF = t.first;
-        assert(t.second->getOperand(0).isReg());
-        Register Reg = t.second->getOperand(0).getReg();
-        collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
-      }
-    }
   }
 }
 
@@ -266,8 +231,6 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
     }
   }
 
-  // collectTypesConstsVars<GlobalValue>();
-  makeRegisterAliasesFunc(GR, MAI);
   collectFuncDecls(GR, &MAI);
 }
 

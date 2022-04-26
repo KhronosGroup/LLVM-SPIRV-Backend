@@ -41,4 +41,9 @@ template <>
 const SPIRVFuncDeclsTracker *SPIRVGeneralDuplicatesTracker::get(Function *Arg) {
   return &FT;
 }
+
+template <>
+const SPIRVSpecialDeclsTracker *SPIRVGeneralDuplicatesTracker::get(SpecialTypeDescriptor *Arg) {
+  return &ST;
+}
   

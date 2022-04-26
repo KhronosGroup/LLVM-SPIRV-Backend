@@ -40,28 +40,11 @@ class SPIRVGlobalRegistry {
 
   DenseMap<SPIRVType *, const Type *> SPIRVToLLVMType;
 
-  using SPIRVInstrGroup = DenseMap<MachineFunction *, const MachineInstr *>;
-  using VectorOfSPIRVInstrGroups = SmallVector<SPIRVInstrGroup>;
-  using SpecialInstrMapTy = MapVector<unsigned, VectorOfSPIRVInstrGroups>;
-
-  // Builtin types may be represented in two ways while translating to SPIR-V:
-  // in OpenCL form and in SPIR-V form. We have to keep only one type for such
-  // pairs so check any builtin type for existance in the map before emitting
-  // it to SPIR-V. The map contains a vector of SPIR-V builtin types already
-  // emitted for a given type opcode.
-  SpecialInstrMapTy BuiltinTypeMap;
-
-  // Some SPIR-V types and constants have no explicit analogues in LLVM types
-  // and constants. We create and store these special types and constants in
-  // this map to avoid type/const duplicatoin and to hoist the instructions
-  // properly to MB_TypeConstVars in GlobalTypesAndRegNumPass.
-  // Currently it holds OpTypeSampledImage and OpConstantSampler instances.
-  SpecialInstrMapTy SpecialTypesAndConstsMap;
-
   // Look for an equivalent of the newType in the map. Return the equivalent
   // if it's found, otherwise insert newType to the map and return the type.
-  const MachineInstr *checkSpecialInstrMap(const MachineInstr *NewInstr,
-                                           SpecialInstrMapTy &InstrMap);
+  const MachineInstr *checkSpecialInstr(const SpecialTypeDescriptor &TD,
+                                        MachineIRBuilder &MIRBuilder);
+
   SmallPtrSet<const Type *, 4> TypesInProcessing;
   DenseMap<const Type *, SPIRVType *> ForwardPointerTypes;
 
@@ -105,14 +88,14 @@ public:
   }
 
   template <typename T>
-  const DenseMap<const T *, DTSortableEntry> &getAllUses() {
+  const typename SPIRVDuplicatesTracker<T>::StorageTy &getAllUses() {
     return DT.get<T>()->getAllUses();
   }
 
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
-  SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
-    return SpecialTypesAndConstsMap;
-  }
+  // SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
+  //   return SpecialTypesAndConstsMap;
+  // }
 
   SPIRVGlobalRegistry(unsigned PointerSize);
 
@@ -197,12 +180,7 @@ public:
 
 private:
   // Internal methods for creating types which are unsafe in duplications
-  // check sense hence can only be called within getOrCreateSPIRVType callstack.
-  SPIRVType *getSamplerType(MachineIRBuilder &MIRBuilder);
-
-  SPIRVType *getSampledImageType(SPIRVType *ImageType,
-                                 MachineIRBuilder &MIRBuilder);
-
+  // check sense hence can only be called within getOrCreateSPIRVType callstack
   SPIRVType *getOpTypeBool(MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypeInt(uint32_t Width, MachineIRBuilder &MIRBuilder,
@@ -235,16 +213,6 @@ private:
                                const SmallVectorImpl<SPIRVType *> &ArgTypes,
                                MachineIRBuilder &MIRBuilder);
 
-  SPIRVType *getOpTypeImage(MachineIRBuilder &MIRBuilder,
-                            SPIRVType *SampledType, Dim::Dim Dim,
-                            uint32_t Depth, uint32_t Arrayed,
-                            uint32_t Multisampled, uint32_t Sampled,
-                            ImageFormat::ImageFormat ImageFormat,
-                            AQ::AccessQualifier AccQual);
-
-  SPIRVType *getOpTypePipe(MachineIRBuilder &MIRBuilder,
-                           AQ::AccessQualifier AccQual);
-
   SPIRVType *getOpTypeByOpcode(MachineIRBuilder &MIRBuilder, unsigned Opcode);
 
   SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
@@ -252,7 +220,7 @@ private:
                                  AQ::AccessQualifier AccQual);
 
   SPIRVType *
-  generateOpenCLOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
+  getOrCreateOpenCLOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
                            AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
   SPIRVType *handleSPIRVBuiltin(const StructType *Ty,
@@ -260,7 +228,7 @@ private:
                                 AQ::AccessQualifier AccQual);
 
   SPIRVType *
-  generateSPIRVOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
+  getOrCreateSPIRVOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
                           AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
   std::tuple<Register, ConstantInt *, bool> getOrCreateConstIntReg(
@@ -310,8 +278,20 @@ public:
       SPIRVType *BaseType, MachineInstr &I, const SPIRVInstrInfo &TII,
       StorageClass::StorageClass SC = StorageClass::Function);
 
-  SPIRVType *getOrCreateSPIRVSampledImageType(SPIRVType *ImageType,
+  SPIRVType *getOrCreateOpTypeImage(MachineIRBuilder &MIRBuilder,
+                            SPIRVType *SampledType, Dim::Dim Dim,
+                            uint32_t Depth, uint32_t Arrayed,
+                            uint32_t Multisampled, uint32_t Sampled,
+                            ImageFormat::ImageFormat ImageFormat,
+                            AQ::AccessQualifier AccQual);
+
+  SPIRVType *getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder);
+
+  SPIRVType *getOrCreateOpTypeSampledImage(SPIRVType *ImageType,
                                               MachineIRBuilder &MIRBuilder);
+
+  SPIRVType *getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
+                           AQ::AccessQualifier AccQual);
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H

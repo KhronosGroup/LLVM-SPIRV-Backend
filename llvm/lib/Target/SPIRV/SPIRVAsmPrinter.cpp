@@ -225,7 +225,7 @@ void SPIRVAsmPrinter::outputMCInst(MCInst &Inst) {
 void SPIRVAsmPrinter::outputInstruction(const MachineInstr *MI) {
   SPIRVMCInstLower MCInstLowering;
   MCInst TmpInst;
-  MCInstLowering.Lower(MI, TmpInst, MF, MAI);
+  MCInstLowering.lower(MI, TmpInst, MF, MAI);
   outputMCInst(TmpInst);
 }
 
@@ -304,7 +304,7 @@ void SPIRVAsmPrinter::outputEntryPoints() {
   for (MachineInstr *MI : MAI->getMSInstrs(MB_EntryPoints)) {
     SPIRVMCInstLower MCInstLowering;
     MCInst TmpInst;
-    MCInstLowering.Lower(MI, TmpInst, MF, MAI);
+    MCInstLowering.lower(MI, TmpInst, MF, MAI);
     for (Register Reg : InterfaceIDs) {
       assert(Reg.isValid());
       TmpInst.addOperand(MCOperand::createReg(Reg));
