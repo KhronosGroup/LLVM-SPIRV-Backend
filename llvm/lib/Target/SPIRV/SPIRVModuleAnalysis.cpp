@@ -146,7 +146,7 @@ static void collectDefInstr(Register Reg, const MachineFunction *MF,
 void SPIRVModuleAnalysis::collectTypesConstsVars() {
   DenseSet<DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
-    std::function<void(DTSortableEntry *, unsigned)> RecHoistUtil;
+    std::function<void(DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
     // we don't expect depchains long enough to cause SO
     RecHoistUtil = [&Visited, &RecHoistUtil](DTSortableEntry *E) {
