@@ -92,31 +92,29 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
       Register::index2VirtReg(MAI.getNextID());
 }
 
-template <typename T>
 static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
+                                std::vector<DTSortableEntry *> &DepsGraph,
                                 ModuleAnalysisInfo &MAI) {
-  // Make global registers for entries of DT.
-  for (auto &CU : GR->getAllUses<T>()) {
-    Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
-    for (auto &U : CU.second) {
-      auto *MF = U.first;
-      auto Reg = U.second;
-      MAI.setRegisterAlias(MF, Reg, GlobalReg);
-    }
-  }
-  // Make global registers for special types and constants collected in the map.
-  if (std::is_same<T, Type>::value) {
-    for (auto &CU : GR->getSpecialTypesAndConstsMap()) {
-      for (auto &TypeGroup : CU.second) {
-        Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
-        for (auto &t : TypeGroup) {
-          MachineFunction *MF = t.first;
-          assert(t.second->getOperand(0).isReg());
-          Register Reg = t.second->getOperand(0).getReg();
-          MAI.setRegisterAlias(MF, Reg, GlobalReg);
-        }
+  std::set<DTSortableEntry *> Visited;
+  for (auto *E : DepsGraph) {
+    std::function<void(DTSortableEntry *)> RecHoistUtil;
+    // NOTE: here we prefer recursive approach over iterative because
+    // we don't expect depchains long enough to cause SO
+    RecHoistUtil = [&Visited, &RecHoistUtil, &MAI](DTSortableEntry *E) {
+      if (Visited.count(E))
+        return;
+      Visited.insert(E);
+      for (auto *S : E->getDeps())
+        RecHoistUtil(S);
+
+      Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
+      for (auto &U : *E) {
+        auto *MF = U.first;
+        auto Reg = U.second;
+        MAI.setRegisterAlias(MF, Reg, GlobalReg);
       }
-    }
+    };
+    RecHoistUtil(E);
   }
 }
 
@@ -135,7 +133,7 @@ static void insertInstrToMS(Register GlobalReg, MachineInstr *MI,
   }
 }
 // Collect MI which defines the register in the given machine function.
-static void collectDefInstr(Register Reg, MachineFunction *MF,
+static void collectDefInstr(Register Reg, const MachineFunction *MF,
                             ModuleAnalysisInfo *MAI, ModuleSectionType MSType) {
   assert(MAI->hasRegisterAlias(MF, Reg) && "Cannot find register alias");
   Register GlobalReg = MAI->getRegisterAlias(MF, Reg);
@@ -143,31 +141,30 @@ static void collectDefInstr(Register Reg, MachineFunction *MF,
   insertInstrToMS(GlobalReg, MI, MAI, MSType);
 }
 
-template <typename T> void SPIRVModuleAnalysis::collectTypesConstsVars() {
-  // Collect instructions from DT.
-  for (auto &CU : GR->getAllUses<T>()) {
-    for (auto &U : CU.second) {
-      auto *MF = U.first;
-      auto Reg = U.second;
-      // Some instructions may be deleted during global isel, so collect only
-      // those that exist in current IR.
-      if (MF->getRegInfo().getVRegDef(Reg)) {
-        collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
-        if (std::is_same<T, GlobalValue>::value)
-          MAI.GlobalVarList.push_back(MF->getRegInfo().getVRegDef(Reg));
-      }
-    }
-  }
-  // Hoist special types and constants collected in the map.
-  if (std::is_same<T, Type>::value) {
-    for (auto &CU : GR->getSpecialTypesAndConstsMap())
-      for (auto &TypeGroup : CU.second)
-        for (auto &t : TypeGroup) {
-          MachineFunction *MF = t.first;
-          assert(t.second->getOperand(0).isReg());
-          Register Reg = t.second->getOperand(0).getReg();
+void SPIRVModuleAnalysis::collectTypesConstsVars() {
+  std::set<DTSortableEntry *> Visited;
+  for (auto *E : DepsGraph) {
+    std::function<void(DTSortableEntry *)> RecHoistUtil;
+    // NOTE: here we prefer recursive approach over iterative because
+    // we don't expect depchains long enough to cause SO
+    RecHoistUtil = [&Visited, &RecHoistUtil](DTSortableEntry *E) {
+      if (Visited.count(E) || E->getIsFunc())
+        return;
+      Visited.insert(E);
+      for (auto *S : E->getDeps())
+        RecHoistUtil(S);
+
+      for (auto &U : *E) {
+        auto *MF = U.first;
+        auto Reg = U.second;
+        if (MF->getRegInfo().getVRegDef(Reg)) {
           collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
+          if (E->getIsGV())
+            MAI.GlobalVarList.push_back(MF->getRegInfo().getVRegDef(Reg));
         }
+      }
+    };
+    RecHoistUtil(E);
   }
 }
 
@@ -186,7 +183,6 @@ static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
         Reg = MI->getOperand(0).getReg();
         if (MI->getOpcode() == SPIRV::OpFunctionParameter) {
           Register GlobalReg = Register::index2VirtReg(MAI->getNextID());
-          ;
           MAI->setRegisterAlias(MF, Reg, GlobalReg);
           insertInstrToMS(GlobalReg, MI, MAI, MB_ExtFuncDecls);
         } else {
@@ -204,16 +200,14 @@ static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
 // at module level. Also it collects explicit OpExtension/OpCapability
 // instructions.
 void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
+  GR->buildDepsGraph(DepsGraph);
   // OpTypes and OpConstants can have cross references so at first we create
   // new global registers and map them to old regs, then walk the list of
   // instructions, and select ones that should be emitted at module level.
   // Also there are references to global values in constants.
-  makeRegisterAliases<Type>(GR, MAI);
-  makeRegisterAliases<Constant>(GR, MAI);
-  makeRegisterAliases<GlobalValue>(GR, MAI);
+  makeRegisterAliases(GR, DepsGraph, MAI);
 
-  collectTypesConstsVars<Type>();
-  collectTypesConstsVars<Constant>();
+  collectTypesConstsVars();
 
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
@@ -237,8 +231,6 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
     }
   }
 
-  collectTypesConstsVars<GlobalValue>();
-  makeRegisterAliases<Function>(GR, MAI);
   collectFuncDecls(GR, &MAI);
 }
 

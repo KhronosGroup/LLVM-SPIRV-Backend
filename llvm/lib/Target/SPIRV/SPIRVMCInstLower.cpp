@@ -20,7 +20,7 @@
 
 using namespace llvm;
 
-void SPIRVMCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI,
+void SPIRVMCInstLower::lower(const MachineInstr *MI, MCInst &OutMI,
                              const MachineFunction *CurMF,
                              ModuleAnalysisInfo *MAI) const {
   OutMI.setOpcode(MI->getOpcode());

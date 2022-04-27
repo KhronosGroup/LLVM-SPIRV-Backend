@@ -133,7 +133,7 @@ public:
 
 private:
   void setBaseInfo(const Module &M);
-  template <typename T> void collectTypesConstsVars();
+  void collectTypesConstsVars();
   void processDefInstrs(const Module &M);
   void collectFuncNames(MachineInstr &MI, const Function &F);
   void processOtherInstrs(const Module &M);
@@ -143,6 +143,8 @@ private:
   SPIRVGlobalRegistry *GR;
   const SPIRVInstrInfo *TII;
   MachineModuleInfo *MMI;
+
+  std::vector<DTSortableEntry *> DepsGraph;
 };
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVMODULEANALYSIS_H

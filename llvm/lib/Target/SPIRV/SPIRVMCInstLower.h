@@ -20,7 +20,7 @@ struct ModuleAnalysisInfo;
 // This class is used to lower a MachineInstr into an MCInst.
 class LLVM_LIBRARY_VISIBILITY SPIRVMCInstLower {
 public:
-  void Lower(const MachineInstr *MI, MCInst &OutMI,
+  void lower(const MachineInstr *MI, MCInst &OutMI,
              const MachineFunction *CurMF, ModuleAnalysisInfo *MAI) const;
 };
 } // namespace llvm

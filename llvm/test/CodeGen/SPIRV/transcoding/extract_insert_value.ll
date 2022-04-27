@@ -11,16 +11,16 @@ target triple = "spirv32-unknown-unknown"
 %struct.inner = type { float }
 
 ; CHECK-SPIRV: %[[float_ty:[0-9]+]] = OpTypeFloat 32
-; FIXME: properly order array type decl & num elems constant
-; CHECK-SPIRV: %[[array_ty:[0-9]+]] = OpTypeArray %[[float_ty]]
+; CHECK-SPIRV: %[[int_ty:[0-9]+]] = OpTypeInt 32
+; CHECK-SPIRV: %[[arr_size:[0-9]+]] = OpConstant %[[int_ty]] 7
+; CHECK-SPIRV: %[[array_ty:[0-9]+]] = OpTypeArray %[[float_ty]] %[[arr_size]]
 ; CHECK-SPIRV: %[[struct_ty:[0-9]+]] = OpTypeStruct %[[array_ty]]
-; CHECK-SPIRV-DAG: %[[array_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[array_ty]]
-; CHECK-SPIRV-DAG: %[[struct_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct_ty]]
-
+; CHECK-SPIRV: %[[struct_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct_ty]]
+; CHECK-SPIRV: %[[array_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[array_ty]]
 ; CHECK-SPIRV: %[[struct1_in_ty:[0-9]+]] = OpTypeStruct %[[float_ty]]
 ; CHECK-SPIRV: %[[struct1_ty:[0-9]+]] = OpTypeStruct %[[struct1_in_ty]]
-; CHECK-SPIRV-DAG: %[[struct1_in_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_in_ty]]
-; CHECK-SPIRV-DAG: %[[struct1_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_ty]]
+; CHECK-SPIRV: %[[struct1_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_ty]]
+; CHECK-SPIRV: %[[struct1_in_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_in_ty]]
 
 ; CHECK-SPIRV-LABEL:  OpFunction
 ; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %[[struct_ptr_ty]]
