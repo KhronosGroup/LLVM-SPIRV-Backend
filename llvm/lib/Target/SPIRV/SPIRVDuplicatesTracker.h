@@ -273,7 +273,7 @@ public:
         auto *MF = U.first;
         auto R = U.second;
 
-        auto *MI = MF->getRegInfo().getVRegDef(R);
+        auto *MI = MF->getRegInfo().getUniqueVRegDef(R);
         if (!MI)
           continue;
         assert(MI && MI->getParent() && "No MachineInstr created yet");
