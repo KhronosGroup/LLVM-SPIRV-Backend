@@ -92,10 +92,12 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
       Register::index2VirtReg(MAI.getNextID());
 }
 
+// TODO: either merge with collectTypesConstsVars or
+// factor the DFS code out
 static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
                                 std::vector<DTSortableEntry *> &DepsGraph,
                                 ModuleAnalysisInfo &MAI) {
-  std::set<DTSortableEntry *> Visited;
+  DenseSet<DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
     std::function<void(DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
@@ -142,7 +144,7 @@ static void collectDefInstr(Register Reg, const MachineFunction *MF,
 }
 
 void SPIRVModuleAnalysis::collectTypesConstsVars() {
-  std::set<DTSortableEntry *> Visited;
+  DenseSet<DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
     std::function<void(DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
@@ -157,10 +159,10 @@ void SPIRVModuleAnalysis::collectTypesConstsVars() {
       for (auto &U : *E) {
         auto *MF = U.first;
         auto Reg = U.second;
-        if (MF->getRegInfo().getVRegDef(Reg)) {
+        if (auto *MI = MF->getRegInfo().getUniqueVRegDef(Reg)) {
           collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
           if (E->getIsGV())
-            MAI.GlobalVarList.push_back(MF->getRegInfo().getVRegDef(Reg));
+            MAI.GlobalVarList.push_back(MI);
         }
       }
     };
