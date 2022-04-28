@@ -92,15 +92,17 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
       Register::index2VirtReg(MAI.getNextID());
 }
 
-static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
-                                std::vector<DTSortableEntry *> &DepsGraph,
-                                ModuleAnalysisInfo &MAI) {
-  std::set<DTSortableEntry *> Visited;
+// TODO: either merge with collectTypesConstsVars or factor the DFS code out.
+static void
+makeRegisterAliases(SPIRVGlobalRegistry *GR,
+                    std::vector<SPIRV::DTSortableEntry *> &DepsGraph,
+                    ModuleAnalysisInfo &MAI) {
+  DenseSet<SPIRV::DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
-    std::function<void(DTSortableEntry *)> RecHoistUtil;
+    std::function<void(SPIRV::DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
-    // we don't expect depchains long enough to cause SO
-    RecHoistUtil = [&Visited, &RecHoistUtil, &MAI](DTSortableEntry *E) {
+    // we don't expect depchains long enough to cause SO.
+    RecHoistUtil = [&Visited, &RecHoistUtil, &MAI](SPIRV::DTSortableEntry *E) {
       if (Visited.count(E))
         return;
       Visited.insert(E);
@@ -108,11 +110,8 @@ static void makeRegisterAliases(SPIRVGlobalRegistry *GR,
         RecHoistUtil(S);
 
       Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
-      for (auto &U : *E) {
-        auto *MF = U.first;
-        auto Reg = U.second;
-        MAI.setRegisterAlias(MF, Reg, GlobalReg);
-      }
+      for (auto &U : *E)
+        MAI.setRegisterAlias(U.first, U.second, GlobalReg);
     };
     RecHoistUtil(E);
   }
@@ -141,13 +140,14 @@ static void collectDefInstr(Register Reg, const MachineFunction *MF,
   insertInstrToMS(GlobalReg, MI, MAI, MSType);
 }
 
-void SPIRVModuleAnalysis::collectTypesConstsVars() {
-  std::set<DTSortableEntry *> Visited;
+void SPIRVModuleAnalysis::collectTypesConstsVars(
+    std::vector<SPIRV::DTSortableEntry *> DepsGraph) {
+  DenseSet<SPIRV::DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
-    std::function<void(DTSortableEntry *)> RecHoistUtil;
+    std::function<void(SPIRV::DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
-    // we don't expect depchains long enough to cause SO
-    RecHoistUtil = [&Visited, &RecHoistUtil](DTSortableEntry *E) {
+    // we don't expect depchains long enough to cause SO.
+    RecHoistUtil = [&Visited, &RecHoistUtil](SPIRV::DTSortableEntry *E) {
       if (Visited.count(E) || E->getIsFunc())
         return;
       Visited.insert(E);
@@ -155,13 +155,13 @@ void SPIRVModuleAnalysis::collectTypesConstsVars() {
         RecHoistUtil(S);
 
       for (auto &U : *E) {
-        auto *MF = U.first;
-        auto Reg = U.second;
-        if (MF->getRegInfo().getVRegDef(Reg)) {
-          collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
-          if (E->getIsGV())
-            MAI.GlobalVarList.push_back(MF->getRegInfo().getVRegDef(Reg));
-        }
+        const MachineFunction *MF = U.first;
+        Register Reg = U.second;
+        if (!MF->getRegInfo().getUniqueVRegDef(Reg))
+          continue;
+        collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
+        if (E->getIsGV())
+          MAI.GlobalVarList.push_back(MF->getRegInfo().getUniqueVRegDef(Reg));
       }
     };
     RecHoistUtil(E);
@@ -173,10 +173,10 @@ void SPIRVModuleAnalysis::collectTypesConstsVars() {
 // TODO: maybe consider replacing this with explicit OpFunctionParameter
 // generation here instead handling it in CallLowering.
 static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
-  for (auto &CU : GR->getAllUses<Function>()) {
+  for (auto &CU : GR->getFuncAllUses()) {
     for (auto &U : CU.second) {
-      auto *MF = U.first;
-      auto Reg = U.second;
+      const MachineFunction *MF = U.first;
+      Register Reg = U.second;
       MachineInstr *MI = MF->getRegInfo().getVRegDef(Reg);
       while (MI && (MI->getOpcode() == SPIRV::OpFunction ||
                     MI->getOpcode() == SPIRV::OpFunctionParameter)) {
@@ -200,6 +200,7 @@ static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
 // at module level. Also it collects explicit OpExtension/OpCapability
 // instructions.
 void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
+  std::vector<SPIRV::DTSortableEntry *> DepsGraph;
   GR->buildDepsGraph(DepsGraph);
   // OpTypes and OpConstants can have cross references so at first we create
   // new global registers and map them to old regs, then walk the list of
@@ -207,25 +208,25 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
   // Also there are references to global values in constants.
   makeRegisterAliases(GR, DepsGraph, MAI);
 
-  collectTypesConstsVars();
+  collectTypesConstsVars(DepsGraph);
 
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
-    if (MF) {
-      // Iterate through and hoist any instructions we can at this stage.
-      // bool hasSeenFirstOpFunction = false;
-      for (MachineBasicBlock &MBB : *MF) {
-        for (MachineInstr &MI : MBB) {
-          if (MI.getOpcode() == SPIRV::OpExtension) {
-            // Here, OpExtension just has a single enum operand, not a string.
-            auto Ext = Extension::Extension(MI.getOperand(0).getImm());
-            MAI.Reqs.addExtension(Ext);
-            MAI.setSkipEmission(&MI);
-          } else if (MI.getOpcode() == SPIRV::OpCapability) {
-            auto Cap = Capability::Capability(MI.getOperand(0).getImm());
-            MAI.Reqs.addCapability(Cap);
-            MAI.setSkipEmission(&MI);
-          }
+    if (!MF)
+      continue;
+    // Iterate through and hoist any instructions we can at this stage.
+    // bool hasSeenFirstOpFunction = false;
+    for (MachineBasicBlock &MBB : *MF) {
+      for (MachineInstr &MI : MBB) {
+        if (MI.getOpcode() == SPIRV::OpExtension) {
+          // Here, OpExtension just has a single enum operand, not a string.
+          auto Ext = Extension::Extension(MI.getOperand(0).getImm());
+          MAI.Reqs.addExtension(Ext);
+          MAI.setSkipEmission(&MI);
+        } else if (MI.getOpcode() == SPIRV::OpCapability) {
+          auto Cap = Capability::Capability(MI.getOperand(0).getImm());
+          MAI.Reqs.addCapability(Cap);
+          MAI.setSkipEmission(&MI);
         }
       }
     }
@@ -376,29 +377,29 @@ static void processSwitches(const Module &M, ModuleAnalysisInfo &MAI,
   DenseSet<Register> SwitchRegs;
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
-    if (MF) {
-      for (MachineBasicBlock &MBB : *MF)
-        for (MachineInstr &MI : MBB) {
-          if (MAI.getSkipEmission(&MI))
-            continue;
-          if (MI.getOpcode() == SPIRV::OpSwitch) {
-            assert(MI.getOperand(0).isReg());
-            SwitchRegs.insert(MI.getOperand(0).getReg());
-          }
-          if (MI.getOpcode() == SPIRV::OpIEqual && MI.getOperand(2).isReg() &&
-              SwitchRegs.contains(MI.getOperand(2).getReg())) {
-            Register CmpReg = MI.getOperand(0).getReg();
-            MachineInstr *CBr = MI.getNextNode();
-            assert(CBr && CBr->getOpcode() == SPIRV::OpBranchConditional &&
-                   CBr->getOperand(0).isReg() &&
-                   CBr->getOperand(0).getReg() == CmpReg);
-            MAI.setSkipEmission(&MI);
-            MAI.setSkipEmission(CBr);
-            if (&MBB.front() == &MI && &MBB.back() == CBr)
-              MAI.MBBsToSkip.insert(&MBB);
-          }
+    if (!MF)
+      continue;
+    for (MachineBasicBlock &MBB : *MF)
+      for (MachineInstr &MI : MBB) {
+        if (MAI.getSkipEmission(&MI))
+          continue;
+        if (MI.getOpcode() == SPIRV::OpSwitch) {
+          assert(MI.getOperand(0).isReg());
+          SwitchRegs.insert(MI.getOperand(0).getReg());
         }
-    }
+        if (MI.getOpcode() == SPIRV::OpIEqual && MI.getOperand(2).isReg() &&
+            SwitchRegs.contains(MI.getOperand(2).getReg())) {
+          Register CmpReg = MI.getOperand(0).getReg();
+          MachineInstr *CBr = MI.getNextNode();
+          assert(CBr && CBr->getOpcode() == SPIRV::OpBranchConditional &&
+                 CBr->getOperand(0).isReg() &&
+                 CBr->getOperand(0).getReg() == CmpReg);
+          MAI.setSkipEmission(&MI);
+          MAI.setSkipEmission(CBr);
+          if (&MBB.front() == &MI && &MBB.back() == CBr)
+            MAI.MBBsToSkip.insert(&MBB);
+        }
+      }
   }
 }
 
@@ -732,11 +733,11 @@ static void collectReqs(const Module &M, ModuleAnalysisInfo &MAI,
   // Collect requirements for existing instructions.
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
-    if (MF) {
-      for (const MachineBasicBlock &MBB : *MF)
-        for (const MachineInstr &MI : MBB)
-          addInstrRequirements(MI, MAI.Reqs, ST);
-    }
+    if (!MF)
+      continue;
+    for (const MachineBasicBlock &MBB : *MF)
+      for (const MachineInstr &MI : MBB)
+        addInstrRequirements(MI, MAI.Reqs, ST);
   }
   // Collect requirements for OpExecutionMode instructions.
   auto Node = M.getNamedMetadata("spirv.ExecutionMode");

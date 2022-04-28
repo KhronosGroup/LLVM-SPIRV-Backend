@@ -575,7 +575,7 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
                                                 MachineIRBuilder &MIRBuilder,
                                                 AQ::AccessQualifier AccQual,
                                                 bool EmitIR) {
-  auto &TypeToSPIRVTypeMap = DT.get<Type>()->getAllUses();
+  auto &TypeToSPIRVTypeMap = DT.getTypes()->getAllUses();
   auto t = TypeToSPIRVTypeMap.find(Ty);
   if (t != TypeToSPIRVTypeMap.end()) {
     auto tt = t->second.find(&MIRBuilder.getMF());
@@ -773,8 +773,9 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeImage(
     MachineIRBuilder &MIRBuilder, SPIRVType *SampledType, Dim::Dim Dim,
     uint32_t Depth, uint32_t Arrayed, uint32_t Multisampled, uint32_t Sampled,
     ImageFormat::ImageFormat ImageFormat, AQ::AccessQualifier AccessQual) {
-  ImageTypeDescriptor TD(SPIRVToLLVMType.lookup(SampledType), Dim, Depth, Arrayed,
-                         Multisampled, Sampled, ImageFormat, AccessQual);
+  SPIRV::ImageTypeDescriptor TD(SPIRVToLLVMType.lookup(SampledType), Dim, Depth,
+                                Arrayed, Multisampled, Sampled, ImageFormat,
+                                AccessQual);
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
@@ -792,8 +793,9 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeImage(
   return MIB;
 }
 
-SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder) {
-  SamplerTypeDescriptor TD;
+SPIRVType *
+SPIRVGlobalRegistry::getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder) {
+  SPIRV::SamplerTypeDescriptor TD;
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
@@ -803,9 +805,10 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampler(MachineIRBuilder &MIRBu
   return MIB;
 }
 
-SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
-                                              AQ::AccessQualifier AccessQual) {
-  PipeTypeDescriptor TD(AccessQual);
+SPIRVType *
+SPIRVGlobalRegistry::getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
+                                           AQ::AccessQualifier AccessQual) {
+  SPIRV::PipeTypeDescriptor TD(AccessQual);
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
@@ -817,10 +820,9 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypePipe(MachineIRBuilder &MIRBuild
   return MIB;
 }
 
-SPIRVType *
-SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(SPIRVType *ImageType,
-                                         MachineIRBuilder &MIRBuilder) {
-  SampledImageTypeDescriptor TD(
+SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
+    SPIRVType *ImageType, MachineIRBuilder &MIRBuilder) {
+  SPIRV::SampledImageTypeDescriptor TD(
       SPIRVToLLVMType.lookup(MIRBuilder.getMF().getRegInfo().getVRegDef(
           ImageType->getOperand(1).getReg())),
       ImageType);
@@ -845,7 +847,7 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
 }
 
 const MachineInstr *
-SPIRVGlobalRegistry::checkSpecialInstr(const SpecialTypeDescriptor &TD,
+SPIRVGlobalRegistry::checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
                                        MachineIRBuilder &MIRBuilder) {
   Register Reg;
   if (DT.find(TD, &MIRBuilder.getMF(), Reg))
@@ -853,10 +855,9 @@ SPIRVGlobalRegistry::checkSpecialInstr(const SpecialTypeDescriptor &TD,
   return nullptr;
 }
 
-SPIRVType *
-SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(const StructType *Ty,
-                                              MachineIRBuilder &MIRBuilder,
-                                              AQ::AccessQualifier AccessQual) {
+SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
+    const StructType *Ty, MachineIRBuilder &MIRBuilder,
+    AQ::AccessQualifier AccessQual) {
   const StringRef Name = Ty->getName();
   assert(Name.startswith("opencl.") && "CL types should start with 'opencl.'");
   auto TypeName = Name.substr(strlen("opencl."));
@@ -884,7 +885,7 @@ SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(const StructType *Ty,
           Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
           MIRBuilder);
       return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, 0, Arrayed, 0, 0,
-                            ImageFormat::Unknown, AccessQual);
+                                    ImageFormat::Unknown, AccessQual);
     }
   } else if (TypeName.startswith("sampler_t")) {
     return getOrCreateOpTypeSampler(MIRBuilder);
@@ -955,10 +956,9 @@ SPIRVGlobalRegistry::handleSPIRVBuiltin(const StructType *Ty,
   return NewTy;
 }
 
-SPIRVType *
-SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(const StructType *Ty,
-                                             MachineIRBuilder &MIRBuilder,
-                                             AQ::AccessQualifier AccessQual) {
+SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(
+    const StructType *Ty, MachineIRBuilder &MIRBuilder,
+    AQ::AccessQualifier AccessQual) {
   const StringRef Name = Ty->getName();
   assert(Name.startswith("spirv.") && "CL types should start with 'opencl.'");
   auto TypeName = Name.substr(strlen("spirv."));
@@ -984,9 +984,9 @@ SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(const StructType *Ty,
         TypeLiterals[6].getAsInteger(10, ImageFormat) ||
         TypeLiterals[7].getAsInteger(10, AccQual))
       llvm_unreachable("Unable to recognize Image type literals");
-    return getOrCreateOpTypeImage(MIRBuilder, SpirvType, Dim::Dim(Ddim), Depth, Arrayed,
-                          MS, Sampled, ImageFormat::ImageFormat(ImageFormat),
-                          AQ::AccessQualifier(AccQual));
+    return getOrCreateOpTypeImage(
+        MIRBuilder, SpirvType, Dim::Dim(Ddim), Depth, Arrayed, MS, Sampled,
+        ImageFormat::ImageFormat(ImageFormat), AQ::AccessQualifier(AccQual));
   } else if (TypeName.startswith("SampledImage.")) {
     // Find corresponding Image type.
     auto Literals = TypeName.substr(strlen("SampledImage."));
