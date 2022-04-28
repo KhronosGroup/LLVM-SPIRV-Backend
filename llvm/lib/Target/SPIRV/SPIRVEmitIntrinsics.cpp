@@ -37,13 +37,13 @@
 // - emits intrinsics to keep track of original LLVM types of the values
 //   to be able to emit proper SPIR-V types eventually.
 //
-// TODO: consider removing spv.track.constant in favor of spv.assign.type
+// TODO: consider removing spv.track.constant in favor of spv.assign.type.
 
 using namespace llvm;
 
 namespace llvm {
 void initializeSPIRVEmitIntrinsicsPass(PassRegistry &);
-}
+} // namespace llvm
 
 namespace {
 class SPIRVEmitIntrinsics
@@ -54,6 +54,7 @@ class SPIRVEmitIntrinsics
   Function *F = nullptr;
   bool TrackConstants = true;
   DenseMap<Instruction *, Constant *> AggrConsts;
+  DenseSet<Instruction *> AggrStores;
   void preprocessCompositeConstants();
   CallInst *buildIntrCall(Intrinsic::ID IntrID, ArrayRef<Type *> Types,
                           ArrayRef<Value *> Args) {
@@ -298,8 +299,7 @@ Instruction *SPIRVEmitIntrinsics::visitLoadInst(LoadInst &I) {
 }
 
 Instruction *SPIRVEmitIntrinsics::visitStoreInst(StoreInst &I) {
-  PointerType *PTy = cast<PointerType>(I.getOperand(1)->getType());
-  if (!PTy->getPointerElementType()->isAggregateType())
+  if (!AggrStores.contains(&I))
     return &I;
   TrackConstants = false;
   const auto *TLI = TM->getSubtargetImpl()->getTargetLowering();
@@ -331,9 +331,8 @@ void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
     InitInst->setArgOperand(1, Init);
   }
   if ((!GV.hasInitializer() || isa<UndefValue>(GV.getInitializer())) &&
-      GV.getNumUses() == 0) {
+      GV.getNumUses() == 0)
     buildIntrCall(Intrinsic::spv_unref_global, GV.getType(), &GV);
-  }
 }
 
 void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
@@ -359,6 +358,11 @@ void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
       buildIntrWithMD(Intrinsic::spv_assign_type, {Op->getType()}, Op, Op);
     }
   }
+  // StoreInst's operand type can be changed in the next stage so we need to
+  // store it in the set.
+  if (isa<StoreInst>(I) &&
+      cast<StoreInst>(I)->getValueOperand()->getType()->isAggregateType())
+    AggrStores.insert(I);
 }
 
 void SPIRVEmitIntrinsics::processInstrAfterVisit(Instruction *I) {
@@ -403,6 +407,7 @@ bool SPIRVEmitIntrinsics::runOnFunction(Function &Func) {
   F = &Func;
   IRB = new IRBuilder<>(Func.getContext());
   AggrConsts.clear();
+  AggrStores.clear();
 
   IRB->SetInsertPoint(&Func.getEntryBlock().front());
 

@@ -8,15 +8,15 @@ target triple = "spirv32-unknown-unknown"
 %struct.B = type { i32, %struct.A addrspace(4)* }
 %struct.Node = type { %struct.Node addrspace(1)*, i32 }
 
-; CHECK-SPIRV-DAG: %[[NodeFwdPtr:[0-9]+]] = OpTypeForwardPointer CrossWorkgroup
-; CHECK-SPIRV-DAG: %[[AFwdPtr:[0-9]+]] = OpTypeForwardPointer Generic
-; CHECK-SPIRV: %[[IntID:[0-9]+]] = OpTypeInt 32 0
+; CHECK-SPIRV-DAG: OpTypeForwardPointer %[[NodeFwdPtr:[0-9]+]] CrossWorkgroup
+; CHECK-SPIRV-DAG: OpTypeForwardPointer %[[AFwdPtr:[0-9]+]] Generic
+; CHECK-SPIRV-DAG: %[[IntID:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-SPIRV: %[[BID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[AFwdPtr]]
 ; CHECK-SPIRV: %[[CID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[BID]]
 ; CHECK-SPIRV: %[[AID:[0-9]+]] = OpTypeStruct %{{[0-9]+}} %[[CID]]
-; CHECK-SPIRV: %[[AFwdPtr]] = OpTypePointer Generic %[[AID:[0-9]+]]
-; CHECK-SPIRV: %[[NodeID:[0-9]+]] = OpTypeStruct %[[NodeFwdPtr]]
-; CHECK-SPIRV: %[[NodeFwdPtr]] = OpTypePointer CrossWorkgroup %[[NodeID]]
+; CHECK-SPIRV-DAG: %[[AFwdPtr]] = OpTypePointer Generic %[[AID:[0-9]+]]
+; CHECK-SPIRV-DAG: %[[NodeID:[0-9]+]] = OpTypeStruct %[[NodeFwdPtr]]
+; CHECK-SPIRV-DAG: %[[NodeFwdPtr]] = OpTypePointer CrossWorkgroup %[[NodeID]]
 
 ; Function Attrs: nounwind
 define spir_kernel void @test(%struct.A addrspace(1)* %result, %struct.Node addrspace(1)* %node) #0 !kernel_arg_addr_space !1 !kernel_arg_access_qual !2 !kernel_arg_type !3 !kernel_arg_base_type !4 !kernel_arg_type_qual !5 {

@@ -32,13 +32,18 @@ const SPIRVConstantTracker *SPIRVGeneralDuplicatesTracker::get(Constant *Arg) {
 }
 
 template <>
-const SPIRVGlobalValueTracker *
-SPIRVGeneralDuplicatesTracker::get(GlobalValue *Arg) {
+const SPIRVGlobalVariableTracker *
+SPIRVGeneralDuplicatesTracker::get(GlobalVariable *Arg) {
   return &GT;
 }
 
 template <>
 const SPIRVFuncDeclsTracker *SPIRVGeneralDuplicatesTracker::get(Function *Arg) {
   return &FT;
+}
+
+template <>
+const SPIRVSpecialDeclsTracker *SPIRVGeneralDuplicatesTracker::get(SpecialTypeDescriptor *Arg) {
+  return &ST;
 }
   
