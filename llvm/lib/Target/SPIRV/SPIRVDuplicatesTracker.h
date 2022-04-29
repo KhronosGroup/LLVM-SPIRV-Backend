@@ -1,13 +1,13 @@
-//===-- SPIRVDuplicatesTracker.h - SPIR-V Duplicates Tracker --------------===//
+//===-- SPIRVDuplicatesTracker.h - SPIR-V Duplicates Tracker ----*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
 // General infrastructure for keeping track of the values that according to
 // the SPIR-V binary layout should be global to the whole module.
-// Actual hoisting happens in SPIRVGlobalTypesAndRegNum pass.
 //
 //===----------------------------------------------------------------------===//
 
@@ -16,31 +16,31 @@
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "MCTargetDesc/SPIRVMCTargetDesc.h"
-#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 #include <type_traits>
 
 namespace llvm {
-
+namespace SPIRV {
 // NOTE: using MapVector instead of DenseMap because it helps getting
 // everything ordered in a stable manner for a price of extra (NumKeys)*PtrSize
-// memory and expensive removals which do not happen anyway
+// memory and expensive removals which do not happen anyway.
 class DTSortableEntry : public MapVector<const MachineFunction *, Register> {
   SmallVector<DTSortableEntry *, 2> Deps;
 
   struct FlagsTy {
     unsigned IsFunc : 1;
     unsigned IsGV : 1;
-    // NOTE: bit-field default init is a C++20 feature
+    // NOTE: bit-field default init is a C++20 feature.
     FlagsTy() : IsFunc(0), IsGV(0) {}
   };
   FlagsTy Flags;
 
 public:
-  // common hoisting utility doesn't support
-  // function because their hoisting require hoisting of params as well
+  // Common hoisting utility doesn't support function, because their hoisting
+  // require hoisting of params as well.
   bool getIsFunc() const { return Flags.IsFunc; }
   bool getIsGV() const { return Flags.IsGV; }
   void setIsFunc(bool V) { Flags.IsFunc = V; }
@@ -61,18 +61,16 @@ struct SpecialTypeDescriptor {
   SpecialTypeKind Kind;
 
   unsigned Hash;
-  
-  SpecialTypeDescriptor() = delete;
-  SpecialTypeDescriptor(SpecialTypeKind K): Kind(K) { Hash = Kind; }
 
-  unsigned getHash() const {
-    return Hash;
-  }
+  SpecialTypeDescriptor() = delete;
+  SpecialTypeDescriptor(SpecialTypeKind K) : Kind(K) { Hash = Kind; }
+
+  unsigned getHash() const { return Hash; }
 
   virtual ~SpecialTypeDescriptor() {}
 };
 
-struct ImageTypeDescriptor: public SpecialTypeDescriptor {
+struct ImageTypeDescriptor : public SpecialTypeDescriptor {
   union ImageAttrs {
     struct BitFlags {
       unsigned Dim : 3;
@@ -99,7 +97,8 @@ struct ImageTypeDescriptor: public SpecialTypeDescriptor {
     Attrs.Flags.Sampled = Sampled;
     Attrs.Flags.ImageFormat = ImageFormat;
     Attrs.Flags.AQ = AQ;
-    Hash = (DenseMapInfo<Type*>().getHashValue(SampledTy) & 0xffff) ^ ((Attrs.Val << 8) | Kind);
+    Hash = (DenseMapInfo<Type *>().getHashValue(SampledTy) & 0xffff) ^
+           ((Attrs.Val << 8) | Kind);
   }
 
   static bool classof(const SpecialTypeDescriptor *TD) {
@@ -107,7 +106,7 @@ struct ImageTypeDescriptor: public SpecialTypeDescriptor {
   }
 };
 
-struct SampledImageTypeDescriptor: public SpecialTypeDescriptor {
+struct SampledImageTypeDescriptor : public SpecialTypeDescriptor {
   SampledImageTypeDescriptor(const Type *SampledTy, const MachineInstr *ImageTy)
       : SpecialTypeDescriptor(SpecialTypeKind::STK_SampledImage) {
     assert(ImageTy->getOpcode() == SPIRV::OpTypeImage);
@@ -124,8 +123,9 @@ struct SampledImageTypeDescriptor: public SpecialTypeDescriptor {
   }
 };
 
-struct SamplerTypeDescriptor: public SpecialTypeDescriptor {
-  SamplerTypeDescriptor(): SpecialTypeDescriptor(SpecialTypeKind::STK_Sampler) {
+struct SamplerTypeDescriptor : public SpecialTypeDescriptor {
+  SamplerTypeDescriptor()
+      : SpecialTypeDescriptor(SpecialTypeKind::STK_Sampler) {
     Hash = Kind;
   }
 
@@ -133,9 +133,11 @@ struct SamplerTypeDescriptor: public SpecialTypeDescriptor {
     return TD->Kind == SpecialTypeKind::STK_Sampler;
   }
 };
-struct PipeTypeDescriptor: public SpecialTypeDescriptor {
 
-  PipeTypeDescriptor(uint8_t AQ): SpecialTypeDescriptor(SpecialTypeKind::STK_Pipe) {
+struct PipeTypeDescriptor : public SpecialTypeDescriptor {
+
+  PipeTypeDescriptor(uint8_t AQ)
+      : SpecialTypeDescriptor(SpecialTypeKind::STK_Pipe) {
     Hash = (AQ << 8) | Kind;
   }
 
@@ -143,36 +145,36 @@ struct PipeTypeDescriptor: public SpecialTypeDescriptor {
     return TD->Kind == SpecialTypeKind::STK_Pipe;
   }
 };
+} // namespace SPIRV
 
-template <> struct DenseMapInfo<SpecialTypeDescriptor> {
-  static inline SpecialTypeDescriptor getEmptyKey() {
-    return SpecialTypeDescriptor(SpecialTypeDescriptor::STK_Empty);
+template <> struct DenseMapInfo<SPIRV::SpecialTypeDescriptor> {
+  static inline SPIRV::SpecialTypeDescriptor getEmptyKey() {
+    return SPIRV::SpecialTypeDescriptor(
+        SPIRV::SpecialTypeDescriptor::STK_Empty);
   }
-  static inline SpecialTypeDescriptor getTombstoneKey() {
-    return SpecialTypeDescriptor(SpecialTypeDescriptor::STK_Last);
+  static inline SPIRV::SpecialTypeDescriptor getTombstoneKey() {
+    return SPIRV::SpecialTypeDescriptor(SPIRV::SpecialTypeDescriptor::STK_Last);
   }
-  static unsigned getHashValue(SpecialTypeDescriptor Val) {
+  static unsigned getHashValue(SPIRV::SpecialTypeDescriptor Val) {
     return Val.getHash();
   }
-  static bool isEqual(SpecialTypeDescriptor LHS, SpecialTypeDescriptor RHS) {
+  static bool isEqual(SPIRV::SpecialTypeDescriptor LHS,
+                      SPIRV::SpecialTypeDescriptor RHS) {
     return getHashValue(LHS) == getHashValue(RHS);
   }
 };
 
-
 template <typename KeyTy> class SPIRVDuplicatesTrackerBase {
 public:
-  // NOTE: using MapVector instead of DenseMap helps getting
-  // everything ordered in a stable manner for a price of extra
-  // (NumKeys)*PtrSize memory and expensive removals which don't happen anyway
-  using StorageTy = MapVector<KeyTy, DTSortableEntry>;
+  // NOTE: using MapVector instead of DenseMap helps getting everything ordered
+  // in a stable manner for a price of extra (NumKeys)*PtrSize memory and
+  // expensive removals which don't happen anyway.
+  using StorageTy = MapVector<KeyTy, SPIRV::DTSortableEntry>;
 
 private:
   StorageTy Storage;
 
 public:
-  SPIRVDuplicatesTrackerBase() {}
-
   void add(KeyTy V, const MachineFunction *MF, Register R) {
     Register OldReg;
     if (find(V, MF, OldReg)) {
@@ -190,7 +192,7 @@ public:
       Storage[V].setIsGV(true);
   }
 
-  bool find(KeyTy V, const MachineFunction *MF, Register& R) const {
+  bool find(KeyTy V, const MachineFunction *MF, Register &R) const {
     auto iter = Storage.find(V);
     if (iter != Storage.end()) {
       auto Map = iter->second;
@@ -215,82 +217,38 @@ private:
   friend class SPIRVGeneralDuplicatesTracker;
 };
 
-template<typename T>
-class SPIRVDuplicatesTracker: public SPIRVDuplicatesTrackerBase<const T*> {};
+template <typename T>
+class SPIRVDuplicatesTracker : public SPIRVDuplicatesTrackerBase<const T *> {};
 
-template<>
-class SPIRVDuplicatesTracker<SpecialTypeDescriptor>: public SPIRVDuplicatesTrackerBase<SpecialTypeDescriptor> {};
-
-using SPIRVTypeTracker = SPIRVDuplicatesTracker<Type>;
-using SPIRVConstantTracker = SPIRVDuplicatesTracker<Constant>;
-using SPIRVGlobalVariableTracker = SPIRVDuplicatesTracker<GlobalVariable>;
-using SPIRVFuncDeclsTracker = SPIRVDuplicatesTracker<Function>;
-using SPIRVSpecialDeclsTracker = SPIRVDuplicatesTracker<SpecialTypeDescriptor>;
+template <>
+class SPIRVDuplicatesTracker<SPIRV::SpecialTypeDescriptor>
+    : public SPIRVDuplicatesTrackerBase<SPIRV::SpecialTypeDescriptor> {};
 
 class SPIRVGeneralDuplicatesTracker {
-  SPIRVTypeTracker TT;
-  SPIRVConstantTracker CT;
-  SPIRVGlobalVariableTracker GT;
-  SPIRVFuncDeclsTracker FT;
-  SPIRVSpecialDeclsTracker ST;
+  SPIRVDuplicatesTracker<Type> TT;
+  SPIRVDuplicatesTracker<Constant> CT;
+  SPIRVDuplicatesTracker<GlobalVariable> GT;
+  SPIRVDuplicatesTracker<Function> FT;
+  SPIRVDuplicatesTracker<SPIRV::SpecialTypeDescriptor> ST;
 
-  // NOTE: using MOs instead of regs to get rid of MF dependency
-  // to be able to use flat data structure
-  // NOTE: replacing DenseMap with MapVector doesn't affect overall
-  // correctness but makes LITs more stable, should prefer DenseMap still
-  // due to significant perf difference
-  using Reg2EntryTy = MapVector<MachineOperand *, DTSortableEntry *>;
+  // NOTE: using MOs instead of regs to get rid of MF dependency to be able
+  // to use flat data structure.
+  // NOTE: replacing DenseMap with MapVector doesn't affect overall correctness
+  // but makes LITs more stable, should prefer DenseMap still due to
+  // significant perf difference.
+  using SPIRVReg2EntryTy =
+      MapVector<MachineOperand *, SPIRV::DTSortableEntry *>;
 
-private:
   template <typename T>
   void prebuildReg2Entry(SPIRVDuplicatesTracker<T> &DT,
-                         Reg2EntryTy &Reg2Entry) {
-    for (auto &TPair : DT.getAllUses()) {
-      for (auto &RegPair : TPair.second) {
-        auto *MF = RegPair.first;
-        auto R = RegPair.second;
-        auto *MI = MF->getRegInfo().getVRegDef(R);
-        if (!MI)
-          continue;
-        Reg2Entry[&MI->getOperand(0)] = &TPair.second;
-      }
-    }
-  }
+                         SPIRVReg2EntryTy &Reg2Entry);
 
 public:
-  void buildDepsGraph(std::vector<DTSortableEntry *> &Graph) {
-    Reg2EntryTy Reg2Entry;
-    prebuildReg2Entry(TT, Reg2Entry);
-    prebuildReg2Entry(CT, Reg2Entry);
-    prebuildReg2Entry(GT, Reg2Entry);
-    prebuildReg2Entry(FT, Reg2Entry);
-    prebuildReg2Entry(ST, Reg2Entry);
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph);
 
-    for (auto &Op2E : Reg2Entry) {
-      auto *E = Op2E.second;
-      Graph.push_back(E);
-      for (auto &U : *E) {
-        auto *MF = U.first;
-        auto R = U.second;
-
-        auto *MI = MF->getRegInfo().getUniqueVRegDef(R);
-        if (!MI)
-          continue;
-        assert(MI && MI->getParent() && "No MachineInstr created yet");
-        for (auto i = MI->getNumDefs(); i < MI->getNumOperands(); i++) {
-          auto Op = MI->getOperand(i);
-          if (!Op.isReg())
-            continue;
-          MachineOperand *RegOp = &MF->getRegInfo().getVRegDef(Op.getReg())->getOperand(0);
-          assert((MI->getOpcode() == SPIRV::OpVariable && i == 3) || Reg2Entry.count(RegOp));
-          if (Reg2Entry.count(RegOp))
-            E->getDeps().push_back(Reg2Entry[RegOp]);
-        }
-      }
-    }
+  void add(const Type *T, const MachineFunction *MF, Register R) {
+    TT.add(T, MF, R);
   }
-
-  void add(const Type *T, const MachineFunction *MF, Register R) { TT.add(T, MF, R); }
 
   void add(const Constant *C, const MachineFunction *MF, Register R) {
     CT.add(C, MF, R);
@@ -304,36 +262,34 @@ public:
     FT.add(F, MF, R);
   }
 
-  void add(const SpecialTypeDescriptor &TD, const MachineFunction *MF, Register R) {
+  void add(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,
+           Register R) {
     ST.add(TD, MF, R);
   }
 
-  bool find(const Type *T, const MachineFunction *MF, Register& R) {
-    return TT.find(const_cast<Type*>(T), MF, R);
+  bool find(const Type *T, const MachineFunction *MF, Register &R) {
+    return TT.find(const_cast<Type *>(T), MF, R);
   }
 
-  bool find(const Constant *C, const MachineFunction *MF, Register& R) {
-    return CT.find(const_cast<Constant*>(C), MF, R);
+  bool find(const Constant *C, const MachineFunction *MF, Register &R) {
+    return CT.find(const_cast<Constant *>(C), MF, R);
   }
 
   bool find(const GlobalVariable *GV, const MachineFunction *MF, Register &R) {
-    return GT.find(const_cast<GlobalVariable*>(GV), MF, R);
+    return GT.find(const_cast<GlobalVariable *>(GV), MF, R);
   }
 
-  bool find(const Function *F, const MachineFunction *MF, Register& R) {
-    return FT.find(const_cast<Function*>(F), MF, R);
+  bool find(const Function *F, const MachineFunction *MF, Register &R) {
+    return FT.find(const_cast<Function *>(F), MF, R);
   }
 
-  bool find(const SpecialTypeDescriptor &TD, const MachineFunction *MF, Register& R) {
+  bool find(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,
+            Register &R) {
     return ST.find(TD, MF, R);
   }
 
-
-  // NOTE:
-  // T *Arg = nullptr is added as compiler fails to infer T for specializations
-  // based just on templated return type
-  template <typename T> const SPIRVDuplicatesTracker<T> *get(T *Arg = nullptr);
+  const SPIRVDuplicatesTracker<Type> *getTypes() { return &TT; }
+  const SPIRVDuplicatesTracker<Function> *getFuncs() { return &FT; }
 };
-
-} // end namespace llvm
+} // namespace llvm
 #endif

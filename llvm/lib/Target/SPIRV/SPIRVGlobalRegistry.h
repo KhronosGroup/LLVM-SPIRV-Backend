@@ -42,7 +42,7 @@ class SPIRVGlobalRegistry {
 
   // Look for an equivalent of the newType in the map. Return the equivalent
   // if it's found, otherwise insert newType to the map and return the type.
-  const MachineInstr *checkSpecialInstr(const SpecialTypeDescriptor &TD,
+  const MachineInstr *checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
                                         MachineIRBuilder &MIRBuilder);
 
   SmallPtrSet<const Type *, 4> TypesInProcessing;
@@ -87,9 +87,12 @@ public:
     return DT.find(F, MF, R);
   }
 
-  template <typename T>
-  const typename SPIRVDuplicatesTracker<T>::StorageTy &getAllUses() {
-    return DT.get<T>()->getAllUses();
+  const typename SPIRVDuplicatesTracker<Function>::StorageTy &getFuncAllUses() {
+    return DT.getFuncs()->getAllUses();
+  }
+
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph) {
+    DT.buildDepsGraph(Graph);
   }
 
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
@@ -152,10 +155,6 @@ public:
   Register getSPIRVTypeID(const SPIRVType *SpirvType) const;
 
   void setCurrentFunc(MachineFunction &MF) { CurMF = &MF; }
-
-  void buildDepsGraph(std::vector<DTSortableEntry *> &Graph) {
-    DT.buildDepsGraph(Graph);
-  }
 
   // Whether the given VReg has an OpTypeXXX instruction mapped to it with the
   // given opcode (e.g. OpTypeFloat).
@@ -220,8 +219,9 @@ private:
                                  AQ::AccessQualifier AccQual);
 
   SPIRVType *
-  getOrCreateOpenCLOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
-                           AQ::AccessQualifier AccQual = AQ::ReadWrite);
+  getOrCreateOpenCLOpaqueType(const StructType *Ty,
+                              MachineIRBuilder &MIRBuilder,
+                              AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
   SPIRVType *handleSPIRVBuiltin(const StructType *Ty,
                                 MachineIRBuilder &MIRBuilder,
@@ -229,7 +229,7 @@ private:
 
   SPIRVType *
   getOrCreateSPIRVOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
-                          AQ::AccessQualifier AccQual = AQ::ReadWrite);
+                             AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
   std::tuple<Register, ConstantInt *, bool> getOrCreateConstIntReg(
       uint64_t Val, SPIRVType *SpvType, MachineIRBuilder *MIRBuilder,
@@ -279,19 +279,19 @@ public:
       StorageClass::StorageClass SC = StorageClass::Function);
 
   SPIRVType *getOrCreateOpTypeImage(MachineIRBuilder &MIRBuilder,
-                            SPIRVType *SampledType, Dim::Dim Dim,
-                            uint32_t Depth, uint32_t Arrayed,
-                            uint32_t Multisampled, uint32_t Sampled,
-                            ImageFormat::ImageFormat ImageFormat,
-                            AQ::AccessQualifier AccQual);
+                                    SPIRVType *SampledType, Dim::Dim Dim,
+                                    uint32_t Depth, uint32_t Arrayed,
+                                    uint32_t Multisampled, uint32_t Sampled,
+                                    ImageFormat::ImageFormat ImageFormat,
+                                    AQ::AccessQualifier AccQual);
 
   SPIRVType *getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOrCreateOpTypeSampledImage(SPIRVType *ImageType,
-                                              MachineIRBuilder &MIRBuilder);
+                                           MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
-                           AQ::AccessQualifier AccQual);
+                                   AQ::AccessQualifier AccQual);
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
