@@ -21,6 +21,9 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV: %[[struct1_ty:[0-9]+]] = OpTypeStruct %[[struct1_in_ty]]
 ; CHECK-SPIRV: %[[struct1_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_ty]]
 ; CHECK-SPIRV: %[[struct1_in_ptr_ty:[0-9]+]] = OpTypePointer CrossWorkgroup %[[struct1_in_ty]]
+; CHECK-SPIRV-NOT: OpConstant %{{.*}} 2
+; CHECK-SPIRV-NOT: OpConstant %{{.*}} 4
+; CHECK-SPIRV-NOT: OpConstant %{{.*}} 5
 
 ; CHECK-SPIRV-LABEL:  OpFunction
 ; CHECK-SPIRV-NEXT:   %[[object:[0-9]+]] = OpFunctionParameter %[[struct_ptr_ty]]

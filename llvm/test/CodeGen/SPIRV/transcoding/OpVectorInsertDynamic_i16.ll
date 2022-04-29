@@ -11,9 +11,9 @@
 ; CHECK-SPIRV: %[[undef:[0-9]+]] = OpUndef %[[int16_2]]
 
 ; CHECK-SPIRV-DAG: %[[const1:[0-9]+]] = OpConstant %[[int16]] 4
-; CHECK-SPIRV-DAG: %[[idx1:[0-9]+]] = OpConstant %[[int32]] 0
 ; CHECK-SPIRV-DAG: %[[const2:[0-9]+]] = OpConstant %[[int16]] 8
-; CHECK-SPIRV-DAG: %[[idx2:[0-9]+]] = OpConstant %[[int32]] 1
+; CHECK-SPIRV-NOT: %[[idx1:[0-9]+]] = OpConstant %[[int32]] 0
+; CHECK-SPIRV-NOT: %[[idx2:[0-9]+]] = OpConstant %[[int32]] 1
 
 ; CHECK-SPIRV: %[[vec1:[0-9]+]] = OpCompositeInsert %[[int16_2]] %[[const1]] %[[undef]] 0
 ; CHECK-SPIRV: %[[vec2:[0-9]+]] = OpCompositeInsert %[[int16_2]] %[[const2]] %[[vec1]] 1
