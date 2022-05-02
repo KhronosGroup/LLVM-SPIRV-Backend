@@ -37,6 +37,7 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
   prebuildReg2Entry(CT, Reg2Entry);
   prebuildReg2Entry(GT, Reg2Entry);
   prebuildReg2Entry(FT, Reg2Entry);
+  prebuildReg2Entry(AT, Reg2Entry);
   prebuildReg2Entry(ST, Reg2Entry);
 
   for (auto &Op2E : Reg2Entry) {
@@ -56,7 +57,15 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
         assert((MI->getOpcode() == SPIRV::OpVariable && i == 3) ||
                Reg2Entry.count(RegOp));
         if (Reg2Entry.count(RegOp))
-          E->getDeps().push_back(Reg2Entry[RegOp]);
+          E->addDep(Reg2Entry[RegOp]);
+      }
+
+      if (E->getIsFunc()) {
+        MachineInstr *Next = MI->getNextNode();
+        if (Next && (Next->getOpcode() == SPIRV::OpFunction ||
+                     Next->getOpcode() == SPIRV::OpFunctionParameter)) {
+          Reg2Entry[&Next->getOperand(0)]->addDep(E);
+        }
       }
     }
   }

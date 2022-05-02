@@ -46,7 +46,8 @@ public:
   void setIsFunc(bool V) { Flags.IsFunc = V; }
   void setIsGV(bool V) { Flags.IsGV = V; }
 
-  SmallVector<DTSortableEntry *, 2> &getDeps() { return Deps; }
+  const SmallVector<DTSortableEntry *, 2> &getDeps() const { return Deps; }
+  void addDep(DTSortableEntry *E) { Deps.push_back(E); }
 };
 
 struct SpecialTypeDescriptor {
@@ -184,6 +185,9 @@ public:
     Storage[V][MF] = R;
     if (std::is_same<Function,
                      typename std::remove_const<
+                         typename std::remove_pointer<KeyTy>::type>::type>() ||
+        std::is_same<Argument,
+                     typename std::remove_const<
                          typename std::remove_pointer<KeyTy>::type>::type>())
       Storage[V].setIsFunc(true);
     if (std::is_same<GlobalVariable,
@@ -229,6 +233,7 @@ class SPIRVGeneralDuplicatesTracker {
   SPIRVDuplicatesTracker<Constant> CT;
   SPIRVDuplicatesTracker<GlobalVariable> GT;
   SPIRVDuplicatesTracker<Function> FT;
+  SPIRVDuplicatesTracker<Argument> AT;
   SPIRVDuplicatesTracker<SPIRV::SpecialTypeDescriptor> ST;
 
   // NOTE: using MOs instead of regs to get rid of MF dependency to be able
@@ -262,6 +267,10 @@ public:
     FT.add(F, MF, R);
   }
 
+  void add(const Argument *Arg, const MachineFunction *MF, Register R) {
+    AT.add(Arg, MF, R);
+  }
+
   void add(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,
            Register R) {
     ST.add(TD, MF, R);
@@ -281,6 +290,10 @@ public:
 
   bool find(const Function *F, const MachineFunction *MF, Register &R) {
     return FT.find(const_cast<Function *>(F), MF, R);
+  }
+
+  bool find(const Argument *Arg, const MachineFunction *MF, Register &R) {
+    return AT.find(const_cast<Argument *>(Arg), MF, R);
   }
 
   bool find(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,

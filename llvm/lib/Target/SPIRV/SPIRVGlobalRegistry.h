@@ -75,6 +75,10 @@ public:
     DT.add(F, MF, R);
   }
 
+  void add(const Argument *Arg, MachineFunction *MF, Register R) {
+    DT.add(Arg, MF, R);
+  }
+
   bool find(const Constant *C, MachineFunction *MF, Register &R) {
     return DT.find(C, MF, R);
   }
