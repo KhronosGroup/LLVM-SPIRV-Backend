@@ -22,7 +22,7 @@ using namespace llvm;
 
 void SPIRVMCInstLower::lower(const MachineInstr *MI, MCInst &OutMI,
                              const MachineFunction *CurMF,
-                             ModuleAnalysisInfo *MAI) const {
+                             SPIRV::ModuleAnalysisInfo *MAI) const {
   OutMI.setOpcode(MI->getOpcode());
   const MachineFunction *MF = MI->getMF();
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {

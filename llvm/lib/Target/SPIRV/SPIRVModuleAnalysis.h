@@ -22,8 +22,11 @@
 #include "llvm/ADT/StringMap.h"
 
 namespace llvm {
+class MachineFunction;
+class MachineModuleInfo;
 
-// The enum contains logical module sections for instruction callection.
+namespace SPIRV {
+// The enum contains logical module sections for the instruction collection.
 enum ModuleSectionType {
   //  MB_Capabilities,   // All OpCapability instructions.
   //  MB_Extensions,     // Optional OpExtension instructions.
@@ -39,9 +42,6 @@ enum ModuleSectionType {
   MB_ExtFuncDecls,         // OpFunction etc. to declare for external funcs.
   NUM_MODULE_SECTIONS      // Total number of sections requiring basic blocks.
 };
-
-class MachineFunction;
-class MachineModuleInfo;
 
 using InstrList = SmallVector<MachineInstr *>;
 // Maps a local register to the corresponding global alias.
@@ -120,6 +120,7 @@ struct ModuleAnalysisInfo {
     return NewReg;
   }
 };
+} // namespace SPIRV
 
 struct SPIRVModuleAnalysis : public ModulePass {
   static char ID;
@@ -129,7 +130,7 @@ public:
 
   bool runOnModule(Module &M) override;
   void getAnalysisUsage(AnalysisUsage &AU) const override;
-  static struct ModuleAnalysisInfo MAI;
+  static struct SPIRV::ModuleAnalysisInfo MAI;
 
 private:
   void setBaseInfo(const Module &M);

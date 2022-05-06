@@ -627,7 +627,6 @@ static MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
   case AtomicOrdering::Unordered:
   case AtomicOrdering::Monotonic:
   case AtomicOrdering::NotAtomic:
-  default:
     return MemorySemantics::None;
   }
 }
