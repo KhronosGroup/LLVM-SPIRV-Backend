@@ -51,7 +51,7 @@ static unsigned getMetadataUInt(MDNode *MdNode, unsigned OpIndex,
 
 void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
   MAI.MaxID = 0;
-  for (int i = 0; i < NUM_MODULE_SECTIONS; i++)
+  for (int i = 0; i < SPIRV::NUM_MODULE_SECTIONS; i++)
     MAI.MS[i].clear();
   MAI.RegisterAliasTable.clear();
   MAI.InstrsToDelete.clear();
@@ -96,7 +96,7 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
 static void
 makeRegisterAliases(SPIRVGlobalRegistry *GR,
                     std::vector<SPIRV::DTSortableEntry *> &DepsGraph,
-                    ModuleAnalysisInfo &MAI) {
+                    SPIRV::ModuleAnalysisInfo &MAI) {
   DenseSet<SPIRV::DTSortableEntry *> Visited;
   for (auto *E : DepsGraph) {
     std::function<void(SPIRV::DTSortableEntry *)> RecHoistUtil;
@@ -123,7 +123,8 @@ static DenseSet<Register> InsertedTypeConstVarDefs;
 // Insert instruction to a module section if it was not inserted before.
 // Set skip emission on function output.
 static void insertInstrToMS(Register GlobalReg, MachineInstr *MI,
-                            ModuleAnalysisInfo *MAI, ModuleSectionType MSType) {
+                            SPIRV::ModuleAnalysisInfo *MAI,
+                            SPIRV::ModuleSectionType MSType) {
   assert(MI && "There should be an instruction that defines the register");
   MAI->setSkipEmission(MI);
   if (!InsertedTypeConstVarDefs.contains(GlobalReg)) {
@@ -133,7 +134,8 @@ static void insertInstrToMS(Register GlobalReg, MachineInstr *MI,
 }
 // Collect MI which defines the register in the given machine function.
 static void collectDefInstr(Register Reg, const MachineFunction *MF,
-                            ModuleAnalysisInfo *MAI, ModuleSectionType MSType) {
+                            SPIRV::ModuleAnalysisInfo *MAI,
+                            SPIRV::ModuleSectionType MSType) {
   assert(MAI->hasRegisterAlias(MF, Reg) && "Cannot find register alias");
   Register GlobalReg = MAI->getRegisterAlias(MF, Reg);
   MachineInstr *MI = MF->getRegInfo().getVRegDef(Reg);
@@ -159,7 +161,7 @@ void SPIRVModuleAnalysis::collectTypesConstsVars(
         Register Reg = U.second;
         if (!MF->getRegInfo().getUniqueVRegDef(Reg))
           continue;
-        collectDefInstr(Reg, MF, &MAI, MB_TypeConstVars);
+        collectDefInstr(Reg, MF, &MAI, SPIRV::MB_TypeConstVars);
         if (E->getIsGV())
           MAI.GlobalVarList.push_back(MF->getRegInfo().getUniqueVRegDef(Reg));
       }
@@ -172,7 +174,8 @@ void SPIRVModuleAnalysis::collectTypesConstsVars(
 // collect OpFunctions but OpFunctionParameters too.
 // TODO: maybe consider replacing this with explicit OpFunctionParameter
 // generation here instead handling it in CallLowering.
-static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
+static void collectFuncDecls(SPIRVGlobalRegistry *GR,
+                             SPIRV::ModuleAnalysisInfo *MAI) {
   for (auto &CU : GR->getFuncAllUses()) {
     for (auto &U : CU.second) {
       const MachineFunction *MF = U.first;
@@ -184,9 +187,9 @@ static void collectFuncDecls(SPIRVGlobalRegistry *GR, ModuleAnalysisInfo *MAI) {
         if (MI->getOpcode() == SPIRV::OpFunctionParameter) {
           Register GlobalReg = Register::index2VirtReg(MAI->getNextID());
           MAI->setRegisterAlias(MF, Reg, GlobalReg);
-          insertInstrToMS(GlobalReg, MI, MAI, MB_ExtFuncDecls);
+          insertInstrToMS(GlobalReg, MI, MAI, SPIRV::MB_ExtFuncDecls);
         } else {
-          collectDefInstr(Reg, MF, MAI, MB_ExtFuncDecls);
+          collectDefInstr(Reg, MF, MAI, SPIRV::MB_ExtFuncDecls);
         }
         MI = MI->getNextNode();
         Reg = MI->getOperand(0).getReg();
@@ -238,8 +241,9 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
 // True if there is an instruction in the MS list with all the same operands as
 // the given instruction has (after the given starting index).
 // TODO: maybe it needs to check Opcodes too.
-static bool findSameInstrInMS(const MachineInstr &A, ModuleSectionType MSType,
-                              ModuleAnalysisInfo &MAI,
+static bool findSameInstrInMS(const MachineInstr &A,
+                              SPIRV::ModuleSectionType MSType,
+                              SPIRV::ModuleAnalysisInfo &MAI,
                               unsigned StartOpIndex = 0) {
   for (const auto *B : MAI.MS[MSType]) {
     const unsigned NumAOps = A.getNumOperands();
@@ -294,8 +298,9 @@ void SPIRVModuleAnalysis::collectFuncNames(MachineInstr &MI,
 // Collect the given instruction in the specified MS. We assume global register
 // numbering has already occurred by this point. We can directly compare reg
 // arguments when detecting duplicates.
-static void collectOtherInstr(MachineInstr &MI, ModuleAnalysisInfo &MAI,
-                              ModuleSectionType MSType, bool Append = true) {
+static void collectOtherInstr(MachineInstr &MI, SPIRV::ModuleAnalysisInfo &MAI,
+                              SPIRV::ModuleSectionType MSType,
+                              bool Append = true) {
   MAI.setSkipEmission(&MI);
   if (findSameInstrInMS(MI, MSType, MAI))
     return; // Found a duplicate, so don't add it.
@@ -320,20 +325,20 @@ void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
           continue;
         const unsigned OpCode = MI.getOpcode();
         if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
-          collectOtherInstr(MI, MAI, MB_DebugNames);
+          collectOtherInstr(MI, MAI, SPIRV::MB_DebugNames);
         } else if (OpCode == SPIRV::OpEntryPoint) {
-          collectOtherInstr(MI, MAI, MB_EntryPoints);
+          collectOtherInstr(MI, MAI, SPIRV::MB_EntryPoints);
         } else if (TII->isDecorationInstr(MI)) {
-          collectOtherInstr(MI, MAI, MB_Annotations);
+          collectOtherInstr(MI, MAI, SPIRV::MB_Annotations);
           collectFuncNames(MI, *F);
         } else if (TII->isConstantInstr(MI)) {
           // Now OpSpecConstant*s are not in DT,
           // but they need to be collected anyway.
-          collectOtherInstr(MI, MAI, MB_TypeConstVars);
+          collectOtherInstr(MI, MAI, SPIRV::MB_TypeConstVars);
         } else if (OpCode == SPIRV::OpFunction) {
           collectFuncNames(MI, *F);
         } else if (OpCode == SPIRV::OpTypeForwardPointer) {
-          collectOtherInstr(MI, MAI, MB_TypeConstVars, false);
+          collectOtherInstr(MI, MAI, SPIRV::MB_TypeConstVars, false);
         }
       }
   }
@@ -372,7 +377,7 @@ void SPIRVModuleAnalysis::numberRegistersGlobally(const Module &M) {
 // Find OpIEqual and OpBranchConditional instructions originating from
 // OpSwitches, mark them skipped for emission. Also mark MBB skipped if it
 // contains only these instructions.
-static void processSwitches(const Module &M, ModuleAnalysisInfo &MAI,
+static void processSwitches(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
                             MachineModuleInfo *MMI) {
   DenseSet<Register> SwitchRegs;
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
@@ -728,7 +733,7 @@ void addInstrRequirements(const MachineInstr &MI, SPIRVRequirementHandler &Reqs,
   }
 }
 
-static void collectReqs(const Module &M, ModuleAnalysisInfo &MAI,
+static void collectReqs(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
                         MachineModuleInfo *MMI, const SPIRVSubtarget &ST) {
   // Collect requirements for existing instructions.
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
@@ -777,7 +782,7 @@ static void collectReqs(const Module &M, ModuleAnalysisInfo &MAI,
   }
 }
 
-struct ModuleAnalysisInfo SPIRVModuleAnalysis::MAI;
+struct SPIRV::ModuleAnalysisInfo SPIRVModuleAnalysis::MAI;
 
 void SPIRVModuleAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetPassConfig>();
@@ -811,7 +816,7 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
   processOtherInstrs(M);
 
   // If there are no entry points, we need the Linkage capability.
-  if (MAI.MS[MB_EntryPoints].empty())
+  if (MAI.MS[SPIRV::MB_EntryPoints].empty())
     MAI.Reqs.addCapability(Capability::Linkage);
 
   return false;

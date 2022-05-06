@@ -64,7 +64,7 @@ public:
 
   void outputMCInst(MCInst &Inst);
   void outputInstruction(const MachineInstr *MI);
-  void outputModuleSection(ModuleSectionType MSType);
+  void outputModuleSection(SPIRV::ModuleSectionType MSType);
   void outputGlobalRequirements();
   void outputEntryPoints();
   void outputDebugSourceAndStrings(const Module &M);
@@ -90,7 +90,7 @@ public:
   bool doInitialization(Module &M) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
-  ModuleAnalysisInfo *MAI;
+  SPIRV::ModuleAnalysisInfo *MAI;
 };
 } // namespace
 
@@ -243,7 +243,7 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   }
 }
 
-void SPIRVAsmPrinter::outputModuleSection(ModuleSectionType MSType) {
+void SPIRVAsmPrinter::outputModuleSection(SPIRV::ModuleSectionType MSType) {
   for (MachineInstr *MI : MAI->getMSInstrs(MSType))
     outputInstruction(MI);
 }
@@ -301,7 +301,7 @@ void SPIRVAsmPrinter::outputEntryPoints() {
   }
 
   // Output OpEntryPoints adding interface args to all of them.
-  for (MachineInstr *MI : MAI->getMSInstrs(MB_EntryPoints)) {
+  for (MachineInstr *MI : MAI->getMSInstrs(SPIRV::MB_EntryPoints)) {
     SPIRVMCInstLower MCInstLowering;
     MCInst TmpInst;
     MCInstLowering.lower(MI, TmpInst, MF, MAI);
@@ -340,8 +340,8 @@ void SPIRVAsmPrinter::outputGlobalRequirements() {
 void SPIRVAsmPrinter::outputExtFuncDecls() {
   // Insert OpFunctionEnd after each declaration.
   SmallVectorImpl<MachineInstr *>::iterator
-      I = MAI->getMSInstrs(MB_ExtFuncDecls).begin(),
-      E = MAI->getMSInstrs(MB_ExtFuncDecls).end();
+      I = MAI->getMSInstrs(SPIRV::MB_ExtFuncDecls).begin(),
+      E = MAI->getMSInstrs(SPIRV::MB_ExtFuncDecls).end();
   for (; I != E; ++I) {
     outputInstruction(*I);
     if ((I + 1) == E || (*(I + 1))->getOpcode() == SPIRV::OpFunction)
@@ -380,7 +380,7 @@ static unsigned encodeVecTypeHint(Type *Ty) {
 }
 
 static void addOpsFromMDNode(MDNode *MDN, MCInst &Inst,
-                             ModuleAnalysisInfo *MAI) {
+                             SPIRV::ModuleAnalysisInfo *MAI) {
   for (const MDOperand &MDOp : MDN->operands()) {
     if (auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp)) {
       Constant *C = CMeta->getValue();
@@ -441,7 +441,7 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
 }
 
 void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
-  outputModuleSection(MB_Annotations);
+  outputModuleSection(SPIRV::MB_Annotations);
   // Process llvm.global.annotations special global variable.
   for (auto F = M.global_begin(), E = M.global_end(); F != E; ++F) {
     if ((*F).getName() == "llvm.global.annotations") {
@@ -495,16 +495,16 @@ void SPIRVAsmPrinter::outputModuleSections() {
   // OpSourceContinued, without forward references.
   outputDebugSourceAndStrings(*M);
   // 7b. Debug: all OpName and all OpMemberName.
-  outputModuleSection(MB_DebugNames);
+  outputModuleSection(SPIRV::MB_DebugNames);
   // 7c. Debug: all OpModuleProcessed instructions.
-  outputModuleSection(MB_DebugModuleProcessed);
+  outputModuleSection(SPIRV::MB_DebugModuleProcessed);
   // 8. All annotation instructions (all decorations).
   outputAnnotations(*M);
   // 9. All type declarations (OpTypeXXX instructions), all constant
   // instructions, and all global variable declarations. This section is
   // the first section to allow use of: OpLine and OpNoLine debug information;
   // non-semantic instructions with OpExtInst.
-  outputModuleSection(MB_TypeConstVars);
+  outputModuleSection(SPIRV::MB_TypeConstVars);
   // 10. All function declarations (functions without a body).
   outputExtFuncDecls();
   // 11. All function definitions (functions with a body).
