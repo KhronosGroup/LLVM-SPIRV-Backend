@@ -57,6 +57,7 @@ struct ModuleAnalysisInfo {
   AddressingModel::AddressingModel Addr;
   SourceLanguage::SourceLanguage SrcLang;
   unsigned SrcLangVersion;
+  StringSet<> SrcExt;
   // Maps ExtInstSet to corresponding ID register.
   DenseMap<unsigned, Register> ExtInstSetMap;
   // Contains the list of all global OpVariables in the module.

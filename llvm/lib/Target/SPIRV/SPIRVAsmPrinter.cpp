@@ -249,6 +249,13 @@ void SPIRVAsmPrinter::outputModuleSection(SPIRV::ModuleSectionType MSType) {
 }
 
 void SPIRVAsmPrinter::outputDebugSourceAndStrings(const Module &M) {
+  // Output OpSourceExtensions.
+  for (auto &Str : MAI->SrcExt) {
+    MCInst Inst;
+    Inst.setOpcode(SPIRV::OpSourceExtension);
+    addStringImm(Str.first(), Inst);
+    outputMCInst(Inst);
+  }
   // Output OpSource.
   MCInst Inst;
   Inst.setOpcode(SPIRV::OpSource);
