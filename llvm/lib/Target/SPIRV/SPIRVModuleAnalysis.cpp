@@ -60,24 +60,47 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
   MAI.ExtInstSetMap.clear();
   MAI.Reqs.clear();
 
-  // TODO: determine memory model and source language from the configuratoin.
-  MAI.Mem = MemoryModel::OpenCL;
-  MAI.SrcLang = SourceLanguage::OpenCL_C;
-  unsigned PtrSize = ST->getPointerSize();
-  MAI.Addr = PtrSize == 32   ? AddressingModel::Physical32
-             : PtrSize == 64 ? AddressingModel::Physical64
-                             : AddressingModel::Logical;
+  // TODO: determine memory model from the configuratoin.
+  if (auto MemModel = M.getNamedMetadata("spirv.MemoryModel")) {
+    auto MemMD = MemModel->getOperand(0);
+    MAI.Addr = static_cast<AddressingModel::AddressingModel>(
+        getMetadataUInt(MemMD, 0));
+    MAI.Mem = static_cast<MemoryModel::MemoryModel>(getMetadataUInt(MemMD, 1));
+  } else {
+    MAI.Mem = MemoryModel::OpenCL;
+    unsigned PtrSize = ST->getPointerSize();
+    MAI.Addr = PtrSize == 32   ? AddressingModel::Physical32
+               : PtrSize == 64 ? AddressingModel::Physical64
+                               : AddressingModel::Logical;
+  }
+
   // Get the OpenCL version number from metadata.
   // TODO: support other source languages.
-  MAI.SrcLangVersion = 0;
   if (auto VerNode = M.getNamedMetadata("opencl.ocl.version")) {
-    // Construct version literal according to OpenCL 2.2 environment spec.
+    MAI.SrcLang = SourceLanguage::OpenCL_C;
+    // Construct version literal in accordance with SPIRV-LLVM-Translator.
+    // TODO: support multiple OCL version metadata.
+    assert(VerNode->getNumOperands() > 0 && "Invalid SPIR");
     auto VersionMD = VerNode->getOperand(0);
     unsigned MajorNum = getMetadataUInt(VersionMD, 0, 2);
     unsigned MinorNum = getMetadataUInt(VersionMD, 1);
     unsigned RevNum = getMetadataUInt(VersionMD, 2);
-    MAI.SrcLangVersion = 0 | (MajorNum << 16) | (MinorNum << 8) | RevNum;
+    MAI.SrcLangVersion = (MajorNum * 100 + MinorNum) * 1000 + RevNum;
+  } else {
+    MAI.SrcLang = SourceLanguage::Unknown;
+    MAI.SrcLangVersion = 0;
   }
+
+  if (auto ExtNode = M.getNamedMetadata("opencl.used.extensions")) {
+    for (unsigned I = 0, E = ExtNode->getNumOperands(); I != E; ++I) {
+      MDNode *MD = ExtNode->getOperand(I);
+      if (!MD || MD->getNumOperands() == 0)
+        continue;
+      for (unsigned J = 0, N = MD->getNumOperands(); J != N; ++J)
+        MAI.SrcExt.insert(cast<MDString>(MD->getOperand(J))->getString());
+    }
+  }
+
   // Update required capabilities for this memory model, addressing model and
   // source language.
   MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
