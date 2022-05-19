@@ -623,8 +623,10 @@ def OpAtomicCompareExchange: Op<230, (outs ID:$res),
                   (ins TYPE:$ty, ID:$ptr, ID:$sc, ID:$eq,
                    ID:$neq, ID:$val, ID:$cmp),
                   "$res = OpAtomicCompareExchange $ty $ptr $sc $eq $neq $val $cmp">;
-// TODO Currently the following deprecated opcode is missing:
-// OpAtomicCompareExchangeWeak
+def OpAtomicCompareExchangeWeak: Op<231, (outs ID:$res),
+                   (ins TYPE:$ty, ID:$ptr, ID:$sc, ID:$eq,
+                    ID:$neq, ID:$val, ID:$cmp),
+                   "$res = OpAtomicCompareExchangeWeak $ty $ptr $sc $eq $neq $val $cmp">;
 
 def OpAtomicIIncrement: AtomicOp<"OpAtomicIIncrement", 232>;
 def OpAtomicIDecrement: AtomicOp<"OpAtomicIDecrement", 233>;

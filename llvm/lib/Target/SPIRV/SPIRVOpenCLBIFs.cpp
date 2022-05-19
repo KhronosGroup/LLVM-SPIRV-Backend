@@ -840,15 +840,23 @@ static bool genAtomicCmpXchg(MachineIRBuilder &MIRBuilder, Register resVReg,
   Register tmp = !isCmpxchg ? MRI->createGenericVirtualRegister(desiredLLT) :
                               resVReg;
   GR->assignSPIRVTypeToVReg(spvDesiredTy, tmp, MIRBuilder.getMF());
-  auto MIB = MIRBuilder.buildInstr(OpAtomicCompareExchange)
-                 .addDef(tmp)
-                 .addUse(GR->getSPIRVTypeID(spvObjectTy))
-                 .addUse(objectPtr)
-                 .addUse(scopeReg)
-                 .addUse(memSemEqualReg)
-                 .addUse(memSemUnequalReg)
-                 .addUse(desired)
-                 .addUse(expected);
+
+  MachineInstrBuilder MIB;
+  if (isWeak)
+    MIB = MIRBuilder.buildInstr(OpAtomicCompareExchangeWeak);
+  else
+    MIB = MIRBuilder.buildInstr(OpAtomicCompareExchange);
+
+  MIB.addDef(tmp)
+      .addUse(
+          GR->getSPIRVTypeID(GR->getOrCreateSPIRVIntegerType(32, MIRBuilder)))
+      .addUse(objectPtr)
+      .addUse(scopeReg)
+      .addUse(memSemEqualReg)
+      .addUse(memSemUnequalReg)
+      .addUse(desired)
+      .addUse(expected);
+
   if (!isCmpxchg) {
     MIRBuilder.buildInstr(OpStore).addUse(expectedArg).addUse(tmp);
     MIRBuilder.buildICmp(CmpInst::ICMP_EQ, resVReg, tmp, expected);
