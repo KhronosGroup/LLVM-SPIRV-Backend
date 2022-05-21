@@ -1279,29 +1279,29 @@ bool SPIRVInstructionSelector::selectInsertVal(Register ResVReg,
                                                const SPIRVType *ResType,
                                                MachineInstr &I) const {
   MachineBasicBlock &BB = *I.getParent();
-  return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCompositeInsert))
-      .addDef(ResVReg)
-      .addUse(GR.getSPIRVTypeID(ResType))
-      // object to insert
-      .addUse(I.getOperand(3).getReg())
-      // composite to insert into
-      .addUse(I.getOperand(2).getReg())
-      // TODO: support arbitrary number of indices
-      .addImm(foldImm(I.getOperand(4), MRI))
-      .constrainAllUses(TII, TRI, RBI);
+  auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCompositeInsert))
+                 .addDef(ResVReg)
+                 .addUse(GR.getSPIRVTypeID(ResType))
+                 // object to insert
+                 .addUse(I.getOperand(3).getReg())
+                 // composite to insert into
+                 .addUse(I.getOperand(2).getReg());
+  for (unsigned i = 4; i < I.getNumOperands(); i++)
+    MIB.addImm(foldImm(I.getOperand(i), MRI));
+  return MIB.constrainAllUses(TII, TRI, RBI);
 }
 
 bool SPIRVInstructionSelector::selectExtractVal(Register ResVReg,
                                                 const SPIRVType *ResType,
                                                 MachineInstr &I) const {
   MachineBasicBlock &BB = *I.getParent();
-  return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCompositeExtract))
-      .addDef(ResVReg)
-      .addUse(GR.getSPIRVTypeID(ResType))
-      .addUse(I.getOperand(2).getReg())
-      // TODO: support arbitrary number of indices
-      .addImm(foldImm(I.getOperand(3), MRI))
-      .constrainAllUses(TII, TRI, RBI);
+  auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCompositeExtract))
+                 .addDef(ResVReg)
+                 .addUse(GR.getSPIRVTypeID(ResType))
+                 .addUse(I.getOperand(2).getReg());
+  for (unsigned i = 3; i < I.getNumOperands(); i++)
+    MIB.addImm(foldImm(I.getOperand(i), MRI));
+  return MIB.constrainAllUses(TII, TRI, RBI);
 }
 
 bool SPIRVInstructionSelector::selectInsertElt(Register ResVReg,

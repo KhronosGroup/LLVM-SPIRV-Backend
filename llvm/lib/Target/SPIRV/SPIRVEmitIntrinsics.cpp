@@ -307,10 +307,10 @@ Instruction *SPIRVEmitIntrinsics::visitStoreInst(StoreInst &I) {
   MachineMemOperand::Flags Flags =
       TLI->getStoreMemOperandFlags(I, F->getParent()->getDataLayout());
   auto *PtrOp = I.getPointerOperand();
-  auto *NewI =
-      IRB->CreateIntrinsic(Intrinsic::spv_store, {PtrOp->getType()},
-                           {I.getValueOperand(), PtrOp, IRB->getInt16(Flags),
-                            IRB->getInt8(I.getAlignment())});
+  auto *NewI = IRB->CreateIntrinsic(
+      Intrinsic::spv_store, {I.getValueOperand()->getType(), PtrOp->getType()},
+      {I.getValueOperand(), PtrOp, IRB->getInt16(Flags),
+       IRB->getInt8(I.getAlignment())});
   I.eraseFromParent();
   return NewI;
 }
@@ -357,14 +357,13 @@ void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
         // Check GetElementPtrConstantExpr case.
         (isa<ConstantExpr>(Op) && isa<GEPOperator>(Op))) {
       IRB->SetInsertPoint(I);
-      buildIntrWithMD(Intrinsic::spv_assign_type, {Op->getType()}, Op, Op);
+      if (isa<UndefValue>(Op) && Op->getType()->isAggregateType())
+        buildIntrWithMD(Intrinsic::spv_assign_type, {IRB->getInt32Ty()}, Op,
+                        UndefValue::get(IRB->getInt32Ty()));
+      else
+        buildIntrWithMD(Intrinsic::spv_assign_type, {Op->getType()}, Op, Op);
     }
   }
-  // StoreInst's operand type can be changed in the next stage so we need to
-  // store it in the set.
-  if (isa<StoreInst>(I) &&
-      cast<StoreInst>(I)->getValueOperand()->getType()->isAggregateType())
-    AggrStores.insert(I);
 }
 
 void SPIRVEmitIntrinsics::processInstrAfterVisit(Instruction *I) {
@@ -411,8 +410,20 @@ bool SPIRVEmitIntrinsics::runOnFunction(Function &Func) {
   AggrConsts.clear();
   AggrStores.clear();
 
-  IRB->SetInsertPoint(&Func.getEntryBlock().front());
+  // StoreInst's operand type can be changed during the next transformations,
+  // so we need to store it in the set. Also store already transformed types.
+  for (auto &I : instructions(Func)) {
+    StoreInst *SI = dyn_cast<StoreInst>(&I);
+    if (!SI)
+      continue;
+    Type *ElTy = SI->getValueOperand()->getType();
+    PointerType *PTy = cast<PointerType>(SI->getOperand(1)->getType());
+    if (ElTy->isAggregateType() || ElTy->isVectorTy() ||
+        !PTy->isOpaqueOrPointeeTypeMatches(ElTy))
+      AggrStores.insert(&I);
+  }
 
+  IRB->SetInsertPoint(&Func.getEntryBlock().front());
   for (auto &GV : Func.getParent()->globals())
     processGlobalValue(GV);
 
