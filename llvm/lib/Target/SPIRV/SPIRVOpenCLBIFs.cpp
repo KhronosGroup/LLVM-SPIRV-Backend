@@ -89,6 +89,13 @@ static StringMap<unsigned> OpenCLBIToOperationMap({
 #define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
   _SPIRV_OP(__spirv_Select, SelectSISCond)
   _SPIRV_OP(__spirv_SpecConstant, SpecConstant)
+  // CL 2.0 kernel enqueue builtins
+  _SPIRV_OP(retain_event, RetainEvent)
+  _SPIRV_OP(release_event, ReleaseEvent)
+  _SPIRV_OP(create_user_event, CreateUserEvent)
+  _SPIRV_OP(is_valid_event, IsValidEvent)
+  _SPIRV_OP(set_user_event_status, SetUserEventStatus)
+  _SPIRV_OP(capture_event_profiling_info, CaptureEventProfilingInfo)
   // CL 2.0 workgroup builtins
   _SPIRV_OP(group_all, GroupAll)
   _SPIRV_OP(group_any, GroupAny)
@@ -1447,6 +1454,20 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     return MIRBuilder.buildSelect(OrigRet, args[0], args[1], args[2]);
   case OpSpecConstant:
     return buildSpecConstant(MIRBuilder, opcode, OrigRet, retTy, args, GR);
+  case OpRetainEvent:
+  case OpReleaseEvent:
+    return MIRBuilder.buildInstr(opcode).addUse(args[0]);
+  case OpCreateUserEvent:
+    return MIRBuilder.buildInstr(opcode).addDef(OrigRet)
+        .addUse(GR->getSPIRVTypeID(retTy));
+  case OpIsValidEvent:
+    return MIRBuilder.buildInstr(opcode).addDef(OrigRet)
+        .addUse(GR->getSPIRVTypeID(retTy)).addUse(args[0]);
+  case OpSetUserEventStatus:
+    return MIRBuilder.buildInstr(opcode).addUse(args[0]).addUse(args[1]);
+  case OpCaptureEventProfilingInfo:
+    return MIRBuilder.buildInstr(opcode).addUse(args[0]).addUse(args[1])
+        .addUse(args[2]);
   case OpGroupAll:
   case OpGroupAny:
   case OpGroupBroadcast:
