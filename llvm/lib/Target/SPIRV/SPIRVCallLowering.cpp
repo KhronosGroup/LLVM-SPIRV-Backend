@@ -72,6 +72,47 @@ static ConstantInt *getConstInt(MDNode *MD, unsigned NumOp) {
   return nullptr;
 }
 
+// This code restores function args/retvalue types for composite cases
+// because the final types should still be aggregate whereas they're i32
+// during the translation to cope with aggregate flattening etc.
+static FunctionType *getOriginalFunctionType(const Function &F) {
+  auto *NamedMD = F.getParent()->getNamedMetadata("spv.cloned_funcs");
+  if (NamedMD == nullptr)
+    return F.getFunctionType();
+
+  Type *RetTy = F.getFunctionType()->getReturnType();
+  SmallVector<Type *, 4> ArgTypes;
+  for (auto &Arg : F.args())
+    ArgTypes.push_back(Arg.getType());
+
+  auto ThisFuncMDIt =
+      std::find_if(NamedMD->op_begin(), NamedMD->op_end(), [&F](MDNode *N) {
+        return isa<MDString>(N->getOperand(0)) &&
+               cast<MDString>(N->getOperand(0))->getString() == F.getName();
+      });
+  // TODO: probably one function can have numerous type mutations,
+  // so we should support this.
+  if (ThisFuncMDIt != NamedMD->op_end()) {
+    auto *ThisFuncMD = *ThisFuncMDIt;
+    MDNode *MD = dyn_cast<MDNode>(ThisFuncMD->getOperand(1));
+    assert(MD && "MDNode operand is expected");
+    ConstantInt *Const = getConstInt(MD, 0);
+    if (Const) {
+      auto *CMeta = dyn_cast<ConstantAsMetadata>(MD->getOperand(1));
+      assert(CMeta && "ConstantAsMetadata operand is expected");
+      assert(Const->getSExtValue() >= -1);
+      // Currently -1 indicates return value, greater values mean
+      // argument numbers.
+      if (Const->getSExtValue() == -1)
+        RetTy = CMeta->getType();
+      else
+        ArgTypes[Const->getSExtValue()] = CMeta->getType();
+    }
+  }
+
+  return FunctionType::get(RetTy, ArgTypes, F.isVarArg());
+}
+
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
@@ -80,6 +121,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   GR->setCurrentFunc(MIRBuilder.getMF());
 
   // Assign types and names to all args, and store their types for later.
+  FunctionType *FTy = getOriginalFunctionType(F);
   SmallVector<Register, 4> ArgTypeVRegs;
   if (VRegs.size() > 0) {
     unsigned i = 0;
@@ -88,8 +130,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       // auto *SpirvTy = GR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
       // SPIRVType *SpirvTy = GR->getSPIRVTypeForVReg(VRegs[i][0]);
       // if (!SpirvTy)
-      auto *SpirvTy =
-          GR->assignTypeToVReg(Arg.getType(), VRegs[i][0], MIRBuilder);
+      Type *ArgTy = FTy->getParamType(i);
+      auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder);
       ArgTypeVRegs.push_back(GR->getSPIRVTypeID(SpirvTy));
 
       if (Arg.hasName())
@@ -155,41 +197,6 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
   MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
 
-  auto *FTy = F.getFunctionType();
-
-  // This code restores function args/retvalue types for composite cases
-  // because the final types should still be aggregate whereas they're i32
-  // during the translation to cope with aggregate flattening etc.
-  auto *NamedMD = F.getParent()->getNamedMetadata("spv.cloned_funcs");
-  if (NamedMD) {
-    Type *RetTy = F.getFunctionType()->getReturnType();
-    SmallVector<Type *, 4> ArgTypes;
-    auto ThisFuncMDIt =
-        std::find_if(NamedMD->op_begin(), NamedMD->op_end(), [&F](MDNode *N) {
-          return isa<MDString>(N->getOperand(0)) &&
-                 cast<MDString>(N->getOperand(0))->getString() == F.getName();
-        });
-
-    if (ThisFuncMDIt != NamedMD->op_end()) {
-      auto *ThisFuncMD = *ThisFuncMDIt;
-      MDNode *MD = dyn_cast<MDNode>(ThisFuncMD->getOperand(1));
-      assert(MD && "MDNode operand is expected");
-      ConstantInt *Const = getConstInt(MD, 0);
-      // TODO: currently -1 indicates return value, support this types
-      // renaming for arguments as well.
-      if (Const && Const->getSExtValue() == -1) {
-        auto *CMeta = dyn_cast<ConstantAsMetadata>(MD->getOperand(1));
-        assert(CMeta && "ConstantAsMetadata operand is expected");
-        RetTy = CMeta->getType();
-      }
-    }
-
-    for (auto &Arg : F.args())
-      ArgTypes.push_back(Arg.getType());
-
-    FTy = FunctionType::get(RetTy, ArgTypes, F.isVarArg());
-  }
-
   auto FuncTy = GR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
 
   // Build the OpTypeFunction declaring it.
@@ -238,6 +245,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   auto FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
   auto &MF = MIRBuilder.getMF();
   GR->setCurrentFunc(MF);
+  FunctionType *FTy = nullptr;
 
   size_t n;
   int Status;
@@ -301,6 +309,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         FunctionLoweringInfo FuncInfo;
         lowerFormalArguments(FirstBlockBuilder, *CF, VRegArgs, FuncInfo);
       }
+      FTy = getOriginalFunctionType(*CF);
     }
 
     // Make sure there's a valid return reg, even for functions returning void.
@@ -308,7 +317,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
     }
     SPIRVType *RetType =
-        GR->assignTypeToVReg(Info.OrigRet.Ty, ResVReg, MIRBuilder);
+        GR->assignTypeToVReg(FTy->getReturnType(), ResVReg, MIRBuilder);
 
     // Emit the OpFunctionCall and its args.
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
