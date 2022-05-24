@@ -75,7 +75,7 @@ static ConstantInt *getConstInt(MDNode *MD, unsigned NumOp) {
 // This code restores function args/retvalue types for composite cases
 // because the final types should still be aggregate whereas they're i32
 // during the translation to cope with aggregate flattening etc.
-static FunctionType *getFuncType(const Function &F) {
+static FunctionType *getOriginalFunctionType(const Function &F) {
   auto *NamedMD = F.getParent()->getNamedMetadata("spv.cloned_funcs");
   if (NamedMD == nullptr)
     return F.getFunctionType();
@@ -121,7 +121,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   GR->setCurrentFunc(MIRBuilder.getMF());
 
   // Assign types and names to all args, and store their types for later.
-  FunctionType *FTy = getFuncType(F);
+  FunctionType *FTy = getOriginalFunctionType(F);
   SmallVector<Register, 4> ArgTypeVRegs;
   if (VRegs.size() > 0) {
     unsigned i = 0;
@@ -309,7 +309,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         FunctionLoweringInfo FuncInfo;
         lowerFormalArguments(FirstBlockBuilder, *CF, VRegArgs, FuncInfo);
       }
-      FTy = getFuncType(*CF);
+      FTy = getOriginalFunctionType(*CF);
     }
 
     // Make sure there's a valid return reg, even for functions returning void.
