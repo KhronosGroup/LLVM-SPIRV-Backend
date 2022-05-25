@@ -887,6 +887,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
       return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, 0, Arrayed, 0, 0,
                                     ImageFormat::Unknown, AccessQual);
     }
+  } else if (TypeName.startswith("clk_event_t")) {
+    return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
   } else if (TypeName.startswith("sampler_t")) {
     return getOrCreateOpTypeSampler(MIRBuilder);
   } else if (TypeName.startswith("pipe")) {
@@ -960,7 +962,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(
     const StructType *Ty, MachineIRBuilder &MIRBuilder,
     AQ::AccessQualifier AccessQual) {
   const StringRef Name = Ty->getName();
-  assert(Name.startswith("spirv.") && "CL types should start with 'opencl.'");
+  assert(Name.startswith("spirv.") && "CL types should start with 'spirv.'");
   auto TypeName = Name.substr(strlen("spirv."));
 
   if (TypeName.startswith("Image.")) {
