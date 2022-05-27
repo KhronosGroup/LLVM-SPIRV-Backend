@@ -19,6 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 
 #include <type_traits>
 
@@ -249,7 +250,8 @@ class SPIRVGeneralDuplicatesTracker {
                          SPIRVReg2EntryTy &Reg2Entry);
 
 public:
-  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph);
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph,
+                      MachineModuleInfo *MMI);
 
   void add(const Type *T, const MachineFunction *MF, Register R) {
     TT.add(T, MF, R);

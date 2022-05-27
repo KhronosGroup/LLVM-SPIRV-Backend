@@ -31,7 +31,8 @@ void SPIRVGeneralDuplicatesTracker::prebuildReg2Entry(
 }
 
 void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
-    std::vector<SPIRV::DTSortableEntry *> &Graph) {
+    std::vector<SPIRV::DTSortableEntry *> &Graph,
+    MachineModuleInfo *MMI = nullptr) {
   SPIRVReg2EntryTy Reg2Entry;
   prebuildReg2Entry(TT, Reg2Entry);
   prebuildReg2Entry(CT, Reg2Entry);
@@ -41,7 +42,7 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
   prebuildReg2Entry(ST, Reg2Entry);
 
   for (auto &Op2E : Reg2Entry) {
-    auto *E = Op2E.second;
+    SPIRV::DTSortableEntry *E = Op2E.second;
     Graph.push_back(E);
     for (auto &U : *E) {
       const MachineRegisterInfo &MRI = U.first->getRegInfo();
@@ -64,7 +65,30 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
         MachineInstr *Next = MI->getNextNode();
         if (Next && (Next->getOpcode() == SPIRV::OpFunction ||
                      Next->getOpcode() == SPIRV::OpFunctionParameter)) {
-          Reg2Entry[&Next->getOperand(0)]->addDep(E);
+          E->addDep(Reg2Entry[&Next->getOperand(0)]);
+        }
+      }
+    }
+  }
+
+  if (MMI) {
+    const Module *M = MMI->getModule();
+    for (auto F = M->begin(), E = M->end(); F != E; ++F) {
+      const MachineFunction *MF = MMI->getMachineFunction(*F);
+      if (!MF)
+        continue;
+      for (const MachineBasicBlock &MBB : *MF) {
+        for (const MachineInstr &CMI : MBB) {
+          MachineInstr &MI = const_cast<MachineInstr &>(CMI);
+          MI.dump();
+          if (MI.getNumExplicitDefs() > 0 &&
+              Reg2Entry.count(&MI.getOperand(0))) {
+            dbgs() << "\t[";
+            for (SPIRV::DTSortableEntry *D :
+                 Reg2Entry.lookup(&MI.getOperand(0))->getDeps())
+              dbgs() << Register::virtReg2Index(D->lookup(MF)) << ", ";
+            dbgs() << "]\n";
+          }
         }
       }
     }

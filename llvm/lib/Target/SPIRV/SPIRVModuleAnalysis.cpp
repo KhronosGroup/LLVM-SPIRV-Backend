@@ -30,6 +30,11 @@ using namespace llvm;
 
 #define DEBUG_TYPE "spirv-module-analysis"
 
+static cl::opt<bool>
+    SPVDumpDeps("spv-dump-deps",
+                cl::desc("Dump MIR with SPIR-V dependencies info"),
+                cl::Optional, cl::init(false));
+
 char llvm::SPIRVModuleAnalysis::ID = 0;
 
 namespace llvm {
@@ -131,35 +136,44 @@ static void collectDefInstr(Register Reg, const MachineFunction *MF,
 void SPIRVModuleAnalysis::collectGlobalEntities(
     const std::vector<SPIRV::DTSortableEntry *> &DepsGraph,
     SPIRV::ModuleSectionType MSType,
-    std::function<bool(const SPIRV::DTSortableEntry *)> Pred) {
+    std::function<bool(const SPIRV::DTSortableEntry *)> Pred,
+    bool UsePreOrder = false) {
   DenseSet<const SPIRV::DTSortableEntry *> Visited;
   for (const auto *E : DepsGraph) {
     std::function<void(const SPIRV::DTSortableEntry *)> RecHoistUtil;
     // NOTE: here we prefer recursive approach over iterative because
     // we don't expect depchains long enough to cause SO.
-    RecHoistUtil = [MSType, &Visited, &Pred,
+    RecHoistUtil = [MSType, UsePreOrder, &Visited, &Pred,
                     &RecHoistUtil](const SPIRV::DTSortableEntry *E) {
-      if (Visited.count(E))
+      if (Visited.count(E) || !Pred(E))
         return;
       Visited.insert(E);
-      for (auto *S : E->getDeps())
-        RecHoistUtil(S);
 
       // Traversing deps graph in post-order allows us to get rid of
-      // register aliases preprocessing
+      // register aliases preprocessing.
+      // But pre-order is required for correct processing of function
+      // declaration and arguments processing.
+      if (!UsePreOrder)
+        for (auto *S : E->getDeps())
+          RecHoistUtil(S);
+
       Register GlobalReg = Register::index2VirtReg(MAI.getNextID());
       bool IsFirst = true;
       for (auto &U : *E) {
         const MachineFunction *MF = U.first;
         Register Reg = U.second;
         MAI.setRegisterAlias(MF, Reg, GlobalReg);
-        if (Pred(E) || !MF->getRegInfo().getUniqueVRegDef(Reg))
+        if (!MF->getRegInfo().getUniqueVRegDef(Reg))
           continue;
         collectDefInstr(Reg, MF, &MAI, MSType, IsFirst);
         IsFirst = false;
         if (E->getIsGV())
           MAI.GlobalVarList.push_back(MF->getRegInfo().getUniqueVRegDef(Reg));
       }
+
+      if (UsePreOrder)
+        for (auto *S : E->getDeps())
+          RecHoistUtil(S);
     };
     RecHoistUtil(E);
   }
@@ -171,11 +185,12 @@ void SPIRVModuleAnalysis::collectGlobalEntities(
 // instructions.
 void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
   std::vector<SPIRV::DTSortableEntry *> DepsGraph;
-  GR->buildDepsGraph(DepsGraph);
+
+  GR->buildDepsGraph(DepsGraph, SPVDumpDeps ? MMI : nullptr);
 
   collectGlobalEntities(
       DepsGraph, SPIRV::MB_TypeConstVars,
-      [](const SPIRV::DTSortableEntry *E) { return E->getIsFunc(); });
+      [](const SPIRV::DTSortableEntry *E) { return !E->getIsFunc(); });
 
   for (auto F = M.begin(), E = M.end(); F != E; ++F) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
@@ -200,7 +215,7 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
 
   collectGlobalEntities(
       DepsGraph, SPIRV::MB_ExtFuncDecls,
-      [](const SPIRV::DTSortableEntry *E) { return !E->getIsFunc(); });
+      [](const SPIRV::DTSortableEntry *E) { return E->getIsFunc(); }, true);
 }
 
 // True if there is an instruction in the MS list with all the same operands as

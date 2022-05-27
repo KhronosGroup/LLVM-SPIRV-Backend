@@ -138,7 +138,8 @@ private:
   void collectGlobalEntities(
       const std::vector<SPIRV::DTSortableEntry *> &DepsGraph,
       SPIRV::ModuleSectionType MSType,
-      std::function<bool(const SPIRV::DTSortableEntry *)> Pred);
+      std::function<bool(const SPIRV::DTSortableEntry *)> Pred,
+      bool UsePreOrder);
   void processDefInstrs(const Module &M);
   void collectFuncNames(MachineInstr &MI, const Function &F);
   void processOtherInstrs(const Module &M);

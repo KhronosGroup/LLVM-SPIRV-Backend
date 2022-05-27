@@ -95,8 +95,9 @@ public:
     return DT.getFuncs()->getAllUses();
   }
 
-  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph) {
-    DT.buildDepsGraph(Graph);
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph,
+                      MachineModuleInfo *MMI = nullptr) {
+    DT.buildDepsGraph(Graph, MMI);
   }
 
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
