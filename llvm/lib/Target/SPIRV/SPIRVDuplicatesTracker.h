@@ -19,6 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 
 #include <type_traits>
 
@@ -46,7 +47,8 @@ public:
   void setIsFunc(bool V) { Flags.IsFunc = V; }
   void setIsGV(bool V) { Flags.IsGV = V; }
 
-  SmallVector<DTSortableEntry *, 2> &getDeps() { return Deps; }
+  const SmallVector<DTSortableEntry *, 2> &getDeps() const { return Deps; }
+  void addDep(DTSortableEntry *E) { Deps.push_back(E); }
 };
 
 struct SpecialTypeDescriptor {
@@ -184,6 +186,9 @@ public:
     Storage[V][MF] = R;
     if (std::is_same<Function,
                      typename std::remove_const<
+                         typename std::remove_pointer<KeyTy>::type>::type>() ||
+        std::is_same<Argument,
+                     typename std::remove_const<
                          typename std::remove_pointer<KeyTy>::type>::type>())
       Storage[V].setIsFunc(true);
     if (std::is_same<GlobalVariable,
@@ -229,6 +234,7 @@ class SPIRVGeneralDuplicatesTracker {
   SPIRVDuplicatesTracker<Constant> CT;
   SPIRVDuplicatesTracker<GlobalVariable> GT;
   SPIRVDuplicatesTracker<Function> FT;
+  SPIRVDuplicatesTracker<Argument> AT;
   SPIRVDuplicatesTracker<SPIRV::SpecialTypeDescriptor> ST;
 
   // NOTE: using MOs instead of regs to get rid of MF dependency to be able
@@ -244,7 +250,8 @@ class SPIRVGeneralDuplicatesTracker {
                          SPIRVReg2EntryTy &Reg2Entry);
 
 public:
-  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph);
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph,
+                      MachineModuleInfo *MMI);
 
   void add(const Type *T, const MachineFunction *MF, Register R) {
     TT.add(T, MF, R);
@@ -260,6 +267,10 @@ public:
 
   void add(const Function *F, const MachineFunction *MF, Register R) {
     FT.add(F, MF, R);
+  }
+
+  void add(const Argument *Arg, const MachineFunction *MF, Register R) {
+    AT.add(Arg, MF, R);
   }
 
   void add(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,
@@ -281,6 +292,10 @@ public:
 
   bool find(const Function *F, const MachineFunction *MF, Register &R) {
     return FT.find(const_cast<Function *>(F), MF, R);
+  }
+
+  bool find(const Argument *Arg, const MachineFunction *MF, Register &R) {
+    return AT.find(const_cast<Argument *>(Arg), MF, R);
   }
 
   bool find(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,

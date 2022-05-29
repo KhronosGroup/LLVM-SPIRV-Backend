@@ -75,6 +75,10 @@ public:
     DT.add(F, MF, R);
   }
 
+  void add(const Argument *Arg, MachineFunction *MF, Register R) {
+    DT.add(Arg, MF, R);
+  }
+
   bool find(const Constant *C, MachineFunction *MF, Register &R) {
     return DT.find(C, MF, R);
   }
@@ -91,8 +95,9 @@ public:
     return DT.getFuncs()->getAllUses();
   }
 
-  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph) {
-    DT.buildDepsGraph(Graph);
+  void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph,
+                      MachineModuleInfo *MMI = nullptr) {
+    DT.buildDepsGraph(Graph, MMI);
   }
 
   // This interface is for walking the map in GlobalTypesAndRegNumPass.
