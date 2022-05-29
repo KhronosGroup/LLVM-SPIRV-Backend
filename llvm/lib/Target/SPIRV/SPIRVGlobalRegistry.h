@@ -252,6 +252,8 @@ public:
                                 unsigned FilerMode,
                                 MachineIRBuilder &MIRBuilder,
                                 SPIRVType *SpvType);
+  Register getOrCreateUndef(MachineInstr &I, SPIRVType *SpvType,
+                            const SPIRVInstrInfo &TII);
   Register
   buildGlobalVariable(Register Reg, SPIRVType *BaseType, StringRef Name,
                       const GlobalValue *GV, StorageClass::StorageClass Storage,
@@ -265,6 +267,8 @@ public:
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth, MachineInstr &I,
                                          const SPIRVInstrInfo &TII);
   SPIRVType *getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder);
+  SPIRVType *getOrCreateSPIRVBoolType(MachineInstr &I,
+                                      const SPIRVInstrInfo &TII);
   SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
                                         unsigned NumElements,
                                         MachineIRBuilder &MIRBuilder);

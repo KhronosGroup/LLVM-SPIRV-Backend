@@ -1059,6 +1059,20 @@ SPIRVGlobalRegistry::getOrCreateSPIRVBoolType(MachineIRBuilder &MIRBuilder) {
       MIRBuilder);
 }
 
+SPIRVType *
+SPIRVGlobalRegistry::getOrCreateSPIRVBoolType(MachineInstr &I,
+                                              const SPIRVInstrInfo &TII) {
+  Type *LLVMTy = IntegerType::get(CurMF->getFunction().getContext(), 1);
+  Register Reg;
+  if (DT.find(LLVMTy, CurMF, Reg)) {
+    return getSPIRVTypeForVReg(Reg);
+  }
+  MachineBasicBlock &BB = *I.getParent();
+  auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeBool))
+                 .addDef(createTypeVReg(CurMF->getRegInfo()));
+  return restOfCreateSPIRVType(LLVMTy, MIB);
+}
+
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVVectorType(
     SPIRVType *BaseType, unsigned NumElements, MachineIRBuilder &MIRBuilder) {
   return getOrCreateSPIRVType(
@@ -1109,4 +1123,31 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
                  .addImm(static_cast<uint32_t>(SC))
                  .addUse(getSPIRVTypeID(BaseType));
   return restOfCreateSPIRVType(LLVMTy, MIB);
+}
+
+Register SPIRVGlobalRegistry::getOrCreateUndef(MachineInstr &I,
+                                               SPIRVType *SpvType,
+                                               const SPIRVInstrInfo &TII) {
+  assert(SpvType);
+  const Type *LLVMTy = getTypeForSPIRVType(SpvType);
+  assert(LLVMTy);
+  Register Res;
+  // Find a constant in DT or build a new one.
+  UndefValue *UV = UndefValue::get(const_cast<Type *>(LLVMTy));
+  if (DT.find(UV, CurMF, Res))
+    return Res;
+
+  LLT LLTy = LLT::scalar(32);
+  Res = CurMF->getRegInfo().createGenericVirtualRegister(LLTy);
+  assignSPIRVTypeToVReg(SpvType, Res, *CurMF);
+  DT.add(UV, CurMF, Res);
+
+  MachineInstrBuilder MIB;
+  MIB = BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(SPIRV::OpUndef))
+            .addDef(Res)
+            .addUse(getSPIRVTypeID(SpvType));
+  const auto &ST = CurMF->getSubtarget();
+  constrainSelectedInstRegOperands(*MIB, *ST.getInstrInfo(),
+                                   *ST.getRegisterInfo(), *ST.getRegBankInfo());
+  return Res;
 }

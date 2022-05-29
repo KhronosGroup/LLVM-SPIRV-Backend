@@ -189,6 +189,23 @@ getMemSemanticsForStorageClass(StorageClass::StorageClass sc) {
   }
 }
 
+MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
+  switch (Ord) {
+  case AtomicOrdering::Acquire:
+    return MemorySemantics::Acquire;
+  case AtomicOrdering::Release:
+    return MemorySemantics::Release;
+  case AtomicOrdering::AcquireRelease:
+    return MemorySemantics::AcquireRelease;
+  case AtomicOrdering::SequentiallyConsistent:
+    return MemorySemantics::SequentiallyConsistent;
+  case AtomicOrdering::Unordered:
+  case AtomicOrdering::Monotonic:
+  case AtomicOrdering::NotAtomic:
+    return MemorySemantics::None;
+  }
+}
+
 bool constrainRegOperands(MachineInstrBuilder &MIB, MachineFunction *MF) {
   if (!MF)
     MF = MIB->getMF();

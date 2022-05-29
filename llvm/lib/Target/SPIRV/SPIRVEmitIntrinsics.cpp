@@ -87,6 +87,7 @@ public:
   Instruction *visitLoadInst(LoadInst &I);
   Instruction *visitStoreInst(StoreInst &I);
   Instruction *visitAllocaInst(AllocaInst &I);
+  Instruction *visitAtomicCmpXchgInst(AtomicCmpXchgInst &I);
   bool runOnFunction(Function &F) override;
 };
 } // namespace
@@ -103,7 +104,7 @@ static inline bool isAssignTypeInstr(const Instruction *I) {
 
 static bool isMemInstrToReplace(Instruction *I) {
   return isa<StoreInst>(I) || isa<LoadInst>(I) || isa<InsertValueInst>(I) ||
-         isa<ExtractValueInst>(I);
+         isa<ExtractValueInst>(I) || isa<AtomicCmpXchgInst>(I);
 }
 
 static bool isAggrToReplace(const Value *V) {
@@ -318,6 +319,20 @@ Instruction *SPIRVEmitIntrinsics::visitStoreInst(StoreInst &I) {
 Instruction *SPIRVEmitIntrinsics::visitAllocaInst(AllocaInst &I) {
   TrackConstants = false;
   return &I;
+}
+
+Instruction *SPIRVEmitIntrinsics::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I) {
+  assert(I.getType()->isAggregateType() && "Aggregate result is expected");
+  SmallVector<Value *> Args;
+  for (auto &Op : I.operands())
+    Args.push_back(Op);
+  Args.push_back(IRB->getInt32(I.getSyncScopeID()));
+  Args.push_back(IRB->getInt32(getMemSemantics(I.getSuccessOrdering())));
+  Args.push_back(IRB->getInt32(getMemSemantics(I.getFailureOrdering())));
+  auto *NewI = IRB->CreateIntrinsic(Intrinsic::spv_cmpxchg,
+                                    {I.getPointerOperand()->getType()}, {Args});
+  replaceMemInstrUses(&I, NewI);
+  return NewI;
 }
 
 void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
