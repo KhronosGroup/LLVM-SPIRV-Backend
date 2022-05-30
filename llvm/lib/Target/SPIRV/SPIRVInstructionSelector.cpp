@@ -614,23 +614,6 @@ bool SPIRVInstructionSelector::selectUnOp(Register ResVReg,
                            Opcode);
 }
 
-static MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
-  switch (Ord) {
-  case AtomicOrdering::Acquire:
-    return MemorySemantics::Acquire;
-  case AtomicOrdering::Release:
-    return MemorySemantics::Release;
-  case AtomicOrdering::AcquireRelease:
-    return MemorySemantics::AcquireRelease;
-  case AtomicOrdering::SequentiallyConsistent:
-    return MemorySemantics::SequentiallyConsistent;
-  case AtomicOrdering::Unordered:
-  case AtomicOrdering::Monotonic:
-  case AtomicOrdering::NotAtomic:
-    return MemorySemantics::None;
-  }
-}
-
 static Scope::Scope getScope(SyncScope::ID Ord) {
   switch (Ord) {
   case SyncScope::SingleThread:
@@ -773,36 +756,71 @@ bool SPIRVInstructionSelector::selectFence(MachineInstr &I) const {
 bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
                                                    const SPIRVType *ResType,
                                                    MachineInstr &I) const {
-  assert(I.hasOneMemOperand());
-  const MachineMemOperand *MemOp = *I.memoperands_begin();
-  Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
-  Register ScopeReg = buildI32Constant(Scope, I);
-
+  Register ScopeReg;
+  Register MemSemEqReg;
+  Register MemSemNeqReg;
   Register Ptr = I.getOperand(2).getReg();
+  if (I.getOpcode() != TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS) {
+    assert(I.hasOneMemOperand());
+    const MachineMemOperand *MemOp = *I.memoperands_begin();
+    Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
+    ScopeReg = buildI32Constant(Scope, I);
+
+    unsigned ScSem =
+        getMemSemanticsForStorageClass(GR.getPointerStorageClass(Ptr));
+
+    unsigned MemSemEq = getMemSemantics(MemOp->getSuccessOrdering()) | ScSem;
+    MemSemEqReg = buildI32Constant(MemSemEq, I);
+
+    unsigned MemSemNeq = getMemSemantics(MemOp->getFailureOrdering()) | ScSem;
+    MemSemNeqReg =
+        MemSemEq == MemSemNeq ? MemSemEqReg : buildI32Constant(MemSemNeq, I);
+  } else {
+    ScopeReg = I.getOperand(5).getReg();
+    MemSemEqReg = I.getOperand(6).getReg();
+    MemSemNeqReg = I.getOperand(7).getReg();
+  }
+
   Register Cmp = I.getOperand(3).getReg();
   Register Val = I.getOperand(4).getReg();
-
   SPIRVType *SpvValTy = GR.getSPIRVTypeForVReg(Val);
-  unsigned ScSem =
-      getMemSemanticsForStorageClass(GR.getPointerStorageClass(Ptr));
-
-  unsigned MemSemEq = getMemSemantics(MemOp->getSuccessOrdering()) | ScSem;
-  Register MemSemEqReg = buildI32Constant(MemSemEq, I);
-
-  unsigned MemSemNeq = getMemSemantics(MemOp->getFailureOrdering()) | ScSem;
-  Register MemSemNeqReg =
-      MemSemEq == MemSemNeq ? MemSemEqReg : buildI32Constant(MemSemNeq, I);
+  Register ACmpRes = MRI->createVirtualRegister(&SPIRV::IDRegClass);
   const DebugLoc &DL = I.getDebugLoc();
-  return BuildMI(*I.getParent(), I, DL, TII.get(SPIRV::OpAtomicCompareExchange))
-      .addDef(ResVReg)
-      .addUse(GR.getSPIRVTypeID(SpvValTy))
-      .addUse(Ptr)
-      .addUse(ScopeReg)
-      .addUse(MemSemEqReg)
-      .addUse(MemSemNeqReg)
-      .addUse(Val)
-      .addUse(Cmp)
-      .constrainAllUses(TII, TRI, RBI);
+  bool Result =
+      BuildMI(*I.getParent(), I, DL, TII.get(SPIRV::OpAtomicCompareExchange))
+          .addDef(ACmpRes)
+          .addUse(GR.getSPIRVTypeID(SpvValTy))
+          .addUse(Ptr)
+          .addUse(ScopeReg)
+          .addUse(MemSemEqReg)
+          .addUse(MemSemNeqReg)
+          .addUse(Val)
+          .addUse(Cmp)
+          .constrainAllUses(TII, TRI, RBI);
+  Register CmpSuccReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  SPIRVType *BoolTy = GR.getOrCreateSPIRVBoolType(I, TII);
+  Result |= BuildMI(*I.getParent(), I, DL, TII.get(SPIRV::OpIEqual))
+                .addDef(CmpSuccReg)
+                .addUse(GR.getSPIRVTypeID(BoolTy))
+                .addUse(ACmpRes)
+                .addUse(Cmp)
+                .constrainAllUses(TII, TRI, RBI);
+  Register TmpReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+  Result |= BuildMI(*I.getParent(), I, DL, TII.get(SPIRV::OpCompositeInsert))
+                .addDef(TmpReg)
+                .addUse(GR.getSPIRVTypeID(ResType))
+                .addUse(ACmpRes)
+                .addUse(GR.getOrCreateUndef(I, ResType, TII))
+                .addImm(0)
+                .constrainAllUses(TII, TRI, RBI);
+  Result |= BuildMI(*I.getParent(), I, DL, TII.get(SPIRV::OpCompositeInsert))
+                .addDef(ResVReg)
+                .addUse(GR.getSPIRVTypeID(ResType))
+                .addUse(CmpSuccReg)
+                .addUse(TmpReg)
+                .addImm(1)
+                .constrainAllUses(TII, TRI, RBI);
+  return Result;
 }
 
 static bool isGenericCastablePtr(StorageClass::StorageClass Sc) {
@@ -1427,6 +1445,9 @@ bool SPIRVInstructionSelector::selectIntrinsic(Register ResVReg,
     }
     return MIB.constrainAllUses(TII, TRI, RBI);
   } break;
+  case Intrinsic::spv_cmpxchg:
+    return selectAtomicCmpXchg(ResVReg, ResType, I);
+    break;
   default:
     llvm_unreachable("Intrinsic selection not implemented");
   }
