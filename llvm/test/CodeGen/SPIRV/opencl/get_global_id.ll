@@ -40,7 +40,7 @@ define i64 @foo(i32 %dim) {
 ; CHECK-DAG: [[PTR:%.+]] = OpTypePointer Input [[VEC]]
 ; CHECK-DAG: [[FN:%.+]] = OpTypeFunction [[I64]] [[I32]]
 ; CHECK-DAG: [[GET_GLOBAL_ID]] = OpVariable [[PTR]] Input
-; CHECK-DAG: [[ZERO:%.+]] = OpConstant [[I64]] 0
+; CHECK-DAG: [[ZERO:%.+]] = OpConstantNull [[I64]]
 ; CHECK-DAG: [[THREE:%.+]] = OpConstant [[I32]] 3
 
 ; Functions:

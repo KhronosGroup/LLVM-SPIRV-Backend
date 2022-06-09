@@ -38,13 +38,6 @@ public:
 };
 } // namespace
 
-static bool isSpvIntrinsic(MachineInstr &MI, Intrinsic::ID IntrinsicID) {
-  if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
-      MI.getIntrinsicID() == IntrinsicID)
-    return true;
-  return false;
-}
-
 static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
   MachineRegisterInfo &MRI = MF.getRegInfo();
   DenseMap<MachineInstr *, Register> RegsAlreadyAddedToDT;

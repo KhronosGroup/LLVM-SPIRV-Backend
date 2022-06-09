@@ -237,6 +237,13 @@ uint64_t getIConstVal(Register ConstReg, const MachineRegisterInfo *MRI) {
   return MI->getOperand(1).getCImm()->getValue().getZExtValue();
 }
 
+bool isSpvIntrinsic(MachineInstr &MI, Intrinsic::ID IntrinsicID) {
+  if (MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS &&
+      MI.getIntrinsicID() == IntrinsicID)
+    return true;
+  return false;
+}
+
 Type *getMDOperandAsType(const MDNode *N, unsigned I) {
   return cast<ValueAsMetadata>(N->getOperand(I))->getType();
 }
