@@ -852,13 +852,15 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(Register ResVReg,
     Register NewReg = I.getOperand(1).getReg();
     MachineBasicBlock &BB = *I.getParent();
     SPIRVType *SpvBaseTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
-    ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII, StorageClass::Generic);
-    bool Result = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
-                   .addDef(ResVReg)
-                   .addUse(GR.getSPIRVTypeID(ResType))
-                   .addImm(Opcode::PtrCastToGeneric)
-                   .addUse(NewReg)
-                   .constrainAllUses(TII, TRI, RBI);
+    ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII,
+                                             StorageClass::Generic);
+    bool Result =
+        BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
+            .addDef(ResVReg)
+            .addUse(GR.getSPIRVTypeID(ResType))
+            .addImm(Opcode::PtrCastToGeneric)
+            .addUse(NewReg)
+            .constrainAllUses(TII, TRI, RBI);
     return Result;
   }
   namespace SC = StorageClass;
@@ -1574,14 +1576,15 @@ bool SPIRVInstructionSelector::selectGlobalValue(
       Register NewReg = ResVReg;
       GR.add(ConstVal, GR.CurMF, NewReg);
       return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpConstantNull))
-           .addDef(NewReg)
-           .addUse(GR.getSPIRVTypeID(ResType))
-           .constrainAllUses(TII, TRI, RBI);
+          .addDef(NewReg)
+          .addUse(GR.getSPIRVTypeID(ResType))
+          .constrainAllUses(TII, TRI, RBI);
     }
     assert(NewReg != ResVReg);
     return BuildMI(BB, I, I.getDebugLoc(), TII.get(TargetOpcode::COPY))
         .addDef(ResVReg)
-        .addUse(NewReg).constrainAllUses(TII, TRI, RBI); 
+        .addUse(NewReg)
+        .constrainAllUses(TII, TRI, RBI);
   }
   auto GlobalVar = cast<GlobalVariable>(GV);
   assert(GlobalVar->getName() != "llvm.global.annotations");
