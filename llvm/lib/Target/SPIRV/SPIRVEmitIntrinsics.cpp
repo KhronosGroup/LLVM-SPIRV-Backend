@@ -398,7 +398,7 @@ void SPIRVEmitIntrinsics::processInstrAfterVisit(Instruction *I) {
     if ((isa<ConstantAggregateZero>(Op) && Op->getType()->isVectorTy()) ||
         isa<PHINode>(I) || isa<SwitchInst>(I))
       TrackConstants = false;
-    if (isa<ConstantData>(Op) && TrackConstants) {
+    if ((isa<ConstantData>(Op) || isa<ConstantExpr>(Op)) && TrackConstants) {
       unsigned OpNo = Op.getOperandNo();
       if (II && ((II->getIntrinsicID() == Intrinsic::spv_gep && OpNo == 0) ||
                  (II->paramHasAttr(OpNo, Attribute::ImmArg))))

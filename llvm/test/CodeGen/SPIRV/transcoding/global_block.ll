@@ -16,14 +16,14 @@ source_filename = "global_block.cl"
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
 
-; CHECK-SPIRV1_4: OpEntryPoint Kernel %[[#]] "block_kernel" [[#InterfaceId:]]
+; CHECK-SPIRV1_4: OpEntryPoint Kernel %[[#]] "block_kernel" %[[#InterfaceId:]]
 ; CHECK-SPIRV1_4: OpName %[[#InterfaceId]] "__block_literal_global"
 ; CHECK-SPIRV: OpName %[[block_invoke:[0-9]+]] "_block_invoke"
 ; CHECK-SPIRV: %[[int:[0-9]+]] = OpTypeInt 32
 ; CHECK-SPIRV: %[[int8:[0-9]+]] = OpTypeInt 8
-; CHECK-SPIRV: %[[five:[0-9]+]] = OpConstant %[[int]] 5
 ; CHECK-SPIRV: %[[int8Ptr:[0-9]+]] = OpTypePointer Generic %[[int8]]
 ; CHECK-SPIRV: %[[block_invoke_type:[0-9]+]] = OpTypeFunction %[[int]] %[[int8Ptr]] %[[int]]
+; CHECK-SPIRV: %[[five:[0-9]+]] = OpConstant %[[int]] 5
 
 ; CHECK-SPIRV: %{{[0-9]+}} = OpFunctionCall %[[int]] %[[block_invoke]] %{{[0-9]+}} %[[five]]
 

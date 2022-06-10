@@ -87,6 +87,9 @@ getDefInstrMaybeConstant(llvm::Register &ConstReg,
 uint64_t getIConstVal(llvm::Register ConstReg,
                       const llvm::MachineRegisterInfo *MRI);
 
+// Check if MI is a SPIR-V specific intrinsic call.
+bool isSpvIntrinsic(llvm::MachineInstr &MI, llvm::Intrinsic::ID IntrinsicID);
+
 // Get type of i-th operand of the metadata node.
 llvm::Type *getMDOperandAsType(const llvm::MDNode *N, unsigned I);
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H

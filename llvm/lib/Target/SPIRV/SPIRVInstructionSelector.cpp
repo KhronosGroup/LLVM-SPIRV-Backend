@@ -842,6 +842,27 @@ static bool isGenericCastablePtr(StorageClass::StorageClass Sc) {
 bool SPIRVInstructionSelector::selectAddrSpaceCast(Register ResVReg,
                                                    const SPIRVType *ResType,
                                                    MachineInstr &I) const {
+  // If the AddrSpaceCast user is single and in OpConstantComposite or
+  // OpVariable, we should select OpSpecConstantOp.
+  auto UIs = MRI->use_instructions(ResVReg);
+  if (!UIs.empty() && ++UIs.begin() == UIs.end() &&
+      (UIs.begin()->getOpcode() == SPIRV::OpConstantComposite ||
+       UIs.begin()->getOpcode() == SPIRV::OpVariable ||
+       isSpvIntrinsic(*UIs.begin(), Intrinsic::spv_init_global))) {
+    Register NewReg = I.getOperand(1).getReg();
+    MachineBasicBlock &BB = *I.getParent();
+    SPIRVType *SpvBaseTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
+    ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII,
+                                             StorageClass::Generic);
+    bool Result =
+        BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
+            .addDef(ResVReg)
+            .addUse(GR.getSPIRVTypeID(ResType))
+            .addImm(Opcode::PtrCastToGeneric)
+            .addUse(NewReg)
+            .constrainAllUses(TII, TRI, RBI);
+    return Result;
+  }
   namespace SC = StorageClass;
   Register SrcPtr = I.getOperand(1).getReg();
   SPIRVType *SrcPtrTy = GR.getSPIRVTypeForVReg(SrcPtr);
@@ -1258,6 +1279,15 @@ bool SPIRVInstructionSelector::selectConst(Register ResVReg,
         .addDef(ResVReg)
         .addUse(GR.getSPIRVTypeID(ResType))
         .constrainAllUses(TII, TRI, RBI);
+  if (ResType->getOpcode() == SPIRV::OpTypeInt) {
+    Register Reg = GR.getOrCreateConstInt(Imm.getZExtValue(), I, ResType, TII);
+    if (Reg == ResVReg)
+      return true;
+    return BuildMI(BB, I, I.getDebugLoc(), TII.get(TargetOpcode::COPY))
+        .addDef(ResVReg)
+        .addUse(Reg)
+        .constrainAllUses(TII, TRI, RBI);
+  }
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpConstantI))
                  .addDef(ResVReg)
                  .addUse(GR.getSPIRVTypeID(ResType));
@@ -1532,6 +1562,30 @@ bool SPIRVInstructionSelector::selectGlobalValue(
       GR.getOrCreateSPIRVType(GV->getType(), MIRBuilder, AQ::ReadWrite, false);
 
   std::string GlobalIdent = GV->getGlobalIdentifier();
+  // We have functions as operands in tests with blocks of instruction e.g. in
+  // transcoding/global_block.ll. These operands are not used and should be
+  // substituted by zero constants. Their type is expected to be always
+  // OpTypePointer Function %uchar.
+  if (isa<Function>(GV)) {
+    Register NewReg;
+    const Constant *ConstVal = GV;
+    MachineBasicBlock &BB = *I.getParent();
+    if (GR.find(ConstVal, GR.CurMF, NewReg) == false) {
+      SPIRVType *SpvBaseTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
+      ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII);
+      Register NewReg = ResVReg;
+      GR.add(ConstVal, GR.CurMF, NewReg);
+      return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpConstantNull))
+          .addDef(NewReg)
+          .addUse(GR.getSPIRVTypeID(ResType))
+          .constrainAllUses(TII, TRI, RBI);
+    }
+    assert(NewReg != ResVReg);
+    return BuildMI(BB, I, I.getDebugLoc(), TII.get(TargetOpcode::COPY))
+        .addDef(ResVReg)
+        .addUse(NewReg)
+        .constrainAllUses(TII, TRI, RBI);
+  }
   auto GlobalVar = cast<GlobalVariable>(GV);
   assert(GlobalVar->getName() != "llvm.global.annotations");
 

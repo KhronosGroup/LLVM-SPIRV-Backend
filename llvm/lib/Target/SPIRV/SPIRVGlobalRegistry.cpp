@@ -153,7 +153,9 @@ Register SPIRVGlobalRegistry::getOrCreateConstInt(uint64_t Val, MachineInstr &I,
   bool New;
   std::tie(Res, CI, New) =
       getOrCreateConstIntReg(Val, SpvType, nullptr, &I, &TII);
-  if (!New)
+  // If we have found Res register which is defined by the passed G_CONSTANT
+  // machine instruction, a new constant instruction should be created.
+  if (!New && (!I.getOperand(0).isReg() || Res != I.getOperand(0).getReg()))
     return Res;
   MachineInstrBuilder MIB;
   MachineBasicBlock &BB = *I.getParent();
@@ -496,6 +498,8 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeStruct(const StructType *Ty,
     MIB.addUse(Ty);
   if (Ty->hasName())
     buildOpName(ResVReg, Ty->getName(), MIRBuilder);
+  if (Ty->isPacked())
+    buildOpDecorate(ResVReg, MIRBuilder, Decoration::CPacked, {});
   return MIB;
 }
 

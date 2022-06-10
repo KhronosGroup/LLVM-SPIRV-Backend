@@ -1,5 +1,6 @@
-; RUN: llc -O0 %s -o - | FileCheck %s --check-prefixes=CHECK-SPIRV,CHECK-SPIRV1_1,CHECK-SPIRV1_4
-
+; RUN: llc -O0 %s -o - | FileCheck %s --check-prefixes=CHECK-SPIRV,CHECK-SPIRV1_4
+; TODO: We cannot check SPIR_V 1.1 and 1.4 simultaneously, implement additional
+;       run with CHECK-SPIRV1_1.
 ; kernel void block_ret_struct(__global int* res)
 ; {
 ;   struct A {
@@ -22,11 +23,11 @@ source_filename = "block_w_struct_return.cl"
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
 
-; CHECK-SPIRV1_4: OpEntryPoint Kernel %[[#]] "block_ret_struct" [[#InterdaceId1:]] [[#InterdaceId2:]]
+; CHECK-SPIRV1_4: OpEntryPoint Kernel %[[#]] "block_ret_struct" %[[#InterdaceId1:]] %[[#InterdaceId2:]]
 ; CHECK-SPIRV1_4: OpName %[[#InterdaceId1]] "__block_literal_global"
 ; CHECK-SPIRV1_4: OpName %[[#InterdaceId2]] "__spirv_BuiltInGlobalInvocationId"
 
-; CHECK-SPIRV1_1: OpEntryPoint Kernel %[[#]] "block_ret_struct" [[#InterdaceId1:]]
+; CHECK-SPIRV1_1: OpEntryPoint Kernel %[[#]] "block_ret_struct" %[[#InterdaceId1:]]
 ; CHECK-SPIRV1_1: OpName %[[#InterdaceId1]] "__spirv_BuiltInGlobalInvocationId"
 
 ; CHECK-SPIRV: OpName %[[BlockInv:[0-9]+]] "__block_ret_struct_block_invoke"
@@ -34,7 +35,7 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV: %[[IntTy:[0-9]+]] = OpTypeInt 32
 ; CHECK-SPIRV: %[[Int8Ty:[0-9]+]] = OpTypeInt 8
 ; CHECK-SPIRV: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8Ty]]
-; CHECK-SPIRV: %[[StructTy:[0-9]+]] = OpTypeStruct %[[IntTy]]
+; CHECK-SPIRV: %[[StructTy:[0-9]+]] = OpTypeStruct %[[IntTy]]{{$}}
 ; CHECK-SPIRV: %[[StructPtrTy:[0-9]+]] = OpTypePointer Function %[[StructTy]]
 
 ; CHECK-SPIRV: %[[StructArg:[0-9]+]] = OpVariable %[[StructPtrTy]] Function
