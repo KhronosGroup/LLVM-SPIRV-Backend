@@ -13,12 +13,12 @@
 
 ; RUN: llc -O0 %s -o - | FileCheck %s
 
-; CHECK-DAG: %[[Int:[0-9]+]] = OpTypeInt 32 0
-; CHECK-DAG: %[[Int8:[0-9]+]] = OpTypeInt 8 0
-; CHECK-DAG: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8]]
-; CHECK-DAG: OpName %[[StructType0:[0-9]+]] "struct.__opencl_block_literal_generic"
-; CHECK-DAG: %[[StructType0:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
-; CHECK-DAG: %[[StructType:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
+; CHECK: OpName %[[StructType0:[0-9]+]] "struct.__opencl_block_literal_generic"
+; CHECK: %[[Int8:[0-9]+]] = OpTypeInt 8 0
+; CHECK: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8]]
+; CHECK: %[[Int:[0-9]+]] = OpTypeInt 32 0
+; CHECK: %[[StructType0:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
+; CHECK: %[[StructType:[0-9]+]] = OpTypeStruct %[[Int]] %[[Int]] %[[Int8Ptr]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-unknown"
@@ -26,10 +26,10 @@ target triple = "spirv32-unknown-unknown"
 %struct.__opencl_block_literal_generic = type { i32, i32, i8 addrspace(4)* }
 
 @__block_literal_global = internal addrspace(1) constant { i32, i32, i8 addrspace(4)* } { i32 12, i32 4, i8 addrspace(4)* addrspacecast (i8* bitcast (void (i8 addrspace(4)*)* @__foo_block_invoke to i8*) to i8 addrspace(4)*) }, align 4
-; CHECK-DAG: OpConstantComposite %[[StructType]]
+; CHECK: OpConstantComposite %[[StructType]]
 
 @__block_literal_global.1 = internal addrspace(1) constant { i32, i32, i8 addrspace(4)* } zeroinitializer, align 4
-; CHECK-DAG: OpConstantNull %[[StructType]]
+; CHECK: OpConstantNull %[[StructType]]
 
 ; Function Attrs: convergent noinline nounwind optnone
 define spir_func void @foo() #0 {

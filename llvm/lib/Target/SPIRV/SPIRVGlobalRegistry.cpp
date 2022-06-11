@@ -155,9 +155,8 @@ Register SPIRVGlobalRegistry::getOrCreateConstInt(uint64_t Val, MachineInstr &I,
       getOrCreateConstIntReg(Val, SpvType, nullptr, &I, &TII);
   // If we have found Res register which is defined by the passed G_CONSTANT
   // machine instruction, a new constant instruction should be created.
-  if (!New && (!I.getOperand(0).isReg() || Res != I.getOperand(0).getReg())) {
+  if (!New && (!I.getOperand(0).isReg() || Res != I.getOperand(0).getReg()))
     return Res;
-  }
   MachineInstrBuilder MIB;
   MachineBasicBlock &BB = *I.getParent();
   if (Val) {

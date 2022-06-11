@@ -35,8 +35,8 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV: %[[IntTy:[0-9]+]] = OpTypeInt 32
 ; CHECK-SPIRV: %[[Int8Ty:[0-9]+]] = OpTypeInt 8
 ; CHECK-SPIRV: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8Ty]]
-; CHECK-SPIRV-DAG: %[[StructTy:[0-9]+]] = OpTypeStruct %[[IntTy]]{{$}}
-; CHECK-SPIRV-DAG: %[[StructPtrTy:[0-9]+]] = OpTypePointer Function %[[StructTy]]
+; CHECK-SPIRV: %[[StructTy:[0-9]+]] = OpTypeStruct %[[IntTy]]{{$}}
+; CHECK-SPIRV: %[[StructPtrTy:[0-9]+]] = OpTypePointer Function %[[StructTy]]
 
 ; CHECK-SPIRV: %[[StructArg:[0-9]+]] = OpVariable %[[StructPtrTy]] Function
 ; CHECK-SPIRV: %[[StructRet:[0-9]+]] = OpVariable %[[StructPtrTy]] Function

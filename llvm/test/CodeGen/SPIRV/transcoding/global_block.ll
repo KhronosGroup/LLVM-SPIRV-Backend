@@ -19,11 +19,11 @@ target triple = "spirv32-unknown-unknown"
 ; CHECK-SPIRV1_4: OpEntryPoint Kernel %[[#]] "block_kernel" %[[#InterfaceId:]]
 ; CHECK-SPIRV1_4: OpName %[[#InterfaceId]] "__block_literal_global"
 ; CHECK-SPIRV: OpName %[[block_invoke:[0-9]+]] "_block_invoke"
-; CHECK-SPIRV-DAG: %[[int:[0-9]+]] = OpTypeInt 32
-; CHECK-SPIRV-DAG: %[[int8:[0-9]+]] = OpTypeInt 8
-; CHECK-SPIRV-DAG: %[[five:[0-9]+]] = OpConstant %[[int]] 5
-; CHECK-SPIRV-DAG: %[[int8Ptr:[0-9]+]] = OpTypePointer Generic %[[int8]]
-; CHECK-SPIRV-DAG: %[[block_invoke_type:[0-9]+]] = OpTypeFunction %[[int]] %[[int8Ptr]] %[[int]]
+; CHECK-SPIRV: %[[int:[0-9]+]] = OpTypeInt 32
+; CHECK-SPIRV: %[[int8:[0-9]+]] = OpTypeInt 8
+; CHECK-SPIRV: %[[int8Ptr:[0-9]+]] = OpTypePointer Generic %[[int8]]
+; CHECK-SPIRV: %[[block_invoke_type:[0-9]+]] = OpTypeFunction %[[int]] %[[int8Ptr]] %[[int]]
+; CHECK-SPIRV: %[[five:[0-9]+]] = OpConstant %[[int]] 5
 
 ; CHECK-SPIRV: %{{[0-9]+}} = OpFunctionCall %[[int]] %[[block_invoke]] %{{[0-9]+}} %[[five]]
 
