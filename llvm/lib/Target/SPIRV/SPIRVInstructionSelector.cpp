@@ -458,6 +458,7 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     Register GV = I.getOperand(1).getReg();
     MachineRegisterInfo::def_instr_iterator II = MRI->def_instr_begin(GV);
     assert(((*II).getOpcode() == TargetOpcode::G_GLOBAL_VALUE ||
+            (*II).getOpcode() == TargetOpcode::COPY ||
             (*II).getOpcode() == SPIRV::OpVariable) &&
            isImm(I.getOperand(2), MRI));
     Register Idx = buildZerosVal(GR.getOrCreateSPIRVIntegerType(32, I, TII), I);
@@ -699,7 +700,7 @@ bool SPIRVInstructionSelector::selectMemOperation(Register ResVReg,
                                                   MachineInstr &I) const {
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCopyMemorySized))
-                 .addDef(I.getOperand(0).getReg())
+                 .addUse(I.getOperand(0).getReg())
                  .addUse(I.getOperand(1).getReg())
                  .addUse(I.getOperand(2).getReg());
   if (I.getNumMemOperands())

@@ -881,15 +881,18 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
                  : DimC == '2' ? Dim::DIM_2D
                                : Dim::DIM_3D;
       unsigned Arrayed = 0;
+      unsigned Depth = 0;
       if (TypeName.contains("buffer"))
         Dim = Dim::DIM_Buffer;
       if (TypeName.contains("array"))
         Arrayed = 1;
+      if (TypeName.contains("depth"))
+        Depth = 1;
       auto *VoidTy = getOrCreateSPIRVType(
           Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
           MIRBuilder);
-      return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, 0, Arrayed, 0, 0,
-                                    ImageFormat::Unknown, AccessQual);
+      return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, Depth, Arrayed, 0,
+                                    0, ImageFormat::Unknown, AccessQual);
     }
   } else if (TypeName.startswith("clk_event_t")) {
     return getOpTypeByOpcode(MIRBuilder, SPIRV::OpTypeDeviceEvent);
