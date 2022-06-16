@@ -5,15 +5,15 @@
 ; CHECK-SPIRV-DAG: %[[one:[0-9]+]] = OpConstant %[[i32]] 1
 ; CHECK-SPIRV-DAG: %[[two:[0-9]+]] = OpConstant %[[i32]] 2
 ; CHECK-SPIRV-DAG: %[[three:[0-9]+]] = OpConstant %[[i32]] 3
-; CHECK-SPIRV-DAG: %[[twelve:[0-9]+]] = OpConstant %[[i32]] 12
 ; CHECK-SPIRV-DAG: %[[i32x3:[0-9]+]] = OpTypeArray %[[i32]] %[[three]]
 ; CHECK-SPIRV-DAG: %[[i32x3_ptr:[0-9]+]] = OpTypePointer Function %[[i32x3]]
 ; CHECK-SPIRV-DAG: %[[const_i32x3_ptr:[0-9]+]] = OpTypePointer UniformConstant %[[i32x3]]
 ; CHECK-SPIRV-DAG: %[[i8_ptr:[0-9]+]] = OpTypePointer Function %[[i8]]
 ; CHECK-SPIRV-DAG: %[[const_i8_ptr:[0-9]+]] = OpTypePointer UniformConstant %[[i8]]
 ; CHECK-SPIRV: %[[test_arr_init:[0-9]+]] = OpConstantComposite %[[i32x3]] %[[one]] %[[two]] %[[three]]
-; CHECK-SPIRV: %[[test_arr:[0-9]+]] = OpVariable %[[const_i32x3_ptr]] UniformConstant %[[test_arr_init]]
+; CHECK-SPIRV: %[[twelve:[0-9]+]] = OpConstant %[[i32]] 12
 ; CHECK-SPIRV: %[[test_arr2:[0-9]+]] = OpVariable %[[const_i32x3_ptr]] UniformConstant %[[test_arr_init]]
+; CHECK-SPIRV: %[[test_arr:[0-9]+]] = OpVariable %[[const_i32x3_ptr]] UniformConstant %[[test_arr_init]]
 ;
 ; CHECK-SPIRV: %[[arr:[0-9]+]] = OpVariable %[[i32x3_ptr]] Function
 ; CHECK-SPIRV: %[[arr2:[0-9]+]] = OpVariable %[[i32x3_ptr]] Function

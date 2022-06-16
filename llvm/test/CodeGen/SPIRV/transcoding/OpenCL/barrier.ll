@@ -38,11 +38,10 @@ target triple = "spirv32-unknown-unknown"
 ; memory order for OpControlBarrier and therefore, constants below include a
 ; bit more information than original source
 ;
-; 0x2 Workgroup
-; CHECK-SPIRV-DAG: %[[WG:[0-9]+]] = OpConstant %[[UINT]] 2
-;
 ; 0x10 SequentiallyConsistent + 0x100 WorkgroupMemory
-; CHECK-SPIRV-DAG: %[[LOCAL:[0-9]+]] = OpConstant %[[UINT]] 272
+; CHECK-SPIRV: %[[LOCAL:[0-9]+]] = OpConstant %[[UINT]] 272
+; 0x2 Workgroup
+; CHECK-SPIRV: %[[WG:[0-9]+]] = OpConstant %[[UINT]] 2
 ; 0x10 SequentiallyConsistent + 0x200 CrossWorkgroupMemory
 ; CHECK-SPIRV-DAG: %[[GLOBAL:[0-9]+]] = OpConstant %[[UINT]] 528
 ; 0x10 SequentiallyConsistent + 0x800 ImageMemory

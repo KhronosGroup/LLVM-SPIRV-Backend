@@ -171,6 +171,7 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
       }
       case TargetOpcode::G_TRUNC:
       case TargetOpcode::G_ADDRSPACE_CAST:
+      case TargetOpcode::G_PTR_ADD:
       case TargetOpcode::COPY: {
         MachineOperand &Op = MI->getOperand(1);
         MachineInstr *Def = Op.isReg() ? MRI.getVRegDef(Op.getReg()) : nullptr;
