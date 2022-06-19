@@ -126,11 +126,11 @@ SPIRVGlobalRegistry::getOrCreateConstIntReg(uint64_t Val, SPIRVType *SpvType,
     LLVMIntTy = cast<IntegerType>(getTypeForSPIRVType(SpvType));
   else
     LLVMIntTy = IntegerType::getInt32Ty(CurMF->getFunction().getContext());
-  Register Res;
   bool NewInstr = false;
   // Find a constant in DT or build a new one.
   ConstantInt *CI = ConstantInt::get(const_cast<IntegerType *>(LLVMIntTy), Val);
-  if (DT.find(CI, CurMF, Res) == false) {
+  Register Res = DT.find(CI, CurMF);
+  if (!Res.isValid()) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     LLT LLTy = LLT::scalar(32);
     Res = CurMF->getRegInfo().createGenericVirtualRegister(LLTy);
@@ -180,7 +180,6 @@ Register SPIRVGlobalRegistry::buildConstantInt(uint64_t Val,
                                                SPIRVType *SpvType,
                                                bool EmitIR) {
   auto &MF = MIRBuilder.getMF();
-  Register Res;
   const IntegerType *LLVMIntTy;
   if (SpvType)
     LLVMIntTy = cast<IntegerType>(getTypeForSPIRVType(SpvType));
@@ -189,7 +188,8 @@ Register SPIRVGlobalRegistry::buildConstantInt(uint64_t Val,
   // Find a constant in DT or build a new one.
   const auto ConstInt =
       ConstantInt::get(const_cast<IntegerType *>(LLVMIntTy), Val);
-  if (DT.find(ConstInt, &MIRBuilder.getMF(), Res) == false) {
+  Register Res = DT.find(ConstInt, &MIRBuilder.getMF());
+  if (!Res.isValid()) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     LLT LLTy = LLT::scalar(EmitIR ? BitWidth : 32);
     Res = MF.getRegInfo().createGenericVirtualRegister(LLTy);
@@ -224,7 +224,6 @@ Register SPIRVGlobalRegistry::buildConstantFP(APFloat Val,
                                               MachineIRBuilder &MIRBuilder,
                                               SPIRVType *SpvType) {
   auto &MF = MIRBuilder.getMF();
-  Register Res;
   const Type *LLVMFPTy;
   if (SpvType) {
     LLVMFPTy = getTypeForSPIRVType(SpvType);
@@ -234,7 +233,8 @@ Register SPIRVGlobalRegistry::buildConstantFP(APFloat Val,
   }
   // Find a constant in DT or build a new one.
   const auto ConstFP = ConstantFP::get(LLVMFPTy->getContext(), Val);
-  if (DT.find(ConstFP, &MIRBuilder.getMF(), Res) == false) {
+  Register Res = DT.find(ConstFP, &MIRBuilder.getMF());
+  if (!Res.isValid()) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     Res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
     assignTypeToVReg(LLVMFPTy, Res, MIRBuilder);
@@ -256,8 +256,8 @@ SPIRVGlobalRegistry::getOrCreateConsIntVector(uint64_t Val, MachineInstr &I,
   const auto ConstInt = ConstantInt::get(LLVMBaseTy, Val);
   auto ConstVec =
       ConstantVector::getSplat(LLVMVecTy->getElementCount(), ConstInt);
-  Register Res;
-  if (DT.find(ConstVec, CurMF, Res) == false) {
+  Register Res = DT.find(ConstVec, CurMF);
+  if (!Res.isValid()) {
     unsigned BitWidth = getScalarOrVectorBitWidth(SpvType);
     SPIRVType *SpvBaseType = getOrCreateSPIRVIntegerType(BitWidth, I, TII);
     // SpvScalConst should be created before SpvVecConst to avoid undefined ID
@@ -308,8 +308,8 @@ SPIRVGlobalRegistry::buildConstantIntVector(uint64_t Val,
   const auto ConstInt = ConstantInt::get(LLVMBaseTy, Val);
   auto ConstVec =
       ConstantVector::getSplat(LLVMVecTy->getElementCount(), ConstInt);
-  Register Res;
-  if (DT.find(ConstVec, &MIRBuilder.getMF(), Res) == false) {
+  Register Res = DT.find(ConstVec, &MIRBuilder.getMF());
+  if (!Res.isValid()) {
     Register SpvScalConst;
     if (Val || EmitIR) {
       SPIRVType *SpvBaseType =
@@ -394,8 +394,8 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
     }
     GV = GVar;
   }
-  Register Reg;
-  if (DT.find(GVar, &MIRBuilder.getMF(), Reg)) {
+  Register Reg = DT.find(GVar, &MIRBuilder.getMF());
+  if (Reg.isValid()) {
     if (Reg != ResVReg)
       MIRBuilder.buildCopy(ResVReg, Reg);
     return ResVReg;
@@ -560,8 +560,8 @@ SPIRVType *SPIRVGlobalRegistry::findSPIRVType(const Type *Ty,
                                               MachineIRBuilder &MIRBuilder,
                                               AQ::AccessQualifier AccQual,
                                               bool EmitIR) {
-  Register Reg;
-  if (DT.find(Ty, &MIRBuilder.getMF(), Reg))
+  Register Reg = DT.find(Ty, &MIRBuilder.getMF());
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
   if (ForwardPointerTypes.find(Ty) != ForwardPointerTypes.end())
     return ForwardPointerTypes[Ty];
@@ -675,11 +675,10 @@ SPIRVType *SPIRVGlobalRegistry::restOfCreateSPIRVType(
   TypesInProcessing.erase(Ty);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(SpirvType)] = SpirvType;
   SPIRVToLLVMType[SpirvType] = Ty;
-  Register Reg;
+  Register Reg = DT.find(Ty, &MIRBuilder.getMF());
   // Do not add OpTypeForwardPointer to DT, a corresponding normal pointer type
   // will be added later.
-  if (SpirvType->getOpcode() != SPIRV::OpTypeForwardPointer &&
-      !DT.find(Ty, &MIRBuilder.getMF(), Reg))
+  if (SpirvType->getOpcode() != SPIRV::OpTypeForwardPointer && !Reg.isValid())
     DT.add(Ty, &MIRBuilder.getMF(), getSPIRVTypeID(SpirvType));
 
   return SpirvType;
@@ -698,8 +697,8 @@ SPIRVType *SPIRVGlobalRegistry::getSPIRVTypeForVReg(Register VReg) const {
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVType(
     const Type *Ty, MachineIRBuilder &MIRBuilder,
     AQ::AccessQualifier AccessQual, bool EmitIR) {
-  Register Reg;
-  if (DT.find(Ty, &MIRBuilder.getMF(), Reg))
+  Register Reg = DT.find(Ty, &MIRBuilder.getMF());
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
   TypesInProcessing.clear();
   SPIRVType *STy = restOfCreateSPIRVType(Ty, MIRBuilder, AccessQual, EmitIR);
@@ -707,7 +706,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVType(
   for (auto &CU : ForwardPointerTypes) {
     const Type *Ty2 = CU.first;
     SPIRVType *STy2 = CU.second;
-    if (DT.find(Ty2, &MIRBuilder.getMF(), Reg))
+    if ((Reg = DT.find(Ty2, &MIRBuilder.getMF())).isValid())
       STy2 = getSPIRVTypeForVReg(Reg);
     else
       STy2 = restOfCreateSPIRVType(Ty2, MIRBuilder, AccessQual, EmitIR);
@@ -853,8 +852,8 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeByOpcode(MachineIRBuilder &MIRBuilder,
 const MachineInstr *
 SPIRVGlobalRegistry::checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
                                        MachineIRBuilder &MIRBuilder) {
-  Register Reg;
-  if (DT.find(TD, &MIRBuilder.getMF(), Reg))
+  Register Reg = DT.find(TD, &MIRBuilder.getMF());
+  if (Reg.isValid())
     return MIRBuilder.getMF().getRegInfo().getUniqueVRegDef(Reg);
   return nullptr;
 }
@@ -1047,10 +1046,9 @@ SPIRVType *SPIRVGlobalRegistry::restOfCreateSPIRVType(Type *LLVMTy,
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVIntegerType(
     unsigned BitWidth, MachineInstr &I, const SPIRVInstrInfo &TII) {
   Type *LLVMTy = IntegerType::get(CurMF->getFunction().getContext(), BitWidth);
-  Register Reg;
-  if (DT.find(LLVMTy, CurMF, Reg)) {
+  Register Reg = DT.find(LLVMTy, CurMF);
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
-  }
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeInt))
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
@@ -1070,10 +1068,9 @@ SPIRVType *
 SPIRVGlobalRegistry::getOrCreateSPIRVBoolType(MachineInstr &I,
                                               const SPIRVInstrInfo &TII) {
   Type *LLVMTy = IntegerType::get(CurMF->getFunction().getContext(), 1);
-  Register Reg;
-  if (DT.find(LLVMTy, CurMF, Reg)) {
+  Register Reg = DT.find(LLVMTy, CurMF);
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
-  }
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeBool))
                  .addDef(createTypeVReg(CurMF->getRegInfo()));
@@ -1093,10 +1090,9 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVVectorType(
     const SPIRVInstrInfo &TII) {
   Type *LLVMTy = FixedVectorType::get(
       const_cast<Type *>(getTypeForSPIRVType(BaseType)), NumElements);
-  Register Reg;
-  if (DT.find(LLVMTy, CurMF, Reg)) {
+  Register Reg = DT.find(LLVMTy, CurMF);
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
-  }
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeVector))
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
@@ -1120,10 +1116,9 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
   Type *LLVMTy =
       PointerType::get(const_cast<Type *>(getTypeForSPIRVType(BaseType)),
                        storageClassToAddressSpace(SC));
-  Register Reg;
-  if (DT.find(LLVMTy, CurMF, Reg)) {
+  Register Reg = DT.find(LLVMTy, CurMF);
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
-  }
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypePointer))
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
@@ -1138,12 +1133,11 @@ Register SPIRVGlobalRegistry::getOrCreateUndef(MachineInstr &I,
   assert(SpvType);
   const Type *LLVMTy = getTypeForSPIRVType(SpvType);
   assert(LLVMTy);
-  Register Res;
   // Find a constant in DT or build a new one.
   UndefValue *UV = UndefValue::get(const_cast<Type *>(LLVMTy));
-  if (DT.find(UV, CurMF, Res))
+  Register Res = DT.find(UV, CurMF);
+  if (Res.isValid())
     return Res;
-
   LLT LLTy = LLT::scalar(32);
   Res = CurMF->getRegInfo().createGenericVirtualRegister(LLTy);
   assignSPIRVTypeToVReg(SpvType, Res, *CurMF);

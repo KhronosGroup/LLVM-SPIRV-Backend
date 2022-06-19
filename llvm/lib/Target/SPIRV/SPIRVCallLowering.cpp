@@ -288,9 +288,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     // hoisted globally later.
     if (Info.Callee.isGlobal()) {
       const Function *CF = cast<const Function>(Info.Callee.getGlobal());
-      Register FuncVReg;
-      if (CF->isDeclaration() &&
-          (GR->find(CF, &MIRBuilder.getMF(), FuncVReg) == false)) {
+      if (CF->isDeclaration() && !GR->find(CF, &MIRBuilder.getMF()).isValid()) {
         // Emit the type info and forward function declaration to the first MBB
         // to ensure VReg definition dependencies are valid across all MBBs.
         MachineIRBuilder FirstBlockBuilder;
