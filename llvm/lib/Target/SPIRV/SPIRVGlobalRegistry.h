@@ -221,7 +221,11 @@ private:
                                const SmallVectorImpl<SPIRVType *> &ArgTypes,
                                MachineIRBuilder &MIRBuilder);
 
-  SPIRVType *getOpTypeByOpcode(MachineIRBuilder &MIRBuilder, unsigned Opcode);
+  SPIRVType *getOpTypeByOpcode(const Type *Ty, MachineIRBuilder &MIRBuilder,
+                               unsigned Opcode);
+  SPIRVType *getOrCreateSpecialType(const Type *Ty,
+                                    MachineIRBuilder &MIRBuilder,
+                                    AQ::AccessQualifier AccQual);
 
   SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
                                  MachineIRBuilder &MIRBuilder,
@@ -305,6 +309,10 @@ public:
 
   SPIRVType *getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
                                    AQ::AccessQualifier AccQual);
+  SPIRVType *getOrCreateOpTypeFunctionWithArgs(
+      const Type *Ty, SPIRVType *RetType,
+      const SmallVectorImpl<SPIRVType *> &ArgTypes,
+      MachineIRBuilder &MIRBuilder);
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
