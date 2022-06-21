@@ -79,17 +79,21 @@ public:
     DT.add(Arg, MF, R);
   }
 
-  bool find(const Constant *C, MachineFunction *MF, Register &R) {
-    return DT.find(C, MF, R);
+  Register find(const Constant *C, MachineFunction *MF) {
+    return DT.find(C, MF);
   }
 
-  bool find(const GlobalVariable *GV, MachineFunction *MF, Register &R) {
-    return DT.find(GV, MF, R);
+  Register find(const GlobalVariable *GV, MachineFunction *MF) {
+    return DT.find(GV, MF);
   }
 
-  bool find(const Function *F, MachineFunction *MF, Register &R) {
-    return DT.find(F, MF, R);
+  Register find(const Function *F, MachineFunction *MF) {
+    return DT.find(F, MF);
   }
+
+  // DTIterator end() {
+  //   return DT.end();
+  // }
 
   const typename SPIRVDuplicatesTracker<Function>::StorageTy &getFuncAllUses() {
     return DT.getFuncs()->getAllUses();

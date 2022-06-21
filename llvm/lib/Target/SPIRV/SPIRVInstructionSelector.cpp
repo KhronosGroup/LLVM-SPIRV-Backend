@@ -1134,8 +1134,8 @@ SPIRVInstructionSelector::buildI32Constant(uint32_t Val, MachineInstr &I,
       ResType ? ResType : GR.getOrCreateSPIRVIntegerType(32, I, TII);
   // Find a constant in DT or build a new one.
   auto ConstInt = ConstantInt::get(LLVMTy, Val);
-  Register NewReg;
-  if (GR.find(ConstInt, GR.CurMF, NewReg) == false) {
+  Register NewReg = GR.find(ConstInt, GR.CurMF);
+  if (!NewReg.isValid()) {
     NewReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
     GR.add(ConstInt, GR.CurMF, NewReg);
     MachineInstr *MI;
@@ -1568,10 +1568,10 @@ bool SPIRVInstructionSelector::selectGlobalValue(
   // substituted by zero constants. Their type is expected to be always
   // OpTypePointer Function %uchar.
   if (isa<Function>(GV)) {
-    Register NewReg;
     const Constant *ConstVal = GV;
     MachineBasicBlock &BB = *I.getParent();
-    if (GR.find(ConstVal, GR.CurMF, NewReg) == false) {
+    Register NewReg = GR.find(ConstVal, GR.CurMF);
+    if (!NewReg.isValid()) {
       SPIRVType *SpvBaseTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
       ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII);
       Register NewReg = ResVReg;
