@@ -122,7 +122,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   // Assign types and names to all args, and store their types for later.
   FunctionType *FTy = getOriginalFunctionType(F);
-  SmallVector<Register, 4> ArgTypeVRegs;
+  SmallVector<SPIRVType *, 4> ArgTypeVRegs;
   if (VRegs.size() > 0) {
     unsigned i = 0;
     for (const auto &Arg : F.args()) {
@@ -131,8 +131,17 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       // SPIRVType *SpirvTy = GR->getSPIRVTypeForVReg(VRegs[i][0]);
       // if (!SpirvTy)
       Type *ArgTy = FTy->getParamType(i);
-      auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder);
-      ArgTypeVRegs.push_back(GR->getSPIRVTypeID(SpirvTy));
+      AccessQualifier::AccessQualifier AQ = AccessQualifier::ReadWrite;
+      auto Node = F.getMetadata("kernel_arg_access_qual");
+      if (Node && i < Node->getNumOperands()) {
+        StringRef AQString = cast<MDString>(Node->getOperand(i))->getString();
+        if (AQString.compare("read_only") == 0)
+          AQ = AccessQualifier::ReadOnly;
+        else if (AQString.compare("write_only") == 0)
+          AQ = AccessQualifier::WriteOnly;
+      }
+      auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder, AQ);
+      ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
         buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
@@ -161,7 +170,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                         {FunctionParameterAttribute::NoAlias});
       }
 
-      auto Node = F.getMetadata("kernel_arg_type_qual");
+      Node = F.getMetadata("kernel_arg_type_qual");
       if (Node && i < Node->getNumOperands()) {
         StringRef TypeQual = cast<MDString>(Node->getOperand(i))->getString();
         if (TypeQual.compare("volatile") == 0)
@@ -197,15 +206,16 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
   MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
 
-  auto FuncTy = GR->assignTypeToVReg(FTy, FuncVReg, MIRBuilder);
+  SPIRVType *RetTy = GR->getOrCreateSPIRVType(FTy->getReturnType(), MIRBuilder);
+  SPIRVType *FuncTy = GR->getOrCreateOpTypeFunctionWithArgs(
+      FTy, RetTy, ArgTypeVRegs, MIRBuilder);
 
   // Build the OpTypeFunction declaring it.
-  Register ReturnTypeID = FuncTy->getOperand(1).getReg();
   uint32_t FuncControl = getFunctionControl(F);
 
   MIRBuilder.buildInstr(SPIRV::OpFunction)
       .addDef(FuncVReg)
-      .addUse(ReturnTypeID)
+      .addUse(GR->getSPIRVTypeID(RetTy))
       .addImm(FuncControl)
       .addUse(GR->getSPIRVTypeID(FuncTy));
 
@@ -216,7 +226,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
     MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
         .addDef(VRegs[i][0])
-        .addUse(ArgTypeVRegs[i]);
+        .addUse(GR->getSPIRVTypeID(ArgTypeVRegs[i]));
     if (F.isDeclaration())
       GR->add(&Arg, &MIRBuilder.getMF(), VRegs[i][0]);
     i++;
