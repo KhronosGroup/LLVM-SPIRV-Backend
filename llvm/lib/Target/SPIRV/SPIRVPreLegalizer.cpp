@@ -51,14 +51,15 @@ static void addConstantsToTrack(MachineFunction &MF, SPIRVGlobalRegistry *GR) {
           cast<Constant>(cast<ConstantAsMetadata>(
                              MI.getOperand(3).getMetadata()->getOperand(0))
                              ->getValue());
-      Register Reg;
       if (auto *GV = dyn_cast<GlobalValue>(Const)) {
-        if (GR->find(GV, &MF, Reg) == false)
+        Register Reg = GR->find(GV, &MF);
+        if (!Reg.isValid())
           GR->add(GV, &MF, MI.getOperand(2).getReg());
         else
           RegsAlreadyAddedToDT[&MI] = Reg;
       } else {
-        if (GR->find(Const, &MF, Reg) == false) {
+        Register Reg = GR->find(Const, &MF);
+        if (!Reg.isValid()) {
           if (auto *ConstVec = dyn_cast<ConstantDataVector>(Const)) {
             auto *BuildVec = MRI.getVRegDef(MI.getOperand(2).getReg());
             assert(BuildVec &&

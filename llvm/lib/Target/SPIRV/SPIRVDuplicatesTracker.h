@@ -178,11 +178,9 @@ private:
 
 public:
   void add(KeyTy V, const MachineFunction *MF, Register R) {
-    Register OldReg;
-    if (find(V, MF, OldReg)) {
-      assert(OldReg == R);
+    if (find(V, MF).isValid())
       return;
-    }
+
     Storage[V][MF] = R;
     if (std::is_same<Function,
                      typename std::remove_const<
@@ -197,17 +195,15 @@ public:
       Storage[V].setIsGV(true);
   }
 
-  bool find(KeyTy V, const MachineFunction *MF, Register &R) const {
+  Register find(KeyTy V, const MachineFunction *MF) const {
     auto iter = Storage.find(V);
     if (iter != Storage.end()) {
       auto Map = iter->second;
       auto iter2 = Map.find(MF);
-      if (iter2 != Map.end()) {
-        R = iter2->second;
-        return true;
-      }
+      if (iter2 != Map.end())
+        return iter2->second;
     }
-    return false;
+    return Register();
   }
 
   const StorageTy &getAllUses() const { return Storage; }
@@ -278,29 +274,29 @@ public:
     ST.add(TD, MF, R);
   }
 
-  bool find(const Type *T, const MachineFunction *MF, Register &R) {
-    return TT.find(const_cast<Type *>(T), MF, R);
+  Register find(const Type *T, const MachineFunction *MF) {
+    return TT.find(const_cast<Type *>(T), MF);
   }
 
-  bool find(const Constant *C, const MachineFunction *MF, Register &R) {
-    return CT.find(const_cast<Constant *>(C), MF, R);
+  Register find(const Constant *C, const MachineFunction *MF) {
+    return CT.find(const_cast<Constant *>(C), MF);
   }
 
-  bool find(const GlobalVariable *GV, const MachineFunction *MF, Register &R) {
-    return GT.find(const_cast<GlobalVariable *>(GV), MF, R);
+  Register find(const GlobalVariable *GV, const MachineFunction *MF) {
+    return GT.find(const_cast<GlobalVariable *>(GV), MF);
   }
 
-  bool find(const Function *F, const MachineFunction *MF, Register &R) {
-    return FT.find(const_cast<Function *>(F), MF, R);
+  Register find(const Function *F, const MachineFunction *MF) {
+    return FT.find(const_cast<Function *>(F), MF);
   }
 
-  bool find(const Argument *Arg, const MachineFunction *MF, Register &R) {
-    return AT.find(const_cast<Argument *>(Arg), MF, R);
+  Register find(const Argument *Arg, const MachineFunction *MF) {
+    return AT.find(const_cast<Argument *>(Arg), MF);
   }
 
-  bool find(const SPIRV::SpecialTypeDescriptor &TD, const MachineFunction *MF,
-            Register &R) {
-    return ST.find(TD, MF, R);
+  Register find(const SPIRV::SpecialTypeDescriptor &TD,
+                const MachineFunction *MF) {
+    return ST.find(TD, MF);
   }
 
   const SPIRVDuplicatesTracker<Type> *getTypes() { return &TT; }
