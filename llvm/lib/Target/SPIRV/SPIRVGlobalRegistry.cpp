@@ -586,8 +586,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeFunctionWithArgs(
     const Type *Ty, SPIRVType *RetType,
     const SmallVectorImpl<SPIRVType *> &ArgTypes,
     MachineIRBuilder &MIRBuilder) {
-  Register Reg;
-  if (DT.find(Ty, &MIRBuilder.getMF(), Reg))
+  Register Reg = DT.find(Ty, &MIRBuilder.getMF());
+  if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
   SPIRVType *SpirvType = getOpTypeFunction(RetType, ArgTypes, MIRBuilder);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(SpirvType)] = SpirvType;
@@ -871,8 +871,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
 SPIRVType *SPIRVGlobalRegistry::getOpTypeByOpcode(const Type *Ty,
                                                   MachineIRBuilder &MIRBuilder,
                                                   unsigned Opcode) {
-  Register ResVReg;
-  if (DT.find(Ty, &MIRBuilder.getMF(), ResVReg))
+  Register ResVReg = DT.find(Ty, &MIRBuilder.getMF());
+  if (ResVReg.isValid())
     return MIRBuilder.getMF().getRegInfo().getUniqueVRegDef(ResVReg);
   ResVReg = createTypeVReg(MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(Opcode).addDef(ResVReg);
