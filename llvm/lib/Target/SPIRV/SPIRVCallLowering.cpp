@@ -16,6 +16,7 @@
 #include "SPIRV.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
+#include "SPIRVBuiltins.h"
 #include "SPIRVOpenCLBIFs.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
@@ -263,9 +264,12 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
       }
-      bool Result = generateOpenCLBuiltinCall(
-          DoubleUnderscore ? FuncName : DemangledName, MIRBuilder, ResVReg,
-          Info.OrigRet.Ty, ArgVRegs, GR);
+      
+      bool Result = false;
+
+      Result = lowerBuiltin(DoubleUnderscore ? FuncName : DemangledName,
+                            ExternalInstructionSet::OpenCL_std, MIRBuilder,
+                            ResVReg, Info.OrigRet.Ty, ArgVRegs, GR);
       free(DemangledName);
       return Result;
     }
