@@ -89,6 +89,7 @@ static StringMap<unsigned> OpenCLBIToOperationMap({
 #define _SPIRV_OP(x, y) {#x, SPIRV::Op##y},
   _SPIRV_OP(__spirv_Select, SelectSISCond)
   _SPIRV_OP(__spirv_SpecConstant, SpecConstant)
+  _SPIRV_OP(__spirv_SpecConstantComposite, SpecConstantComposite)
   // CL 2.0 kernel enqueue builtins
   _SPIRV_OP(retain_event, RetainEvent)
   _SPIRV_OP(release_event, ReleaseEvent)
@@ -1224,6 +1225,17 @@ static bool buildSpecConstant(MachineIRBuilder &MIRBuilder, unsigned Opcode,
   return constrainRegOperands(MIB);
 }
 
+static bool buildSpecConstantComposite(MachineIRBuilder &MIRBuilder,
+    unsigned Opcode, Register ResVReg, const SPIRVType *ResType,
+    const SmallVectorImpl<Register> &OrigArgs, SPIRVGlobalRegistry *GR) {
+  auto MIB = MIRBuilder.buildInstr(Opcode)
+                 .addDef(ResVReg)
+                 .addUse(GR->getSPIRVTypeID(ResType));
+  for (unsigned i = 0; i < OrigArgs.size(); i++)
+    MIB.addUse(OrigArgs[i]);
+  return constrainRegOperands(MIB);
+}
+
 static bool genOpenCLOpGroup(MachineIRBuilder &MIRBuilder, StringRef name,
     unsigned opcode, Register resVReg, const SPIRVType *resType,
     const SmallVectorImpl<Register> &OrigArgs, SPIRVGlobalRegistry *GR) {
@@ -1374,8 +1386,14 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
   if (OrigRetTy && !OrigRetTy->isVoidTy())
     retTy = GR->assignTypeToVReg(OrigRetTy, OrigRet, MIRBuilder);
 
-  auto firstBraceIdx = demangledName.find_first_of('(');
-  auto nameNoArgs = demangledName.substr(0, firstBraceIdx);
+  size_t firstBraceIdx = demangledName.find_first_of('(');
+  StringRef nameNoArgs(demangledName);
+  char typeChar = 0;
+
+  if (firstBraceIdx != StringRef::npos) {
+    nameNoArgs = demangledName.substr(0, firstBraceIdx);
+    typeChar = demangledName[firstBraceIdx + 1];
+  }
 
   auto extInstIDOpt = getOpenCL_stdFromName(nameNoArgs.str());
   if (extInstIDOpt.hasValue()) {
@@ -1403,7 +1421,6 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
 
   auto extInstMatch = typeDependantExtInstMap.find(nameNoArgs.str());
   if (extInstMatch != typeDependantExtInstMap.end()) {
-    char typeChar = demangledName[firstBraceIdx + 1];
     int idx = -1;
     if (typeChar == 'u')
       idx = 0;
@@ -1428,8 +1445,7 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     returnTypeStr = tmpStr.first;
   }
   // Modify the names of builtins to use smaller map of opcodes.
-  auto modifiedName = modifyBINameForLookup(nameNoArgs, retTy,
-                                            demangledName[firstBraceIdx + 1]);
+  auto modifiedName = modifyBINameForLookup(nameNoArgs, retTy, typeChar);
   using namespace SPIRV;
   const unsigned opcode = OpenCLBIToOperationMap.lookup(modifiedName);
   switch (opcode) {
@@ -1454,6 +1470,8 @@ bool llvm::generateOpenCLBuiltinCall(const StringRef demangledName,
     return MIRBuilder.buildSelect(OrigRet, args[0], args[1], args[2]);
   case OpSpecConstant:
     return buildSpecConstant(MIRBuilder, opcode, OrigRet, retTy, args, GR);
+  case OpSpecConstantComposite:
+    return buildSpecConstantComposite(MIRBuilder, opcode, OrigRet, retTy, args, GR);
   case OpRetainEvent:
   case OpReleaseEvent:
     return MIRBuilder.buildInstr(opcode).addUse(args[0]);

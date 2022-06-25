@@ -92,4 +92,8 @@ bool isSpvIntrinsic(llvm::MachineInstr &MI, llvm::Intrinsic::ID IntrinsicID);
 
 // Get type of i-th operand of the metadata node.
 llvm::Type *getMDOperandAsType(const llvm::MDNode *N, unsigned I);
+
+// Return a demangled name with arg type info by itaniumDemangle().
+// If the parser fails, return only function name.
+std::string isOclOrSpirvBuiltin(llvm::StringRef Name);
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
