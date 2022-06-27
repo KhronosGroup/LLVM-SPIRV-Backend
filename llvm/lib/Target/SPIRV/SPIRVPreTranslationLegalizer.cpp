@@ -106,12 +106,7 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   auto *ThisFuncMD = MDNode::get(B.getContext(), MDArgs);
   FuncMD->addOperand(ThisFuncMD);
 
-  // Make a list of all uses, then modify the instructions, otherwise the uses
-  // may be corrupted by modifications.
-  SmallVector<User *, 4> AllUses;
-  for (auto *U : F->users())
-    AllUses.push_back(U);
-  for (auto *U : AllUses) {
+  for (auto *U : make_early_inc_range(F->users())) {
     if (auto *CI = dyn_cast<CallInst>(U))
       CI->mutateFunctionType(NewF->getFunctionType());
     U->replaceUsesOfWith(F, NewF);
