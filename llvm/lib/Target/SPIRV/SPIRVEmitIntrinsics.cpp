@@ -136,13 +136,14 @@ void SPIRVEmitIntrinsics::replaceMemInstrUses(Instruction *Old,
                                               Instruction *New) {
   while (!Old->user_empty()) {
     auto *U = Old->user_back();
-    if (isMemInstrToReplace(U) || isa<ReturnInst>(U)) {
-      U->replaceUsesOfWith(Old, New);
-    } else if (isAssignTypeInstr(U)) {
+    if (isAssignTypeInstr(U)) {
       IRB->SetInsertPoint(U);
       SmallVector<Value *, 2> Args = {New, U->getOperand(1)};
       IRB->CreateIntrinsic(Intrinsic::spv_assign_type, {New->getType()}, Args);
       U->eraseFromParent();
+    } else if (isMemInstrToReplace(U) || isa<ReturnInst>(U) ||
+               isa<CallInst>(U)) {
+      U->replaceUsesOfWith(Old, New);
     } else {
       llvm_unreachable("illegal aggregate intrinsic user");
     }

@@ -53,8 +53,7 @@ char SPIRVPreTranslationLegalizer::ID = 0;
 INITIALIZE_PASS(SPIRVPreTranslationLegalizer, "pre-gisel-legalizer",
                 "SPIRV Pre-GISel Legalizer", false, false)
 
-Function *
-SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
+Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   IRBuilder<> B(F->getContext());
 
   bool IsRetAggr = F->getReturnType()->isAggregateType();
@@ -71,7 +70,7 @@ SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
     ChangedTypes.push_back(std::pair<int, Type *>(-1, F->getReturnType()));
   SmallVector<Type *, 4> ArgTypes;
   for (const auto &Arg : F->args()) {
-    if (Arg.getType()->isAggregateType() || Arg.getType()->isVectorTy()) {
+    if (Arg.getType()->isAggregateType()) {
       ArgTypes.push_back(B.getInt32Ty());
       ChangedTypes.push_back(
           std::pair<int, Type *>(Arg.getArgNo(), Arg.getType()));
@@ -107,12 +106,11 @@ SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   auto *ThisFuncMD = MDNode::get(B.getContext(), MDArgs);
   FuncMD->addOperand(ThisFuncMD);
 
-  for (auto *U : F->users()) {
+  for (auto *U : make_early_inc_range(F->users())) {
     if (auto *CI = dyn_cast<CallInst>(U))
       CI->mutateFunctionType(NewF->getFunctionType());
     U->replaceUsesOfWith(F, NewF);
   }
-
   return NewF;
 }
 
@@ -139,7 +137,6 @@ bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
   return Changed;
 }
 
-ModulePass *
-llvm::createSPIRVPreTranslationLegalizerPass() {
+ModulePass *llvm::createSPIRVPreTranslationLegalizerPass() {
   return new SPIRVPreTranslationLegalizer();
 }
