@@ -16,6 +16,7 @@
 
 #include "SPIRV.h"
 #include "SPIRVTargetMachine.h"
+#include "SPIRVUtils.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -114,6 +115,75 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   return NewF;
 }
 
+static Function *getOrCreateFunction(Module *M, Type *RetTy,
+                                     ArrayRef<Type *> ArgTypes,
+                                     StringRef Name) {
+  FunctionType *FT = FunctionType::get(RetTy, ArgTypes, false);
+  Function *F = M->getFunction(Name);
+  if (!F || F->getFunctionType() != FT) {
+    auto NewF = Function::Create(FT, GlobalValue::ExternalLinkage, Name, M);
+    if (F)
+      NewF->setDSOLocal(F->isDSOLocal());
+    F = NewF;
+    F->setCallingConv(CallingConv::SPIR_FUNC);
+  }
+  return F;
+}
+
+// Add a wrapper around the kernel function to act as an entry point.
+static void addKernelEntryPointWrapper(Module *M, Function *F) {
+  F->setCallingConv(CallingConv::SPIR_FUNC);
+  FunctionType *FType = F->getFunctionType();
+  std::string WrapName =
+      "__spirv_entry_" + static_cast<std::string>(F->getName());
+  Function *WrapFn =
+      getOrCreateFunction(M, F->getReturnType(), FType->params(), WrapName);
+
+  auto *CallBB = BasicBlock::Create(M->getContext(), "", WrapFn);
+  IRBuilder<> Builder(CallBB);
+
+  Function::arg_iterator DestI = WrapFn->arg_begin();
+  for (const Argument &I : F->args()) {
+    DestI->setName(I.getName());
+    DestI++;
+  }
+  SmallVector<Value *, 1> Args;
+  for (Argument &I : WrapFn->args())
+    Args.emplace_back(&I);
+
+  auto *CI = CallInst::Create(F, ArrayRef<Value *>(Args), "", CallBB);
+  CI->setCallingConv(F->getCallingConv());
+  CI->setAttributes(F->getAttributes());
+
+  // Copy over all the metadata excepting debug info.
+  // TODO: removed some metadata from F if it's necessery.
+  SmallVector<std::pair<unsigned, MDNode *>> MDs;
+  F->getAllMetadata(MDs);
+  WrapFn->setAttributes(F->getAttributes());
+  for (auto MD = MDs.begin(), End = MDs.end(); MD != End; ++MD) {
+    if (MD->first != LLVMContext::MD_dbg)
+      WrapFn->addMetadata(MD->first, *MD->second);
+  }
+  WrapFn->setCallingConv(CallingConv::SPIR_KERNEL);
+  WrapFn->setLinkage(llvm::GlobalValue::InternalLinkage);
+
+  Builder.CreateRet(F->getReturnType()->isVoidTy() ? nullptr : CI);
+
+  // Have to find the spir-v metadata for execution mode and transfer it to
+  // the wrapper.
+  auto Node = M->getNamedMetadata("spirv.ExecutionMode");
+  if (Node) {
+    for (unsigned i = 0; i < Node->getNumOperands(); i++) {
+      MDNode *MDN = cast<MDNode>(Node->getOperand(i));
+      const MDOperand &MDOp = MDN->getOperand(0);
+      auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp);
+      Function *MDF = dyn_cast<Function>(CMeta->getValue());
+      if (MDF == F)
+        MDN->replaceOperandWith(0, ValueAsMetadata::get(WrapFn));
+    }
+  }
+}
+
 bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
   std::vector<Function *> FuncsWorklist;
   bool Changed = false;
@@ -121,6 +191,9 @@ bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
     FuncsWorklist.push_back(&F);
 
   for (auto *Func : FuncsWorklist) {
+    if (isKernel(Func))
+      addKernelEntryPointWrapper(&M, Func);
+
     auto *F = processFunctionSignature(Func);
 
     bool CreatedNewF = F != Func;

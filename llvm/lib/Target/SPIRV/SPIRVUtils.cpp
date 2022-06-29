@@ -338,3 +338,7 @@ std::string isOclOrSpirvBuiltin(StringRef Name) {
       .getAsInteger(10, Len);
   return Name.substr(Start, Len).str();
 }
+
+bool isKernel(const Function *F) {
+  return F->getCallingConv() == CallingConv::SPIR_KERNEL;
+}

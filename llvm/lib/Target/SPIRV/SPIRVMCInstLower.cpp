@@ -34,7 +34,7 @@ void SPIRVMCInstLower::lower(const MachineInstr *MI, MCInst &OutMI,
       MI->print(errs());
       llvm_unreachable("unknown operand type");
     case MachineOperand::MO_GlobalAddress: {
-      Register FuncReg = MAI->getFuncReg(MO.getGlobal()->getGlobalIdentifier());
+      Register FuncReg = MAI->getFuncReg(MO.getGlobal()->getName().str());
       assert(FuncReg.isValid() && "Cannot find function Id");
       MCOp = MCOperand::createReg(FuncReg);
       break;

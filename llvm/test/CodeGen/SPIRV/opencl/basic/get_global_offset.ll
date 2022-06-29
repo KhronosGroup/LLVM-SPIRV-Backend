@@ -2,9 +2,9 @@
 
 target triple = "spirv64-unknown-unknown"
 
-; CHECK: OpEntryPoint Kernel %[[test_func:[0-9]+]] "test"
+; CHECK: OpEntryPoint Kernel %[[test_func_wrap:[0-9]+]] "test"
 ; CHECK: OpName %[[outOffsets:[0-9]+]] "outOffsets"
-; CHECK: OpName %[[test_func]] "test"
+; CHECK: OpName %[[test_func:[0-9]+]] "test"
 ; CHECK: OpName %[[f2_decl:[0-9]+]] "BuiltInGlobalOffset"
 ; CHECK: OpDecorate %[[f2_decl]] LinkageAttributes "BuiltInGlobalOffset" Import
 ; CHECK: %[[int_ty:[0-9]+]] = OpTypeInt 32 0
