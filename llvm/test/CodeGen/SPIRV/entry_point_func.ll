@@ -15,4 +15,4 @@ define spir_kernel void @testfunction() {
 ; CHECK-SPIRV: OpDecorate %[[FUNC]] LinkageAttributes "testfunction" Export
 ; CHECK-SPIRV: %[[FUNC]] = OpFunction %2 None %3
 ; CHECK-SPIRV: %[[EP]] = OpFunction %2 None %3
-; CHECK-SPIRV: %8 = OpFunctionCall %2 %[[FUNC]]
+; CHECK-SPIRV: OpFunctionCall %2 %[[FUNC]]

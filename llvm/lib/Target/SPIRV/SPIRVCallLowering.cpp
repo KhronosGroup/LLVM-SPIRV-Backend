@@ -231,17 +231,19 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     i++;
   }
 
-  // Name the function.
-  if (F.hasName())
+  // Name the function but skip the kernels that are wrappers at this point.
+  if (F.hasName() && !isKernel(&F))
     buildOpName(FuncVReg, F.getName(), MIRBuilder);
 
   // Handle entry points and function linkage.
-  if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+  if (isKernel(&F)) {
     auto ExecModel = ExecutionModel::Kernel;
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpEntryPoint)
                    .addImm(ExecModel)
                    .addUse(FuncVReg);
-    addStringImm(F.getName(), MIB);
+    StringRef Name = F.getName();
+    Name.consume_front("__spirv_entry_");
+    addStringImm(Name, MIB);
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
@@ -273,7 +275,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
   std::string FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
   std::string DemangledName = isOclOrSpirvBuiltin(FuncName);
-  if (!DemangledName.empty()) {
+  if (!DemangledName.empty() && CF && CF->isDeclaration()) {
     // TODO: check that it's OCL builtin, then apply OpenCL_std.
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {

@@ -425,9 +425,9 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
   }
   for (auto FI = M.begin(), E = M.end(); FI != E; ++FI) {
     const Function &F = *FI;
-    if (F.isDeclaration())
+    if (F.isDeclaration() || !isKernel(&F))
       continue;
-    Register FReg = MAI->getFuncReg(F.getGlobalIdentifier());
+    Register FReg = MAI->getFuncReg(F.getName().str());
     assert(FReg.isValid());
     if (MDNode *Node = F.getMetadata("reqd_work_group_size"))
       outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::LocalSize);
@@ -462,7 +462,7 @@ void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
         Register Reg;
         if (isa<Function>(AnnotatedVar)) {
           auto *Func = cast<Function>(AnnotatedVar);
-          Reg = MAI->getFuncReg(Func->getGlobalIdentifier());
+          Reg = MAI->getFuncReg(Func->getName().str());
         } else {
           llvm_unreachable("Unsupported value in llvm.global.annotations");
         }
