@@ -32,10 +32,10 @@
 #define DEBUG_TYPE "spirv-isel"
 
 using namespace llvm;
-namespace CL = OpenCL_std;
-namespace GL = GLSL_std_450;
+namespace CL = OpenCLExtInst;
+namespace GL = GLSLExtInst;
 
-using ExtInstList = std::vector<std::pair<ExtInstSet, uint32_t>>;
+using ExtInstList = std::vector<std::pair<InstructionSet::InstructionSet, uint32_t>>;
 
 namespace {
 
@@ -172,10 +172,10 @@ private:
                  MachineInstr &I) const;
 
   bool selectExtInst(Register ResVReg, const SPIRVType *ResType,
-                     MachineInstr &I, CL::OpenCL_std CLInst) const;
+                     MachineInstr &I, CL::OpenCLExtInst CLInst) const;
   bool selectExtInst(Register ResVReg, const SPIRVType *ResType,
-                     MachineInstr &I, OpenCL_std::OpenCL_std CLInst,
-                     GL::GLSL_std_450 GLInst) const;
+                     MachineInstr &I, CL::OpenCLExtInst CLInst,
+                     GL::GLSLExtInst GLInst) const;
   bool selectExtInst(Register ResVReg, const SPIRVType *ResType,
                      MachineInstr &I, const ExtInstList &ExtInsts) const;
 
@@ -507,17 +507,17 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
 bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              const SPIRVType *ResType,
                                              MachineInstr &I,
-                                             CL::OpenCL_std CLInst) const {
-  return selectExtInst(ResVReg, ResType, I, {{ExtInstSet::OpenCL_std, CLInst}});
+                                             CL::OpenCLExtInst CLInst) const {
+  return selectExtInst(ResVReg, ResType, I, {{InstructionSet::OpenCL_std, CLInst}});
 }
 
 bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              const SPIRVType *ResType,
                                              MachineInstr &I,
-                                             CL::OpenCL_std CLInst,
-                                             GL::GLSL_std_450 GLInst) const {
-  ExtInstList ExtInsts = {{ExtInstSet::OpenCL_std, CLInst},
-                          {ExtInstSet::GLSL_std_450, GLInst}};
+                                             CL::OpenCLExtInst CLInst,
+                                             GL::GLSLExtInst GLInst) const {
+  ExtInstList ExtInsts = {{InstructionSet::OpenCL_std, CLInst},
+                          {InstructionSet::GLSL_std_450, GLInst}};
   return selectExtInst(ResVReg, ResType, I, ExtInsts);
 }
 
@@ -527,7 +527,7 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              const ExtInstList &Insts) const {
 
   for (const auto &Ex : Insts) {
-    ExtInstSet Set = Ex.first;
+    InstructionSet::InstructionSet Set = Ex.first;
     uint32_t Opcode = Ex.second;
     if (STI.canUseExtInstSet(Set)) {
       MachineBasicBlock &BB = *I.getParent();

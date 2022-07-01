@@ -276,7 +276,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   if (!DemangledName.empty()) {
     // TODO: check that it's OCL builtin, then apply OpenCL_std.
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    if (ST->canUseExtInstSet(ExtInstSet::OpenCL_std)) {
+    if (ST->canUseExtInstSet(InstructionSet::OpenCL_std)) {
       // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp.
       const Type *OrigRetTy = Info.OrigRet.Ty;
       if (FTy)

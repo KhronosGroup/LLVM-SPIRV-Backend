@@ -107,7 +107,7 @@ bool SPIRVSubtarget::canUseExtension(Extension::Extension E) const {
   return std::find(Exts.begin(), Exts.end(), E) != Exts.end();
 }
 
-bool SPIRVSubtarget::canUseExtInstSet(ExtInstSet E) const {
+bool SPIRVSubtarget::canUseExtInstSet(InstructionSet::InstructionSet E) const {
   const auto &Sets = AvailableExtInstSets;
   return std::find(Sets.begin(), Sets.end(), E) != Sets.end();
 }
@@ -200,13 +200,13 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
 // Must have called initAvailableExtensions first.
 void SPIRVSubtarget::initAvailableExtInstSets(const Triple &TT) {
   if (UsesVulkanEnv) {
-    AvailableExtInstSets.insert(ExtInstSet::GLSL_std_450);
+    AvailableExtInstSets.insert(InstructionSet::GLSL_std_450);
   } else {
-    AvailableExtInstSets.insert(ExtInstSet::OpenCL_std);
+    AvailableExtInstSets.insert(InstructionSet::OpenCL_std);
   }
 
   // Handle extended instruction sets from extensions.
-  if (canUseExtension(Extension::SPV_AMD_shader_trinary_minmax)) {
-    AvailableExtInstSets.insert(ExtInstSet::SPV_AMD_shader_trinary_minmax);
+  if (canUseExtension(Extension::SPV_AMD_shader_trinary_minmax_extension)) {
+    AvailableExtInstSets.insert(InstructionSet::SPV_AMD_shader_trinary_minmax);
   }
 }

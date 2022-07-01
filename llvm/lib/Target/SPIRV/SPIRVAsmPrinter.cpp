@@ -271,7 +271,7 @@ void SPIRVAsmPrinter::outputOpExtInstImports(const Module &M) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtInstImport);
     Inst.addOperand(MCOperand::createReg(Reg));
-    addStringImm(getExtInstSetName(static_cast<ExtInstSet>(Set)), Inst);
+    addStringImm(getExtInstSetName(static_cast<InstructionSet::InstructionSet>(Set)), Inst);
     outputMCInst(Inst);
   }
 }

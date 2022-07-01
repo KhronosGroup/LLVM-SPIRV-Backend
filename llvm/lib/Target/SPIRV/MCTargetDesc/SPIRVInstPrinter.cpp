@@ -194,12 +194,12 @@ void SPIRVInstPrinter::printOpExtInst(const MCInst *MI, raw_ostream &O) {
 
   auto SetReg = MI->getOperand(2).getReg();
   auto Set = ExtInstSetIDs[SetReg];
-  if (Set == ExtInstSet::OpenCL_std) {
-    auto Inst = static_cast<OpenCL_std::OpenCL_std>(MI->getOperand(3).getImm());
+  if (Set == InstructionSet::OpenCL_std) {
+    auto Inst = static_cast<OpenCLExtInst::OpenCLExtInst>(MI->getOperand(3).getImm());
     switch (Inst) {
-    case OpenCL_std::vstore_half_r:
-    case OpenCL_std::vstore_halfn_r:
-    case OpenCL_std::vstorea_halfn_r: {
+    case OpenCLExtInst::vstore_half_r:
+    case OpenCLExtInst::vstore_halfn_r:
+    case OpenCLExtInst::vstorea_halfn_r: {
       // These ops have a literal FPRoundingMode as the last arg.
       for (unsigned i = NumFixedOps; i < NumOps - 1; ++i) {
         printOperand(MI, i, O);
