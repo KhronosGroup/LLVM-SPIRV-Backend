@@ -32,7 +32,7 @@ add_llvm_target(SPIRVCodeGen
   SPIRVMCInstLower.cpp
   SPIRVModuleAnalysis.cpp
   SPIRVOCLRegularizer.cpp
-  SPIRVOpenCLBIFs.cpp
+  SPIRVBuiltins.cpp
   SPIRVPreLegalizer.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp

@@ -16,7 +16,7 @@
 #include "SPIRV.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
-#include "SPIRVOpenCLBIFs.h"
+#include "SPIRVBuiltins.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVUtils.h"
@@ -288,8 +288,8 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
       }
-      return generateOpenCLBuiltinCall(DemangledName, MIRBuilder, ResVReg,
-                                       OrigRetTy, ArgVRegs, GR);
+      return lowerBuiltin(DemangledName, ExternalInstructionSet::OpenCL_std,
+                          MIRBuilder, ResVReg, OrigRetTy, ArgVRegs, GR);
     }
     llvm_unreachable("Unable to handle this environment's built-in funcs.");
   }
