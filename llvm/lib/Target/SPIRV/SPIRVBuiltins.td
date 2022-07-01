@@ -1,0 +1,888 @@
+//===-- SPIRVBuiltins.td - Describe SPIRV Builtins ---------*- tablegen -*-===//
+ //
+ // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+ // See https://llvm.org/LICENSE.txt for license information.
+ // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+ //
+ //===----------------------------------------------------------------------===//
+ //
+ // TableGen records defining implementation details of demangled builtin 
+ // functions and types.
+ //
+ //===----------------------------------------------------------------------===//
+
+// Define SPIR-V external builtin/instruction sets
+def InstructionSet : GenericEnum {
+  let FilterClass = "InstructionSet";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class InstructionSet<bits<32> value> {
+  string Name = NAME;
+  bits<32> Value = value;
+}
+
+def OpenCL_std : InstructionSet<0>;
+def GLSL_std_450 : InstructionSet<1>;
+//def SPV_AMD_shader_trinary_minmax : InstructionSet<2>;
+
+// Define various builtin groups
+def BuiltinGroup : GenericEnum {
+  let FilterClass = "BuiltinGroup";
+}
+
+class BuiltinGroup;
+
+def Extended : BuiltinGroup;
+def Relational : BuiltinGroup;
+def Group : BuiltinGroup;
+def Variable : BuiltinGroup;
+def Atomic : BuiltinGroup;
+def Barrier : BuiltinGroup;
+def Dot : BuiltinGroup;
+def GetQuery : BuiltinGroup;
+def ImageSizeQuery : BuiltinGroup;
+def ImageMiscQuery : BuiltinGroup;
+def Convert : BuiltinGroup;
+def ReadImage : BuiltinGroup;
+def WriteImage : BuiltinGroup;
+def SampleImage : BuiltinGroup;
+def Select : BuiltinGroup;
+def SpecConstant : BuiltinGroup;
+def Enqueue : BuiltinGroup;
+
+//===----------------------------------------------------------------------===//
+// Class defining a demangled builtin record. The information in the record
+// should be used to expand the builtin into either native SPIR-V instructions
+// or an external call (in case of builtins without a direct mapping).
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// group specifies to which implementation group given record belongs.
+// minNumArgs is the minimum required number of arguments for lowering.
+// maxNumArgs specifies the maximum used number of arguments for lowering.
+//===----------------------------------------------------------------------===//
+
+class DemangledBuiltin<string name, InstructionSet set, BuiltinGroup group, bits<8> minNumArgs, bits<8> maxNumArgs> {
+  string Name = name;
+  InstructionSet Set = set;
+  BuiltinGroup Group = group;
+  bits<8> MinNumArgs = minNumArgs;
+  bits<8> MaxNumArgs = maxNumArgs;
+}
+
+// Table gathering all the builtins.
+def DemangledBuiltins : GenericTable {
+  let FilterClass = "DemangledBuiltin";
+  let Fields = ["Name", "Set", "Group", "MinNumArgs", "MaxNumArgs"];
+  string TypeOf_Set = "InstructionSet";
+  string TypeOf_Group = "BuiltinGroup";
+}
+
+// Function to lookup builtins by their demangled name and set.
+def lookupBuiltin : SearchIndex {
+  let Table = DemangledBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Dot builtin record:
+def : DemangledBuiltin<"dot", OpenCL_std, Dot, 2, 2>;
+
+// Image builtin records:
+def : DemangledBuiltin<"read_imagei", OpenCL_std, ReadImage, 2, 4>;
+def : DemangledBuiltin<"read_imageui", OpenCL_std, ReadImage, 2, 4>;
+def : DemangledBuiltin<"read_imagef", OpenCL_std, ReadImage, 2, 4>;
+
+def : DemangledBuiltin<"write_imagef", OpenCL_std, WriteImage, 3, 4>;
+def : DemangledBuiltin<"write_imagei", OpenCL_std, WriteImage, 3, 4>;
+def : DemangledBuiltin<"write_imageui", OpenCL_std, WriteImage, 3, 4>;
+def : DemangledBuiltin<"write_imageh", OpenCL_std, WriteImage, 3, 4>;
+
+def : DemangledBuiltin<"__translate_sampler_initializer", OpenCL_std, SampleImage, 1, 1>;
+def : DemangledBuiltin<"__spirv_SampledImage", OpenCL_std, SampleImage, 2, 2>;
+def : DemangledBuiltin<"__spirv_ImageSampleExplicitLod", OpenCL_std, SampleImage, 3, 4>;
+
+// Select builtin record:
+def : DemangledBuiltin<"__spirv_Select", OpenCL_std, Select, 3, 3>;
+
+//===----------------------------------------------------------------------===//
+// Class defining an extended builtin record used for lowering into an
+// OpExtInst instruction.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// number specifies the number of the instruction in the external set.
+//===----------------------------------------------------------------------===//
+class ExtendedBuiltin<string name, InstructionSet set, int number> {
+  string Name = name;
+  InstructionSet Set = set;
+  bits<32> Number = number;
+}
+
+// Table gathering all the extended builtins.
+def ExtendedBuiltins : GenericTable {
+  let FilterClass = "ExtendedBuiltin";
+  let Fields = ["Name", "Set", "Number"];
+  string TypeOf_Set = "InstructionSet";
+}
+
+// Function to lookup extended builtins by their name and set.
+def lookupExtendedBuiltin : SearchIndex {
+  let Table = ExtendedBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both a demangled builtin record
+// and a corresponding extended builtin record.
+multiclass DemangledExtendedBuiltin<string name, InstructionSet set, int number> {
+  def : DemangledBuiltin<name, set, Extended, 1, 3>;
+  def : ExtendedBuiltin<name, set, number>;
+}
+
+// Extended builtin records:
+defm : DemangledExtendedBuiltin<"acos", OpenCL_std, 0>;
+defm : DemangledExtendedBuiltin<"acosh", OpenCL_std, 1>;
+defm : DemangledExtendedBuiltin<"acospi", OpenCL_std, 2>;
+defm : DemangledExtendedBuiltin<"asin", OpenCL_std, 3>;
+defm : DemangledExtendedBuiltin<"asinh", OpenCL_std, 4>;
+defm : DemangledExtendedBuiltin<"asinpi", OpenCL_std, 5>;
+defm : DemangledExtendedBuiltin<"atan", OpenCL_std, 6>;
+defm : DemangledExtendedBuiltin<"atan2", OpenCL_std, 7>;
+defm : DemangledExtendedBuiltin<"atanh", OpenCL_std, 8>;
+defm : DemangledExtendedBuiltin<"atanpi", OpenCL_std, 9>;
+defm : DemangledExtendedBuiltin<"atan2pi", OpenCL_std, 10>;
+defm : DemangledExtendedBuiltin<"cbrt", OpenCL_std, 11>;
+defm : DemangledExtendedBuiltin<"ceil", OpenCL_std, 12>;
+defm : DemangledExtendedBuiltin<"copysign", OpenCL_std, 13>;
+defm : DemangledExtendedBuiltin<"cos", OpenCL_std, 14>;
+defm : DemangledExtendedBuiltin<"cosh", OpenCL_std, 15>;
+defm : DemangledExtendedBuiltin<"cospi", OpenCL_std, 16>;
+defm : DemangledExtendedBuiltin<"erfc", OpenCL_std, 17>;
+defm : DemangledExtendedBuiltin<"erf", OpenCL_std, 18>;
+defm : DemangledExtendedBuiltin<"exp", OpenCL_std, 19>;
+defm : DemangledExtendedBuiltin<"exp2", OpenCL_std, 20>;
+defm : DemangledExtendedBuiltin<"exp10", OpenCL_std, 21>;
+defm : DemangledExtendedBuiltin<"expm1", OpenCL_std, 22>;
+defm : DemangledExtendedBuiltin<"fabs", OpenCL_std, 23>;
+defm : DemangledExtendedBuiltin<"fdim", OpenCL_std, 24>;
+defm : DemangledExtendedBuiltin<"floor", OpenCL_std, 25>;
+defm : DemangledExtendedBuiltin<"fma", OpenCL_std, 26>;
+defm : DemangledExtendedBuiltin<"fmax", OpenCL_std, 27>;
+defm : DemangledExtendedBuiltin<"fmin", OpenCL_std, 28>;
+defm : DemangledExtendedBuiltin<"fmod", OpenCL_std, 29>;
+defm : DemangledExtendedBuiltin<"fract", OpenCL_std, 30>;
+defm : DemangledExtendedBuiltin<"frexp", OpenCL_std, 31>;
+defm : DemangledExtendedBuiltin<"hypot", OpenCL_std, 32>;
+defm : DemangledExtendedBuiltin<"ilogb", OpenCL_std, 33>;
+defm : DemangledExtendedBuiltin<"ldexp", OpenCL_std, 34>;
+defm : DemangledExtendedBuiltin<"lgamma", OpenCL_std, 35>;
+defm : DemangledExtendedBuiltin<"lgamma_r", OpenCL_std, 36>;
+defm : DemangledExtendedBuiltin<"log", OpenCL_std, 37>;
+defm : DemangledExtendedBuiltin<"log2", OpenCL_std, 38>;
+defm : DemangledExtendedBuiltin<"log10", OpenCL_std, 39>;
+defm : DemangledExtendedBuiltin<"log1p", OpenCL_std, 40>;
+defm : DemangledExtendedBuiltin<"logb", OpenCL_std, 41>;
+defm : DemangledExtendedBuiltin<"mad", OpenCL_std, 42>;
+defm : DemangledExtendedBuiltin<"maxmag", OpenCL_std, 43>;
+defm : DemangledExtendedBuiltin<"minmag", OpenCL_std, 44>;
+defm : DemangledExtendedBuiltin<"modf", OpenCL_std, 45>;
+defm : DemangledExtendedBuiltin<"nan", OpenCL_std, 46>;
+defm : DemangledExtendedBuiltin<"nextafter", OpenCL_std, 47>;
+defm : DemangledExtendedBuiltin<"pow", OpenCL_std, 48>;
+defm : DemangledExtendedBuiltin<"pown", OpenCL_std, 49>;
+defm : DemangledExtendedBuiltin<"powr", OpenCL_std, 50>;
+defm : DemangledExtendedBuiltin<"remainder", OpenCL_std, 51>;
+defm : DemangledExtendedBuiltin<"remquo", OpenCL_std, 52>;
+defm : DemangledExtendedBuiltin<"rint", OpenCL_std, 53>;
+defm : DemangledExtendedBuiltin<"rootn", OpenCL_std, 54>;
+defm : DemangledExtendedBuiltin<"round", OpenCL_std, 55>;
+defm : DemangledExtendedBuiltin<"rsqrt", OpenCL_std, 56>;
+defm : DemangledExtendedBuiltin<"sin", OpenCL_std, 57>;
+defm : DemangledExtendedBuiltin<"sincos", OpenCL_std, 58>;
+defm : DemangledExtendedBuiltin<"sinh", OpenCL_std, 59>;
+defm : DemangledExtendedBuiltin<"sinpi", OpenCL_std, 60>;
+defm : DemangledExtendedBuiltin<"sqrt", OpenCL_std, 61>;
+defm : DemangledExtendedBuiltin<"tan", OpenCL_std, 62>;
+defm : DemangledExtendedBuiltin<"tanh", OpenCL_std, 63>;
+defm : DemangledExtendedBuiltin<"tanpi", OpenCL_std, 64>;
+defm : DemangledExtendedBuiltin<"tgamma", OpenCL_std, 65>;
+defm : DemangledExtendedBuiltin<"trunc", OpenCL_std, 66>;
+defm : DemangledExtendedBuiltin<"half_cos", OpenCL_std, 67>;
+defm : DemangledExtendedBuiltin<"half_divide", OpenCL_std, 68>;
+defm : DemangledExtendedBuiltin<"half_exp", OpenCL_std, 69>;
+defm : DemangledExtendedBuiltin<"half_exp2", OpenCL_std, 70>;
+defm : DemangledExtendedBuiltin<"half_exp10", OpenCL_std, 71>;
+defm : DemangledExtendedBuiltin<"half_log", OpenCL_std, 72>;
+defm : DemangledExtendedBuiltin<"half_log2", OpenCL_std, 73>;
+defm : DemangledExtendedBuiltin<"half_log10", OpenCL_std, 74>;
+defm : DemangledExtendedBuiltin<"half_powr", OpenCL_std, 75>;
+defm : DemangledExtendedBuiltin<"half_recip", OpenCL_std, 76>;
+defm : DemangledExtendedBuiltin<"half_rsqrt", OpenCL_std, 77>;
+defm : DemangledExtendedBuiltin<"half_sin", OpenCL_std, 78>;
+defm : DemangledExtendedBuiltin<"half_sqrt", OpenCL_std, 79>;
+defm : DemangledExtendedBuiltin<"half_tan", OpenCL_std, 80>;
+defm : DemangledExtendedBuiltin<"native_cos", OpenCL_std, 81>;
+defm : DemangledExtendedBuiltin<"native_divide", OpenCL_std, 82>;
+defm : DemangledExtendedBuiltin<"native_exp", OpenCL_std, 83>;
+defm : DemangledExtendedBuiltin<"native_exp2", OpenCL_std, 84>;
+defm : DemangledExtendedBuiltin<"native_exp10", OpenCL_std, 85>;
+defm : DemangledExtendedBuiltin<"native_log", OpenCL_std, 86>;
+defm : DemangledExtendedBuiltin<"native_log2", OpenCL_std, 87>;
+defm : DemangledExtendedBuiltin<"native_log10", OpenCL_std, 88>;
+defm : DemangledExtendedBuiltin<"native_powr", OpenCL_std, 89>;
+defm : DemangledExtendedBuiltin<"native_recip", OpenCL_std, 90>;
+defm : DemangledExtendedBuiltin<"native_rsqrt", OpenCL_std, 91>;
+defm : DemangledExtendedBuiltin<"native_sin", OpenCL_std, 92>;
+defm : DemangledExtendedBuiltin<"native_sqrt", OpenCL_std, 93>;
+defm : DemangledExtendedBuiltin<"native_tan", OpenCL_std, 94>;
+defm : DemangledExtendedBuiltin<"s_abs", OpenCL_std, 141>;
+defm : DemangledExtendedBuiltin<"s_abs_diff", OpenCL_std, 142>;
+defm : DemangledExtendedBuiltin<"s_add_sat", OpenCL_std, 143>;
+defm : DemangledExtendedBuiltin<"u_add_sat", OpenCL_std, 144>;
+defm : DemangledExtendedBuiltin<"s_hadd", OpenCL_std, 145>;
+defm : DemangledExtendedBuiltin<"u_hadd", OpenCL_std, 146>;
+defm : DemangledExtendedBuiltin<"s_rhadd", OpenCL_std, 147>;
+defm : DemangledExtendedBuiltin<"u_rhadd", OpenCL_std, 148>;
+defm : DemangledExtendedBuiltin<"s_clamp", OpenCL_std, 149>;
+defm : DemangledExtendedBuiltin<"u_clamp", OpenCL_std, 150>;
+defm : DemangledExtendedBuiltin<"clz", OpenCL_std, 151>;
+defm : DemangledExtendedBuiltin<"ctz", OpenCL_std, 152>;
+defm : DemangledExtendedBuiltin<"s_mad_hi", OpenCL_std, 153>;
+defm : DemangledExtendedBuiltin<"u_mad_sat", OpenCL_std, 154>;
+defm : DemangledExtendedBuiltin<"s_mad_sat", OpenCL_std, 155>;
+defm : DemangledExtendedBuiltin<"s_max", OpenCL_std, 156>;
+defm : DemangledExtendedBuiltin<"u_max", OpenCL_std, 157>;
+defm : DemangledExtendedBuiltin<"s_min", OpenCL_std, 158>;
+defm : DemangledExtendedBuiltin<"u_min", OpenCL_std, 159>;
+defm : DemangledExtendedBuiltin<"s_mul_hi", OpenCL_std, 160>;
+defm : DemangledExtendedBuiltin<"rotate", OpenCL_std, 161>;
+defm : DemangledExtendedBuiltin<"s_sub_sat", OpenCL_std, 162>;
+defm : DemangledExtendedBuiltin<"u_sub_sat", OpenCL_std, 163>;
+defm : DemangledExtendedBuiltin<"u_upsample", OpenCL_std, 164>;
+defm : DemangledExtendedBuiltin<"s_upsample", OpenCL_std, 165>;
+defm : DemangledExtendedBuiltin<"popcount", OpenCL_std, 166>;
+defm : DemangledExtendedBuiltin<"s_mad24", OpenCL_std, 167>;
+defm : DemangledExtendedBuiltin<"u_mad24", OpenCL_std, 168>;
+defm : DemangledExtendedBuiltin<"s_mul24", OpenCL_std, 169>;
+defm : DemangledExtendedBuiltin<"u_mul24", OpenCL_std, 170>;
+defm : DemangledExtendedBuiltin<"u_abs", OpenCL_std, 201>;
+defm : DemangledExtendedBuiltin<"u_abs_diff", OpenCL_std, 202>;
+defm : DemangledExtendedBuiltin<"u_mul_hi", OpenCL_std, 203>;
+defm : DemangledExtendedBuiltin<"u_mad_hi", OpenCL_std, 204>;
+defm : DemangledExtendedBuiltin<"fclamp", OpenCL_std, 95>;
+defm : DemangledExtendedBuiltin<"degrees", OpenCL_std, 96>;
+defm : DemangledExtendedBuiltin<"fmax_common", OpenCL_std, 97>;
+defm : DemangledExtendedBuiltin<"fmin_common", OpenCL_std, 98>;
+defm : DemangledExtendedBuiltin<"mix", OpenCL_std, 99>;
+defm : DemangledExtendedBuiltin<"radians", OpenCL_std, 100>;
+defm : DemangledExtendedBuiltin<"step", OpenCL_std, 101>;
+defm : DemangledExtendedBuiltin<"smoothstep", OpenCL_std, 102>;
+defm : DemangledExtendedBuiltin<"sign", OpenCL_std, 103>;
+defm : DemangledExtendedBuiltin<"cross", OpenCL_std, 104>;
+defm : DemangledExtendedBuiltin<"distance", OpenCL_std, 105>;
+defm : DemangledExtendedBuiltin<"length", OpenCL_std, 106>;
+defm : DemangledExtendedBuiltin<"normalize", OpenCL_std, 107>;
+defm : DemangledExtendedBuiltin<"fast_distance", OpenCL_std, 108>;
+defm : DemangledExtendedBuiltin<"fast_length", OpenCL_std, 109>;
+defm : DemangledExtendedBuiltin<"fast_normalize", OpenCL_std, 110>;
+defm : DemangledExtendedBuiltin<"bitselect", OpenCL_std, 186>;
+defm : DemangledExtendedBuiltin<"select", OpenCL_std, 187>;
+defm : DemangledExtendedBuiltin<"vloadn", OpenCL_std, 171>;
+defm : DemangledExtendedBuiltin<"vstoren", OpenCL_std, 172>;
+defm : DemangledExtendedBuiltin<"vload_half", OpenCL_std, 173>;
+defm : DemangledExtendedBuiltin<"vload_halfn", OpenCL_std, 174>;
+defm : DemangledExtendedBuiltin<"vstore_half", OpenCL_std, 175>;
+defm : DemangledExtendedBuiltin<"vstore_half_r", OpenCL_std, 176>;
+defm : DemangledExtendedBuiltin<"vstore_halfn", OpenCL_std, 177>;
+defm : DemangledExtendedBuiltin<"vstore_halfn_r", OpenCL_std, 178>;
+defm : DemangledExtendedBuiltin<"vloada_halfn", OpenCL_std, 179>;
+defm : DemangledExtendedBuiltin<"vstorea_halfn", OpenCL_std, 180>;
+defm : DemangledExtendedBuiltin<"vstorea_halfn_r", OpenCL_std, 181>;
+defm : DemangledExtendedBuiltin<"shuffle", OpenCL_std, 182>;
+defm : DemangledExtendedBuiltin<"shuffle2", OpenCL_std, 183>;
+defm : DemangledExtendedBuiltin<"printf", OpenCL_std, 184>;
+defm : DemangledExtendedBuiltin<"prefetch", OpenCL_std, 185>;
+
+//===----------------------------------------------------------------------===//
+// Class defining an native builtin record used for direct translation into a
+// SPIR-V instruction.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// opcode specifies the SPIR-V operation code of the generated instruction.
+//===----------------------------------------------------------------------===//
+class NativeBuiltin<string name, InstructionSet set, Op operation> {
+  string Name = name;
+  InstructionSet Set = set;
+  Op Opcode = operation;
+}
+
+// Table gathering all the native builtins.
+def NativeBuiltins : GenericTable {
+  let FilterClass = "NativeBuiltin";
+  let Fields = ["Name", "Set", "Opcode"];
+  string TypeOf_Set = "InstructionSet";
+}
+
+// Function to lookup native builtins by their name and set.
+def lookupNativeBuiltin : SearchIndex {
+  let Table = NativeBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both an incoming builtin record
+// and a corresponding native builtin record.
+multiclass DemangledNativeBuiltin<string name, InstructionSet set, BuiltinGroup group, bits<8> minNumArgs, bits<8> maxNumArgs, Op operation> {
+  def : DemangledBuiltin<name, set, group, minNumArgs, maxNumArgs>;
+  def : NativeBuiltin<name, set, operation>;
+}
+
+// Relational builtin records:
+defm : DemangledNativeBuiltin<"isequal", OpenCL_std, Relational, 2, 2, OpFOrdEqual>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdEqual", OpenCL_std, Relational, 2, 2, OpFOrdEqual>;
+defm : DemangledNativeBuiltin<"isnotequal", OpenCL_std, Relational, 2, 2, OpFUnordNotEqual>;
+defm : DemangledNativeBuiltin<"__spirv_FUnordNotEqual", OpenCL_std, Relational, 2, 2, OpFUnordNotEqual>;
+defm : DemangledNativeBuiltin<"isgreater", OpenCL_std, Relational, 2, 2, OpFOrdGreaterThan>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdGreaterThan", OpenCL_std, Relational, 2, 2, OpFOrdGreaterThan>;
+defm : DemangledNativeBuiltin<"isgreaterequal", OpenCL_std, Relational, 2, 2, OpFOrdGreaterThanEqual>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdGreaterThanEqual", OpenCL_std, Relational, 2, 2, OpFOrdGreaterThanEqual>;
+defm : DemangledNativeBuiltin<"isless", OpenCL_std, Relational, 2, 2, OpFOrdLessThan>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdLessThan", OpenCL_std, Relational, 2, 2, OpFOrdLessThan>;
+defm : DemangledNativeBuiltin<"islessequal", OpenCL_std, Relational, 2, 2, OpFOrdLessThanEqual>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdLessThanEqual", OpenCL_std, Relational, 2, 2, OpFOrdLessThanEqual>;
+defm : DemangledNativeBuiltin<"islessgreater", OpenCL_std, Relational, 2, 2, OpFOrdNotEqual>;
+defm : DemangledNativeBuiltin<"__spirv_FOrdNotEqual", OpenCL_std, Relational, 2, 2, OpFOrdNotEqual>;
+defm : DemangledNativeBuiltin<"isordered", OpenCL_std, Relational, 2, 2, OpOrdered>;
+defm : DemangledNativeBuiltin<"__spirv_Ordered", OpenCL_std, Relational, 2, 2, OpOrdered>;
+defm : DemangledNativeBuiltin<"isunordered", OpenCL_std, Relational, 2, 2, OpUnordered>;
+defm : DemangledNativeBuiltin<"__spirv_Unordered", OpenCL_std, Relational, 2, 2, OpUnordered>;
+defm : DemangledNativeBuiltin<"isfinite", OpenCL_std, Relational, 1, 1, OpIsFinite>;
+defm : DemangledNativeBuiltin<"__spirv_IsFinite", OpenCL_std, Relational, 1, 1, OpIsFinite>;
+defm : DemangledNativeBuiltin<"isinf", OpenCL_std, Relational, 1, 1, OpIsInf>;
+defm : DemangledNativeBuiltin<"__spirv_IsInf", OpenCL_std, Relational, 1, 1, OpIsInf>;
+defm : DemangledNativeBuiltin<"isnan", OpenCL_std, Relational, 1, 1, OpIsNan>;
+defm : DemangledNativeBuiltin<"__spirv_IsNan", OpenCL_std, Relational, 1, 1, OpIsNan>;
+defm : DemangledNativeBuiltin<"isnormal", OpenCL_std, Relational, 1, 1, OpIsNormal>;
+defm : DemangledNativeBuiltin<"__spirv_IsNormal", OpenCL_std, Relational, 1, 1, OpIsNormal>;
+defm : DemangledNativeBuiltin<"signbit", OpenCL_std, Relational, 1, 1, OpSignBitSet>;
+defm : DemangledNativeBuiltin<"__spirv_SignBitSet", OpenCL_std, Relational, 1, 1, OpSignBitSet>;
+defm : DemangledNativeBuiltin<"any", OpenCL_std, Relational, 1, 1, OpAny>;
+defm : DemangledNativeBuiltin<"__spirv_Any", OpenCL_std, Relational, 1, 1, OpAny>;
+defm : DemangledNativeBuiltin<"all", OpenCL_std, Relational, 1, 1, OpAll>;
+defm : DemangledNativeBuiltin<"__spirv_All", OpenCL_std, Relational, 1, 1, OpAll>;
+
+// Atomic builtin records:
+defm : DemangledNativeBuiltin<"atomic_load", OpenCL_std, Atomic, 1, 1, OpAtomicLoad>;
+defm : DemangledNativeBuiltin<"atomic_load_explicit", OpenCL_std, Atomic, 2, 3, OpAtomicLoad>;
+defm : DemangledNativeBuiltin<"atomic_store", OpenCL_std, Atomic, 2, 2, OpAtomicStore>;
+defm : DemangledNativeBuiltin<"atomic_store_explicit", OpenCL_std, Atomic, 2, 2, OpAtomicStore>;
+defm : DemangledNativeBuiltin<"atomic_compare_exchange_strong", OpenCL_std, Atomic, 3, 6, OpAtomicCompareExchange>;
+defm : DemangledNativeBuiltin<"atomic_compare_exchange_strong_explicit", OpenCL_std, Atomic, 5, 6, OpAtomicCompareExchange>;
+defm : DemangledNativeBuiltin<"atomic_compare_exchange_weak", OpenCL_std, Atomic, 3, 6, OpAtomicCompareExchangeWeak>;
+defm : DemangledNativeBuiltin<"atomic_compare_exchange_weak_explicit", OpenCL_std, Atomic, 5, 6, OpAtomicCompareExchangeWeak>;
+defm : DemangledNativeBuiltin<"atom_cmpxchg", OpenCL_std, Atomic, 3, 6, OpAtomicCompareExchange>;
+defm : DemangledNativeBuiltin<"atomic_cmpxchg", OpenCL_std, Atomic, 3, 6, OpAtomicCompareExchange>;
+defm : DemangledNativeBuiltin<"atom_add", OpenCL_std, Atomic, 2, 4, OpAtomicIAdd>;
+defm : DemangledNativeBuiltin<"atomic_add", OpenCL_std, Atomic, 2, 4, OpAtomicIAdd>;
+defm : DemangledNativeBuiltin<"atom_sub", OpenCL_std, Atomic, 2, 4, OpAtomicISub>;
+defm : DemangledNativeBuiltin<"atomic_sub", OpenCL_std, Atomic, 2, 4, OpAtomicISub>;
+defm : DemangledNativeBuiltin<"atom_or", OpenCL_std, Atomic, 2, 4, OpAtomicOr>;
+defm : DemangledNativeBuiltin<"atomic_or", OpenCL_std, Atomic, 2, 4, OpAtomicOr>;
+defm : DemangledNativeBuiltin<"atom_xor", OpenCL_std, Atomic, 2, 4, OpAtomicXor>;
+defm : DemangledNativeBuiltin<"atomic_xor", OpenCL_std, Atomic, 2, 4, OpAtomicXor>;
+defm : DemangledNativeBuiltin<"atom_and", OpenCL_std, Atomic, 2, 4, OpAtomicAnd>;
+defm : DemangledNativeBuiltin<"atomic_and", OpenCL_std, Atomic, 2, 4, OpAtomicAnd>;
+defm : DemangledNativeBuiltin<"atomic_exchange", OpenCL_std, Atomic, 2, 4, OpAtomicExchange>;
+defm : DemangledNativeBuiltin<"atomic_exchange_explicit", OpenCL_std, Atomic, 2, 4, OpAtomicExchange>;
+defm : DemangledNativeBuiltin<"atomic_work_item_fence", OpenCL_std, Atomic, 1, 3, OpMemoryBarrier>;
+defm : DemangledNativeBuiltin<"atomic_fetch_add", OpenCL_std, Atomic, 2, 4, OpAtomicIAdd>;
+defm : DemangledNativeBuiltin<"atomic_fetch_sub", OpenCL_std, Atomic, 2, 4, OpAtomicISub>;
+defm : DemangledNativeBuiltin<"atomic_fetch_or", OpenCL_std, Atomic, 2, 4, OpAtomicOr>;
+defm : DemangledNativeBuiltin<"atomic_fetch_xor", OpenCL_std, Atomic, 2, 4, OpAtomicXor>;
+defm : DemangledNativeBuiltin<"atomic_fetch_and", OpenCL_std, Atomic, 2, 4, OpAtomicAnd>;
+defm : DemangledNativeBuiltin<"atomic_fetch_add_explicit", OpenCL_std, Atomic, 4, 6, OpAtomicIAdd>;
+defm : DemangledNativeBuiltin<"atomic_fetch_sub_explicit", OpenCL_std, Atomic, 4, 6, OpAtomicISub>;
+defm : DemangledNativeBuiltin<"atomic_fetch_or_explicit", OpenCL_std, Atomic, 4, 6, OpAtomicOr>;
+defm : DemangledNativeBuiltin<"atomic_fetch_xor_explicit", OpenCL_std, Atomic, 4, 6, OpAtomicXor>;
+defm : DemangledNativeBuiltin<"atomic_fetch_and_explicit", OpenCL_std, Atomic, 4, 6, OpAtomicAnd>;
+
+// Barrier builtin records:
+defm : DemangledNativeBuiltin<"barrier", OpenCL_std, Barrier, 1, 3, OpControlBarrier>;
+defm : DemangledNativeBuiltin<"work_group_barrier", OpenCL_std, Barrier, 1, 3, OpControlBarrier>;
+
+// Kernel enqueue builtin records:
+defm : DemangledNativeBuiltin<"retain_event", OpenCL_std, Enqueue, 1, 1, OpRetainEvent>;
+defm : DemangledNativeBuiltin<"release_event", OpenCL_std, Enqueue, 1, 1, OpReleaseEvent>;
+defm : DemangledNativeBuiltin<"create_user_event", OpenCL_std, Enqueue, 0, 0, OpCreateUserEvent>;
+defm : DemangledNativeBuiltin<"is_valid_event", OpenCL_std, Enqueue, 1, 1, OpIsValidEvent>;
+defm : DemangledNativeBuiltin<"set_user_event_status", OpenCL_std, Enqueue, 2, 2, OpSetUserEventStatus>;
+defm : DemangledNativeBuiltin<"capture_event_profiling_info", OpenCL_std, Enqueue, 3, 3, OpCaptureEventProfilingInfo>;
+
+// Spec constant builtin record:
+defm : DemangledNativeBuiltin<"__spirv_SpecConstant", OpenCL_std, SpecConstant, 2, 2, OpSpecConstant>;
+defm : DemangledNativeBuiltin<"__spirv_SpecConstantComposite", OpenCL_std, SpecConstant, 1, 0, OpSpecConstantComposite>;
+
+//===----------------------------------------------------------------------===//
+// Class defining a work/sub group builtin that should be translated into a
+// SPIR-V instruction using the defined properties.
+//
+// name is the demangled name of the given builtin.
+// opcode specifies the SPIR-V operation code of the generated instruction.
+//===----------------------------------------------------------------------===//
+class GroupBuiltin<string name, Op operation> {
+  string Name = name;
+  Op Opcode = operation;
+  bits<32> GroupOperation = !cond(!not(!eq(!find(name, "group_reduce"), -1)) : Reduce.Value,
+                                  !not(!eq(!find(name, "group_scan_inclusive"), -1)) : InclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_scan_exclusive"), -1)) : ExclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_ballot_bit_count"), -1)) : Reduce.Value,
+                                  !not(!eq(!find(name, "group_ballot_inclusive_scan"), -1)) : InclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_ballot_exclusive_scan"), -1)) : ExclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_reduce"), -1)) : Reduce.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_scan_inclusive"), -1)) : InclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_scan_exclusive"), -1)) : ExclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_reduce_logical"), -1)) : Reduce.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_scan_inclusive_logical"), -1)) : InclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_non_uniform_scan_exclusive_logical"), -1)) : ExclusiveScan.Value,
+                                  !not(!eq(!find(name, "group_clustered_reduce"), -1)) : ClusteredReduce.Value,
+                                  !not(!eq(!find(name, "group_clustered_reduce_logical"), -1)) : ClusteredReduce.Value,
+                                  true : 0);
+  bit IsElect = !eq(operation, OpGroupNonUniformElect);
+  bit IsAllOrAny = !or(!eq(operation, OpGroupAll), 
+                       !eq(operation, OpGroupAny), 
+                       !eq(operation, OpGroupNonUniformAll), 
+                       !eq(operation, OpGroupNonUniformAny));
+  bit IsAllEqual = !eq(operation, OpGroupNonUniformAllEqual);
+  bit IsBallot = !eq(operation, OpGroupNonUniformBallot);
+  bit IsInverseBallot = !eq(operation, OpGroupNonUniformInverseBallot);
+  bit IsBallotBitExtract = !eq(operation, OpGroupNonUniformBallotBitExtract);
+  bit IsBallotFindBit = !or(!eq(operation, OpGroupNonUniformBallotFindLSB), 
+                            !eq(operation, OpGroupNonUniformBallotFindMSB));
+  bit IsLogical = !or(!eq(operation, OpGroupNonUniformLogicalAnd), 
+                      !eq(operation, OpGroupNonUniformLogicalOr), 
+                      !eq(operation, OpGroupNonUniformLogicalXor));
+  bit NoGroupOperation = !or(IsElect, IsAllOrAny, IsAllEqual, 
+                             IsBallot, IsInverseBallot, 
+                             IsBallotBitExtract, IsBallotFindBit, 
+                             !eq(operation, OpGroupNonUniformShuffle),
+                             !eq(operation, OpGroupNonUniformShuffleXor),
+                             !eq(operation, OpGroupNonUniformShuffleUp),
+                             !eq(operation, OpGroupNonUniformShuffleDown),
+                             !eq(operation, OpGroupBroadcast),
+                             !eq(operation, OpGroupNonUniformBroadcast),
+                             !eq(operation, OpGroupNonUniformBroadcastFirst));
+  bit HasBoolArg = !or(!and(IsAllOrAny, !eq(IsAllEqual, false)), IsBallot, IsLogical);
+}
+
+// Table gathering all the work/sub group builtins.
+def GroupBuiltins : GenericTable {
+  let FilterClass = "GroupBuiltin";
+  let Fields = ["Name", "Opcode", "GroupOperation", "IsElect", "IsAllOrAny",
+                "IsAllEqual", "IsBallot", "IsInverseBallot", "IsBallotBitExtract",
+                "IsBallotFindBit", "IsLogical", "NoGroupOperation", "HasBoolArg"];
+}
+
+// Function to lookup native builtins by their name and set.
+def lookupGroupBuiltin : SearchIndex {
+  let Table = GroupBuiltins;
+  let Key = ["Name"];
+}
+
+// Multiclass used to define at the same time both incoming builtin records
+// and corresponding work/sub group builtin records.
+defvar OnlyWork = 0; defvar OnlySub = 1; defvar WorkOrSub = 2;
+multiclass DemangledGroupBuiltin<string name, int level /* OnlyWork/OnlySub/... */, Op operation> {
+  assert !and(!ge(level, 0), !le(level, 2)), "group level is invalid: " # level;
+
+  if !or(!eq(level, OnlyWork), !eq(level, WorkOrSub)) then {
+    def : DemangledBuiltin<!strconcat("work_", name), OpenCL_std, Group, 0, 4>;
+    def : GroupBuiltin<!strconcat("work_", name), operation>;
+  }
+
+  if !or(!eq(level, OnlySub), !eq(level, WorkOrSub)) then {
+    def : DemangledBuiltin<!strconcat("sub_", name), OpenCL_std, Group, 0, 4>;
+    def : GroupBuiltin<!strconcat("sub_", name), operation>;
+  }
+}
+
+defm : DemangledGroupBuiltin<"group_all", WorkOrSub, OpGroupAll>;
+defm : DemangledGroupBuiltin<"group_any", WorkOrSub, OpGroupAny>;
+defm : DemangledGroupBuiltin<"group_broadcast", WorkOrSub, OpGroupBroadcast>;
+defm : DemangledGroupBuiltin<"group_non_uniform_broadcast", OnlySub, OpGroupNonUniformBroadcast>;
+defm : DemangledGroupBuiltin<"group_broadcast_first", OnlySub, OpGroupNonUniformBroadcastFirst>;
+
+// cl_khr_subgroup_non_uniform_vote
+defm : DemangledGroupBuiltin<"group_elect", OnlySub, OpGroupNonUniformElect>;
+defm : DemangledGroupBuiltin<"group_non_uniform_all", OnlySub, OpGroupNonUniformAll>;
+defm : DemangledGroupBuiltin<"group_non_uniform_any", OnlySub, OpGroupNonUniformAny>;
+defm : DemangledGroupBuiltin<"group_non_uniform_all_equal", OnlySub, OpGroupNonUniformAllEqual>;
+
+// cl_khr_subgroup_ballot
+defm : DemangledGroupBuiltin<"group_ballot", OnlySub, OpGroupNonUniformBallot>;
+defm : DemangledGroupBuiltin<"group_inverse_ballot", OnlySub, OpGroupNonUniformInverseBallot>;
+defm : DemangledGroupBuiltin<"group_ballot_bit_extract", OnlySub, OpGroupNonUniformBallotBitExtract>;
+defm : DemangledGroupBuiltin<"group_ballot_bit_count", OnlySub, OpGroupNonUniformBallotBitCount>;
+defm : DemangledGroupBuiltin<"group_ballot_inclusive_scan", OnlySub, OpGroupNonUniformBallotBitCount>;
+defm : DemangledGroupBuiltin<"group_ballot_exclusive_scan", OnlySub, OpGroupNonUniformBallotBitCount>;
+defm : DemangledGroupBuiltin<"group_ballot_find_lsb", OnlySub, OpGroupNonUniformBallotFindLSB>;
+defm : DemangledGroupBuiltin<"group_ballot_find_msb", OnlySub, OpGroupNonUniformBallotFindMSB>;
+
+// cl_khr_subgroup_shuffle
+defm : DemangledGroupBuiltin<"group_shuffle", OnlySub, OpGroupNonUniformShuffle>;
+defm : DemangledGroupBuiltin<"group_shuffle_xor", OnlySub, OpGroupNonUniformShuffleXor>;
+
+// cl_khr_subgroup_shuffle_relative
+defm : DemangledGroupBuiltin<"group_shuffle_up", OnlySub, OpGroupNonUniformShuffleUp>;
+defm : DemangledGroupBuiltin<"group_shuffle_down", OnlySub, OpGroupNonUniformShuffleDown>;
+
+defm : DemangledGroupBuiltin<"group_iadd", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_reduce_adds", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_adds", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_adds", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_reduce_addu", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_addu", WorkOrSub, OpGroupIAdd>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_addu", WorkOrSub, OpGroupIAdd>;
+
+defm : DemangledGroupBuiltin<"group_fadd", WorkOrSub, OpGroupFAdd>;
+defm : DemangledGroupBuiltin<"group_reduce_addf", WorkOrSub, OpGroupFAdd>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_addf", WorkOrSub, OpGroupFAdd>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_addf", WorkOrSub, OpGroupFAdd>;
+
+defm : DemangledGroupBuiltin<"group_fmin", WorkOrSub, OpGroupFMin>;
+defm : DemangledGroupBuiltin<"group_reduce_minf", WorkOrSub, OpGroupFMin>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_minf", WorkOrSub, OpGroupFMin>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_minf", WorkOrSub, OpGroupFMin>;
+
+defm : DemangledGroupBuiltin<"group_umin", WorkOrSub, OpGroupUMin>;
+defm : DemangledGroupBuiltin<"group_reduce_minu", WorkOrSub, OpGroupUMin>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_minu", WorkOrSub, OpGroupUMin>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_minu", WorkOrSub, OpGroupUMin>;
+
+defm : DemangledGroupBuiltin<"group_smin", WorkOrSub, OpGroupSMin>;
+defm : DemangledGroupBuiltin<"group_reduce_mins", WorkOrSub, OpGroupSMin>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_mins", WorkOrSub, OpGroupSMin>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_mins", WorkOrSub, OpGroupSMin>;
+
+defm : DemangledGroupBuiltin<"group_fmax", WorkOrSub, OpGroupFMax>;
+defm : DemangledGroupBuiltin<"group_reduce_maxf", WorkOrSub, OpGroupFMax>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_maxf", WorkOrSub, OpGroupFMax>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_maxf", WorkOrSub, OpGroupFMax>;
+
+defm : DemangledGroupBuiltin<"group_umax", WorkOrSub, OpGroupUMax>;
+defm : DemangledGroupBuiltin<"group_reduce_maxu", WorkOrSub, OpGroupUMax>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_maxu", WorkOrSub, OpGroupUMax>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_maxu", WorkOrSub, OpGroupUMax>;
+
+defm : DemangledGroupBuiltin<"group_smax", WorkOrSub, OpGroupSMax>;
+defm : DemangledGroupBuiltin<"group_reduce_maxs", WorkOrSub, OpGroupSMax>;
+defm : DemangledGroupBuiltin<"group_scan_exclusive_maxs", WorkOrSub, OpGroupSMax>;
+defm : DemangledGroupBuiltin<"group_scan_inclusive_maxs", WorkOrSub, OpGroupSMax>;
+
+// cl_khr_subgroup_non_uniform_arithmetic
+defm : DemangledGroupBuiltin<"group_non_uniform_iadd", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_addu", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_adds", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_addu", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_adds", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_addu", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_adds", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_addu", WorkOrSub, OpGroupNonUniformIAdd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_adds", WorkOrSub, OpGroupNonUniformIAdd>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_fadd", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_addf", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_addh", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_addd", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_addf", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_addh", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_addd", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_addf", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_addh", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_addd", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_addf", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_addh", WorkOrSub, OpGroupNonUniformFAdd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_addd", WorkOrSub, OpGroupNonUniformFAdd>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_imul", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_mulu", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_muls", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_mulu", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_muls", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_mulu", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_muls", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_mulu", WorkOrSub, OpGroupNonUniformIMul>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_muls", WorkOrSub, OpGroupNonUniformIMul>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_fmul", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_mulf", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_mulh", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_muld", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_mulf", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_mulh", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_muld", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_mulf", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_mulh", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_muld", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_mulf", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_mulh", WorkOrSub, OpGroupNonUniformFMul>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_muld", WorkOrSub, OpGroupNonUniformFMul>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_smin", WorkOrSub, OpGroupNonUniformSMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_mins", WorkOrSub, OpGroupNonUniformSMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_mins", WorkOrSub, OpGroupNonUniformSMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_mins", WorkOrSub, OpGroupNonUniformSMin>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_mins", WorkOrSub, OpGroupNonUniformSMin>;
+
+
+defm : DemangledGroupBuiltin<"group_non_uniform_umin", WorkOrSub, OpGroupNonUniformUMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_minu", WorkOrSub, OpGroupNonUniformUMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_minu", WorkOrSub, OpGroupNonUniformUMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_minu", WorkOrSub, OpGroupNonUniformUMin>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_minu", WorkOrSub, OpGroupNonUniformUMin>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_fmin", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_minf", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_minh", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_mind", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_minf", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_minh", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_mind", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_minf", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_minh", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_mind", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_minf", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_minh", WorkOrSub, OpGroupNonUniformFMin>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_mind", WorkOrSub, OpGroupNonUniformFMin>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_smax", WorkOrSub, OpGroupNonUniformSMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_maxs", WorkOrSub, OpGroupNonUniformSMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_maxs", WorkOrSub, OpGroupNonUniformSMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_maxs", WorkOrSub, OpGroupNonUniformSMax>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_maxs", WorkOrSub, OpGroupNonUniformSMax>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_umax", WorkOrSub, OpGroupNonUniformUMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_maxu", WorkOrSub, OpGroupNonUniformUMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_maxu", WorkOrSub, OpGroupNonUniformUMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_maxu", WorkOrSub, OpGroupNonUniformUMax>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_maxu", WorkOrSub, OpGroupNonUniformUMax>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_fmax", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_maxf", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_maxh", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_maxd", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_maxf", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_maxh", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_maxd", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_maxf", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_maxh", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_maxd", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_maxf", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_maxh", WorkOrSub, OpGroupNonUniformFMax>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_maxd", WorkOrSub, OpGroupNonUniformFMax>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_iand", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_andu", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_ands", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_andu", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_ands", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_andu", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_ands", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_andu", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_ands", WorkOrSub, OpGroupNonUniformBitwiseAnd>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_ior", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_oru", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_ors", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_oru", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_ors", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_oru", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_ors", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_oru", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_ors", WorkOrSub, OpGroupNonUniformBitwiseOr>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_ixor", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_xoru", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_xors", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_xoru", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_xors", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_xoru", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_xors", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_xoru", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_xors", WorkOrSub, OpGroupNonUniformBitwiseXor>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_logical_iand", WorkOrSub, OpGroupNonUniformLogicalAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_logical_ands", WorkOrSub, OpGroupNonUniformLogicalAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_logical_ands", WorkOrSub, OpGroupNonUniformLogicalAnd>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_logical_ands", WorkOrSub, OpGroupNonUniformLogicalAnd>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_logical_and", WorkOrSub, OpGroupNonUniformLogicalAnd>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_logical_ior", WorkOrSub, OpGroupNonUniformLogicalOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_logical_ors", WorkOrSub, OpGroupNonUniformLogicalOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_logical_ors", WorkOrSub, OpGroupNonUniformLogicalOr>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_logical_ors", WorkOrSub, OpGroupNonUniformLogicalOr>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_logical_or", WorkOrSub, OpGroupNonUniformLogicalOr>;
+
+defm : DemangledGroupBuiltin<"group_non_uniform_logical_ixor", WorkOrSub, OpGroupNonUniformLogicalXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_reduce_logical_xors", WorkOrSub, OpGroupNonUniformLogicalXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_inclusive_logical_xors", WorkOrSub, OpGroupNonUniformLogicalXor>;
+defm : DemangledGroupBuiltin<"group_non_uniform_scan_exclusive_logical_xors", WorkOrSub, OpGroupNonUniformLogicalXor>;
+defm : DemangledGroupBuiltin<"group_clustered_reduce_logical_xor", WorkOrSub, OpGroupNonUniformLogicalXor>;
+
+
+//===----------------------------------------------------------------------===//
+// Class defining a get builtin record used for lowering builtin calls such as
+// "get_sub_group_eq_mask" or "get_global_id" to SPIR-V instructions.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// value specifies the value of the BuiltIn enum. 
+//===----------------------------------------------------------------------===//
+class GetBuiltin<string name, InstructionSet set, BuiltIn value> {
+  string Name = name;
+  InstructionSet Set = set;
+  BuiltIn Value = value;
+}
+
+// Table gathering all the get builtin records.
+def GetBuiltins : GenericTable {
+  let FilterClass = "GetBuiltin";
+  let Fields = ["Name", "Set", "Value"];
+  string TypeOf_Set = "InstructionSet";
+  string TypeOf_Value = "BuiltIn";
+}
+
+// Function to lookup get builtin records by their name and set.
+def lookupGetBuiltin : SearchIndex {
+  let Table = GetBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both a demangled builtin record
+// and a corresponding get builtin record.
+multiclass DemangledGetBuiltin<string name, InstructionSet set, BuiltinGroup group, BuiltIn value> {
+  def : DemangledBuiltin<name, set, group, 0, 1>;
+  def : GetBuiltin<name, set, value>;
+}
+
+// Builtin variable records:
+defm : DemangledGetBuiltin<"get_sub_group_eq_mask", OpenCL_std, Variable, SubgroupEqMask>;
+defm : DemangledGetBuiltin<"get_sub_group_ge_mask", OpenCL_std, Variable, SubgroupGeMask>;
+defm : DemangledGetBuiltin<"get_sub_group_gt_mask", OpenCL_std, Variable, SubgroupGtMask>;
+defm : DemangledGetBuiltin<"get_sub_group_le_mask", OpenCL_std, Variable, SubgroupLeMask>;
+defm : DemangledGetBuiltin<"get_sub_group_lt_mask", OpenCL_std, Variable, SubgroupLtMask>;
+defm : DemangledGetBuiltin<"__spirv_BuiltInGlobalLinearId", OpenCL_std, Variable, GlobalLinearId>;
+defm : DemangledGetBuiltin<"__spirv_BuiltInGlobalInvocationId", OpenCL_std, Variable, GlobalInvocationId>;
+
+// GetQuery builtin records:
+defm : DemangledGetBuiltin<"get_local_id", OpenCL_std, GetQuery, LocalInvocationId>;
+defm : DemangledGetBuiltin<"get_global_id", OpenCL_std, GetQuery, GlobalInvocationId>;
+defm : DemangledGetBuiltin<"get_local_size", OpenCL_std, GetQuery, WorkgroupSize>;
+defm : DemangledGetBuiltin<"get_global_size", OpenCL_std, GetQuery, GlobalSize>;
+defm : DemangledGetBuiltin<"get_group_id", OpenCL_std, GetQuery, WorkgroupId>;
+defm : DemangledGetBuiltin<"get_enqueued_local_size", OpenCL_std, GetQuery, EnqueuedWorkgroupSize>;
+defm : DemangledGetBuiltin<"get_num_groups", OpenCL_std, GetQuery, NumWorkgroups>;
+
+//===----------------------------------------------------------------------===//
+// Class defining an image query builtin record used for lowering the OpenCL 
+// "get_image_*" calls into OpImageQuerySize/OpImageQuerySizeLod instructions.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// component specifies the unsigned number of the query component.
+//===----------------------------------------------------------------------===//
+class ImageQueryBuiltin<string name, InstructionSet set, bits<32> component> {
+  string Name = name;
+  InstructionSet Set = set;
+  bits<32> Component = component;
+}
+
+// Table gathering all the image query builtins.
+def ImageQueryBuiltins : GenericTable {
+  let FilterClass = "ImageQueryBuiltin";
+  let Fields = ["Name", "Set", "Component"];
+  string TypeOf_Set = "InstructionSet";
+}
+
+// Function to lookup image query builtins by their name and set.
+def lookupImageQueryBuiltin : SearchIndex {
+  let Table = ImageQueryBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both a demangled builtin record
+// and a corresponding image query builtin record.
+multiclass DemangledImageQueryBuiltin<string name, InstructionSet set, int component> {
+  def : DemangledBuiltin<name, set, ImageSizeQuery, 1, 1>;
+  def : ImageQueryBuiltin<name, set, component>;
+}
+
+// Image query builtin records:
+defm : DemangledImageQueryBuiltin<"get_image_width", OpenCL_std, 0>;
+defm : DemangledImageQueryBuiltin<"get_image_height", OpenCL_std, 1>;
+defm : DemangledImageQueryBuiltin<"get_image_depth", OpenCL_std, 2>;
+defm : DemangledImageQueryBuiltin<"get_image_dim", OpenCL_std, 0>;
+defm : DemangledImageQueryBuiltin<"get_image_array_size", OpenCL_std, 3>;
+
+defm : DemangledNativeBuiltin<"get_image_num_samples", OpenCL_std, ImageMiscQuery, 1, 1, OpImageQuerySamples>;
+
+//===----------------------------------------------------------------------===//
+// Classes definining various OpenCL enums.
+//===----------------------------------------------------------------------===//
+
+// OpenCL memory_scope enum
+def CLMemoryScope : GenericEnum {
+  let FilterClass = "CLMemoryScope";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class CLMemoryScope<bits<32> value> {
+  string Name = NAME;
+  bits<32> Value = value;
+}
+
+def memory_scope_work_item : CLMemoryScope<0>;
+def memory_scope_work_group : CLMemoryScope<1>;
+def memory_scope_device : CLMemoryScope<2>;
+def memory_scope_all_svm_devices : CLMemoryScope<3>;
+def memory_scope_sub_group : CLMemoryScope<4>;
+
+// OpenCL sampler addressing mode/bitmask enum
+def CLSamplerAddressingMode : GenericEnum {
+  let FilterClass = "CLSamplerAddressingMode";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class CLSamplerAddressingMode<bits<32> value> {
+  string Name = NAME;
+  bits<32> Value = value;
+}
+
+def CLK_ADDRESS_NONE : CLSamplerAddressingMode<0x0>;
+def CLK_ADDRESS_CLAMP : CLSamplerAddressingMode<0x4>;
+def CLK_ADDRESS_CLAMP_TO_EDGE : CLSamplerAddressingMode<0x2>;
+def CLK_ADDRESS_REPEAT : CLSamplerAddressingMode<0x6>;
+def CLK_ADDRESS_MIRRORED_REPEAT : CLSamplerAddressingMode<0x8>;
+def CLK_ADDRESS_MODE_MASK : CLSamplerAddressingMode<0xE>;
+def CLK_NORMALIZED_COORDS_FALSE : CLSamplerAddressingMode<0x0>;
+def CLK_NORMALIZED_COORDS_TRUE : CLSamplerAddressingMode<0x1>;
+def CLK_FILTER_NEAREST : CLSamplerAddressingMode<0x10>;
+def CLK_FILTER_LINEAR : CLSamplerAddressingMode<0x20>;
+
+// OpenCL memory fences
+def CLMemoryFenceFlags : GenericEnum {
+  let FilterClass = "CLMemoryFenceFlags";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class CLMemoryFenceFlags<bits<32> value> {
+  string Name = NAME;
+  bits<32> Value = value;
+}
+
+def CLK_LOCAL_MEM_FENCE : CLMemoryFenceFlags<0x1>;
+def CLK_GLOBAL_MEM_FENCE : CLMemoryFenceFlags<0x2>;
+def CLK_IMAGE_MEM_FENCE : CLMemoryFenceFlags<0x4>;

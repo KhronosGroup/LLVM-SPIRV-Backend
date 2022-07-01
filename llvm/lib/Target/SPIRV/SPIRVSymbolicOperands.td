@@ -1143,14 +1143,14 @@ class BuiltIn<string name, bits<32> value> {
 }
 
 multiclass BuiltInOperand<bits<32> value, bits<32> minVersion, bits<32> maxVersion, list<Extension> reqExtensions, list<Capability> reqCapabilities> {
-  def : BuiltIn<NAME, value>;
+  def NAME : BuiltIn<NAME, value>;
   defm : SymbolicOperandWithRequirements<BuiltInOperand, value, NAME, minVersion, maxVersion, reqExtensions, reqCapabilities>;
 }
 
 defm Position : BuiltInOperand<0, 0, 0, [], [Shader]>;
 defm PointSize : BuiltInOperand<1, 0, 0, [], [Shader]>;
-defm ClipDistance : BuiltInOperand<3, 0, 0, [], [ClipDistance]>;
-defm CullDistance : BuiltInOperand<4, 0, 0, [], [CullDistance]>;
+defm ClipDistanceVariable : BuiltInOperand<3, 0, 0, [], [ClipDistance]>;
+defm CullDistanceVariable : BuiltInOperand<4, 0, 0, [], [CullDistance]>;
 defm VertexId : BuiltInOperand<5, 0, 0, [], [Shader]>;
 defm InstanceId : BuiltInOperand<6, 0, 0, [], [Shader]>;
 defm PrimitiveId : BuiltInOperand<7, 0, 0, [], [Geometry, Tessellation, RayTracingNV]>;
@@ -1444,7 +1444,7 @@ class GroupOperation<string name, bits<32> value> {
 }
 
 multiclass GroupOperationOperand<bits<32> value, bits<32> minVersion, bits<32> maxVersion, list<Extension> reqExtensions, list<Capability> reqCapabilities> {
-  def : GroupOperation<NAME, value>;
+  def NAME : GroupOperation<NAME, value>;
   defm : SymbolicOperandWithRequirements<GroupOperationOperand, value, NAME, minVersion, maxVersion, reqExtensions, reqCapabilities>;
 }
 
