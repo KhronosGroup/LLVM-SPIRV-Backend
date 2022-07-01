@@ -51,7 +51,7 @@ private:
   bool OpenCLImageSupport;
 
   std::set<Extension::Extension> AvailableExtensions;
-  std::set<ExtInstSet> AvailableExtInstSets;
+  std::set<InstructionSet::InstructionSet> AvailableExtInstSets;
   std::set<Capability::Capability> AvailableCaps;
 
   std::unique_ptr<SPIRVGlobalRegistry> GR;
@@ -97,7 +97,7 @@ public:
 
   bool canUseCapability(Capability::Capability C) const;
   bool canUseExtension(Extension::Extension E) const;
-  bool canUseExtInstSet(ExtInstSet E) const;
+  bool canUseExtInstSet(InstructionSet::InstructionSet E) const;
 
   SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
 

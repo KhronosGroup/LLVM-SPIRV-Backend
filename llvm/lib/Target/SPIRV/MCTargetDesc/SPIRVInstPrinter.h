@@ -21,7 +21,7 @@
 namespace llvm {
 class SPIRVInstPrinter : public MCInstPrinter {
 private:
-  SmallDenseMap<unsigned, ExtInstSet> ExtInstSetIDs;
+  SmallDenseMap<unsigned, InstructionSet::InstructionSet> ExtInstSetIDs;
   void recordOpExtInstImport(const MCInst *MI);
 
 public:

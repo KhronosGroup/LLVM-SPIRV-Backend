@@ -11,45 +11,62 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVExtInsts.h"
-#include "llvm/Support/ErrorHandling.h"
-#include <map>
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ArrayRef.h"
 
 using namespace llvm;
 
-const char *getExtInstSetName(ExtInstSet e) {
-  switch (e) {
-  case ExtInstSet::OpenCL_std:
+namespace {
+  struct ExtendedBuiltin {
+  StringRef Name;
+  InstructionSet::InstructionSet Set;
+  uint32_t Number;
+};
+
+using namespace InstructionSet;
+#define GET_ExtendedBuiltins_DECL
+#define GET_ExtendedBuiltins_IMPL
+#include "SPIRVGenTables.inc"
+}
+
+std::string getExtInstSetName(::InstructionSet::InstructionSet Set) {
+  switch (Set) {
+  case ::InstructionSet::OpenCL_std:
     return "OpenCL.std";
-  case ExtInstSet::GLSL_std_450:
+  case ::InstructionSet::GLSL_std_450:
     return "GLSL.std.450";
-  case ExtInstSet::SPV_AMD_shader_trinary_minmax:
+  case ::InstructionSet::SPV_AMD_shader_trinary_minmax:
     return "SPV_AMD_shader_trinary_minmax";
   }
   return "UNKNOWN_EXT_INST_SET";
 }
 
-ExtInstSet getExtInstSetFromString(const std::string &nameStr) {
-  for (auto set : {ExtInstSet::GLSL_std_450, ExtInstSet::OpenCL_std}) {
-    if (nameStr == getExtInstSetName(set)) {
-      return set;
+::InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName) {
+  for (auto Set : {::InstructionSet::GLSL_std_450, ::InstructionSet::OpenCL_std}) {
+    if (SetName == getExtInstSetName(Set)) {
+      return Set;
     }
   }
   llvm_unreachable("UNKNOWN_EXT_INST_SET");
 }
 
-const char *getExtInstName(ExtInstSet set, uint32_t inst) {
-  switch (set) {
-  case ExtInstSet::OpenCL_std:
-    return getOpenCL_stdName(inst);
-  case ExtInstSet::GLSL_std_450:
-    return getGLSL_std_450Name(inst);
-  case ExtInstSet::SPV_AMD_shader_trinary_minmax:
-    return getSPV_AMD_shader_trinary_minmaxName(inst);
+std::string getExtInstName(::InstructionSet::InstructionSet Set,
+                           uint32_t InstructionNumber) {
+  switch (Set) {
+  case ::InstructionSet::OpenCL_std: {
+    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
+        ::InstructionSet::OpenCL_std, InstructionNumber);
+    if (Lookup)
+      return Lookup->Name.str();
   }
+  case ::InstructionSet::GLSL_std_450: {
+    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
+        ::InstructionSet::GLSL_std_450, InstructionNumber);
+
+    if (Lookup)
+      return Lookup->Name.str();
+  }
+  }
+
   return "UNKNOWN_EXT_INST_SET";
 }
-
-GEN_EXT_INST_IMPL(OpenCL_std)
-GEN_EXT_INST_IMPL(GLSL_std_450)
-GEN_EXT_INST_IMPL(SPV_AMD_shader_trinary_minmax)
-

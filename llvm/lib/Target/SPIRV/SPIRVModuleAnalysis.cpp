@@ -116,7 +116,7 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
       OperandCategory::AddressingModelOperand, MAI.Addr, *ST));
 
   // TODO: check if it's required by default.
-  MAI.ExtInstSetMap[static_cast<unsigned>(ExtInstSet::OpenCL_std)] =
+  MAI.ExtInstSetMap[static_cast<unsigned>(InstructionSet::OpenCL_std)] =
       Register::index2VirtReg(MAI.getNextID());
 }
 

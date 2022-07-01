@@ -188,7 +188,7 @@ multiclass ExtensionOperand<bits<32> value> {
 }
 
 defm SPV_AMD_shader_explicit_vertex_parameter : ExtensionOperand<1>;
-defm SPV_AMD_shader_trinary_minmax : ExtensionOperand<2>;
+defm SPV_AMD_shader_trinary_minmax_extension : ExtensionOperand<2>;
 defm SPV_AMD_gcn_shader : ExtensionOperand<3>;
 defm SPV_KHR_shader_ballot : ExtensionOperand<4>;
 defm SPV_AMD_shader_ballot : ExtensionOperand<5>;

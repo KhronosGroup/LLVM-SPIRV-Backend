@@ -25,7 +25,7 @@ class InstructionSet<bits<32> value> {
 
 def OpenCL_std : InstructionSet<0>;
 def GLSL_std_450 : InstructionSet<1>;
-//def SPV_AMD_shader_trinary_minmax : InstructionSet<2>;
+def SPV_AMD_shader_trinary_minmax : InstructionSet<2>;
 
 // Define various builtin groups
 def BuiltinGroup : GenericEnum {
@@ -133,11 +133,49 @@ def lookupExtendedBuiltin : SearchIndex {
   let Key = ["Name", "Set"];
 }
 
+// Function to lookup extended builtins by their set and number.
+def lookupExtendedBuiltinBySetAndNumber : SearchIndex {
+  let Table = ExtendedBuiltins;
+  let Key = ["Set", "Number"];
+}
+
+// OpenCL extended instruction enums
+def OpenCLExtInst : GenericEnum {
+  let FilterClass = "OpenCLExtInst";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class OpenCLExtInst<string name, bits<32> value> {
+  string Name = name;
+  bits<32> Value = value;
+}
+
+// GLSL extended instruction enums
+def GLSLExtInst : GenericEnum {
+  let FilterClass = "GLSLExtInst";
+  let NameField = "Name";
+  let ValueField = "Value";
+}
+
+class GLSLExtInst<string name, bits<32> value> {
+  string Name = name;
+  bits<32> Value = value;
+}
+
 // Multiclass used to define at the same time both a demangled builtin record
 // and a corresponding extended builtin record.
 multiclass DemangledExtendedBuiltin<string name, InstructionSet set, int number> {
   def : DemangledBuiltin<name, set, Extended, 1, 3>;
   def : ExtendedBuiltin<name, set, number>;
+
+  if !eq(set, OpenCL_std) then {
+    def : OpenCLExtInst<name, number>;
+  }
+
+  if !eq(set, GLSL_std_450) then {
+    def : GLSLExtInst<name, number>;
+  }
 }
 
 // Extended builtin records:
@@ -303,6 +341,87 @@ defm : DemangledExtendedBuiltin<"shuffle", OpenCL_std, 182>;
 defm : DemangledExtendedBuiltin<"shuffle2", OpenCL_std, 183>;
 defm : DemangledExtendedBuiltin<"printf", OpenCL_std, 184>;
 defm : DemangledExtendedBuiltin<"prefetch", OpenCL_std, 185>;
+
+defm : DemangledExtendedBuiltin<"Round", GLSL_std_450, 1>;
+defm : DemangledExtendedBuiltin<"RoundEven", GLSL_std_450, 2>;
+defm : DemangledExtendedBuiltin<"Trunc", GLSL_std_450, 3>;
+defm : DemangledExtendedBuiltin<"FAbs", GLSL_std_450, 4>;
+defm : DemangledExtendedBuiltin<"SAbs", GLSL_std_450, 5>;
+defm : DemangledExtendedBuiltin<"FSign", GLSL_std_450, 6>;
+defm : DemangledExtendedBuiltin<"SSign", GLSL_std_450, 7>;
+defm : DemangledExtendedBuiltin<"Floor", GLSL_std_450, 8>;
+defm : DemangledExtendedBuiltin<"Ceil", GLSL_std_450, 9>;
+defm : DemangledExtendedBuiltin<"Fract", GLSL_std_450, 10>;
+defm : DemangledExtendedBuiltin<"Radians", GLSL_std_450, 11>;
+defm : DemangledExtendedBuiltin<"Degrees", GLSL_std_450, 12>;
+defm : DemangledExtendedBuiltin<"Sin", GLSL_std_450, 13>;
+defm : DemangledExtendedBuiltin<"Cos", GLSL_std_450, 14>;
+defm : DemangledExtendedBuiltin<"Tan", GLSL_std_450, 15>;
+defm : DemangledExtendedBuiltin<"Asin", GLSL_std_450, 16>;
+defm : DemangledExtendedBuiltin<"Acos", GLSL_std_450, 17>;
+defm : DemangledExtendedBuiltin<"Atan", GLSL_std_450, 18>;
+defm : DemangledExtendedBuiltin<"Sinh", GLSL_std_450, 19>;
+defm : DemangledExtendedBuiltin<"Cosh", GLSL_std_450, 20>;
+defm : DemangledExtendedBuiltin<"Tanh", GLSL_std_450, 21>;
+defm : DemangledExtendedBuiltin<"Asinh", GLSL_std_450, 22>;
+defm : DemangledExtendedBuiltin<"Acosh", GLSL_std_450, 23>;
+defm : DemangledExtendedBuiltin<"Atanh", GLSL_std_450, 24>;
+defm : DemangledExtendedBuiltin<"Atan2", GLSL_std_450, 25>;
+defm : DemangledExtendedBuiltin<"Pow", GLSL_std_450, 26>;
+defm : DemangledExtendedBuiltin<"Exp", GLSL_std_450, 27>;
+defm : DemangledExtendedBuiltin<"Log", GLSL_std_450, 28>;
+defm : DemangledExtendedBuiltin<"Exp2", GLSL_std_450, 29>;
+defm : DemangledExtendedBuiltin<"Log2", GLSL_std_450, 30>;
+defm : DemangledExtendedBuiltin<"Sqrt", GLSL_std_450, 31>;
+defm : DemangledExtendedBuiltin<"InverseSqrt", GLSL_std_450, 32>;
+defm : DemangledExtendedBuiltin<"Determinant", GLSL_std_450, 33>;
+defm : DemangledExtendedBuiltin<"MatrixInverse", GLSL_std_450, 34>;
+defm : DemangledExtendedBuiltin<"Modf", GLSL_std_450, 35>;
+defm : DemangledExtendedBuiltin<"ModfStruct", GLSL_std_450, 36>;
+defm : DemangledExtendedBuiltin<"FMin", GLSL_std_450, 37>;
+defm : DemangledExtendedBuiltin<"UMin", GLSL_std_450, 38>;
+defm : DemangledExtendedBuiltin<"SMin", GLSL_std_450, 39>;
+defm : DemangledExtendedBuiltin<"FMax", GLSL_std_450, 40>;
+defm : DemangledExtendedBuiltin<"UMax", GLSL_std_450, 41>;
+defm : DemangledExtendedBuiltin<"SMax", GLSL_std_450, 42>;
+defm : DemangledExtendedBuiltin<"FClamp", GLSL_std_450, 43>;
+defm : DemangledExtendedBuiltin<"UClamp", GLSL_std_450, 44>;
+defm : DemangledExtendedBuiltin<"SClamp", GLSL_std_450, 45>;
+defm : DemangledExtendedBuiltin<"FMix", GLSL_std_450, 46>;
+defm : DemangledExtendedBuiltin<"Step", GLSL_std_450, 48>;
+defm : DemangledExtendedBuiltin<"SmoothStep", GLSL_std_450, 49>;
+defm : DemangledExtendedBuiltin<"Fma", GLSL_std_450, 50>;
+defm : DemangledExtendedBuiltin<"Frexp", GLSL_std_450, 51>;
+defm : DemangledExtendedBuiltin<"FrexpStruct", GLSL_std_450, 52>;
+defm : DemangledExtendedBuiltin<"Ldexp", GLSL_std_450, 53>;
+defm : DemangledExtendedBuiltin<"PackSnorm4x8", GLSL_std_450, 54>;
+defm : DemangledExtendedBuiltin<"PackUnorm4x8", GLSL_std_450, 55>;
+defm : DemangledExtendedBuiltin<"PackSnorm2x16", GLSL_std_450, 56>;
+defm : DemangledExtendedBuiltin<"PackUnorm2x16", GLSL_std_450, 57>;
+defm : DemangledExtendedBuiltin<"PackHalf2x16", GLSL_std_450, 58>;
+defm : DemangledExtendedBuiltin<"PackDouble2x32", GLSL_std_450, 59>;
+defm : DemangledExtendedBuiltin<"UnpackSnorm2x16", GLSL_std_450, 60>;
+defm : DemangledExtendedBuiltin<"UnpackUnorm2x16", GLSL_std_450, 61>;
+defm : DemangledExtendedBuiltin<"UnpackHalf2x16", GLSL_std_450, 62>;
+defm : DemangledExtendedBuiltin<"UnpackSnorm4x8", GLSL_std_450, 63>;
+defm : DemangledExtendedBuiltin<"UnpackUnorm4x8", GLSL_std_450, 64>;
+defm : DemangledExtendedBuiltin<"UnpackDouble2x32", GLSL_std_450, 65>;
+defm : DemangledExtendedBuiltin<"Length", GLSL_std_450, 66>;
+defm : DemangledExtendedBuiltin<"Distance", GLSL_std_450, 67>;
+defm : DemangledExtendedBuiltin<"Cross", GLSL_std_450, 68>;
+defm : DemangledExtendedBuiltin<"Normalize", GLSL_std_450, 69>;
+defm : DemangledExtendedBuiltin<"FaceForward", GLSL_std_450, 70>;
+defm : DemangledExtendedBuiltin<"Reflect", GLSL_std_450, 71>;
+defm : DemangledExtendedBuiltin<"Refract", GLSL_std_450, 72>;
+defm : DemangledExtendedBuiltin<"FindILsb", GLSL_std_450, 73>;
+defm : DemangledExtendedBuiltin<"FindSMsb", GLSL_std_450, 74>;
+defm : DemangledExtendedBuiltin<"FindUMsb", GLSL_std_450, 75>;
+defm : DemangledExtendedBuiltin<"InterpolateAtCentroid", GLSL_std_450, 76>;
+defm : DemangledExtendedBuiltin<"InterpolateAtSample", GLSL_std_450, 77>;
+defm : DemangledExtendedBuiltin<"InterpolateAtOffset", GLSL_std_450, 78>;
+defm : DemangledExtendedBuiltin<"NMin", GLSL_std_450, 79>;
+defm : DemangledExtendedBuiltin<"NMax", GLSL_std_450, 80>;
+defm : DemangledExtendedBuiltin<"NClamp", GLSL_std_450, 81>;
 
 //===----------------------------------------------------------------------===//
 // Class defining an native builtin record used for direct translation into a
