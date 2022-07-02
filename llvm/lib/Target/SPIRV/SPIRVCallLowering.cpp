@@ -14,9 +14,9 @@
 #include "SPIRVCallLowering.h"
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRV.h"
+#include "SPIRVBuiltins.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
-#include "SPIRVBuiltins.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVUtils.h"
@@ -273,7 +273,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
   std::string FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
   std::string DemangledName = isOclOrSpirvBuiltin(FuncName);
-  if (!DemangledName.empty()) {
+  if (!DemangledName.empty() && CF && CF->isDeclaration()) {
     // TODO: check that it's OCL builtin, then apply OpenCL_std.
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
     if (ST->canUseExtInstSet(InstructionSet::OpenCL_std)) {

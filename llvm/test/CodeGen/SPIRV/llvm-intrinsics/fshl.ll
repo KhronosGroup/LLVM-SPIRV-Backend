@@ -7,18 +7,18 @@ target triple = "spirv64-unknown-unknown"
 ; CHECK-SPIRV: OpName %[[NAME_FSHL_FUNC_16:[0-9]+]] "spirv.llvm_fshl_i16"
 ; CHECK-SPIRV: OpName %[[NAME_FSHL_FUNC_VEC_INT_16:[0-9]+]] "spirv.llvm_fshl_v2i16"
 ; CHECK-SPIRV: %[[TYPE_INT_32:[0-9]+]] = OpTypeInt 32 0
-; CHECK-SPIRV: %[[TYPE_INT_16:[0-9]+]] = OpTypeInt 16 0
-; CHECK-SPIRV-DAG: %[[CONST_ROTATE_32:[0-9]+]] = OpConstant %[[TYPE_INT_32]] 8
-; CHECK-SPIRV-DAG: %[[CONST_ROTATE_16:[0-9]+]] = OpConstant %[[TYPE_INT_16]] 8
-; CHECK-SPIRV-DAG: %[[CONST_TYPE_SIZE_32:[0-9]+]] = OpConstant %[[TYPE_INT_32]] 32
 ; CHECK-SPIRV: %[[TYPE_ORIG_FUNC_32:[0-9]+]] = OpTypeFunction %[[TYPE_INT_32]] %[[TYPE_INT_32]] %[[TYPE_INT_32]]
-; CHECK-SPIRV: %[[TYPE_FSHL_FUNC_32:[0-9]+]] = OpTypeFunction %[[TYPE_INT_32]] %[[TYPE_INT_32]] %[[TYPE_INT_32]] %[[TYPE_INT_32]]
+; CHECK-SPIRV: %[[TYPE_INT_16:[0-9]+]] = OpTypeInt 16 0
 ; CHECK-SPIRV: %[[TYPE_ORIG_FUNC_16:[0-9]+]] = OpTypeFunction %[[TYPE_INT_16]] %[[TYPE_INT_16]] %[[TYPE_INT_16]]
-; CHECK-SPIRV: %[[TYPE_FSHL_FUNC_16:[0-9]+]] = OpTypeFunction %[[TYPE_INT_16]] %[[TYPE_INT_16]] %[[TYPE_INT_16]] %[[TYPE_INT_16]]
 ; CHECK-SPIRV: %[[TYPE_VEC_INT_16:[0-9]+]] = OpTypeVector %[[TYPE_INT_16]] 2
 ; CHECK-SPIRV: %[[TYPE_ORIG_FUNC_VEC_INT_16:[0-9]+]] = OpTypeFunction %[[TYPE_VEC_INT_16]] %[[TYPE_VEC_INT_16]] %[[TYPE_VEC_INT_16]]
+; CHECK-SPIRV: %[[TYPE_FSHL_FUNC_32:[0-9]+]] = OpTypeFunction %[[TYPE_INT_32]] %[[TYPE_INT_32]] %[[TYPE_INT_32]] %[[TYPE_INT_32]]
+; CHECK-SPIRV: %[[TYPE_FSHL_FUNC_16:[0-9]+]] = OpTypeFunction %[[TYPE_INT_16]] %[[TYPE_INT_16]] %[[TYPE_INT_16]] %[[TYPE_INT_16]]
 ; CHECK-SPIRV: %[[TYPE_FSHL_FUNC_VEC_INT_16:[0-9]+]] = OpTypeFunction %[[TYPE_VEC_INT_16]] %[[TYPE_VEC_INT_16]] %[[TYPE_VEC_INT_16]] %[[TYPE_VEC_INT_16]]
+; CHECK-SPIRV-DAG: %[[CONST_ROTATE_32:[0-9]+]] = OpConstant %[[TYPE_INT_32]] 8
+; CHECK-SPIRV-DAG: %[[CONST_ROTATE_16:[0-9]+]] = OpConstant %[[TYPE_INT_16]] 8
 ; CHECK-SPIRV: %[[CONST_ROTATE_VEC_INT_16:[0-9]+]] = OpConstantComposite %[[TYPE_VEC_INT_16]] %[[CONST_ROTATE_16]] %[[CONST_ROTATE_16]]
+; CHECK-SPIRV-DAG: %[[CONST_TYPE_SIZE_32:[0-9]+]] = OpConstant %[[TYPE_INT_32]] 32
 
 ; Function Attrs: nounwind readnone
 ; CHECK-SPIRV: %{{[0-9]+}} = OpFunction %[[TYPE_INT_32]] {{.*}} %[[TYPE_ORIG_FUNC_32]]
@@ -36,18 +36,6 @@ entry:
   ret i32 %sum
 }
 
-; CHECK-SPIRV: %[[NAME_FSHL_FUNC_32]] = OpFunction %[[TYPE_INT_32]] {{.*}} %[[TYPE_FSHL_FUNC_32]]
-; CHECK-SPIRV: %[[X_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
-; CHECK-SPIRV: %[[Y_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
-; CHECK-SPIRV: %[[ROT:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
-
-; CHECK-SPIRV: %[[ROTATE_MOD_SIZE:[0-9]+]] = OpUMod %[[TYPE_INT_32]] %[[ROT]] %[[CONST_TYPE_SIZE_32]]
-; CHECK-SPIRV: %[[X_SHIFT_LEFT:[0-9]+]] = OpShiftLeftLogical %[[TYPE_INT_32]] %[[X_FSHL]] %[[ROTATE_MOD_SIZE]]
-; CHECK-SPIRV: %[[NEG_ROTATE:[0-9]+]] = OpISub %[[TYPE_INT_32]] %[[CONST_TYPE_SIZE_32]] %[[ROTATE_MOD_SIZE]]
-; CHECK-SPIRV: %[[Y_SHIFT_RIGHT:[0-9]+]] = OpShiftRightLogical %[[TYPE_INT_32]] %[[Y_FSHL]] %[[NEG_ROTATE]]
-; CHECK-SPIRV: %[[FSHL_RESULT:[0-9]+]] = OpBitwiseOr %[[TYPE_INT_32]] %[[X_SHIFT_LEFT]] %[[Y_SHIFT_RIGHT]]
-; CHECK-SPIRV: OpReturnValue %[[FSHL_RESULT]]
-
 ; Function Attrs: nounwind readnone
 ; CHECK-SPIRV: %{{[0-9]+}} = OpFunction %[[TYPE_INT_16]] {{.*}} %[[TYPE_ORIG_FUNC_16]]
 ; CHECK-SPIRV: %[[X:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
@@ -60,12 +48,6 @@ entry:
   ret i16 %0
 }
 
-; Just check that the function for i16 was generated as such - we've checked the logic for another type.
-; CHECK-SPIRV: %[[NAME_FSHL_FUNC_16]] = OpFunction %[[TYPE_INT_16]] {{.*}} %[[TYPE_FSHL_FUNC_16]]
-; CHECK-SPIRV: %[[X_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
-; CHECK-SPIRV: %[[Y_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
-; CHECK-SPIRV: %[[ROT:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
-
 ; CHECK-SPIRV: %{{[0-9]+}} = OpFunction %[[TYPE_VEC_INT_16]] {{.*}} %[[TYPE_ORIG_FUNC_VEC_INT_16]]
 ; CHECK-SPIRV: %[[X:[0-9]+]] = OpFunctionParameter %[[TYPE_VEC_INT_16]]
 ; CHECK-SPIRV: %[[Y:[0-9]+]] = OpFunctionParameter %[[TYPE_VEC_INT_16]]
@@ -76,6 +58,24 @@ entry:
   ; CHECK-SPIRV: OpReturnValue %[[CALL_VEC_INT_16]]
   ret <2 x i16> %0
 }
+
+; CHECK-SPIRV: %[[NAME_FSHL_FUNC_32]] = OpFunction %[[TYPE_INT_32]] {{.*}} %[[TYPE_FSHL_FUNC_32]]
+; CHECK-SPIRV: %[[X_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
+; CHECK-SPIRV: %[[Y_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
+; CHECK-SPIRV: %[[ROT:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_32]]
+
+; CHECK-SPIRV: %[[ROTATE_MOD_SIZE:[0-9]+]] = OpUMod %[[TYPE_INT_32]] %[[ROT]] %[[CONST_TYPE_SIZE_32]]
+; CHECK-SPIRV: %[[X_SHIFT_LEFT:[0-9]+]] = OpShiftLeftLogical %[[TYPE_INT_32]] %[[X_FSHL]] %[[ROTATE_MOD_SIZE]]
+; CHECK-SPIRV: %[[NEG_ROTATE:[0-9]+]] = OpISub %[[TYPE_INT_32]] %[[CONST_TYPE_SIZE_32]] %[[ROTATE_MOD_SIZE]]
+; CHECK-SPIRV: %[[Y_SHIFT_RIGHT:[0-9]+]] = OpShiftRightLogical %[[TYPE_INT_32]] %[[Y_FSHL]] %[[NEG_ROTATE]]
+; CHECK-SPIRV: %[[FSHL_RESULT:[0-9]+]] = OpBitwiseOr %[[TYPE_INT_32]] %[[X_SHIFT_LEFT]] %[[Y_SHIFT_RIGHT]]
+; CHECK-SPIRV: OpReturnValue %[[FSHL_RESULT]]
+
+; Just check that the function for i16 was generated as such - we've checked the logic for another type.
+; CHECK-SPIRV: %[[NAME_FSHL_FUNC_16]] = OpFunction %[[TYPE_INT_16]] {{.*}} %[[TYPE_FSHL_FUNC_16]]
+; CHECK-SPIRV: %[[X_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
+; CHECK-SPIRV: %[[Y_FSHL:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
+; CHECK-SPIRV: %[[ROT:[0-9]+]] = OpFunctionParameter %[[TYPE_INT_16]]
 
 ; Just check that the function for v2i16 was generated as such - we've checked the logic for another type.
 ; CHECK-SPIRV: %[[NAME_FSHL_FUNC_VEC_INT_16]] = OpFunction %[[TYPE_VEC_INT_16]] {{.*}} %[[TYPE_FSHL_FUNC_VEC_INT_16]]
