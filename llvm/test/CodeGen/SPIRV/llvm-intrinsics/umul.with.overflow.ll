@@ -19,16 +19,6 @@ entry:
   ret void
 }
 
-; CHECK-SPIRV: %[[NAME_UMUL_FUNC_8]] = OpFunction %[[#]]
-; CHECK-SPIRV: %[[VAR_A:[0-9]+]] = OpFunctionParameter %[[#]]
-; CHECK-SPIRV: %[[VAR_B:[0-9]+]] = OpFunctionParameter %[[#]]
-; CHECK-SPIRV: %[[MUL_RES:[0-9]+]] = OpIMul %[[#]] %[[VAR_A]] %[[VAR_B]]
-; CHECK-SPIRV: %[[DIV_RES:[0-9]+]] = OpUDiv %[[#]] %[[MUL_RES]] %[[VAR_A]]
-; CHECK-SPIRV: %[[CMP_RES:[0-9]+]] = OpINotEqual %[[#]] %[[VAR_A]] %[[DIV_RES]]
-; CHECK-SPIRV: %[[INSERT_RES:[0-9]+]] = OpCompositeInsert %[[#]] %[[MUL_RES]]
-; CHECK-SPIRV: %[[INSERT_RES_1:[0-9]+]] = OpCompositeInsert %[[#]] %[[CMP_RES]] %[[INSERT_RES]]
-; CHECK-SPIRV: OpReturnValue %[[INSERT_RES_1]]
-
 ; Function Attrs: nofree nounwind writeonly
 define dso_local spir_func void @_Z5foo32jjPj(i32 %a, i32 %b, i32* nocapture %c) local_unnamed_addr #0 {
 entry:
@@ -52,6 +42,16 @@ define dso_local spir_func void @umulo_v2i64(<2 x i64> %a, <2 x i64> %b, <2 x i6
   store <2 x i64> %spec.select, <2 x i64>* %p
   ret void
 }
+
+; CHECK-SPIRV: %[[NAME_UMUL_FUNC_8]] = OpFunction %[[#]]
+; CHECK-SPIRV: %[[VAR_A:[0-9]+]] = OpFunctionParameter %[[#]]
+; CHECK-SPIRV: %[[VAR_B:[0-9]+]] = OpFunctionParameter %[[#]]
+; CHECK-SPIRV: %[[MUL_RES:[0-9]+]] = OpIMul %[[#]] %[[VAR_A]] %[[VAR_B]]
+; CHECK-SPIRV: %[[DIV_RES:[0-9]+]] = OpUDiv %[[#]] %[[MUL_RES]] %[[VAR_A]]
+; CHECK-SPIRV: %[[CMP_RES:[0-9]+]] = OpINotEqual %[[#]] %[[VAR_A]] %[[DIV_RES]]
+; CHECK-SPIRV: %[[INSERT_RES:[0-9]+]] = OpCompositeInsert %[[#]] %[[MUL_RES]]
+; CHECK-SPIRV: %[[INSERT_RES_1:[0-9]+]] = OpCompositeInsert %[[#]] %[[CMP_RES]] %[[INSERT_RES]]
+; CHECK-SPIRV: OpReturnValue %[[INSERT_RES_1]]
 
 ; Function Attrs: nounwind readnone speculatable willreturn
 declare { i8, i1 } @llvm.umul.with.overflow.i8(i8, i8) #1

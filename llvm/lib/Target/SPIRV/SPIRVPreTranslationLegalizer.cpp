@@ -16,8 +16,10 @@
 
 #include "SPIRV.h"
 #include "SPIRVTargetMachine.h"
+#include "SPIRVUtils.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/LowerMemIntrinsics.h"
 
 using namespace llvm;
 
@@ -114,7 +116,150 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   return NewF;
 }
 
+std::string lowerLLVMIntrinsicName(IntrinsicInst *II) {
+  Function *IntrinsicFunc = II->getCalledFunction();
+  assert(IntrinsicFunc && "Missing function");
+  std::string FuncName = IntrinsicFunc->getName().str();
+  std::replace(FuncName.begin(), FuncName.end(), '.', '_');
+  FuncName = "spirv." + FuncName;
+  return FuncName;
+}
+
+static Function *getOrCreateFunction(Module *M, Type *RetTy,
+                                     ArrayRef<Type *> ArgTypes,
+                                     StringRef Name) {
+  FunctionType *FT = FunctionType::get(RetTy, ArgTypes, false);
+  Function *F = M->getFunction(Name);
+  if (!F || F->getFunctionType() != FT) {
+    auto NewF = Function::Create(FT, GlobalValue::ExternalLinkage, Name, M);
+    if (F)
+      NewF->setDSOLocal(F->isDSOLocal());
+    F = NewF;
+    F->setCallingConv(CallingConv::SPIR_FUNC);
+  }
+  return F;
+}
+
+static void lowerFunnelShifts(Module *M, IntrinsicInst *FSHIntrinsic) {
+  // Get a separate function - otherwise, we'd have to rework the CFG of the
+  // current one. Then simply replace the intrinsic uses with a call to the new
+  // function.
+  // Generate LLVM IR for  i* @spirv.llvm_fsh?_i* (i* %a, i* %b, i* %c)
+  FunctionType *FSHFuncTy = FSHIntrinsic->getFunctionType();
+  Type *FSHRetTy = FSHFuncTy->getReturnType();
+  const std::string FuncName = lowerLLVMIntrinsicName(FSHIntrinsic);
+  Function *FSHFunc =
+      getOrCreateFunction(M, FSHRetTy, FSHFuncTy->params(), FuncName);
+
+  if (!FSHFunc->empty()) {
+    FSHIntrinsic->setCalledFunction(FSHFunc);
+    return;
+  }
+  BasicBlock *RotateBB = BasicBlock::Create(M->getContext(), "rotate", FSHFunc);
+  IRBuilder<> IRB(RotateBB);
+  Type *Ty = FSHFunc->getReturnType();
+  // Build the actual funnel shift rotate logic.
+  // In the comments, "int" is used interchangeably with "vector of int
+  // elements".
+  FixedVectorType *VectorTy = dyn_cast<FixedVectorType>(Ty);
+  Type *IntTy = VectorTy ? VectorTy->getElementType() : Ty;
+  unsigned BitWidth = IntTy->getIntegerBitWidth();
+  ConstantInt *BitWidthConstant = IRB.getInt({BitWidth, BitWidth});
+  Value *BitWidthForInsts =
+      VectorTy
+          ? IRB.CreateVectorSplat(VectorTy->getNumElements(), BitWidthConstant)
+          : BitWidthConstant;
+  Value *RotateModVal =
+      IRB.CreateURem(/*Rotate*/ FSHFunc->getArg(2), BitWidthForInsts);
+  Value *FirstShift = nullptr, *SecShift = nullptr;
+  if (FSHIntrinsic->getIntrinsicID() == Intrinsic::fshr) {
+    // Shift the less significant number right, the "rotate" number of bits
+    // will be 0-filled on the left as a result of this regular shift.
+    FirstShift = IRB.CreateLShr(FSHFunc->getArg(1), RotateModVal);
+  } else {
+    // Shift the more significant number left, the "rotate" number of bits
+    // will be 0-filled on the right as a result of this regular shift.
+    FirstShift = IRB.CreateShl(FSHFunc->getArg(0), RotateModVal);
+  }
+  // We want the "rotate" number of the more significant int's LSBs (MSBs) to
+  // occupy the leftmost (rightmost) "0 space" left by the previous operation.
+  // Therefore, subtract the "rotate" number from the integer bitsize...
+  Value *SubRotateVal = IRB.CreateSub(BitWidthForInsts, RotateModVal);
+  if (FSHIntrinsic->getIntrinsicID() == Intrinsic::fshr) {
+    // ...and left-shift the more significant int by this number, zero-filling
+    // the LSBs.
+    SecShift = IRB.CreateShl(FSHFunc->getArg(0), SubRotateVal);
+  } else {
+    // ...and right-shift the less significant int by this number, zero-filling
+    // the MSBs.
+    SecShift = IRB.CreateLShr(FSHFunc->getArg(1), SubRotateVal);
+  }
+  // A simple binary addition of the shifted ints yields the final result.
+  IRB.CreateRet(IRB.CreateOr(FirstShift, SecShift));
+
+  FSHIntrinsic->setCalledFunction(FSHFunc);
+}
+
+static void buildUMulWithOverflowFunc(Module *M, Function *UMulFunc) {
+  // The function body is already created.
+  if (!UMulFunc->empty())
+    return;
+
+  BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "entry", UMulFunc);
+  IRBuilder<> IRB(EntryBB);
+  // Build the actual unsigned multiplication logic with the overflow
+  // indication. Do unsigned multiplication Mul = A * B. Then check
+  // if unsigned division Div = Mul / A is not equal to B. If so,
+  // then overflow has happened.
+  Value *Mul = IRB.CreateNUWMul(UMulFunc->getArg(0), UMulFunc->getArg(1));
+  Value *Div = IRB.CreateUDiv(Mul, UMulFunc->getArg(0));
+  Value *Overflow = IRB.CreateICmpNE(UMulFunc->getArg(0), Div);
+
+  // umul.with.overflow intrinsic return a structure, where the first element
+  // is the multiplication result, and the second is an overflow bit.
+  Type *StructTy = UMulFunc->getReturnType();
+  Value *Agg = IRB.CreateInsertValue(UndefValue::get(StructTy), Mul, {0});
+  Value *Res = IRB.CreateInsertValue(Agg, Overflow, {1});
+  IRB.CreateRet(Res);
+}
+
+static void lowerUMulWithOverflow(Module *M, IntrinsicInst *UMulIntrinsic) {
+  // Get a separate function - otherwise, we'd have to rework the CFG of the
+  // current one. Then simply replace the intrinsic uses with a call to the new
+  // function.
+  FunctionType *UMulFuncTy = UMulIntrinsic->getFunctionType();
+  Type *FSHLRetTy = UMulFuncTy->getReturnType();
+  const std::string FuncName = lowerLLVMIntrinsicName(UMulIntrinsic);
+  Function *UMulFunc =
+      getOrCreateFunction(M, FSHLRetTy, UMulFuncTy->params(), FuncName);
+  buildUMulWithOverflowFunc(M, UMulFunc);
+  UMulIntrinsic->setCalledFunction(UMulFunc);
+}
+
+static void substituteIntrinsicCalls(Module *M, Function *F) {
+  for (BasicBlock &BB : *F) {
+    for (Instruction &I : BB) {
+      auto Call = dyn_cast<CallInst>(&I);
+      if (!Call)
+        continue;
+      Call->setTailCall(false);
+      Function *CF = Call->getCalledFunction();
+      if (!CF || !CF->isIntrinsic())
+        continue;
+      auto *II = cast<IntrinsicInst>(Call);
+      if (II->getIntrinsicID() == Intrinsic::fshl ||
+          II->getIntrinsicID() == Intrinsic::fshr)
+        lowerFunnelShifts(M, II);
+      else if (II->getIntrinsicID() == Intrinsic::umul_with_overflow)
+        lowerUMulWithOverflow(M, II);
+    }
+  }
+}
+
 bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
+  for (Function &F : M)
+    substituteIntrinsicCalls(&M, &F);
+
   std::vector<Function *> FuncsWorklist;
   bool Changed = false;
   for (auto &F : M)
