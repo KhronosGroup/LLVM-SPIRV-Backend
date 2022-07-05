@@ -21,7 +21,6 @@ add_llvm_target(SPIRVCodeGen
   SPIRVDuplicatesTracker.cpp
   SPIRVEmitIntrinsics.cpp
   SPIRVEnumRequirements.cpp
-  SPIRVExtInsts.cpp
   SPIRVGenerateDecorations.cpp
   SPIRVGlobalRegistry.cpp
   SPIRVInstrInfo.cpp

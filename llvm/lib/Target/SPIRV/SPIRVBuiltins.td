@@ -51,6 +51,7 @@ def SampleImage : BuiltinGroup;
 def Select : BuiltinGroup;
 def SpecConstant : BuiltinGroup;
 def Enqueue : BuiltinGroup;
+def AsyncCopy : BuiltinGroup;
 
 //===----------------------------------------------------------------------===//
 // Class defining a demangled builtin record. The information in the record
@@ -541,6 +542,10 @@ defm : DemangledNativeBuiltin<"capture_event_profiling_info", OpenCL_std, Enqueu
 // Spec constant builtin record:
 defm : DemangledNativeBuiltin<"__spirv_SpecConstant", OpenCL_std, SpecConstant, 2, 2, OpSpecConstant>;
 defm : DemangledNativeBuiltin<"__spirv_SpecConstantComposite", OpenCL_std, SpecConstant, 1, 0, OpSpecConstantComposite>;
+
+// Async Copy and Prefetch builtin records:
+defm : DemangledNativeBuiltin<"async_work_group_copy", OpenCL_std, AsyncCopy, 4, 4, OpGroupAsyncCopy>;
+defm : DemangledNativeBuiltin<"wait_group_events", OpenCL_std, AsyncCopy, 2, 2, OpGroupWaitEvents>;
 
 //===----------------------------------------------------------------------===//
 // Class defining a work/sub group builtin that should be translated into a
