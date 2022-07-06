@@ -667,6 +667,11 @@ def OpMemoryNamedBarrier: Op<329, (outs), (ins ID:$barr, ID:$mem, ID:$sem),
 
 // 3.42.21. Group and Subgroup Instructions
 
+def OpGroupAsyncCopy: Op<259, (outs ID:$res), (ins TYPE:$ty, ID:$scope,
+                  ID:$dst, ID:$src, ID:$nelts, ID:$stride, ID:$event),
+                  "$res = OpGroupAsyncCopy $ty $scope $dst $src $nelts $stride $event">;
+def OpGroupWaitEvents: Op<260, (outs), (ins ID:$scope, ID:$nelts, ID:$elist),
+                  "OpGroupWaitEvents $scope $nelts $elist">;
 def OpGroupAll: Op<261, (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pr),
                   "$res = OpGroupAll $ty $scope $pr">;
 def OpGroupAny: Op<262, (outs ID:$res), (ins TYPE:$ty, ID:$scope, ID:$pr),

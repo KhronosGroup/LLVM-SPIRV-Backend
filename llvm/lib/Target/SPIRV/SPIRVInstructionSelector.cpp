@@ -35,7 +35,8 @@ using namespace llvm;
 namespace CL = OpenCLExtInst;
 namespace GL = GLSLExtInst;
 
-using ExtInstList = std::vector<std::pair<InstructionSet::InstructionSet, uint32_t>>;
+using ExtInstList =
+    std::vector<std::pair<InstructionSet::InstructionSet, uint32_t>>;
 
 namespace {
 
@@ -508,7 +509,8 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              const SPIRVType *ResType,
                                              MachineInstr &I,
                                              CL::OpenCLExtInst CLInst) const {
-  return selectExtInst(ResVReg, ResType, I, {{InstructionSet::OpenCL_std, CLInst}});
+  return selectExtInst(ResVReg, ResType, I,
+                       {{InstructionSet::OpenCL_std, CLInst}});
 }
 
 bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
@@ -1273,14 +1275,16 @@ bool SPIRVInstructionSelector::selectConst(Register ResVReg,
                                            const SPIRVType *ResType,
                                            const APInt &Imm,
                                            MachineInstr &I) const {
-  assert(ResType->getOpcode() != SPIRV::OpTypePointer || Imm.isNullValue());
+  unsigned TyOpcode = ResType->getOpcode();
+  assert(TyOpcode != SPIRV::OpTypePointer || Imm.isNullValue());
   MachineBasicBlock &BB = *I.getParent();
-  if (ResType->getOpcode() == SPIRV::OpTypePointer && Imm.isNullValue())
+  if ((TyOpcode == SPIRV::OpTypePointer || TyOpcode == SPIRV::OpTypeEvent) &&
+      Imm.isNullValue())
     return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpConstantNull))
         .addDef(ResVReg)
         .addUse(GR.getSPIRVTypeID(ResType))
         .constrainAllUses(TII, TRI, RBI);
-  if (ResType->getOpcode() == SPIRV::OpTypeInt) {
+  if (TyOpcode == SPIRV::OpTypeInt) {
     Register Reg = GR.getOrCreateConstInt(Imm.getZExtValue(), I, ResType, TII);
     if (Reg == ResVReg)
       return true;
