@@ -16,6 +16,7 @@ add_public_tablegen_target(SPIRVCommonTableGen)
 add_llvm_target(SPIRVCodeGen
   SPIRVAsmPrinter.cpp
   SPIRVBasicBlockDominance.cpp
+  SPIRVBuiltins.cpp
   SPIRVCallLowering.cpp
   SPIRVCapabilityUtils.cpp
   SPIRVDuplicatesTracker.cpp
@@ -31,13 +32,12 @@ add_llvm_target(SPIRVCodeGen
   SPIRVMCInstLower.cpp
   SPIRVModuleAnalysis.cpp
   SPIRVOCLRegularizer.cpp
-  SPIRVBuiltins.cpp
   SPIRVPreLegalizer.cpp
+  SPIRVPrepareFunctions.cpp
   SPIRVRegisterBankInfo.cpp
   SPIRVRegisterInfo.cpp
   SPIRVSubtarget.cpp
   SPIRVTargetMachine.cpp
-  SPIRVPreTranslationLegalizer.cpp
   SPIRVUtils.cpp
 
   LINK_COMPONENTS
