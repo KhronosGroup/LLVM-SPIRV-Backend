@@ -188,7 +188,7 @@ Register SPIRVGlobalRegistry::buildConstantInt(uint64_t Val,
   // Find a constant in DT or build a new one.
   const auto ConstInt =
       ConstantInt::get(const_cast<IntegerType *>(LLVMIntTy), Val);
-  Register Res = DT.find(ConstInt, &MIRBuilder.getMF());
+  Register Res = DT.find(ConstInt, &MF);
   if (!Res.isValid()) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     LLT LLTy = LLT::scalar(EmitIR ? BitWidth : 32);
@@ -233,12 +233,12 @@ Register SPIRVGlobalRegistry::buildConstantFP(APFloat Val,
   }
   // Find a constant in DT or build a new one.
   const auto ConstFP = ConstantFP::get(LLVMFPTy->getContext(), Val);
-  Register Res = DT.find(ConstFP, &MIRBuilder.getMF());
+  Register Res = DT.find(ConstFP, &MF);
   if (!Res.isValid()) {
     unsigned BitWidth = SpvType ? getScalarOrVectorBitWidth(SpvType) : 32;
     Res = MF.getRegInfo().createGenericVirtualRegister(LLT::scalar(BitWidth));
     assignTypeToVReg(LLVMFPTy, Res, MIRBuilder);
-    DT.add(ConstFP, &MIRBuilder.getMF(), Res);
+    DT.add(ConstFP, &MF, Res);
     MIRBuilder.buildFConstant(Res, *ConstFP);
   }
   return Res;

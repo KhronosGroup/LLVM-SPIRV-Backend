@@ -1,4 +1,4 @@
-//===-- SPIRVModifySignatures.cpp - modify function signatures --*- C++ -*-===//
+//===-- SPIRVPrepareFunctions.cpp - modify function signatures --*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,7 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This pass modifies function signatures containing aggregate arguments
-// and/or return value.
+// and/or return value. Also it substitutes some llvm intrinsic calls by
+// function calls, generating these functions as the translator does.
 //
 // NOTE: this pass is a module-level one due to the necessity to modify
 // GVs/functions.
@@ -24,24 +25,23 @@
 using namespace llvm;
 
 namespace llvm {
-void initializeSPIRVPreTranslationLegalizerPass(PassRegistry &);
+void initializeSPIRVPrepareFunctionsPass(PassRegistry &);
 }
 
 namespace {
 
-class SPIRVPreTranslationLegalizer : public ModulePass {
+class SPIRVPrepareFunctions : public ModulePass {
   Function *processFunctionSignature(Function *F);
 
 public:
   static char ID;
-  SPIRVPreTranslationLegalizer() : ModulePass(ID) {
-    initializeSPIRVPreTranslationLegalizerPass(
-        *PassRegistry::getPassRegistry());
+  SPIRVPrepareFunctions() : ModulePass(ID) {
+    initializeSPIRVPrepareFunctionsPass(*PassRegistry::getPassRegistry());
   }
 
   bool runOnModule(Module &M) override;
 
-  StringRef getPassName() const override { return "SPIRV Pre-GISel Legalizer"; }
+  StringRef getPassName() const override { return "SPIRV prepare functions"; }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     ModulePass::getAnalysisUsage(AU);
@@ -50,12 +50,12 @@ public:
 
 } // namespace
 
-char SPIRVPreTranslationLegalizer::ID = 0;
+char SPIRVPrepareFunctions::ID = 0;
 
-INITIALIZE_PASS(SPIRVPreTranslationLegalizer, "pre-gisel-legalizer",
-                "SPIRV Pre-GISel Legalizer", false, false)
+INITIALIZE_PASS(SPIRVPrepareFunctions, "prepare-functions",
+                "SPIRV prepare functions", false, false)
 
-Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
+Function *SPIRVPrepareFunctions::processFunctionSignature(Function *F) {
   IRBuilder<> B(F->getContext());
 
   bool IsRetAggr = F->getReturnType()->isAggregateType();
@@ -67,7 +67,7 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
   if (!DoClone)
     return F;
   SmallVector<std::pair<int, Type *>, 4> ChangedTypes;
-  auto *RetType = IsRetAggr ? B.getInt32Ty() : F->getReturnType();
+  Type *RetType = IsRetAggr ? B.getInt32Ty() : F->getReturnType();
   if (IsRetAggr)
     ChangedTypes.push_back(std::pair<int, Type *>(-1, F->getReturnType()));
   SmallVector<Type *, 4> ArgTypes;
@@ -79,15 +79,15 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
     } else
       ArgTypes.push_back(Arg.getType());
   }
-  auto *NewFTy =
+  FunctionType *NewFTy =
       FunctionType::get(RetType, ArgTypes, F->getFunctionType()->isVarArg());
-  auto *NewF =
+  Function *NewF =
       Function::Create(NewFTy, F->getLinkage(), F->getName(), *F->getParent());
 
   ValueToValueMapTy VMap;
   auto NewFArgIt = NewF->arg_begin();
   for (auto &Arg : F->args()) {
-    auto ArgName = Arg.getName();
+    StringRef ArgName = Arg.getName();
     NewFArgIt->setName(ArgName);
     VMap[&Arg] = &(*NewFArgIt++);
   }
@@ -97,7 +97,8 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
                     Returns);
   NewF->takeName(F);
 
-  auto *FuncMD = F->getParent()->getOrInsertNamedMetadata("spv.cloned_funcs");
+  NamedMDNode *FuncMD =
+      F->getParent()->getOrInsertNamedMetadata("spv.cloned_funcs");
   SmallVector<Metadata *, 2> MDArgs;
   MDArgs.push_back(MDString::get(B.getContext(), NewF->getName()));
   for (auto &ChangedTyP : ChangedTypes)
@@ -105,7 +106,7 @@ Function *SPIRVPreTranslationLegalizer::processFunctionSignature(Function *F) {
         B.getContext(),
         {ConstantAsMetadata::get(B.getInt32(ChangedTyP.first)),
          ValueAsMetadata::get(Constant::getNullValue(ChangedTyP.second))}));
-  auto *ThisFuncMD = MDNode::get(B.getContext(), MDArgs);
+  MDNode *ThisFuncMD = MDNode::get(B.getContext(), MDArgs);
   FuncMD->addOperand(ThisFuncMD);
 
   for (auto *U : make_early_inc_range(F->users())) {
@@ -130,14 +131,13 @@ static Function *getOrCreateFunction(Module *M, Type *RetTy,
                                      StringRef Name) {
   FunctionType *FT = FunctionType::get(RetTy, ArgTypes, false);
   Function *F = M->getFunction(Name);
-  if (!F || F->getFunctionType() != FT) {
-    auto NewF = Function::Create(FT, GlobalValue::ExternalLinkage, Name, M);
-    if (F)
-      NewF->setDSOLocal(F->isDSOLocal());
-    F = NewF;
-    F->setCallingConv(CallingConv::SPIR_FUNC);
-  }
-  return F;
+  if (F && F->getFunctionType() == FT)
+    return F;
+  Function *NewF = Function::Create(FT, GlobalValue::ExternalLinkage, Name, M);
+  if (F)
+    NewF->setDSOLocal(F->isDSOLocal());
+  NewF->setCallingConv(CallingConv::SPIR_FUNC);
+  return NewF;
 }
 
 static void lowerFunnelShifts(Module *M, IntrinsicInst *FSHIntrinsic) {
@@ -256,7 +256,7 @@ static void substituteIntrinsicCalls(Module *M, Function *F) {
   }
 }
 
-bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
+bool SPIRVPrepareFunctions::runOnModule(Module &M) {
   for (Function &F : M)
     substituteIntrinsicCalls(&M, &F);
 
@@ -266,7 +266,7 @@ bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
     FuncsWorklist.push_back(&F);
 
   for (auto *Func : FuncsWorklist) {
-    auto *F = processFunctionSignature(Func);
+    Function *F = processFunctionSignature(Func);
 
     bool CreatedNewF = F != Func;
 
@@ -282,6 +282,6 @@ bool SPIRVPreTranslationLegalizer::runOnModule(Module &M) {
   return Changed;
 }
 
-ModulePass *llvm::createSPIRVPreTranslationLegalizerPass() {
-  return new SPIRVPreTranslationLegalizer();
+ModulePass *llvm::createSPIRVPrepareFunctionsPass() {
+  return new SPIRVPrepareFunctions();
 }
