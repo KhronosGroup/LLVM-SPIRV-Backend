@@ -951,6 +951,71 @@ defm : DemangledImageQueryBuiltin<"get_image_array_size", OpenCL_std, 3>;
 defm : DemangledNativeBuiltin<"get_image_num_samples", OpenCL_std, ImageMiscQuery, 1, 1, OpImageQuerySamples>;
 
 //===----------------------------------------------------------------------===//
+// Class defining a "convert_destType<_sat><_roundingMode>" call record for
+// lowering into OpConvert instructions.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+//===----------------------------------------------------------------------===//
+class ConvertBuiltin<string name, InstructionSet set> {
+  string Name = name;
+  InstructionSet Set = set;
+  bit IsDestinationSigned = !eq(!find(name, "convert_u"), -1);
+  bit IsSaturated = !not(!eq(!find(name, "_sat"), -1));
+  bit IsRounded = !not(!eq(!find(name, "_rt"), -1));
+  FPRoundingMode RoundingMode = !cond(!not(!eq(!find(name, "_rte"), -1)) : RTE,
+                                  !not(!eq(!find(name, "_rtz"), -1)) : RTZ,
+                                  !not(!eq(!find(name, "_rtp"), -1)) : RTP,
+                                  !not(!eq(!find(name, "_rtn"), -1)) : RTN,
+                                  true : RTE);
+}
+
+// Table gathering all the convert builtins.
+def ConvertBuiltins : GenericTable {
+  let FilterClass = "ConvertBuiltin";
+  let Fields = ["Name", "Set", "IsDestinationSigned", "IsSaturated", "IsRounded", "RoundingMode"];
+  string TypeOf_Set = "InstructionSet";
+  string TypeOf_RoundingMode = "FPRoundingMode";
+}
+
+// Function to lookup convert builtins by their name and set.
+def lookupConvertBuiltin : SearchIndex {
+  let Table = ConvertBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both a demangled builtin records
+// and a corresponding convert builtin records.
+multiclass DemangledConvertBuiltin<string name, InstructionSet set> {
+  // Create records for scalar and 2, 4, 8, and 16 element vector conversions.
+  foreach i = ["", "2", "3", "4", "8", "16"] in {
+    // Also create records for each rounding mode.
+    foreach j = ["", "_rte", "_rtz", "_rtp", "_rtn"] in {
+      def : DemangledBuiltin<!strconcat(name, i, j), set, Convert, 1, 1>;
+      def : ConvertBuiltin<!strconcat(name, i, j), set>;
+
+      // Create records with the "_sat" modifier for all conversions except 
+      // those targeting floating-point types.
+      if !eq(!find(name, "float"), -1) then {
+        def : DemangledBuiltin<!strconcat(name, i, "_sat", j), set, Convert, 1, 1>;
+        def : ConvertBuiltin<!strconcat(name, i, "_sat", j), set>;
+      }
+    }
+  }
+}
+
+// Explicit conversion builtin records:
+defm : DemangledConvertBuiltin<"convert_char", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_uchar", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_short", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_ushort", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_int", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_uint", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_long", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_ulong", OpenCL_std>;
+defm : DemangledConvertBuiltin<"convert_float", OpenCL_std>;
+
+//===----------------------------------------------------------------------===//
 // Classes definining various OpenCL enums.
 //===----------------------------------------------------------------------===//
 

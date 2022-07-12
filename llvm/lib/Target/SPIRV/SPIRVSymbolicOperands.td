@@ -947,7 +947,7 @@ class FPRoundingMode<string name, bits<32> value> {
 }
 
 multiclass FPRoundingModeOperand<bits<32> value> {
-  def : FPRoundingMode<NAME, value>;
+  def NAME : FPRoundingMode<NAME, value>;
   defm : SymbolicOperandWithRequirements<FPRoundingModeOperand, value, NAME, 0, 0, [], []>;
 }
 
