@@ -149,7 +149,6 @@ using namespace FPRoundingMode;
 /// 1. Search with the plain demangled name (expecting a 1:1 match).
 /// 2. Search with the prefix before or sufix after the demangled name
 /// signyfying the type of the first argument.
-/// 3. Remove the suffix from the demangled name and repeat the search.
 ///
 /// \returns Wrapper around the demangled call and found builtin definition.
 static std::unique_ptr<const IncomingCall>
@@ -270,29 +269,6 @@ lookupBuiltin(StringRef DemangledCall,
       if ((Builtin = lookupBuiltin(BuiltinName + Sufix, Set)))
         return std::make_unique<IncomingCall>(
             BuiltinName, Builtin, ReturnRegister, ReturnType, Arguments);
-    }
-  }
-
-  // If the lookups above were unsuccessful, try removing the suffix if present.
-  // Some OpenCL functions have suffixes at the end of the demangled name. For
-  // example, the "convert" builtin has a destination type and rounding mode
-  // specified in the name:
-  //
-  // destType *convert_destType<_sat><_roundingMode>*(sourceType)
-  //
-  // Do the search without the <_suffix>*, but keep it in the returned struct
-  // for later use in the implementation code.
-  if (BuiltinName.find('_') != std::string::npos) {
-    // Try removing up to 3 suffixes until a builtin is found in the set.
-    std::string Subname = BuiltinName;
-    for (unsigned i = 0; i < 3; i++) {
-      Subname = Subname.substr(0, Subname.find_last_of('_'));
-
-      if (const DemangledBuiltin *Builtin = lookupBuiltin(Subname, Set)) {
-        if (Builtin->Group == Convert)
-          return std::make_unique<IncomingCall>(
-              BuiltinName, Builtin, ReturnRegister, ReturnType, Arguments);
-      }
     }
   }
 
