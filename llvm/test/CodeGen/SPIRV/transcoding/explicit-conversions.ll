@@ -77,7 +77,7 @@ entry:
 ; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
 declare spir_func <2 x i32> @_Z21convert_uint2_sat_rtnDv2_f(<2 x float> noundef) local_unnamed_addr #1
 
-; CHECK-SPIRV: OpUConvert
+; CHECK-SPIRV: OpSatConvertSToU
 
 ; kernel void testUToUSat(global uchar *a, global uint *res) {
 ;   res[0] = convert_uint_sat(*a);
@@ -95,7 +95,7 @@ entry:
 ; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
 declare spir_func i32 @_Z16convert_uint_sath(i8 noundef zeroext) local_unnamed_addr #1
 
-; CHECK-SPIRV: OpUConvert
+; CHECK-SPIRV: OpSatConvertSToU
 
 ; kernel void testUToUSat1(global uint *a, global uchar *res) {
 ;   res[0] = convert_uchar_sat(*a);

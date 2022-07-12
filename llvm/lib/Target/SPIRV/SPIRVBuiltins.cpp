@@ -100,7 +100,7 @@ struct GroupBuiltin {
 struct GetBuiltin {
   StringRef Name;
   InstructionSet Set;
-  ::BuiltIn::BuiltIn Value;
+  BuiltIn::BuiltIn Value;
 };
 
 using namespace BuiltIn;
@@ -115,6 +115,19 @@ struct ImageQueryBuiltin {
 
 #define GET_ImageQueryBuiltins_DECL
 #define GET_ImageQueryBuiltins_IMPL
+
+struct ConvertBuiltin {
+  StringRef Name;
+  InstructionSet Set;
+  bool IsDestinationSigned;
+  bool IsSaturated;
+  bool IsRounded;
+  FPRoundingMode::FPRoundingMode RoundingMode;
+};
+
+using namespace FPRoundingMode;
+#define GET_ConvertBuiltins_DECL
+#define GET_ConvertBuiltins_IMPL
 
 #define GET_CLMemoryScope_DECL
 #define GET_CLSamplerAddressingMode_DECL
@@ -1527,6 +1540,58 @@ static bool generateAsyncCopy(const IncomingCall *Call,
   }
 }
 
+static bool generateConvertInst(const StringRef DemangledCall,
+                                const IncomingCall *Call,
+                                MachineIRBuilder &MIRBuilder,
+                                SPIRVGlobalRegistry *GR) {
+  // Lookup the conversion builtin in the TableGen records.
+  const ConvertBuiltin *Builtin =
+      lookupConvertBuiltin(Call->Builtin->Name, Call->Builtin->Set);
+
+  if (Builtin->IsSaturated)
+    buildOpDecorate(Call->ReturnRegister, MIRBuilder,
+                    Decoration::SaturatedConversion, {});
+
+  if (Builtin->IsRounded)
+    buildOpDecorate(Call->ReturnRegister, MIRBuilder,
+                    Decoration::FPRoundingMode, {Builtin->RoundingMode});
+
+  unsigned Opcode = OpNop;
+  if (GR->isScalarOrVectorOfType(Call->Arguments[0], OpTypeInt)) {
+    // Int -> ...
+    if (GR->isScalarOrVectorOfType(Call->ReturnRegister, OpTypeInt)) {
+      // Int -> Int
+      if (Builtin->IsSaturated)
+        Opcode =
+            Builtin->IsDestinationSigned ? OpSatConvertUToS : OpSatConvertSToU;
+      else
+        Opcode = Builtin->IsDestinationSigned ? OpUConvert : OpSConvert;
+    } else if (GR->isScalarOrVectorOfType(Call->ReturnRegister, OpTypeFloat)) {
+      // Int -> Float
+      bool IsSourceSigned =
+          DemangledCall[DemangledCall.find_first_of('(') + 1] != 'u';
+      Opcode = IsSourceSigned ? OpConvertSToF : OpConvertUToF;
+    }
+  } else if (GR->isScalarOrVectorOfType(Call->Arguments[0], OpTypeFloat)) {
+    // Float -> ...
+    if (GR->isScalarOrVectorOfType(Call->ReturnRegister, OpTypeInt))
+      // Float -> Int
+      Opcode = Builtin->IsDestinationSigned ? OpConvertFToS : OpConvertFToU;
+    else if (GR->isScalarOrVectorOfType(Call->ReturnRegister, OpTypeFloat))
+      // Float -> Float
+      Opcode = OpFConvert;
+  }
+
+  assert(Opcode != OpNop && "Conversion between the types not implemented!");
+
+  auto MIB = MIRBuilder.buildInstr(Opcode)
+                 .addDef(Call->ReturnRegister)
+                 .addUse(GR->getSPIRVTypeID(Call->ReturnType))
+                 .addUse(Call->Arguments[0]);
+
+  return constrainRegOperands(MIB);
+}
+
 /// Lowers a builtin funtion call using the provided \p DemangledCall skeleton
 /// and external instruction \p Set.
 bool llvm::lowerBuiltin(const StringRef DemangledCall,
@@ -1590,8 +1655,8 @@ bool llvm::lowerBuiltin(const StringRef DemangledCall,
     return generateEnqueueInst(Call.get(), MIRBuilder, GR);
   case AsyncCopy:
     return generateAsyncCopy(Call.get(), MIRBuilder, GR);
-  default:
-    break;
+  case Convert:
+    return generateConvertInst(DemangledCall, Call.get(), MIRBuilder, GR);
   }
 
   return false;
