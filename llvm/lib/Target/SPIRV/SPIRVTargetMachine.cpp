@@ -152,7 +152,7 @@ void SPIRVPassConfig::addIRPasses() {
   TargetPassConfig::addIRPasses();
   addPass(createSPIRVLowerConstExprLegacyPass());
   addPass(createSPIRVOCLRegularizerPass());
-  addPass(createSPIRVPreTranslationLegalizerPass());
+  addPass(createSPIRVPrepareFunctionsPass());
 }
 
 void SPIRVPassConfig::addISelPrepare() {

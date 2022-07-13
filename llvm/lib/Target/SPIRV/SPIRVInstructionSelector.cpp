@@ -59,7 +59,7 @@ public:
   void setupMF(MachineFunction &MF, GISelKnownBits *KB,
                CodeGenCoverage &CoverageInfo, ProfileSummaryInfo *PSI,
                BlockFrequencyInfo *BFI) override;
-  // Common selection code. Instruction-specific selection occurs in spvSelect()
+  // Common selection code. Instruction-specific selection occurs in spvSelect.
   bool select(MachineInstr &I) override;
   static const char *getName() { return DEBUG_TYPE; }
 
@@ -219,7 +219,7 @@ void SPIRVInstructionSelector::setupMF(MachineFunction &MF, GISelKnownBits *KB,
 
 static bool isImm(const MachineOperand &MO, MachineRegisterInfo *MRI);
 
-// Defined in SPIRVLegalizerInfo.cpp
+// Defined in SPIRVLegalizerInfo.cpp.
 extern bool isTypeFoldingSupported(unsigned Opcode);
 
 bool SPIRVInstructionSelector::select(MachineInstr &I) {
@@ -229,7 +229,7 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
   Register Opcode = I.getOpcode();
   // If it's not a GMIR instruction, we've selected it already.
   if (!isPreISelGenericOpcode(Opcode)) {
-    if (Opcode == SPIRV::ASSIGN_TYPE) { // These pseudos aren't needed any more
+    if (Opcode == SPIRV::ASSIGN_TYPE) { // These pseudos aren't needed any more.
       auto *Def = MRI->getVRegDef(I.getOperand(1).getReg());
       if (isTypeFoldingSupported(Def->getOpcode())) {
         auto Res = selectImpl(I, *CoverageInfo);
@@ -239,7 +239,8 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
       }
       MRI->replaceRegWith(I.getOperand(1).getReg(), I.getOperand(0).getReg());
       I.removeFromParent();
-    } else if (I.getNumDefs() == 1) { // Make all vregs 32 bits (for SPIR-V IDs)
+    } else if (I.getNumDefs() == 1) {
+      // Make all vregs 32 bits (for SPIR-V IDs).
       MRI->setType(I.getOperand(0).getReg(), LLT::scalar(32));
     }
     return true;
@@ -257,9 +258,8 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
   SPIRVType *ResType = HasDefs ? GR.getSPIRVTypeForVReg(ResVReg) : nullptr;
   assert(!HasDefs || ResType || I.getOpcode() == TargetOpcode::G_GLOBAL_VALUE);
   if (spvSelect(ResVReg, ResType, I)) {
-    if (HasDefs) { // Make all vregs 32 bits (for SPIR-V IDs)
+    if (HasDefs) // Make all vregs 32 bits (for SPIR-V IDs).
       MRI->setType(ResVReg, LLT::scalar(32));
-    }
     I.eraseFromParentAndMarkDBGValuesForRemoval();
     return true;
   }
@@ -1025,7 +1025,7 @@ static unsigned getPtrCmpOpcode(unsigned Pred) {
   }
 }
 
-// Return the logical operation, or abort if none exists
+// Return the logical operation, or abort if none exists.
 static unsigned getBoolCmpOpcode(unsigned PredNum) {
   auto Pred = static_cast<CmpInst::Predicate>(PredNum);
   switch (Pred) {
@@ -1052,7 +1052,7 @@ bool SPIRVInstructionSelector::selectBitreverse(Register ResVReg,
 bool SPIRVInstructionSelector::selectConstVector(Register ResVReg,
                                                  const SPIRVType *ResType,
                                                  MachineInstr &I) const {
-  // TODO: only const case is supported for now
+  // TODO: only const case is supported for now.
   assert(std::all_of(
       I.operands_begin(), I.operands_end(), [this](const MachineOperand &MO) {
         if (MO.isDef())
@@ -1185,7 +1185,7 @@ bool SPIRVInstructionSelector::selectSelect(Register ResVReg,
                                             const SPIRVType *ResType,
                                             MachineInstr &I,
                                             bool IsSigned) const {
-  // To extend a bool, we need to use OpSelect between constants
+  // To extend a bool, we need to use OpSelect between constants.
   Register ZeroReg = buildZerosVal(ResType, I);
   Register OneReg = buildOnesVal(IsSigned, ResType, I);
   bool IsScalarBool =
@@ -1211,7 +1211,6 @@ bool SPIRVInstructionSelector::selectIToF(Register ResVReg,
   if (GR.isScalarOrVectorOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool)) {
     unsigned BitWidth = GR.getScalarOrVectorBitWidth(ResType);
     SPIRVType *TmpType = GR.getOrCreateSPIRVIntegerType(BitWidth, I, TII);
-    ;
     if (ResType->getOpcode() == SPIRV::OpTypeVector) {
       const unsigned NumElts = ResType->getOperand(2).getImm();
       TmpType = GR.getOrCreateSPIRVVectorType(TmpType, NumElts, I, TII);
@@ -1236,7 +1235,7 @@ bool SPIRVInstructionSelector::selectIntToBool(Register IntReg,
                                                MachineInstr &I,
                                                const SPIRVType *IntTy,
                                                const SPIRVType *BoolTy) const {
-  // To truncate to a bool, we use OpBitwiseAnd 1 and OpINotEqual to zero
+  // To truncate to a bool, we use OpBitwiseAnd 1 and OpINotEqual to zero.
   Register BitIntReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
   bool IsVectorTy = IntTy->getOpcode() == SPIRV::OpTypeVector;
   unsigned Opcode = IsVectorTy ? SPIRV::OpBitwiseAndV : SPIRV::OpBitwiseAndS;
@@ -1296,7 +1295,7 @@ bool SPIRVInstructionSelector::selectConst(Register ResVReg,
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpConstantI))
                  .addDef(ResVReg)
                  .addUse(GR.getSPIRVTypeID(ResType));
-  // <=32-bit integers should be caught by the sdag pattern
+  // <=32-bit integers should be caught by the sdag pattern.
   assert(Imm.getBitWidth() > 32);
   addNumImm(Imm, MIB);
   return MIB.constrainAllUses(TII, TRI, RBI);
@@ -1391,15 +1390,15 @@ bool SPIRVInstructionSelector::selectGEP(Register ResVReg,
                                          MachineInstr &I) const {
   // In general we should also support OpAccessChain instrs here (i.e. not
   // PtrAccessChain) but SPIRV-LLVM Translator doesn't emit them at all and so
-  // do we to stay compliant with its test and more importantly consumers
+  // do we to stay compliant with its test and more importantly consumers.
   unsigned Opcode = I.getOperand(2).getImm() ? SPIRV::OpInBoundsPtrAccessChain
                                              : SPIRV::OpPtrAccessChain;
   auto Res = BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(Opcode))
                  .addDef(ResVReg)
                  .addUse(GR.getSPIRVTypeID(ResType))
-                 // object to get a pointer to
+                 // Object to get a pointer to.
                  .addUse(I.getOperand(3).getReg());
-  // adding indices
+  // Adding indices.
   for (unsigned i = 4; i < I.getNumExplicitOperands(); ++i)
     Res.addUse(I.getOperand(i).getReg());
   return Res.constrainAllUses(TII, TRI, RBI);
@@ -1506,12 +1505,13 @@ bool SPIRVInstructionSelector::selectBranch(MachineInstr &I) const {
   // G_BRCOND, we just use OpBranch for a regular unconditional branch.
   const MachineInstr *PrevI = I.getPrevNode();
   MachineBasicBlock &MBB = *I.getParent();
-  if (PrevI != nullptr && PrevI->getOpcode() == TargetOpcode::G_BRCOND)
+  if (PrevI != nullptr && PrevI->getOpcode() == TargetOpcode::G_BRCOND) {
     return BuildMI(MBB, I, I.getDebugLoc(), TII.get(SPIRV::OpBranchConditional))
         .addUse(PrevI->getOperand(0).getReg())
         .addMBB(PrevI->getOperand(1).getMBB())
         .addMBB(I.getOperand(0).getMBB())
         .constrainAllUses(TII, TRI, RBI);
+  }
   return BuildMI(MBB, I, I.getDebugLoc(), TII.get(SPIRV::OpBranch))
       .addMBB(I.getOperand(0).getMBB())
       .constrainAllUses(TII, TRI, RBI);
@@ -1529,7 +1529,8 @@ bool SPIRVInstructionSelector::selectBranchCond(MachineInstr &I) const {
   // OpBranchConditional with an explicit "false" argument pointing to the next
   // basic block that LLVM would fall through to.
   const MachineInstr *NextI = I.getNextNode();
-  // Check if this has already been successfully selected
+  // Check if this has already been successfully selected.
+  //   }d
   if (NextI != nullptr && NextI->getOpcode() == SPIRV::OpBranchConditional)
     return true;
   // Must be relying on implicit block fallthrough, so generate an
@@ -1551,7 +1552,6 @@ bool SPIRVInstructionSelector::selectPhi(Register ResVReg,
                  .addDef(ResVReg)
                  .addUse(GR.getSPIRVTypeID(ResType));
   const unsigned NumOps = I.getNumOperands();
-  assert((NumOps % 2 == 1) && "Require odd number of operands for G_PHI");
   for (unsigned i = 1; i < NumOps; i += 2) {
     MIB.addUse(I.getOperand(i + 0).getReg());
     MIB.addMBB(I.getOperand(i + 1).getMBB());
@@ -1561,6 +1561,7 @@ bool SPIRVInstructionSelector::selectPhi(Register ResVReg,
 
 bool SPIRVInstructionSelector::selectGlobalValue(
     Register ResVReg, MachineInstr &I, const MachineInstr *Init) const {
+  // FIXME: don't use MachineIRBuilder here, replace it with BuildMI.
   MachineIRBuilder MIRBuilder(I);
   const GlobalValue *GV = I.getOperand(1).getGlobal();
   SPIRVType *ResType =

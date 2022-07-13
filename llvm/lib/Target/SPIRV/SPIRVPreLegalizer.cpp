@@ -195,7 +195,7 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
 // Insert ASSIGN_TYPE instuction between Reg and its definition, set NewReg as
 // a dst of the definition, assign SPIRVType to both registers. If SpirvTy is
 // provided, use it as SPIRVType in ASSIGN_TYPE, otherwise create it from Ty.
-// It's used also in SPIRVOpenCLBIFs.cpp.
+// It's used also in SPIRVBuiltins.cpp.
 // TODO: maybe move to SPIRVUtils.
 Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
                            SPIRVGlobalRegistry *GR, MachineIRBuilder &MIB,
@@ -367,6 +367,22 @@ static void processInstrsWithTypeFolding(MachineFunction &MF,
     for (MachineInstr &MI : MBB) {
       if (isTypeFoldingSupported(MI.getOpcode()))
         processInstr(MI, MIB, MRI, GR);
+    }
+  }
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : MBB) {
+      // We need to rewrite dst types for ASSIGN_TYPE instrs to be able
+      // to perform tblgen'erated selection and we can't do that on Legalizer
+      // as it operates on gMIR only.
+      if (MI.getOpcode() != SPIRV::ASSIGN_TYPE)
+        continue;
+      Register SrcReg = MI.getOperand(1).getReg();
+      if (!isTypeFoldingSupported(MRI.getVRegDef(SrcReg)->getOpcode()))
+        continue;
+      Register DstReg = MI.getOperand(0).getReg();
+      if (MRI.getType(DstReg).isVector())
+        MRI.setRegClass(DstReg, &SPIRV::IDRegClass);
+      MRI.setType(DstReg, LLT::scalar(32));
     }
   }
 }

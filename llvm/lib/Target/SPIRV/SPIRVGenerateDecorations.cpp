@@ -71,9 +71,6 @@ static uint32_t getFastMathFlags(const MachineInstr &I) {
   return flags;
 }
 
-// Defined in SPIRVLegalizerInfo.cpp
-extern bool isTypeFoldingSupported(unsigned Opcode);
-
 bool SPIRVGenerateDecorations::runOnMachineFunction(MachineFunction &MF) {
   MachineIRBuilder MIRBuilder(MF);
   auto &MRI = MF.getRegInfo();
@@ -93,23 +90,6 @@ bool SPIRVGenerateDecorations::runOnMachineFunction(MachineFunction &MF) {
             .addUse(NewReg)
             .addImm(Decoration::FPFastMathMode)
             .addImm(FMFlags);
-      }
-    }
-  }
-
-  for (auto &MBB : MF) {
-    for (auto &MI : MBB) {
-      // We need to rewrite dst types for ASSIGN_TYPE instrs to be able
-      // to perform tblgen'erated selection and we can't do that on Legalizer
-      // as it operates on gMIR only.
-      if (MI.getOpcode() == SPIRV::ASSIGN_TYPE) {
-        Register SrcReg = MI.getOperand(1).getReg();
-        if (isTypeFoldingSupported(MRI.getVRegDef(SrcReg)->getOpcode())) {
-          Register DstReg = MI.getOperand(0).getReg();
-          if (MRI.getType(DstReg).isVector())
-            MRI.setRegClass(DstReg, &SPIRV::IDRegClass);
-          MRI.setType(DstReg, LLT::scalar(32));
-        }
       }
     }
   }

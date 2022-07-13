@@ -19,7 +19,7 @@ class SPIRVSubtarget;
 class InstructionSelector;
 class RegisterBankInfo;
 
-ModulePass *createSPIRVPreTranslationLegalizerPass();
+ModulePass *createSPIRVPrepareFunctionsPass();
 FunctionPass *createSPIRVOCLRegularizerPass();
 FunctionPass *createSPIRVBasicBlockDominancePass();
 ModulePass *createSPIRVLowerConstExprLegacyPass();
