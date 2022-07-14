@@ -14,7 +14,6 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
-#include "MCTargetDesc/SPIRVExtInsts.h"
 #include "SPIRVCallLowering.h"
 #include "SPIRVFrameLowering.h"
 #include "SPIRVGlobalRegistry.h"

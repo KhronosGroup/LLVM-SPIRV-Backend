@@ -1,4 +1,4 @@
-; RUN: llc %s -o - | FileCheck %s
+; RUN: llc -O0 %s -o - | FileCheck %s
 
 target triple = "spirv32-unknown-unknown"
 

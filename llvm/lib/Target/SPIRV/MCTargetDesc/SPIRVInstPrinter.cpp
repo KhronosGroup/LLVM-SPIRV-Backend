@@ -13,7 +13,6 @@
 #include "SPIRVInstPrinter.h"
 #include "SPIRV.h"
 #include "SPIRVBaseInfo.h"
-#include "SPIRVExtInsts.h"
 #include "llvm/CodeGen/Register.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
@@ -195,7 +194,8 @@ void SPIRVInstPrinter::printOpExtInst(const MCInst *MI, raw_ostream &O) {
   auto SetReg = MI->getOperand(2).getReg();
   auto Set = ExtInstSetIDs[SetReg];
   if (Set == InstructionSet::OpenCL_std) {
-    auto Inst = static_cast<OpenCLExtInst::OpenCLExtInst>(MI->getOperand(3).getImm());
+    auto Inst =
+        static_cast<OpenCLExtInst::OpenCLExtInst>(MI->getOperand(3).getImm());
     switch (Inst) {
     case OpenCLExtInst::vstore_half_r:
     case OpenCLExtInst::vstore_halfn_r:
