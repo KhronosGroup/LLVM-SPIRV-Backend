@@ -180,6 +180,21 @@ namespace KernelProfilingInfo {
 #include "SPIRVGenTables.inc"
 } // namespace KernelProfilingInfo
 
+namespace InstructionSet {
+#define GET_InstructionSet_DECL
+#include "SPIRVGenTables.inc"
+} // namespace InstructionSet
+
+namespace OpenCLExtInst {
+#define GET_OpenCLExtInst_DECL
+#include "SPIRVGenTables.inc"
+} // namespace OpenCLExtInst
+
+namespace GLSLExtInst {
+#define GET_GLSLExtInst_DECL
+#include "SPIRVGenTables.inc"
+} // namespace GLSLExtInst
+
 namespace Opcode {
 #define GET_Opcode_DECL
 #include "SPIRVGenTables.inc"
@@ -204,6 +219,11 @@ std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue);
 
 // TODO: Remove function after new SPIRVOpenCLBIFs is merged.
 bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI);
+
+std::string getExtInstSetName(InstructionSet::InstructionSet Set);
+InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName);
+std::string getExtInstName(InstructionSet::InstructionSet Set,
+                           uint32_t InstructionNumber);
 
 // Return a string representation of the operands from startIndex onwards.
 // Templated to allow both MachineInstr and MCInst to use the same logic.

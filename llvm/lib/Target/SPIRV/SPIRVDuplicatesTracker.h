@@ -300,7 +300,6 @@ public:
   }
 
   const SPIRVDuplicatesTracker<Type> *getTypes() { return &TT; }
-  const SPIRVDuplicatesTracker<Function> *getFuncs() { return &FT; }
 };
 } // namespace llvm
 #endif

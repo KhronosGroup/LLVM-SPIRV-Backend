@@ -131,7 +131,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       // if (!SpirvTy)
       Type *ArgTy = FTy->getParamType(i);
       AccessQualifier::AccessQualifier AQ = AccessQualifier::ReadWrite;
-      auto Node = F.getMetadata("kernel_arg_access_qual");
+      MDNode *Node = F.getMetadata("kernel_arg_access_qual");
       if (Node && i < Node->getNumOperands()) {
         StringRef AQString = cast<MDString>(Node->getOperand(i))->getString();
         if (AQString.compare("read_only") == 0)
@@ -254,7 +254,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
 bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
                                   CallLoweringInfo &Info) const {
-  auto &MF = MIRBuilder.getMF();
+  MachineFunction &MF = MIRBuilder.getMF();
   GR->setCurrentFunc(MF);
   FunctionType *FTy = nullptr;
   const Function *CF = nullptr;

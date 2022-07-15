@@ -15,7 +15,6 @@
 #include "SPIRV.h"
 #include "SPIRVCapabilityUtils.h"
 #include "SPIRVEnumRequirements.h"
-#include "SPIRVGlobalRegistry.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVMCInstLower.h"
 #include "SPIRVModuleAnalysis.h"
@@ -49,12 +48,10 @@ public:
                            std::unique_ptr<MCStreamer> Streamer)
       : AsmPrinter(TM, std::move(Streamer)) {
     ST = static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
-    GR = ST->getSPIRVGlobalRegistry();
     TII = ST->getInstrInfo();
   }
   bool ModuleSectionsEmitted;
   const SPIRVSubtarget *ST;
-  SPIRVGlobalRegistry *GR;
   const SPIRVInstrInfo *TII;
 
   StringRef getPassName() const override { return "SPIRV Assembly Printer"; }
@@ -271,7 +268,9 @@ void SPIRVAsmPrinter::outputOpExtInstImports(const Module &M) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtInstImport);
     Inst.addOperand(MCOperand::createReg(Reg));
-    addStringImm(getExtInstSetName(static_cast<InstructionSet::InstructionSet>(Set)), Inst);
+    addStringImm(
+        getExtInstSetName(static_cast<InstructionSet::InstructionSet>(Set)),
+        Inst);
     outputMCInst(Inst);
   }
 }
@@ -392,8 +391,7 @@ static void addOpsFromMDNode(MDNode *MDN, MCInst &Inst,
     if (auto *CMeta = dyn_cast<ConstantAsMetadata>(MDOp)) {
       Constant *C = CMeta->getValue();
       if (ConstantInt *Const = dyn_cast<ConstantInt>(C)) {
-        auto EM = Const->getZExtValue();
-        Inst.addOperand(MCOperand::createImm(EM));
+        Inst.addOperand(MCOperand::createImm(Const->getZExtValue()));
       } else if (auto *CE = dyn_cast<Function>(C)) {
         Register FuncReg = MAI->getFuncReg(CE->getName().str());
         assert(FuncReg.isValid());
@@ -414,7 +412,7 @@ void SPIRVAsmPrinter::outputExecutionModeFromMDNode(Register Reg, MDNode *Node,
 }
 
 void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
-  auto Node = M.getNamedMetadata("spirv.ExecutionMode");
+  NamedMDNode *Node = M.getNamedMetadata("spirv.ExecutionMode");
   if (Node) {
     for (unsigned i = 0; i < Node->getNumOperands(); i++) {
       MCInst Inst;
@@ -451,35 +449,32 @@ void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
   outputModuleSection(SPIRV::MB_Annotations);
   // Process llvm.global.annotations special global variable.
   for (auto F = M.global_begin(), E = M.global_end(); F != E; ++F) {
-    if ((*F).getName() == "llvm.global.annotations") {
-      const GlobalVariable *V = &(*F);
-      const ConstantArray *CA = cast<ConstantArray>(V->getOperand(0));
-      for (Value *Op : CA->operands()) {
-        ConstantStruct *CS = cast<ConstantStruct>(Op);
-        // The first field of the struct contains a pointer to
-        // annotated variable.
-        Value *AnnotatedVar = CS->getOperand(0)->stripPointerCasts();
-        Register Reg;
-        if (isa<Function>(AnnotatedVar)) {
-          auto *Func = cast<Function>(AnnotatedVar);
-          Reg = MAI->getFuncReg(Func->getGlobalIdentifier());
-        } else {
-          llvm_unreachable("Unsupported value in llvm.global.annotations");
-        }
+    if ((*F).getName() != "llvm.global.annotations")
+      continue;
+    const GlobalVariable *V = &(*F);
+    const ConstantArray *CA = cast<ConstantArray>(V->getOperand(0));
+    for (Value *Op : CA->operands()) {
+      ConstantStruct *CS = cast<ConstantStruct>(Op);
+      // The first field of the struct contains a pointer to
+      // the annotated variable.
+      Value *AnnotatedVar = CS->getOperand(0)->stripPointerCasts();
+      if (!isa<Function>(AnnotatedVar))
+        llvm_unreachable("Unsupported value in llvm.global.annotations");
+      Function *Func = cast<Function>(AnnotatedVar);
+      Register Reg = MAI->getFuncReg(Func->getGlobalIdentifier());
 
-        // The second field contains a pointer to a global annotation string.
-        GlobalVariable *GV =
-            cast<GlobalVariable>(CS->getOperand(1)->stripPointerCasts());
+      // The second field contains a pointer to a global annotation string.
+      GlobalVariable *GV =
+          cast<GlobalVariable>(CS->getOperand(1)->stripPointerCasts());
 
-        StringRef AnnotationString;
-        getConstantStringInfo(GV, AnnotationString);
-        MCInst Inst;
-        Inst.setOpcode(SPIRV::OpDecorate);
-        Inst.addOperand(MCOperand::createReg(Reg));
-        Inst.addOperand(MCOperand::createImm(Decoration::UserSemantic));
-        addStringImm(AnnotationString, Inst);
-        outputMCInst(Inst);
-      }
+      StringRef AnnotationString;
+      getConstantStringInfo(GV, AnnotationString);
+      MCInst Inst;
+      Inst.setOpcode(SPIRV::OpDecorate);
+      Inst.addOperand(MCOperand::createReg(Reg));
+      Inst.addOperand(MCOperand::createImm(Decoration::UserSemantic));
+      addStringImm(AnnotationString, Inst);
+      outputMCInst(Inst);
     }
   }
 }

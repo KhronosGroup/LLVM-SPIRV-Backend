@@ -487,7 +487,7 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeStruct(const StructType *Ty,
                                                 bool EmitIR) {
   SmallVector<Register, 4> FieldTypes;
   for (const auto &Elem : Ty->elements()) {
-    auto ElemTy = findSPIRVType(Elem, MIRBuilder);
+    SPIRVType *ElemTy = findSPIRVType(Elem, MIRBuilder);
     assert(ElemTy && ElemTy->getOpcode() != SPIRV::OpTypeVoid &&
            "Invalid struct element type");
     FieldTypes.push_back(getSPIRVTypeID(ElemTy));
@@ -590,10 +590,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeFunctionWithArgs(
   if (Reg.isValid())
     return getSPIRVTypeForVReg(Reg);
   SPIRVType *SpirvType = getOpTypeFunction(RetType, ArgTypes, MIRBuilder);
-  VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(SpirvType)] = SpirvType;
-  SPIRVToLLVMType[SpirvType] = Ty;
-  DT.add(Ty, &MIRBuilder.getMF(), getSPIRVTypeID(SpirvType));
-  return SpirvType;
+  return finishCreatingSPIRVType(Ty, SpirvType);
 }
 
 SPIRVType *SPIRVGlobalRegistry::findSPIRVType(const Type *Ty,
@@ -639,13 +636,13 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
   if (Ty->isVoidTy())
     return getOpTypeVoid(MIRBuilder);
   if (Ty->isVectorTy()) {
-    auto El =
+    SPIRVType *El =
         findSPIRVType(cast<FixedVectorType>(Ty)->getElementType(), MIRBuilder);
     return getOpTypeVector(cast<FixedVectorType>(Ty)->getNumElements(), El,
                            MIRBuilder);
   }
   if (Ty->isArrayTy()) {
-    auto *El = findSPIRVType(Ty->getArrayElementType(), MIRBuilder);
+    SPIRVType *El = findSPIRVType(Ty->getArrayElementType(), MIRBuilder);
     return getOpTypeArray(Ty->getArrayNumElements(), El, MIRBuilder, EmitIR);
   }
   if (auto SType = dyn_cast<StructType>(Ty)) {
@@ -1066,8 +1063,8 @@ SPIRVGlobalRegistry::getOrCreateSPIRVIntegerType(unsigned BitWidth,
       MIRBuilder);
 }
 
-SPIRVType *SPIRVGlobalRegistry::restOfCreateSPIRVType(Type *LLVMTy,
-                                                      SPIRVType *SpirvType) {
+SPIRVType *SPIRVGlobalRegistry::finishCreatingSPIRVType(const Type *LLVMTy,
+                                                        SPIRVType *SpirvType) {
   VRegToTypeMap[CurMF][getSPIRVTypeID(SpirvType)] = SpirvType;
   SPIRVToLLVMType[SpirvType] = LLVMTy;
   DT.add(LLVMTy, CurMF, getSPIRVTypeID(SpirvType));
@@ -1085,7 +1082,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVIntegerType(
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
                  .addImm(BitWidth)
                  .addImm(0);
-  return restOfCreateSPIRVType(LLVMTy, MIB);
+  return finishCreatingSPIRVType(LLVMTy, MIB);
 }
 
 SPIRVType *
@@ -1105,7 +1102,7 @@ SPIRVGlobalRegistry::getOrCreateSPIRVBoolType(MachineInstr &I,
   MachineBasicBlock &BB = *I.getParent();
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpTypeBool))
                  .addDef(createTypeVReg(CurMF->getRegInfo()));
-  return restOfCreateSPIRVType(LLVMTy, MIB);
+  return finishCreatingSPIRVType(LLVMTy, MIB);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVVectorType(
@@ -1129,7 +1126,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVVectorType(
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
                  .addUse(getSPIRVTypeID(BaseType))
                  .addImm(NumElements);
-  return restOfCreateSPIRVType(LLVMTy, MIB);
+  return finishCreatingSPIRVType(LLVMTy, MIB);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
@@ -1155,7 +1152,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
                  .addDef(createTypeVReg(CurMF->getRegInfo()))
                  .addImm(static_cast<uint32_t>(SC))
                  .addUse(getSPIRVTypeID(BaseType));
-  return restOfCreateSPIRVType(LLVMTy, MIB);
+  return finishCreatingSPIRVType(LLVMTy, MIB);
 }
 
 Register SPIRVGlobalRegistry::getOrCreateUndef(MachineInstr &I,

@@ -227,21 +227,21 @@ static bool findSameInstrInMS(const MachineInstr &A,
                               unsigned StartOpIndex = 0) {
   for (const auto *B : MAI.MS[MSType]) {
     const unsigned NumAOps = A.getNumOperands();
-    if (NumAOps == B->getNumOperands() && A.getNumDefs() == B->getNumDefs()) {
-      bool AllOpsMatch = true;
-      for (unsigned i = StartOpIndex; i < NumAOps && AllOpsMatch; ++i) {
-        if (A.getOperand(i).isReg() && B->getOperand(i).isReg()) {
-          Register RegA = A.getOperand(i).getReg();
-          Register RegB = B->getOperand(i).getReg();
-          AllOpsMatch = MAI.getRegisterAlias(A.getMF(), RegA) ==
-                        MAI.getRegisterAlias(B->getMF(), RegB);
-        } else {
-          AllOpsMatch = A.getOperand(i).isIdenticalTo(B->getOperand(i));
-        }
+    if (NumAOps != B->getNumOperands() || A.getNumDefs() != B->getNumDefs())
+      continue;
+    bool AllOpsMatch = true;
+    for (unsigned i = StartOpIndex; i < NumAOps && AllOpsMatch; ++i) {
+      if (A.getOperand(i).isReg() && B->getOperand(i).isReg()) {
+        Register RegA = A.getOperand(i).getReg();
+        Register RegB = B->getOperand(i).getReg();
+        AllOpsMatch = MAI.getRegisterAlias(A.getMF(), RegA) ==
+                      MAI.getRegisterAlias(B->getMF(), RegB);
+      } else {
+        AllOpsMatch = A.getOperand(i).isIdenticalTo(B->getOperand(i));
       }
-      if (AllOpsMatch)
-        return true;
     }
+    if (AllOpsMatch)
+      return true;
   }
   return false;
 }
@@ -344,11 +344,11 @@ void SPIRVModuleAnalysis::numberRegistersGlobally(const Module &M) {
           Register NewReg = Register::index2VirtReg(MAI.getNextID());
           MAI.setRegisterAlias(MF, Reg, NewReg);
         }
-        if (MI.getOpcode() == SPIRV::OpExtInst) {
-          auto Set = MI.getOperand(2).getImm();
-          if (MAI.ExtInstSetMap.find(Set) == MAI.ExtInstSetMap.end())
-            MAI.ExtInstSetMap[Set] = Register::index2VirtReg(MAI.getNextID());
-        }
+        if (MI.getOpcode() != SPIRV::OpExtInst)
+          continue;
+        auto Set = MI.getOperand(2).getImm();
+        if (MAI.ExtInstSetMap.find(Set) == MAI.ExtInstSetMap.end())
+          MAI.ExtInstSetMap[Set] = Register::index2VirtReg(MAI.getNextID());
       }
     }
   }
@@ -372,18 +372,18 @@ static void processSwitches(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
           assert(MI.getOperand(0).isReg());
           SwitchRegs.insert(MI.getOperand(0).getReg());
         }
-        if (MI.getOpcode() == SPIRV::OpIEqual && MI.getOperand(2).isReg() &&
-            SwitchRegs.contains(MI.getOperand(2).getReg())) {
-          Register CmpReg = MI.getOperand(0).getReg();
-          MachineInstr *CBr = MI.getNextNode();
-          assert(CBr && CBr->getOpcode() == SPIRV::OpBranchConditional &&
-                 CBr->getOperand(0).isReg() &&
-                 CBr->getOperand(0).getReg() == CmpReg);
-          MAI.setSkipEmission(&MI);
-          MAI.setSkipEmission(CBr);
-          if (&MBB.front() == &MI && &MBB.back() == CBr)
-            MAI.MBBsToSkip.insert(&MBB);
-        }
+        if (MI.getOpcode() != SPIRV::OpIEqual || !MI.getOperand(2).isReg() ||
+            !SwitchRegs.contains(MI.getOperand(2).getReg()))
+          continue;
+        Register CmpReg = MI.getOperand(0).getReg();
+        MachineInstr *CBr = MI.getNextNode();
+        assert(CBr && CBr->getOpcode() == SPIRV::OpBranchConditional &&
+               CBr->getOperand(0).isReg() &&
+               CBr->getOperand(0).getReg() == CmpReg);
+        MAI.setSkipEmission(&MI);
+        MAI.setSkipEmission(CBr);
+        if (&MBB.front() == &MI && &MBB.back() == CBr)
+          MAI.MBBsToSkip.insert(&MBB);
       }
   }
 }

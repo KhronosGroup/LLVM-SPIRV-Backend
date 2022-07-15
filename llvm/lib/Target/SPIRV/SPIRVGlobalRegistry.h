@@ -95,10 +95,6 @@ public:
   //   return DT.end();
   // }
 
-  const typename SPIRVDuplicatesTracker<Function>::StorageTy &getFuncAllUses() {
-    return DT.getFuncs()->getAllUses();
-  }
-
   void buildDepsGraph(std::vector<SPIRV::DTSortableEntry *> &Graph,
                       MachineModuleInfo *MMI = nullptr) {
     DT.buildDepsGraph(Graph, MMI);
@@ -247,7 +243,7 @@ private:
   std::tuple<Register, ConstantInt *, bool> getOrCreateConstIntReg(
       uint64_t Val, SPIRVType *SpvType, MachineIRBuilder *MIRBuilder,
       MachineInstr *I = nullptr, const SPIRVInstrInfo *TII = nullptr);
-  SPIRVType *restOfCreateSPIRVType(Type *LLVMTy, SPIRVType *SpirvType);
+  SPIRVType *finishCreatingSPIRVType(const Type *LLVMTy, SPIRVType *SpirvType);
 
 public:
   Register buildConstantInt(uint64_t Val, MachineIRBuilder &MIRBuilder,

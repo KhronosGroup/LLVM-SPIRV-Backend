@@ -23,6 +23,7 @@ using namespace llvm;
 using namespace OperandCategory;
 using namespace Extension;
 using namespace Capability;
+using namespace InstructionSet;
 
 struct SymbolicOperand {
   ::OperandCategory::OperandCategory Category;
@@ -44,12 +45,20 @@ struct CapabilityEntry {
   ::Capability::Capability ReqCapability;
 };
 
+struct ExtendedBuiltin {
+  StringRef Name;
+  InstructionSet::InstructionSet Set;
+  uint32_t Number;
+};
+
 #define GET_SymbolicOperands_DECL
 #define GET_SymbolicOperands_IMPL
 #define GET_ExtensionEntries_DECL
 #define GET_ExtensionEntries_IMPL
 #define GET_CapabilityEntries_DECL
 #define GET_CapabilityEntries_IMPL
+#define GET_ExtendedBuiltins_DECL
+#define GET_ExtendedBuiltins_IMPL
 #include "SPIRVGenTables.inc"
 } // end anonymous namespace
 
@@ -175,4 +184,47 @@ bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI) {
 
   BI = static_cast<BuiltIn::BuiltIn>(Lookup->Value);
   return true;
+}
+
+std::string getExtInstSetName(::InstructionSet::InstructionSet Set) {
+  switch (Set) {
+  case ::InstructionSet::OpenCL_std:
+    return "OpenCL.std";
+  case ::InstructionSet::GLSL_std_450:
+    return "GLSL.std.450";
+  case ::InstructionSet::SPV_AMD_shader_trinary_minmax:
+    return "SPV_AMD_shader_trinary_minmax";
+  }
+  return "UNKNOWN_EXT_INST_SET";
+}
+
+::InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName) {
+  for (auto Set :
+       {::InstructionSet::GLSL_std_450, ::InstructionSet::OpenCL_std}) {
+    if (SetName == getExtInstSetName(Set)) {
+      return Set;
+    }
+  }
+  llvm_unreachable("UNKNOWN_EXT_INST_SET");
+}
+
+std::string getExtInstName(::InstructionSet::InstructionSet Set,
+                           uint32_t InstructionNumber) {
+  switch (Set) {
+  case ::InstructionSet::OpenCL_std: {
+    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
+        ::InstructionSet::OpenCL_std, InstructionNumber);
+    if (Lookup)
+      return Lookup->Name.str();
+  }
+  case ::InstructionSet::GLSL_std_450: {
+    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
+        ::InstructionSet::GLSL_std_450, InstructionNumber);
+
+    if (Lookup)
+      return Lookup->Name.str();
+  }
+  }
+
+  return "UNKNOWN_EXT_INST_SET";
 }

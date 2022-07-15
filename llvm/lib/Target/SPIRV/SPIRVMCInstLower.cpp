@@ -27,7 +27,6 @@ void SPIRVMCInstLower::lower(const MachineInstr *MI, MCInst &OutMI,
   const MachineFunction *MF = MI->getMF();
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI->getOperand(i);
-    // At this stage, SPIR-V should only have Register and Immediate operands
     MCOperand MCOp;
     switch (MO.getType()) {
     default:
