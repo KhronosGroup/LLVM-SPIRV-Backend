@@ -748,7 +748,7 @@ static bool generateExtInst(const IncomingCall *Call,
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInst)
                  .addDef(Call->ReturnRegister)
                  .addUse(GR->getSPIRVTypeID(Call->ReturnType))
-                 .addImm(static_cast<uint32_t>(InstructionSet::OpenCL_std))
+                 .addImm(static_cast<uint32_t>(::InstructionSet::OpenCL_std))
                  .addImm(Number);
 
   for (auto Argument : Call->Arguments)
