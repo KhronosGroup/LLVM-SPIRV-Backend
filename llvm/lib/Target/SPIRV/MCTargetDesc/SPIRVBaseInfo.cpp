@@ -126,13 +126,13 @@ getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
   return 0;
 }
 
-std::vector<::Capability::Capability>
+CapabilityList
 getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
                                uint32_t Value) {
   const CapabilityEntry *Capability =
       lookupCapabilityByCategoryAndValue(Category, Value);
 
-  std::vector<::Capability::Capability> Capabilities;
+  CapabilityList Capabilities;
   while (Capability && Capability->Category == Category &&
          Capability->Value == Value) {
     Capabilities.push_back(
@@ -143,13 +143,13 @@ getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
   return Capabilities;
 }
 
-std::vector<::Extension::Extension>
+ExtensionList
 getSymbolicOperandExtensions(::OperandCategory::OperandCategory Category,
                              uint32_t Value) {
   const ExtensionEntry *Extension =
       lookupExtensionByCategoryAndValue(Category, Value);
 
-  std::vector<::Extension::Extension> Extensions;
+  ExtensionList Extensions;
   while (Extension && Extension->Category == Category &&
          Extension->Value == Value) {
     Extensions.push_back(

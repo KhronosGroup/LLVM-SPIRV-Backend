@@ -213,10 +213,14 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   // This is to make it convenient for Legalizer to get the SPIRVType
   // when processing the actual MI (i.e. not pseudo one).
   GR->assignSPIRVTypeToVReg(SpirvTy, NewReg, MIB.getMF());
+  // Copy MIFlags from Def to ASSIGN_TYPE instruction. It's required to keep
+  // the flags after instruction selection.
+  const uint16_t Flags = Def->getFlags();
   MIB.buildInstr(SPIRV::ASSIGN_TYPE)
       .addDef(Reg)
       .addUse(NewReg)
-      .addUse(GR->getSPIRVTypeID(SpirvTy));
+      .addUse(GR->getSPIRVTypeID(SpirvTy))
+      .setMIFlags(Flags);
   Def->getOperand(0).setReg(NewReg);
   MRI.setRegClass(Reg, &SPIRV::ANYIDRegClass);
   return NewReg;

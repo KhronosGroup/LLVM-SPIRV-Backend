@@ -15,10 +15,9 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-
 #include <string>
-#include <vector>
 
 namespace OperandCategory {
 #define GET_OperandCategory_DECL
@@ -200,6 +199,9 @@ namespace Opcode {
 #include "SPIRVGenTables.inc"
 } // namespace Opcode
 
+using CapabilityList = llvm::SmallVector<Capability::Capability, 8>;
+using ExtensionList = llvm::SmallVector<Extension::Extension, 8>;
+
 std::string
 getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
                            int32_t Value);
@@ -209,10 +211,10 @@ getSymbolicOperandMinVersion(::OperandCategory::OperandCategory Category,
 uint32_t
 getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
                              uint32_t Value);
-std::vector<::Capability::Capability>
+CapabilityList
 getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
                                uint32_t Value);
-std::vector<::Extension::Extension>
+ExtensionList
 getSymbolicOperandExtensions(::OperandCategory::OperandCategory Category,
                              uint32_t Value);
 std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue);

@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRV.h"
-#include "SPIRVEnumRequirements.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVRegisterBankInfo.h"
@@ -547,61 +546,11 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
   return false;
 }
 
-static bool canUseNSW(unsigned Opcode) {
-  switch (Opcode) {
-  case SPIRV::OpIAddS:
-  case SPIRV::OpIAddV:
-  case SPIRV::OpISubS:
-  case SPIRV::OpISubV:
-  case SPIRV::OpIMulS:
-  case SPIRV::OpIMulV:
-  case SPIRV::OpShiftLeftLogicalS:
-  case SPIRV::OpShiftLeftLogicalV:
-  case SPIRV::OpSNegate:
-    return true;
-  default:
-    return false;
-  }
-}
-
-static bool canUseNUW(unsigned Opcode) {
-  switch (Opcode) {
-  case SPIRV::OpIAddS:
-  case SPIRV::OpIAddV:
-  case SPIRV::OpISubS:
-  case SPIRV::OpISubV:
-  case SPIRV::OpIMulS:
-  case SPIRV::OpIMulV:
-    return true;
-  default:
-    return false;
-  }
-}
-
-// TODO: move to GenerateDecorations pass
-static void handleIntegerWrapFlags(MachineInstr &I, Register Target,
-                                   unsigned NewOpcode, const SPIRVSubtarget &ST,
-                                   const SPIRVInstrInfo &TII,
-                                   SPIRVGlobalRegistry &GR) {
-  if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && canUseNSW(NewOpcode) &&
-      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
-                                     Decoration::NoSignedWrap, ST)
-          .isSatisfiable)
-    buildOpDecorate(Target, I, TII, Decoration::NoSignedWrap, {});
-
-  if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && canUseNUW(NewOpcode) &&
-      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
-                                     Decoration::NoUnsignedWrap, ST)
-          .isSatisfiable)
-    buildOpDecorate(Target, I, TII, Decoration::NoUnsignedWrap, {});
-}
-
 bool SPIRVInstructionSelector::selectUnOpWithSrc(Register ResVReg,
                                                  const SPIRVType *ResType,
                                                  MachineInstr &I,
                                                  Register SrcReg,
                                                  unsigned Opcode) const {
-  handleIntegerWrapFlags(I, ResVReg, Opcode, STI, TII, GR);
   return BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(Opcode))
       .addDef(ResVReg)
       .addUse(GR.getSPIRVTypeID(ResType))
