@@ -122,12 +122,23 @@ struct ConvertBuiltin {
   bool IsDestinationSigned;
   bool IsSaturated;
   bool IsRounded;
-  FPRoundingMode::FPRoundingMode RoundingMode;
+  ::FPRoundingMode::FPRoundingMode RoundingMode;
 };
 
 using namespace FPRoundingMode;
 #define GET_ConvertBuiltins_DECL
 #define GET_ConvertBuiltins_IMPL
+
+struct VectorLoadStoreBuiltin {
+  StringRef Name;
+  InstructionSet Set;
+  uint32_t Number;
+  bool IsRounded;
+  ::FPRoundingMode::FPRoundingMode RoundingMode;
+};
+
+#define GET_VectorLoadStoreBuiltins_DECL
+#define GET_VectorLoadStoreBuiltins_IMPL
 
 #define GET_CLMemoryScope_DECL
 #define GET_CLSamplerAddressingMode_DECL
@@ -1568,6 +1579,31 @@ static bool generateConvertInst(const StringRef DemangledCall,
   return constrainRegOperands(MIB);
 }
 
+static bool generateVectorLoadStoreInst(const IncomingCall *Call,
+                                        MachineIRBuilder &MIRBuilder,
+                                        SPIRVGlobalRegistry *GR) {
+  // Lookup the vector load/store builtin in the TableGen records.
+  const VectorLoadStoreBuiltin *Builtin =
+      lookupVectorLoadStoreBuiltin(Call->Builtin->Name, Call->Builtin->Set);
+
+  // Build extended instruction.
+  auto MIB = MIRBuilder.buildInstr(SPIRV::OpExtInst)
+                 .addDef(Call->ReturnRegister)
+                 .addUse(GR->getSPIRVTypeID(Call->ReturnType))
+                 .addImm(static_cast<uint32_t>(::InstructionSet::OpenCL_std))
+                 .addImm(Builtin->Number);
+
+  for (auto Argument : Call->Arguments)
+    MIB.addUse(Argument);
+
+  // Rounding mode should be passed as a last argument in the MI for builtins
+  // like "vstorea_halfn_r".
+  if (Builtin->IsRounded)
+    MIB.addImm(static_cast<uint32_t>(Builtin->RoundingMode));
+
+  return constrainRegOperands(MIB);
+}
+
 /// Lowers a builtin funtion call using the provided \p DemangledCall skeleton
 /// and external instruction \p Set.
 bool llvm::lowerBuiltin(const StringRef DemangledCall,
@@ -1579,14 +1615,20 @@ bool llvm::lowerBuiltin(const StringRef DemangledCall,
 
   LLVM_DEBUG(dbgs() << "Lowering builtin call: " << DemangledCall << "\n");
 
-  // SPIR-V type for the return register
+  // SPIR-V type and return register
+  Register ReturnRegister = OrigRet;
   SPIRVType *ReturnType = nullptr;
-  if (OrigRetTy && !OrigRetTy->isVoidTy())
+  if (OrigRetTy && !OrigRetTy->isVoidTy()) {
     ReturnType = GR->assignTypeToVReg(OrigRetTy, OrigRet, MIRBuilder);
+  } else if (OrigRetTy && OrigRetTy->isVoidTy()) {
+    ReturnRegister = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+    MIRBuilder.getMRI()->setType(ReturnRegister, LLT::scalar(32));
+    ReturnType = GR->assignTypeToVReg(OrigRetTy, ReturnRegister, MIRBuilder);
+  }
 
   // Lookup the builtin in the TableGen records
   std::unique_ptr<const IncomingCall> Call =
-      lookupBuiltin(DemangledCall, Set, OrigRet, ReturnType, Args);
+      lookupBuiltin(DemangledCall, Set, ReturnRegister, ReturnType, Args);
 
   if (!Call) {
     LLVM_DEBUG(dbgs() << "Builtin record was not found!");
@@ -1633,6 +1675,8 @@ bool llvm::lowerBuiltin(const StringRef DemangledCall,
     return generateAsyncCopy(Call.get(), MIRBuilder, GR);
   case Convert:
     return generateConvertInst(DemangledCall, Call.get(), MIRBuilder, GR);
+  case VectorLoadStore:
+    return generateVectorLoadStoreInst(Call.get(), MIRBuilder, GR);
   }
 
   return false;
