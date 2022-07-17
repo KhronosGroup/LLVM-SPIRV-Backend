@@ -52,6 +52,7 @@ def Select : BuiltinGroup;
 def SpecConstant : BuiltinGroup;
 def Enqueue : BuiltinGroup;
 def AsyncCopy : BuiltinGroup;
+def VectorLoadStore : BuiltinGroup;
 
 //===----------------------------------------------------------------------===//
 // Class defining a demangled builtin record. The information in the record
@@ -1014,6 +1015,72 @@ defm : DemangledConvertBuiltin<"convert_uint", OpenCL_std>;
 defm : DemangledConvertBuiltin<"convert_long", OpenCL_std>;
 defm : DemangledConvertBuiltin<"convert_ulong", OpenCL_std>;
 defm : DemangledConvertBuiltin<"convert_float", OpenCL_std>;
+
+//===----------------------------------------------------------------------===//
+// Class defining a vector data load/store builtin record used for lowering
+// into OpExtInst instruction.
+//
+// name is the demangled name of the given builtin.
+// set specifies which external instruction set the builtin belongs to.
+// number specifies the number of the instruction in the external set.
+//===----------------------------------------------------------------------===//
+class VectorLoadStoreBuiltin<string name, InstructionSet set, int number> {
+  string Name = name;
+  InstructionSet Set = set;
+  bits<32> Number = number;
+  bit IsRounded = !not(!eq(!find(name, "_rt"), -1));
+  FPRoundingMode RoundingMode = !cond(!not(!eq(!find(name, "_rte"), -1)) : RTE,
+                                  !not(!eq(!find(name, "_rtz"), -1)) : RTZ,
+                                  !not(!eq(!find(name, "_rtp"), -1)) : RTP,
+                                  !not(!eq(!find(name, "_rtn"), -1)) : RTN,
+                                  true : RTE);
+}
+
+// Table gathering all the vector data load/store builtins.
+def VectorLoadStoreBuiltins : GenericTable {
+  let FilterClass = "VectorLoadStoreBuiltin";
+  let Fields = ["Name", "Set", "Number", "IsRounded", "RoundingMode"];
+  string TypeOf_Set = "InstructionSet";
+  string TypeOf_RoundingMode = "FPRoundingMode";
+}
+
+// Function to lookup vector data load/store builtins by their name and set.
+def lookupVectorLoadStoreBuiltin : SearchIndex {
+  let Table = VectorLoadStoreBuiltins;
+  let Key = ["Name", "Set"];
+}
+
+// Multiclass used to define at the same time both a demangled builtin record
+// and a corresponding vector data load/store builtin record.
+multiclass DemangledVectorLoadStoreBuiltin<string name, bits<8> minNumArgs, bits<8> maxNumArgs, int number> {
+  def : DemangledBuiltin<name, OpenCL_std, VectorLoadStore, minNumArgs, maxNumArgs>;
+  def : VectorLoadStoreBuiltin<name, OpenCL_std, number>;
+}
+
+// Create records for scalar and 2, 4, 8, and 16 vector element count.
+foreach i = ["", "2", "3", "4", "8", "16"] in {
+  if !eq(i, "") then {
+    defm : DemangledVectorLoadStoreBuiltin<"vload_half", 2, 2, 173>;
+    defm : DemangledVectorLoadStoreBuiltin<"vstore_half", 3, 3, 175>;
+  } else {
+    defm : DemangledVectorLoadStoreBuiltin<!strconcat("vload_half", i), 3, 3, 174>;
+    defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore_half", i), 3, 3, 177>;
+  }
+  defm : DemangledVectorLoadStoreBuiltin<!strconcat("vload", i), 2, 2, 171>;
+  defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore", i), 3, 3, 172>;
+  defm : DemangledVectorLoadStoreBuiltin<!strconcat("vloada_half", i), 2, 2, 174>;
+  defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstorea_half", i), 3, 3, 180>;
+
+  // Also create records for each rounding mode.
+  foreach j = ["_rte", "_rtz", "_rtp", "_rtn"] in {
+    if !eq(i, "") then {
+      defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore_half", j), 3, 3, 176>;
+    } else {
+      defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore_half", i, j), 3, 3, 178>;
+    }   
+    defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstorea_half", i, j), 3, 3, 181>; 
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Classes definining various OpenCL enums.
