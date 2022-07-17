@@ -200,31 +200,20 @@ std::string getExtInstSetName(::InstructionSet::InstructionSet Set) {
 
 ::InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName) {
   for (auto Set :
-       {::InstructionSet::GLSL_std_450, ::InstructionSet::OpenCL_std}) {
-    if (SetName == getExtInstSetName(Set)) {
+       {::InstructionSet::GLSL_std_450, ::InstructionSet::OpenCL_std})
+    if (SetName == getExtInstSetName(Set))
       return Set;
-    }
-  }
+
   llvm_unreachable("UNKNOWN_EXT_INST_SET");
 }
 
 std::string getExtInstName(::InstructionSet::InstructionSet Set,
                            uint32_t InstructionNumber) {
-  switch (Set) {
-  case ::InstructionSet::OpenCL_std: {
-    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
-        ::InstructionSet::OpenCL_std, InstructionNumber);
-    if (Lookup)
-      return Lookup->Name.str();
-  }
-  case ::InstructionSet::GLSL_std_450: {
-    const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
-        ::InstructionSet::GLSL_std_450, InstructionNumber);
+  const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
+      ::InstructionSet::OpenCL_std, InstructionNumber);
 
-    if (Lookup)
-      return Lookup->Name.str();
-  }
-  }
+  if (!Lookup)
+    return "UNKNOWN_EXT_INST";
 
-  return "UNKNOWN_EXT_INST_SET";
+  return Lookup->Name.str();
 }
