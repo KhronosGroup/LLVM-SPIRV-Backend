@@ -47,7 +47,7 @@ struct CapabilityEntry {
 
 struct ExtendedBuiltin {
   StringRef Name;
-  InstructionSet::InstructionSet Set;
+  ::InstructionSet::InstructionSet Set;
   uint32_t Number;
 };
 
