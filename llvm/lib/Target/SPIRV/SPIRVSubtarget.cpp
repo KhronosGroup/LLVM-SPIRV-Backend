@@ -12,7 +12,6 @@
 
 #include "SPIRVSubtarget.h"
 #include "SPIRV.h"
-#include "SPIRVEnumRequirements.h"
 #include "SPIRVGlobalRegistry.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVRegisterBankInfo.h"
@@ -142,7 +141,7 @@ void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
 
 // Add the given capabilities and all their implicitly defined capabilities too
 static void addCaps(std::set<Capability::Capability> &Caps,
-                    const std::vector<Capability::Capability> &ToAdd) {
+                    const CapabilityList &ToAdd) {
   for (const auto cap : ToAdd) {
     if (Caps.insert(cap).second) {
       addCaps(Caps, getSymbolicOperandCapabilities(

@@ -13,8 +13,6 @@
 
 #include "MCTargetDesc/SPIRVInstPrinter.h"
 #include "SPIRV.h"
-#include "SPIRVCapabilityUtils.h"
-#include "SPIRVEnumRequirements.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVMCInstLower.h"
 #include "SPIRVModuleAnalysis.h"

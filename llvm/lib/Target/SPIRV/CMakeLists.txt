@@ -18,11 +18,8 @@ add_llvm_target(SPIRVCodeGen
   SPIRVBasicBlockDominance.cpp
   SPIRVBuiltins.cpp
   SPIRVCallLowering.cpp
-  SPIRVCapabilityUtils.cpp
   SPIRVDuplicatesTracker.cpp
   SPIRVEmitIntrinsics.cpp
-  SPIRVEnumRequirements.cpp
-  SPIRVGenerateDecorations.cpp
   SPIRVGlobalRegistry.cpp
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp

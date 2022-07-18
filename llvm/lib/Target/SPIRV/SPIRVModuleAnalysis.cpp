@@ -16,9 +16,6 @@
 
 #include "SPIRVModuleAnalysis.h"
 #include "SPIRV.h"
-#include "SPIRVCapabilityUtils.h"
-#include "SPIRVEnumRequirements.h"
-#include "SPIRVGlobalRegistry.h"
 #include "SPIRVSubtarget.h"
 #include "SPIRVTargetMachine.h"
 #include "SPIRVUtils.h"
@@ -52,6 +49,40 @@ static unsigned getMetadataUInt(MDNode *MdNode, unsigned OpIndex,
     return mdconst::extract<ConstantInt>(Op)->getZExtValue();
   }
   return DefaultVal;
+}
+
+static SPIRV::Requirements
+getSymbolicOperandRequirements(OperandCategory::OperandCategory Category,
+                               unsigned i, const SPIRVSubtarget &ST) {
+  unsigned ReqMinVer = getSymbolicOperandMinVersion(Category, i);
+  unsigned ReqMaxVer = getSymbolicOperandMaxVersion(Category, i);
+  unsigned TargetVer = ST.getTargetSPIRVVersion();
+  bool MinVerOK = !ReqMinVer || !TargetVer || TargetVer >= ReqMinVer;
+  bool MaxVerOK = !ReqMaxVer || !TargetVer || TargetVer <= ReqMaxVer;
+  CapabilityList ReqCaps = getSymbolicOperandCapabilities(Category, i);
+  ExtensionList ReqExts = getSymbolicOperandExtensions(Category, i);
+  if (ReqCaps.empty()) {
+    if (ReqExts.empty()) {
+      if (MinVerOK && MaxVerOK)
+        return {true, {}, {}, ReqMinVer, ReqMaxVer};
+      return {false, {}, {}, 0, 0};
+    }
+  } else if (MinVerOK && MaxVerOK) {
+    for (auto Cap : ReqCaps) { // Only need 1 of the capabilities to work.
+      if (ST.canUseCapability(Cap))
+        return {true, {Cap}, {}, ReqMinVer, ReqMaxVer};
+    }
+  }
+  // If there are no capabilities, or we can't satisfy the version or
+  // capability requirements, use the list of extensions (if the subtarget
+  // can handle them all).
+  if (std::all_of(ReqExts.begin(), ReqExts.end(),
+                  [&ST](const Extension::Extension &Ext) {
+                    return ST.canUseExtension(Ext);
+                  })) {
+    return {true, {}, ReqExts, 0, 0}; // TODO: add versions to extensions.
+  }
+  return {false, {}, {}, 0, 0};
 }
 
 void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
@@ -388,10 +419,123 @@ static void processSwitches(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
   }
 }
 
+// RequirementHandler implementations.
+void SPIRV::RequirementHandler::pruneCapabilities(
+    const CapabilityList &ToPrune) {
+  for (const auto &Cap : ToPrune) {
+    AllCaps.insert(Cap);
+    auto FoundIndex = std::find(MinimalCaps.begin(), MinimalCaps.end(), Cap);
+    if (FoundIndex != MinimalCaps.end())
+      MinimalCaps.erase(FoundIndex);
+    CapabilityList ImplicitDecls =
+        getSymbolicOperandCapabilities(OperandCategory::CapabilityOperand, Cap);
+    pruneCapabilities(ImplicitDecls);
+  }
+}
+
+void SPIRV::RequirementHandler::addCapabilities(const CapabilityList &ToAdd) {
+  for (const auto &Cap : ToAdd) {
+    bool IsNewlyInserted = AllCaps.insert(Cap).second;
+    if (!IsNewlyInserted) // Don't re-add if it's already been declared.
+      continue;
+    CapabilityList ImplicitDecls =
+        getSymbolicOperandCapabilities(OperandCategory::CapabilityOperand, Cap);
+    pruneCapabilities(ImplicitDecls);
+    MinimalCaps.push_back(Cap);
+  }
+}
+
+void SPIRV::RequirementHandler::addRequirements(
+    const SPIRV::Requirements &Req) {
+  if (!Req.IsSatisfiable)
+    report_fatal_error("Adding SPIR-V requirements this target can't satisfy.");
+
+  if (Req.Cap.hasValue())
+    addCapabilities({Req.Cap.getValue()});
+
+  addExtensions(Req.Exts);
+
+  if (Req.MinVer) {
+    if (MaxVersion && Req.MinVer > MaxVersion) {
+      LLVM_DEBUG(dbgs() << "Conflicting version requirements: >= " << Req.MinVer
+                        << " and <= " << MaxVersion << "\n");
+      report_fatal_error("Adding SPIR-V requirements that can't be satisfied.");
+    }
+
+    if (MinVersion == 0 || Req.MinVer > MinVersion)
+      MinVersion = Req.MinVer;
+  }
+
+  if (Req.MaxVer) {
+    if (MinVersion && Req.MaxVer < MinVersion) {
+      LLVM_DEBUG(dbgs() << "Conflicting version requirements: <= " << Req.MaxVer
+                        << " and >= " << MinVersion << "\n");
+      report_fatal_error("Adding SPIR-V requirements that can't be satisfied.");
+    }
+
+    if (MaxVersion == 0 || Req.MaxVer < MaxVersion)
+      MaxVersion = Req.MaxVer;
+  }
+}
+
+void SPIRV::RequirementHandler::checkSatisfiable(
+    const llvm::SPIRVSubtarget &ST) const {
+  // Report as many errors as possible before aborting the compilation.
+  bool IsSatisfiable = true;
+  auto TargetVer = ST.getTargetSPIRVVersion();
+
+  if (MaxVersion && TargetVer && MaxVersion < TargetVer) {
+    LLVM_DEBUG(
+        dbgs() << "Target SPIR-V version too high for required features\n"
+               << "Required max version: " << MaxVersion << " target version "
+               << TargetVer << "\n");
+    IsSatisfiable = false;
+  }
+
+  if (MinVersion && TargetVer && MinVersion > TargetVer) {
+    LLVM_DEBUG(dbgs() << "Target SPIR-V version too low for required features\n"
+                      << "Required min version: " << MinVersion
+                      << " target version " << TargetVer << "\n");
+    IsSatisfiable = false;
+  }
+
+  if (MinVersion && MaxVersion && MinVersion > MaxVersion) {
+    LLVM_DEBUG(
+        dbgs()
+        << "Version is too low for some features and too high for others.\n"
+        << "Required SPIR-V min version: " << MinVersion
+        << " required SPIR-V max version " << MaxVersion << "\n");
+    IsSatisfiable = false;
+  }
+
+  for (auto Cap : MinimalCaps) {
+    if (ST.canUseCapability(Cap))
+      continue;
+    LLVM_DEBUG(dbgs() << "Capability not supported: "
+                      << getSymbolicOperandMnemonic(
+                             OperandCategory::CapabilityOperand, Cap)
+                      << "\n");
+    IsSatisfiable = false;
+  }
+
+  for (auto Ext : AllExtensions) {
+    if (ST.canUseExtension(Ext))
+      continue;
+    LLVM_DEBUG(dbgs() << "Extension not suported: "
+                      << getSymbolicOperandMnemonic(
+                             OperandCategory::ExtensionOperand, Ext)
+                      << "\n");
+    IsSatisfiable = false;
+  }
+
+  if (!IsSatisfiable)
+    report_fatal_error("Unable to meet SPIR-V requirements for this target.");
+}
+
 // Add VariablePointers to the requirements if this instruction defines
 // a pointer (Logical only).
 static void addVariablePtrInstrReqs(const MachineInstr &MI,
-                                    SPIRVRequirementHandler &Reqs,
+                                    SPIRV::RequirementHandler &Reqs,
                                     const SPIRVSubtarget &ST) {
   if (ST.isLogicalAddressing()) {
     const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
@@ -404,7 +548,7 @@ static void addVariablePtrInstrReqs(const MachineInstr &MI,
 // Add the required capabilities from a decoration instruction (including
 // BuiltIns).
 static void addOpDecorateReqs(const MachineInstr &MI, unsigned DecIndex,
-                              SPIRVRequirementHandler &Reqs,
+                              SPIRV::RequirementHandler &Reqs,
                               const SPIRVSubtarget &ST) {
   int64_t DecOp = MI.getOperand(DecIndex).getImm();
   auto Dec = static_cast<Decoration::Decoration>(DecOp);
@@ -421,7 +565,7 @@ static void addOpDecorateReqs(const MachineInstr &MI, unsigned DecIndex,
 
 // Add requirements for image handling.
 static void addOpTypeImageReqs(const MachineInstr &MI,
-                               SPIRVRequirementHandler &Reqs,
+                               SPIRV::RequirementHandler &Reqs,
                                const SPIRVSubtarget &ST) {
   assert(MI.getNumOperands() >= 8 && "Insufficient operands for OpTypeImage");
   // The operand indices used here are based on the OpTypeImage layout, which
@@ -473,7 +617,8 @@ static void addOpTypeImageReqs(const MachineInstr &MI,
   }
 }
 
-void addInstrRequirements(const MachineInstr &MI, SPIRVRequirementHandler &Reqs,
+void addInstrRequirements(const MachineInstr &MI,
+                          SPIRV::RequirementHandler &Reqs,
                           const SPIRVSubtarget &ST) {
   switch (MI.getOpcode()) {
   case SPIRV::OpMemoryModel: {
@@ -762,6 +907,59 @@ static void collectReqs(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
   }
 }
 
+static unsigned getFastMathFlags(const MachineInstr &I) {
+  unsigned Flags = FPFastMathMode::None;
+  if (I.getFlag(MachineInstr::MIFlag::FmNoNans))
+    Flags |= FPFastMathMode::NotNaN;
+  if (I.getFlag(MachineInstr::MIFlag::FmNoInfs))
+    Flags |= FPFastMathMode::NotInf;
+  if (I.getFlag(MachineInstr::MIFlag::FmNsz))
+    Flags |= FPFastMathMode::NSZ;
+  if (I.getFlag(MachineInstr::MIFlag::FmArcp))
+    Flags |= FPFastMathMode::AllowRecip;
+  if (I.getFlag(MachineInstr::MIFlag::FmReassoc))
+    Flags |= FPFastMathMode::Fast;
+  return Flags;
+}
+
+static void handleMIFlagDecoration(MachineInstr &I, const SPIRVSubtarget &ST,
+                                   const SPIRVInstrInfo &TII) {
+  if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && TII.canUseNSW(I) &&
+      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
+                                     Decoration::NoSignedWrap, ST)
+          .IsSatisfiable) {
+    buildOpDecorate(I.getOperand(0).getReg(), I, TII, Decoration::NoSignedWrap,
+                    {});
+  }
+  if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && TII.canUseNUW(I) &&
+      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
+                                     Decoration::NoUnsignedWrap, ST)
+          .IsSatisfiable) {
+    buildOpDecorate(I.getOperand(0).getReg(), I, TII,
+                    Decoration::NoUnsignedWrap, {});
+  }
+  if (!TII.canUseFastMathFlags(I))
+    return;
+  unsigned FMFlags = getFastMathFlags(I);
+  if (FMFlags == FPFastMathMode::None)
+    return;
+  Register DstReg = I.getOperand(0).getReg();
+  buildOpDecorate(DstReg, I, TII, Decoration::FPFastMathMode, {FMFlags});
+}
+
+// Walk all functions and add decorations related to MI flags.
+static void addDecorations(const Module &M, const SPIRVInstrInfo &TII,
+                           MachineModuleInfo *MMI, const SPIRVSubtarget &ST) {
+  for (auto F = M.begin(), E = M.end(); F != E; ++F) {
+    MachineFunction *MF = MMI->getMachineFunction(*F);
+    if (!MF)
+      continue;
+    for (auto &MBB : *MF)
+      for (auto &MI : MBB)
+        handleMIFlagDecoration(MI, ST, TII);
+  }
+}
+
 struct SPIRV::ModuleAnalysisInfo SPIRVModuleAnalysis::MAI;
 
 void SPIRVModuleAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {
@@ -779,6 +977,8 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
   MMI = &getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
 
   setBaseInfo(M);
+
+  addDecorations(M, *TII, MMI, *ST);
 
   collectReqs(M, MAI, MMI, *ST);
 
