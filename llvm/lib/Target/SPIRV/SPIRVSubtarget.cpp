@@ -96,17 +96,18 @@ SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
   return *this;
 }
 
-bool SPIRVSubtarget::canUseCapability(Capability::Capability C) const {
+bool SPIRVSubtarget::canUseCapability(SPIRV::Capability::Capability C) const {
   const auto &Caps = AvailableCaps;
   return std::find(Caps.begin(), Caps.end(), C) != Caps.end();
 }
 
-bool SPIRVSubtarget::canUseExtension(Extension::Extension E) const {
+bool SPIRVSubtarget::canUseExtension(SPIRV::Extension::Extension E) const {
   const auto &Exts = AvailableExtensions;
   return std::find(Exts.begin(), Exts.end(), E) != Exts.end();
 }
 
-bool SPIRVSubtarget::canUseExtInstSet(InstructionSet::InstructionSet E) const {
+bool SPIRVSubtarget::canUseExtInstSet(
+    SPIRV::InstructionSet::InstructionSet E) const {
   const auto &Sets = AvailableExtInstSets;
   return std::find(Sets.begin(), Sets.end(), E) != Sets.end();
 }
@@ -130,22 +131,22 @@ bool SPIRVSubtarget::canDirectlyComparePointers() const {
 
 // TODO use command line args for this rather than defaults
 void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
-  using namespace Extension;
   if (TT.isVulkanEnvironment()) {
     AvailableExtensions = {};
   } else {
     // A default extension for testing - should use command line args
-    AvailableExtensions = {SPV_KHR_no_integer_wrap_decoration};
+    AvailableExtensions = {
+        SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration};
   }
 }
 
 // Add the given capabilities and all their implicitly defined capabilities too
-static void addCaps(std::set<Capability::Capability> &Caps,
+static void addCaps(std::set<SPIRV::Capability::Capability> &Caps,
                     const CapabilityList &ToAdd) {
   for (const auto cap : ToAdd) {
     if (Caps.insert(cap).second) {
       addCaps(Caps, getSymbolicOperandCapabilities(
-                        OperandCategory::CapabilityOperand, cap));
+                        SPIRV::OperandCategory::CapabilityOperand, cap));
     }
   }
 }
@@ -153,7 +154,7 @@ static void addCaps(std::set<Capability::Capability> &Caps,
 // TODO use command line args for this rather than defaults
 // Must have called initAvailableExtensions first.
 void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
-  using namespace Capability;
+  using namespace SPIRV::Capability;
   if (TT.isVulkanEnvironment()) {
     // These are the min requirements
     addCaps(AvailableCaps,
@@ -199,13 +200,15 @@ void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
 // Must have called initAvailableExtensions first.
 void SPIRVSubtarget::initAvailableExtInstSets(const Triple &TT) {
   if (UsesVulkanEnv) {
-    AvailableExtInstSets.insert(InstructionSet::GLSL_std_450);
+    AvailableExtInstSets.insert(SPIRV::InstructionSet::GLSL_std_450);
   } else {
-    AvailableExtInstSets.insert(InstructionSet::OpenCL_std);
+    AvailableExtInstSets.insert(SPIRV::InstructionSet::OpenCL_std);
   }
 
   // Handle extended instruction sets from extensions.
-  if (canUseExtension(Extension::SPV_AMD_shader_trinary_minmax_extension)) {
-    AvailableExtInstSets.insert(InstructionSet::SPV_AMD_shader_trinary_minmax);
+  if (canUseExtension(
+          SPIRV::Extension::SPV_AMD_shader_trinary_minmax_extension)) {
+    AvailableExtInstSets.insert(
+        SPIRV::InstructionSet::SPV_AMD_shader_trinary_minmax);
   }
 }

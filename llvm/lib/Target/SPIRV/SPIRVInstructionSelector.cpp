@@ -31,11 +31,11 @@
 #define DEBUG_TYPE "spirv-isel"
 
 using namespace llvm;
-namespace CL = OpenCLExtInst;
-namespace GL = GLSLExtInst;
+namespace CL = SPIRV::OpenCLExtInst;
+namespace GL = SPIRV::GLSLExtInst;
 
 using ExtInstList =
-    std::vector<std::pair<InstructionSet::InstructionSet, uint32_t>>;
+    std::vector<std::pair<SPIRV::InstructionSet::InstructionSet, uint32_t>>;
 
 namespace {
 
@@ -466,7 +466,7 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
     auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
                    .addDef(ResVReg)
                    .addUse(GR.getSPIRVTypeID(ResType))
-                   .addImm(Opcode::InBoundsPtrAccessChain)
+                   .addImm(SPIRV::Opcode::InBoundsPtrAccessChain)
                    .addUse(GV)
                    .addUse(Idx)
                    .addUse(I.getOperand(2).getReg());
@@ -509,7 +509,7 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              MachineInstr &I,
                                              CL::OpenCLExtInst CLInst) const {
   return selectExtInst(ResVReg, ResType, I,
-                       {{InstructionSet::OpenCL_std, CLInst}});
+                       {{SPIRV::InstructionSet::OpenCL_std, CLInst}});
 }
 
 bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
@@ -517,8 +517,8 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              MachineInstr &I,
                                              CL::OpenCLExtInst CLInst,
                                              GL::GLSLExtInst GLInst) const {
-  ExtInstList ExtInsts = {{InstructionSet::OpenCL_std, CLInst},
-                          {InstructionSet::GLSL_std_450, GLInst}};
+  ExtInstList ExtInsts = {{SPIRV::InstructionSet::OpenCL_std, CLInst},
+                          {SPIRV::InstructionSet::GLSL_std_450, GLInst}};
   return selectExtInst(ResVReg, ResType, I, ExtInsts);
 }
 
@@ -528,7 +528,7 @@ bool SPIRVInstructionSelector::selectExtInst(Register ResVReg,
                                              const ExtInstList &Insts) const {
 
   for (const auto &Ex : Insts) {
-    InstructionSet::InstructionSet Set = Ex.first;
+    SPIRV::InstructionSet::InstructionSet Set = Ex.first;
     uint32_t Opcode = Ex.second;
     if (STI.canUseExtInstSet(Set)) {
       MachineBasicBlock &BB = *I.getParent();
@@ -566,12 +566,12 @@ bool SPIRVInstructionSelector::selectUnOp(Register ResVReg,
                            Opcode);
 }
 
-static Scope::Scope getScope(SyncScope::ID Ord) {
+static SPIRV::Scope::Scope getScope(SyncScope::ID Ord) {
   switch (Ord) {
   case SyncScope::SingleThread:
-    return Scope::Invocation;
+    return SPIRV::Scope::Invocation;
   case SyncScope::System:
-    return Scope::Device;
+    return SPIRV::Scope::Device;
   default:
     llvm_unreachable("Unsupported synchronization Scope ID.");
   }
@@ -579,33 +579,33 @@ static Scope::Scope getScope(SyncScope::ID Ord) {
 
 static void addMemoryOperands(MachineMemOperand *MemOp,
                               MachineInstrBuilder &MIB) {
-  uint32_t SpvMemOp = MemoryOperand::None;
+  uint32_t SpvMemOp = SPIRV::MemoryOperand::None;
   if (MemOp->isVolatile())
-    SpvMemOp |= MemoryOperand::Volatile;
+    SpvMemOp |= SPIRV::MemoryOperand::Volatile;
   if (MemOp->isNonTemporal())
-    SpvMemOp |= MemoryOperand::Nontemporal;
+    SpvMemOp |= SPIRV::MemoryOperand::Nontemporal;
   if (MemOp->getAlign().value())
-    SpvMemOp |= MemoryOperand::Aligned;
+    SpvMemOp |= SPIRV::MemoryOperand::Aligned;
 
-  if (SpvMemOp != MemoryOperand::None) {
+  if (SpvMemOp != SPIRV::MemoryOperand::None) {
     MIB.addImm(SpvMemOp);
-    if (SpvMemOp & MemoryOperand::Aligned)
+    if (SpvMemOp & SPIRV::MemoryOperand::Aligned)
       MIB.addImm(MemOp->getAlign().value());
   }
 }
 
 static void addMemoryOperands(uint64_t Flags, MachineInstrBuilder &MIB) {
-  uint32_t SpvMemOp = MemoryOperand::None;
+  uint32_t SpvMemOp = SPIRV::MemoryOperand::None;
   if (Flags & MachineMemOperand::Flags::MOVolatile)
-    SpvMemOp |= MemoryOperand::Volatile;
+    SpvMemOp |= SPIRV::MemoryOperand::Volatile;
   if (Flags & MachineMemOperand::Flags::MONonTemporal)
-    SpvMemOp |= MemoryOperand::Nontemporal;
+    SpvMemOp |= SPIRV::MemoryOperand::Nontemporal;
   // if (MemOp->getAlign().value())
-  //   SpvMemOp |= MemoryOperand::Aligned;
+  //   SpvMemOp |= SPIRV::MemoryOperand::Aligned;
 
-  if (SpvMemOp != MemoryOperand::None) {
+  if (SpvMemOp != SPIRV::MemoryOperand::None) {
     MIB.addImm(SpvMemOp);
-    // if (SpvMemOp & MemoryOperand::Aligned)
+    // if (SpvMemOp & SPIRV::MemoryOperand::Aligned)
     //   MIB.addImm(MemOp->getAlign().value());
   }
 }
@@ -669,7 +669,7 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register ResVReg,
                                                unsigned NewOpcode) const {
   assert(I.hasOneMemOperand());
   const MachineMemOperand *MemOp = *I.memoperands_begin();
-  Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
+  SPIRV::Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
   Register ScopeReg = buildI32Constant(Scope, I);
 
   Register Ptr = I.getOperand(1).getReg();
@@ -677,7 +677,7 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register ResVReg,
   // auto ScSem =
   // getMemSemanticsForStorageClass(GR.getPointerStorageClass(Ptr));
 
-  MemorySemantics::MemorySemantics MemSem =
+  SPIRV::MemorySemantics::MemorySemantics MemSem =
       getMemSemantics(MemOp->getSuccessOrdering());
   Register MemSemReg = buildI32Constant(MemSem /*| ScSem*/, I);
 
@@ -692,11 +692,11 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register ResVReg,
 }
 
 bool SPIRVInstructionSelector::selectFence(MachineInstr &I) const {
-  MemorySemantics::MemorySemantics MemSem =
+  SPIRV::MemorySemantics::MemorySemantics MemSem =
       getMemSemantics(AtomicOrdering(I.getOperand(0).getImm()));
   Register MemSemReg = buildI32Constant(MemSem, I);
 
-  Scope::Scope Scope = getScope(SyncScope::ID(I.getOperand(1).getImm()));
+  SPIRV::Scope::Scope Scope = getScope(SyncScope::ID(I.getOperand(1).getImm()));
   Register ScopeReg = buildI32Constant(Scope, I);
   MachineBasicBlock &BB = *I.getParent();
   return BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpMemoryBarrier))
@@ -715,7 +715,7 @@ bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
   if (I.getOpcode() != TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS) {
     assert(I.hasOneMemOperand());
     const MachineMemOperand *MemOp = *I.memoperands_begin();
-    Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
+    SPIRV::Scope::Scope Scope = getScope(MemOp->getSyncScopeID());
     ScopeReg = buildI32Constant(Scope, I);
 
     unsigned ScSem =
@@ -775,11 +775,11 @@ bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
   return Result;
 }
 
-static bool isGenericCastablePtr(StorageClass::StorageClass Sc) {
+static bool isGenericCastablePtr(SPIRV::StorageClass::StorageClass Sc) {
   switch (Sc) {
-  case StorageClass::Workgroup:
-  case StorageClass::CrossWorkgroup:
-  case StorageClass::Function:
+  case SPIRV::StorageClass::Workgroup:
+  case SPIRV::StorageClass::CrossWorkgroup:
+  case SPIRV::StorageClass::Function:
     return true;
   default:
     return false;
@@ -805,33 +805,32 @@ bool SPIRVInstructionSelector::selectAddrSpaceCast(Register ResVReg,
     MachineBasicBlock &BB = *I.getParent();
     SPIRVType *SpvBaseTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
     ResType = GR.getOrCreateSPIRVPointerType(SpvBaseTy, I, TII,
-                                             StorageClass::Generic);
+                                             SPIRV::StorageClass::Generic);
     bool Result =
         BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpSpecConstantOp))
             .addDef(ResVReg)
             .addUse(GR.getSPIRVTypeID(ResType))
-            .addImm(Opcode::PtrCastToGeneric)
+            .addImm(SPIRV::Opcode::PtrCastToGeneric)
             .addUse(NewReg)
             .constrainAllUses(TII, TRI, RBI);
     return Result;
   }
-  namespace SC = StorageClass;
   Register SrcPtr = I.getOperand(1).getReg();
   SPIRVType *SrcPtrTy = GR.getSPIRVTypeForVReg(SrcPtr);
-  StorageClass::StorageClass SrcSC = GR.getPointerStorageClass(SrcPtr);
-  StorageClass::StorageClass DstSC = GR.getPointerStorageClass(ResVReg);
+  SPIRV::StorageClass::StorageClass SrcSC = GR.getPointerStorageClass(SrcPtr);
+  SPIRV::StorageClass::StorageClass DstSC = GR.getPointerStorageClass(ResVReg);
 
   // Casting from an eligable pointer to Generic.
-  if (DstSC == SC::Generic && isGenericCastablePtr(SrcSC))
+  if (DstSC == SPIRV::StorageClass::Generic && isGenericCastablePtr(SrcSC))
     return selectUnOp(ResVReg, ResType, I, SPIRV::OpPtrCastToGeneric);
   // Casting from Generic to an eligable pointer.
-  if (SrcSC == SC::Generic && isGenericCastablePtr(DstSC))
+  if (SrcSC == SPIRV::StorageClass::Generic && isGenericCastablePtr(DstSC))
     return selectUnOp(ResVReg, ResType, I, SPIRV::OpGenericCastToPtr);
   // Casting between 2 eligable pointers using Generic as an intermediary.
   if (isGenericCastablePtr(SrcSC) && isGenericCastablePtr(DstSC)) {
     Register Tmp = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-    SPIRVType *GenericPtrTy =
-        GR.getOrCreateSPIRVPointerType(SrcPtrTy, I, TII, StorageClass::Generic);
+    SPIRVType *GenericPtrTy = GR.getOrCreateSPIRVPointerType(
+        SrcPtrTy, I, TII, SPIRV::StorageClass::Generic);
     MachineBasicBlock &BB = *I.getParent();
     const DebugLoc &DL = I.getDebugLoc();
     bool Success = BuildMI(BB, I, DL, TII.get(SPIRV::OpPtrCastToGeneric))
@@ -1443,7 +1442,7 @@ bool SPIRVInstructionSelector::selectFrameIndex(Register ResVReg,
   return BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(SPIRV::OpVariable))
       .addDef(ResVReg)
       .addUse(GR.getSPIRVTypeID(ResType))
-      .addImm(StorageClass::Function)
+      .addImm(SPIRV::StorageClass::Function)
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1552,13 +1551,14 @@ bool SPIRVInstructionSelector::selectGlobalValue(
     return true;
 
   unsigned AddrSpace = GV->getAddressSpace();
-  StorageClass::StorageClass Storage = addressSpaceToStorageClass(AddrSpace);
+  SPIRV::StorageClass::StorageClass Storage =
+      addressSpaceToStorageClass(AddrSpace);
   bool HasLnkTy = GV->getLinkage() != GlobalValue::InternalLinkage &&
-                  Storage != StorageClass::Function;
-  LinkageType::LinkageType LnkType =
+                  Storage != SPIRV::StorageClass::Function;
+  SPIRV::LinkageType::LinkageType LnkType =
       (GV->isDeclaration() || GV->hasAvailableExternallyLinkage())
-          ? LinkageType::Import
-          : LinkageType::Export;
+          ? SPIRV::LinkageType::Import
+          : SPIRV::LinkageType::Export;
 
   Register Reg = GR.buildGlobalVariable(ResVReg, ResType, GlobalIdent, GV,
                                         Storage, Init, GlobalVar->isConstant(),

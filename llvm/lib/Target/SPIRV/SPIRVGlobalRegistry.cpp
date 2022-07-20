@@ -374,9 +374,9 @@ Register SPIRVGlobalRegistry::buildConstantSampler(
 
 Register SPIRVGlobalRegistry::buildGlobalVariable(
     Register ResVReg, SPIRVType *BaseType, StringRef Name,
-    const GlobalValue *GV, StorageClass::StorageClass Storage,
+    const GlobalValue *GV, SPIRV::StorageClass::StorageClass Storage,
     const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
-    LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder,
+    SPIRV::LinkageType::LinkageType LinkageType, MachineIRBuilder &MIRBuilder,
     bool IsInstSelector) {
   const GlobalVariable *GVar = nullptr;
   if (GV)
@@ -437,20 +437,20 @@ Register SPIRVGlobalRegistry::buildGlobalVariable(
   // Output decorations for the GV.
   // TODO: maybe move to GenerateDecorations pass.
   if (IsConst)
-    buildOpDecorate(Reg, MIRBuilder, Decoration::Constant, {});
+    buildOpDecorate(Reg, MIRBuilder, SPIRV::Decoration::Constant, {});
 
   if (GVar && GVar->getAlign().valueOrOne().value() != 1) {
     unsigned Alignment = (unsigned)GVar->getAlign().valueOrOne().value();
-    buildOpDecorate(Reg, MIRBuilder, Decoration::Alignment, {Alignment});
+    buildOpDecorate(Reg, MIRBuilder, SPIRV::Decoration::Alignment, {Alignment});
   }
 
   if (HasLinkageTy)
-    buildOpDecorate(Reg, MIRBuilder, Decoration::LinkageAttributes,
+    buildOpDecorate(Reg, MIRBuilder, SPIRV::Decoration::LinkageAttributes,
                     {static_cast<uint32_t>(LinkageType)}, Name);
 
-  BuiltIn::BuiltIn BuiltInId;
+  SPIRV::BuiltIn::BuiltIn BuiltInId;
   if (getSpirvBuiltInIdByName(Name, BuiltInId))
-    buildOpDecorate(Reg, MIRBuilder, Decoration::BuiltIn,
+    buildOpDecorate(Reg, MIRBuilder, SPIRV::Decoration::BuiltIn,
                     {static_cast<uint32_t>(BuiltInId)});
 
   return Reg;
@@ -499,7 +499,7 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeStruct(const StructType *Ty,
   if (Ty->hasName())
     buildOpName(ResVReg, Ty->getName(), MIRBuilder);
   if (Ty->isPacked())
-    buildOpDecorate(ResVReg, MIRBuilder, Decoration::CPacked, {});
+    buildOpDecorate(ResVReg, MIRBuilder, SPIRV::Decoration::CPacked, {});
   return MIB;
 }
 
@@ -551,7 +551,7 @@ SPIRVGlobalRegistry::handleOpenCLBuiltin(const StructType *Ty,
   return NewTy;
 }
 
-SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(StorageClass::StorageClass SC,
+SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(SPIRV::StorageClass::StorageClass SC,
                                                  SPIRVType *ElemType,
                                                  MachineIRBuilder &MIRBuilder,
                                                  Register Reg) {
@@ -564,7 +564,7 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(StorageClass::StorageClass SC,
 }
 
 SPIRVType *
-SPIRVGlobalRegistry::getOpTypeForwardPointer(StorageClass::StorageClass SC,
+SPIRVGlobalRegistry::getOpTypeForwardPointer(SPIRV::StorageClass::StorageClass SC,
                                              MachineIRBuilder &MIRBuilder) {
   return MIRBuilder.buildInstr(SPIRV::OpTypeForwardPointer)
       .addUse(createTypeVReg(MIRBuilder))
@@ -788,18 +788,18 @@ bool SPIRVGlobalRegistry::isScalarOrVectorSigned(const SPIRVType *Type) const {
   llvm_unreachable("Attempting to get sign of non-integer type.");
 }
 
-StorageClass::StorageClass
+SPIRV::StorageClass::StorageClass
 SPIRVGlobalRegistry::getPointerStorageClass(Register VReg) const {
   SPIRVType *Type = getSPIRVTypeForVReg(VReg);
   assert(Type && Type->getOpcode() == SPIRV::OpTypePointer &&
          Type->getOperand(1).isImm() && "Pointer type is expected");
-  return static_cast<StorageClass::StorageClass>(Type->getOperand(1).getImm());
+  return static_cast<SPIRV::StorageClass::StorageClass>(Type->getOperand(1).getImm());
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeImage(
-    MachineIRBuilder &MIRBuilder, SPIRVType *SampledType, Dim::Dim Dim,
+    MachineIRBuilder &MIRBuilder, SPIRVType *SampledType, SPIRV::Dim::Dim Dim,
     uint32_t Depth, uint32_t Arrayed, uint32_t Multisampled, uint32_t Sampled,
-    ImageFormat::ImageFormat ImageFormat, AQ::AccessQualifier AccessQual) {
+    SPIRV::ImageFormat::ImageFormat ImageFormat, AQ::AccessQualifier AccessQual) {
   SPIRV::ImageTypeDescriptor TD(SPIRVToLLVMType.lookup(SampledType), Dim, Depth,
                                 Arrayed, Multisampled, Sampled, ImageFormat,
                                 AccessQual);
@@ -904,13 +904,13 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
       NewAQ = AQ::ReadWrite;
     char DimC = TypeName[strlen("image")];
     if (DimC >= '1' && DimC <= '3') {
-      auto Dim = DimC == '1'   ? Dim::DIM_1D
-                 : DimC == '2' ? Dim::DIM_2D
-                               : Dim::DIM_3D;
+      auto Dim = DimC == '1'   ? SPIRV::Dim::DIM_1D
+                 : DimC == '2' ? SPIRV::Dim::DIM_2D
+                               : SPIRV::Dim::DIM_3D;
       unsigned Arrayed = 0;
       unsigned Depth = 0;
       if (TypeName.contains("buffer"))
-        Dim = Dim::DIM_Buffer;
+        Dim = SPIRV::Dim::DIM_Buffer;
       if (TypeName.contains("array"))
         Arrayed = 1;
       if (TypeName.contains("depth"))
@@ -919,7 +919,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
           Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
           MIRBuilder);
       return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, Depth, Arrayed, 0,
-                                    0, ImageFormat::Unknown, NewAQ);
+                                    0, SPIRV::ImageFormat::Unknown, NewAQ);
     }
   } else if (TypeName.startswith("clk_event_t")) {
     return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeDeviceEvent);
@@ -1021,8 +1021,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(
         TypeLiterals[7].getAsInteger(10, AccQual))
       llvm_unreachable("Unable to recognize Image type literals");
     return getOrCreateOpTypeImage(
-        MIRBuilder, SpirvType, Dim::Dim(Ddim), Depth, Arrayed, MS, Sampled,
-        ImageFormat::ImageFormat(ImageFormat), AQ::AccessQualifier(AccQual));
+        MIRBuilder, SpirvType, SPIRV::Dim::Dim(Ddim), Depth, Arrayed, MS, Sampled,
+        SPIRV::ImageFormat::ImageFormat(ImageFormat), AQ::AccessQualifier(AccQual));
   } else if (TypeName.startswith("SampledImage.")) {
     // Find corresponding Image type.
     auto Literals = TypeName.substr(strlen("SampledImage."));
@@ -1131,7 +1131,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVVectorType(
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
     SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
-    StorageClass::StorageClass SClass) {
+    SPIRV::StorageClass::StorageClass SClass) {
   return getOrCreateSPIRVType(
       PointerType::get(const_cast<Type *>(getTypeForSPIRVType(BaseType)),
                        storageClassToAddressSpace(SClass)),
@@ -1140,7 +1140,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVPointerType(
     SPIRVType *BaseType, MachineInstr &I, const SPIRVInstrInfo &TII,
-    StorageClass::StorageClass SC) {
+    SPIRV::StorageClass::StorageClass SC) {
   Type *LLVMTy =
       PointerType::get(const_cast<Type *>(getTypeForSPIRVType(BaseType)),
                        storageClassToAddressSpace(SC));

@@ -46,18 +46,18 @@ bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
 
 // Based on the LLVM function attributes, get a SPIR-V FunctionControl.
 static uint32_t getFunctionControl(const Function &F) {
-  uint32_t FuncControl = FunctionControl::None;
+  uint32_t FuncControl = SPIRV::FunctionControl::None;
   if (F.hasFnAttribute(Attribute::AttrKind::AlwaysInline)) {
-    FuncControl |= FunctionControl::Inline;
+    FuncControl |= SPIRV::FunctionControl::Inline;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadNone)) {
-    FuncControl |= FunctionControl::Pure;
+    FuncControl |= SPIRV::FunctionControl::Pure;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::ReadOnly)) {
-    FuncControl |= FunctionControl::Const;
+    FuncControl |= SPIRV::FunctionControl::Const;
   }
   if (F.hasFnAttribute(Attribute::AttrKind::NoInline)) {
-    FuncControl |= FunctionControl::DontInline;
+    FuncControl |= SPIRV::FunctionControl::DontInline;
   }
   return FuncControl;
 }
@@ -130,14 +130,15 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       // SPIRVType *SpirvTy = GR->getSPIRVTypeForVReg(VRegs[i][0]);
       // if (!SpirvTy)
       Type *ArgTy = FTy->getParamType(i);
-      AccessQualifier::AccessQualifier AQ = AccessQualifier::ReadWrite;
+      SPIRV::AccessQualifier::AccessQualifier AQ =
+          SPIRV::AccessQualifier::ReadWrite;
       MDNode *Node = F.getMetadata("kernel_arg_access_qual");
       if (Node && i < Node->getNumOperands()) {
         StringRef AQString = cast<MDString>(Node->getOperand(i))->getString();
         if (AQString.compare("read_only") == 0)
-          AQ = AccessQualifier::ReadOnly;
+          AQ = SPIRV::AccessQualifier::ReadOnly;
         else if (AQString.compare("write_only") == 0)
-          AQ = AccessQualifier::WriteOnly;
+          AQ = SPIRV::AccessQualifier::WriteOnly;
       }
       auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder, AQ);
       ArgTypeVRegs.push_back(SpirvTy);
@@ -147,33 +148,37 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       if (Arg.getType()->isPointerTy()) {
         auto DerefBytes = static_cast<unsigned>(Arg.getDereferenceableBytes());
         if (DerefBytes != 0)
-          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::MaxByteOffset,
-                          {DerefBytes});
+          buildOpDecorate(VRegs[i][0], MIRBuilder,
+                          SPIRV::Decoration::MaxByteOffset, {DerefBytes});
       }
       if (Arg.hasAttribute(Attribute::Alignment)) {
         auto Alignment = static_cast<unsigned>(
             Arg.getAttribute(Attribute::Alignment).getValueAsInt());
-        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Alignment,
+        buildOpDecorate(VRegs[i][0], MIRBuilder, SPIRV::Decoration::Alignment,
                         {Alignment});
       }
       if (Arg.hasAttribute(Attribute::ReadOnly)) {
-        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
-                        {FunctionParameterAttribute::NoWrite});
+        buildOpDecorate(VRegs[i][0], MIRBuilder,
+                        SPIRV::Decoration::FuncParamAttr,
+                        {SPIRV::FunctionParameterAttribute::NoWrite});
       }
       if (Arg.hasAttribute(Attribute::ZExt)) {
-        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
-                        {FunctionParameterAttribute::Zext});
+        buildOpDecorate(VRegs[i][0], MIRBuilder,
+                        SPIRV::Decoration::FuncParamAttr,
+                        {SPIRV::FunctionParameterAttribute::Zext});
       }
       if (Arg.hasAttribute(Attribute::NoAlias)) {
-        buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::FuncParamAttr,
-                        {FunctionParameterAttribute::NoAlias});
+        buildOpDecorate(VRegs[i][0], MIRBuilder,
+                        SPIRV::Decoration::FuncParamAttr,
+                        {SPIRV::FunctionParameterAttribute::NoAlias});
       }
 
       Node = F.getMetadata("kernel_arg_type_qual");
       if (Node && i < Node->getNumOperands()) {
         StringRef TypeQual = cast<MDString>(Node->getOperand(i))->getString();
         if (TypeQual.compare("volatile") == 0)
-          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration::Volatile, {});
+          buildOpDecorate(VRegs[i][0], MIRBuilder, SPIRV::Decoration::Volatile,
+                          {});
       }
       Node = F.getMetadata("spirv.ParameterDecorations");
       if (Node && i < Node->getNumOperands() &&
@@ -184,7 +189,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
           assert(MD2 && "Metadata operand is expected");
           ConstantInt *Const = getConstInt(MD2, 0);
           assert(Const && "MDOperand should be ConstantInt");
-          auto Dec = static_cast<Decoration::Decoration>(Const->getZExtValue());
+          auto Dec =
+              static_cast<SPIRV::Decoration::Decoration>(Const->getZExtValue());
           std::vector<uint32_t> DecVec;
           for (unsigned j = 1; j < MD2->getNumOperands(); j++) {
             ConstantInt *Const = getConstInt(MD2, j);
@@ -237,15 +243,16 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   // Handle entry points and function linkage.
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    auto ExecModel = ExecutionModel::Kernel;
+    auto ExecModel = SPIRV::ExecutionModel::Kernel;
     auto MIB = MIRBuilder.buildInstr(SPIRV::OpEntryPoint)
                    .addImm(ExecModel)
                    .addUse(FuncVReg);
     addStringImm(F.getName(), MIB);
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
-    auto LnkTy = F.isDeclaration() ? LinkageType::Import : LinkageType::Export;
-    buildOpDecorate(FuncVReg, MIRBuilder, Decoration::LinkageAttributes,
+    auto LnkTy = F.isDeclaration() ? SPIRV::LinkageType::Import
+                                   : SPIRV::LinkageType::Export;
+    buildOpDecorate(FuncVReg, MIRBuilder, SPIRV::Decoration::LinkageAttributes,
                     {static_cast<uint32_t>(LnkTy)}, F.getGlobalIdentifier());
   }
 
@@ -276,7 +283,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   if (!DemangledName.empty() && CF && CF->isDeclaration()) {
     // TODO: check that it's OCL builtin, then apply OpenCL_std.
     const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    if (ST->canUseExtInstSet(InstructionSet::OpenCL_std)) {
+    if (ST->canUseExtInstSet(SPIRV::InstructionSet::OpenCL_std)) {
       // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp.
       const Type *OrigRetTy = Info.OrigRet.Ty;
       if (FTy)
@@ -288,7 +295,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
         auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
       }
-      return lowerBuiltin(DemangledName, ExternalInstructionSet::OpenCL_std,
+      return lowerBuiltin(DemangledName, SPIRV::InstructionSet::OpenCL_std,
                           MIRBuilder, ResVReg, OrigRetTy, ArgVRegs, GR);
     }
     llvm_unreachable("Unable to handle this environment's built-in funcs.");

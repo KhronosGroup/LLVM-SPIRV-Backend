@@ -266,9 +266,9 @@ void SPIRVAsmPrinter::outputOpExtInstImports(const Module &M) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtInstImport);
     Inst.addOperand(MCOperand::createReg(Reg));
-    addStringImm(
-        getExtInstSetName(static_cast<InstructionSet::InstructionSet>(Set)),
-        Inst);
+    addStringImm(getExtInstSetName(
+                     static_cast<SPIRV::InstructionSet::InstructionSet>(Set)),
+                 Inst);
     outputMCInst(Inst);
   }
 }
@@ -290,14 +290,14 @@ void SPIRVAsmPrinter::outputEntryPoints() {
   DenseSet<Register> InterfaceIDs;
   for (MachineInstr *MI : MAI->GlobalVarList) {
     assert(MI->getOpcode() == SPIRV::OpVariable);
-    auto SC =
-        static_cast<StorageClass::StorageClass>(MI->getOperand(2).getImm());
+    auto SC = static_cast<SPIRV::StorageClass::StorageClass>(
+        MI->getOperand(2).getImm());
     // Before version 1.4, the interface's storage classes are limited to
     // the Input and Output storage classes. Starting with version 1.4,
     // the interface's storage classes are all storage classes used in
     // declaring all global variables referenced by the entry point call tree.
-    if (ST->getTargetSPIRVVersion() >= 14 || SC == StorageClass::Input ||
-        SC == StorageClass::Output) {
+    if (ST->getTargetSPIRVVersion() >= 14 || SC == SPIRV::StorageClass::Input ||
+        SC == SPIRV::StorageClass::Output) {
       MachineFunction *MF = MI->getMF();
       Register Reg = MAI->getRegisterAlias(MF, MI->getOperand(0).getReg());
       InterfaceIDs.insert(Reg);
@@ -333,9 +333,9 @@ void SPIRVAsmPrinter::outputGlobalRequirements() {
   for (const auto &Ext : MAI->Reqs.getExtensions()) {
     MCInst Inst;
     Inst.setOpcode(SPIRV::OpExtension);
-    addStringImm(
-        getSymbolicOperandMnemonic(OperandCategory::ExtensionOperand, Ext),
-        Inst);
+    addStringImm(getSymbolicOperandMnemonic(
+                     SPIRV::OperandCategory::ExtensionOperand, Ext),
+                 Inst);
     outputMCInst(Inst);
   }
   // TODO add a pseudo instr for version number.
@@ -426,16 +426,19 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
     Register FReg = MAI->getFuncReg(F.getGlobalIdentifier());
     assert(FReg.isValid());
     if (MDNode *Node = F.getMetadata("reqd_work_group_size"))
-      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::LocalSize);
+      outputExecutionModeFromMDNode(FReg, Node,
+                                    SPIRV::ExecutionMode::LocalSize);
     if (MDNode *Node = F.getMetadata("work_group_size_hint"))
-      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::LocalSizeHint);
+      outputExecutionModeFromMDNode(FReg, Node,
+                                    SPIRV::ExecutionMode::LocalSizeHint);
     if (MDNode *Node = F.getMetadata("intel_reqd_sub_group_size"))
-      outputExecutionModeFromMDNode(FReg, Node, ExecutionMode::SubgroupSize);
+      outputExecutionModeFromMDNode(FReg, Node,
+                                    SPIRV::ExecutionMode::SubgroupSize);
     if (MDNode *Node = F.getMetadata("vec_type_hint")) {
       MCInst Inst;
       Inst.setOpcode(SPIRV::OpExecutionMode);
       Inst.addOperand(MCOperand::createReg(FReg));
-      Inst.addOperand(MCOperand::createImm(ExecutionMode::VecTypeHint));
+      Inst.addOperand(MCOperand::createImm(SPIRV::ExecutionMode::VecTypeHint));
       unsigned TypeCode = encodeVecTypeHint(getMDOperandAsType(Node, 0));
       Inst.addOperand(MCOperand::createImm(TypeCode));
       outputMCInst(Inst);
@@ -470,7 +473,7 @@ void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
       MCInst Inst;
       Inst.setOpcode(SPIRV::OpDecorate);
       Inst.addOperand(MCOperand::createReg(Reg));
-      Inst.addOperand(MCOperand::createImm(Decoration::UserSemantic));
+      Inst.addOperand(MCOperand::createImm(SPIRV::Decoration::UserSemantic));
       addStringImm(AnnotationString, Inst);
       outputMCInst(Inst);
     }

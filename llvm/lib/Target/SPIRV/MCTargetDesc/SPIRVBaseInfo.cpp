@@ -16,17 +16,15 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 
-#include <string>
-
-namespace {
-using namespace llvm;
+namespace llvm {
+namespace SPIRV {
 using namespace OperandCategory;
 using namespace Extension;
 using namespace Capability;
 using namespace InstructionSet;
 
 struct SymbolicOperand {
-  ::OperandCategory::OperandCategory Category;
+  OperandCategory::OperandCategory Category;
   uint32_t Value;
   StringRef Mnemonic;
   uint32_t MinVersion;
@@ -34,21 +32,15 @@ struct SymbolicOperand {
 };
 
 struct ExtensionEntry {
-  ::OperandCategory::OperandCategory Category;
+  OperandCategory::OperandCategory Category;
   uint32_t Value;
-  ::Extension::Extension ReqExtension;
+  Extension::Extension ReqExtension;
 };
 
 struct CapabilityEntry {
-  ::OperandCategory::OperandCategory Category;
+  OperandCategory::OperandCategory Category;
   uint32_t Value;
-  ::Capability::Capability ReqCapability;
-};
-
-struct ExtendedBuiltin {
-  StringRef Name;
-  ::InstructionSet::InstructionSet Set;
-  uint32_t Number;
+  Capability::Capability ReqCapability;
 };
 
 #define GET_SymbolicOperands_DECL
@@ -60,31 +52,31 @@ struct ExtendedBuiltin {
 #define GET_ExtendedBuiltins_DECL
 #define GET_ExtendedBuiltins_IMPL
 #include "SPIRVGenTables.inc"
-} // end anonymous namespace
+} // namespace SPIRV
 
 std::string
-getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMnemonic(SPIRV::OperandCategory::OperandCategory Category,
                            int32_t Value) {
-  const SymbolicOperand *Lookup =
-      lookupSymbolicOperandByCategoryAndValue(Category, Value);
+  const SPIRV::SymbolicOperand *Lookup =
+      SPIRV::lookupSymbolicOperandByCategoryAndValue(Category, Value);
 
   if (Lookup) {
     // Value that encodes just one enum value
     return Lookup->Mnemonic.str();
-  } else if (Category == ::OperandCategory::ImageOperandOperand ||
-             Category == ::OperandCategory::FPFastMathModeOperand ||
-             Category == ::OperandCategory::SelectionControlOperand ||
-             Category == ::OperandCategory::LoopControlOperand ||
-             Category == ::OperandCategory::FunctionControlOperand ||
-             Category == ::OperandCategory::MemorySemanticsOperand ||
-             Category == ::OperandCategory::MemoryOperandOperand ||
-             Category == ::OperandCategory::KernelProfilingInfoOperand) {
+  } else if (Category == SPIRV::OperandCategory::ImageOperandOperand ||
+             Category == SPIRV::OperandCategory::FPFastMathModeOperand ||
+             Category == SPIRV::OperandCategory::SelectionControlOperand ||
+             Category == SPIRV::OperandCategory::LoopControlOperand ||
+             Category == SPIRV::OperandCategory::FunctionControlOperand ||
+             Category == SPIRV::OperandCategory::MemorySemanticsOperand ||
+             Category == SPIRV::OperandCategory::MemoryOperandOperand ||
+             Category == SPIRV::OperandCategory::KernelProfilingInfoOperand) {
     // Value that encodes many enum values (one bit per enum value)
     std::string Name;
     std::string Separator;
 
-    const SymbolicOperand *EnumValueInCategory =
-        lookupSymbolicOperandByCategory(Category);
+    const SPIRV::SymbolicOperand *EnumValueInCategory =
+        SPIRV::lookupSymbolicOperandByCategory(Category);
 
     while (EnumValueInCategory && EnumValueInCategory->Category == Category) {
       if ((EnumValueInCategory->Value != 0) &&
@@ -103,10 +95,10 @@ getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
 }
 
 uint32_t
-getSymbolicOperandMinVersion(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMinVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value) {
-  const SymbolicOperand *Lookup =
-      lookupSymbolicOperandByCategoryAndValue(Category, Value);
+  const SPIRV::SymbolicOperand *Lookup =
+      SPIRV::lookupSymbolicOperandByCategoryAndValue(Category, Value);
 
   if (Lookup)
     return Lookup->MinVersion;
@@ -115,10 +107,10 @@ getSymbolicOperandMinVersion(::OperandCategory::OperandCategory Category,
 }
 
 uint32_t
-getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMaxVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value) {
-  const SymbolicOperand *Lookup =
-      lookupSymbolicOperandByCategoryAndValue(Category, Value);
+  const SPIRV::SymbolicOperand *Lookup =
+      SPIRV::lookupSymbolicOperandByCategoryAndValue(Category, Value);
 
   if (Lookup)
     return Lookup->MaxVersion;
@@ -127,16 +119,16 @@ getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
 }
 
 CapabilityList
-getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
+getSymbolicOperandCapabilities(SPIRV::OperandCategory::OperandCategory Category,
                                uint32_t Value) {
-  const CapabilityEntry *Capability =
-      lookupCapabilityByCategoryAndValue(Category, Value);
+  const SPIRV::CapabilityEntry *Capability =
+      SPIRV::lookupCapabilityByCategoryAndValue(Category, Value);
 
   CapabilityList Capabilities;
   while (Capability && Capability->Category == Category &&
          Capability->Value == Value) {
     Capabilities.push_back(
-        static_cast<::Capability::Capability>(Capability->ReqCapability));
+        static_cast<SPIRV::Capability::Capability>(Capability->ReqCapability));
     ++Capability;
   }
 
@@ -144,25 +136,26 @@ getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
 }
 
 ExtensionList
-getSymbolicOperandExtensions(::OperandCategory::OperandCategory Category,
+getSymbolicOperandExtensions(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value) {
-  const ExtensionEntry *Extension =
-      lookupExtensionByCategoryAndValue(Category, Value);
+  const SPIRV::ExtensionEntry *Extension =
+      SPIRV::lookupExtensionByCategoryAndValue(Category, Value);
 
   ExtensionList Extensions;
   while (Extension && Extension->Category == Category &&
          Extension->Value == Value) {
     Extensions.push_back(
-        static_cast<::Extension::Extension>(Extension->ReqExtension));
+        static_cast<SPIRV::Extension::Extension>(Extension->ReqExtension));
     ++Extension;
   }
 
   return Extensions;
 }
 
-std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue) {
-  const SymbolicOperand *Lookup = lookupSymbolicOperandByCategoryAndValue(
-      ::OperandCategory::BuiltInOperand, BuiltInValue);
+std::string getLinkStringForBuiltIn(SPIRV::BuiltIn::BuiltIn BuiltInValue) {
+  const SPIRV::SymbolicOperand *Lookup =
+      SPIRV::lookupSymbolicOperandByCategoryAndValue(
+          SPIRV::OperandCategory::BuiltInOperand, BuiltInValue);
 
   if (Lookup)
     return "__spirv_BuiltIn" + Lookup->Mnemonic.str();
@@ -171,49 +164,55 @@ std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue) {
 }
 
 // TODO: Remove function after new SPIRVOpenCLBIFs is merged
-bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI) {
+bool getSpirvBuiltInIdByName(llvm::StringRef Name,
+                             SPIRV::BuiltIn::BuiltIn &BI) {
   const std::string Prefix = "__spirv_BuiltIn";
   if (!Name.startswith(Prefix))
     return false;
 
-  const SymbolicOperand *Lookup = lookupSymbolicOperandByCategoryAndMnemonic(
-      BuiltInOperand, Name.drop_front(Prefix.length()));
+  const SPIRV::SymbolicOperand *Lookup =
+      SPIRV::lookupSymbolicOperandByCategoryAndMnemonic(
+          SPIRV::OperandCategory::BuiltInOperand,
+          Name.drop_front(Prefix.length()));
 
   if (!Lookup)
     return false;
 
-  BI = static_cast<BuiltIn::BuiltIn>(Lookup->Value);
+  BI = static_cast<SPIRV::BuiltIn::BuiltIn>(Lookup->Value);
   return true;
 }
 
-std::string getExtInstSetName(::InstructionSet::InstructionSet Set) {
+std::string getExtInstSetName(SPIRV::InstructionSet::InstructionSet Set) {
   switch (Set) {
-  case ::InstructionSet::OpenCL_std:
+  case SPIRV::InstructionSet::OpenCL_std:
     return "OpenCL.std";
-  case ::InstructionSet::GLSL_std_450:
+  case SPIRV::InstructionSet::GLSL_std_450:
     return "GLSL.std.450";
-  case ::InstructionSet::SPV_AMD_shader_trinary_minmax:
+  case SPIRV::InstructionSet::SPV_AMD_shader_trinary_minmax:
     return "SPV_AMD_shader_trinary_minmax";
   }
   return "UNKNOWN_EXT_INST_SET";
 }
 
-::InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName) {
+SPIRV::InstructionSet::InstructionSet
+getExtInstSetFromString(std::string SetName) {
   for (auto Set :
-       {::InstructionSet::GLSL_std_450, ::InstructionSet::OpenCL_std})
+       {SPIRV::InstructionSet::GLSL_std_450, SPIRV::InstructionSet::OpenCL_std})
     if (SetName == getExtInstSetName(Set))
       return Set;
 
   llvm_unreachable("UNKNOWN_EXT_INST_SET");
 }
 
-std::string getExtInstName(::InstructionSet::InstructionSet Set,
+std::string getExtInstName(SPIRV::InstructionSet::InstructionSet Set,
                            uint32_t InstructionNumber) {
-  const ExtendedBuiltin *Lookup = lookupExtendedBuiltinBySetAndNumber(
-      ::InstructionSet::OpenCL_std, InstructionNumber);
+  const SPIRV::ExtendedBuiltin *Lookup =
+      SPIRV::lookupExtendedBuiltinBySetAndNumber(
+          SPIRV::InstructionSet::OpenCL_std, InstructionNumber);
 
   if (!Lookup)
     return "UNKNOWN_EXT_INST";
 
   return Lookup->Name.str();
 }
+} // namespace llvm

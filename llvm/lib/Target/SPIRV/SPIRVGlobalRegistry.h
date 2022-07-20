@@ -22,9 +22,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
-namespace AQ = AccessQualifier;
-
 namespace llvm {
+namespace AQ = SPIRV::AccessQualifier;
 using SPIRVType = const MachineInstr;
 
 class SPIRVGlobalRegistry {
@@ -177,7 +176,7 @@ public:
   bool isScalarOrVectorSigned(const SPIRVType *Type) const;
 
   // Gets the storage class of the pointer type assigned to this vreg.
-  StorageClass::StorageClass getPointerStorageClass(Register VReg) const;
+  SPIRV::StorageClass::StorageClass getPointerStorageClass(Register VReg) const;
 
   // Return the number of bits SPIR-V pointers and size_t variables require.
   unsigned getPointerSize() const { return PointerSize; }
@@ -206,11 +205,11 @@ private:
   SPIRVType *getOpTypeStruct(const StructType *Ty, MachineIRBuilder &MIRBuilder,
                              bool EmitIR = true);
 
-  SPIRVType *getOpTypePointer(StorageClass::StorageClass SC,
+  SPIRVType *getOpTypePointer(SPIRV::StorageClass::StorageClass SC,
                               SPIRVType *ElemType, MachineIRBuilder &MIRBuilder,
                               Register Reg);
 
-  SPIRVType *getOpTypeForwardPointer(StorageClass::StorageClass SC,
+  SPIRVType *getOpTypeForwardPointer(SPIRV::StorageClass::StorageClass SC,
                                      MachineIRBuilder &MIRBuilder);
 
   SPIRVType *getOpTypeFunction(SPIRVType *RetType,
@@ -265,9 +264,9 @@ public:
                             const SPIRVInstrInfo &TII);
   Register
   buildGlobalVariable(Register Reg, SPIRVType *BaseType, StringRef Name,
-                      const GlobalValue *GV, StorageClass::StorageClass Storage,
+                      const GlobalValue *GV, SPIRV::StorageClass::StorageClass Storage,
                       const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
-                      LinkageType::LinkageType LinkageType,
+                      SPIRV::LinkageType::LinkageType LinkageType,
                       MachineIRBuilder &MIRBuilder, bool IsInstSelector);
 
   // Convenient helpers for getting types with check for duplicates.
@@ -286,16 +285,16 @@ public:
                                         const SPIRVInstrInfo &TII);
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
-      StorageClass::StorageClass SClass = StorageClass::Function);
+      SPIRV::StorageClass::StorageClass SClass = SPIRV::StorageClass::Function);
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineInstr &I, const SPIRVInstrInfo &TII,
-      StorageClass::StorageClass SC = StorageClass::Function);
+      SPIRV::StorageClass::StorageClass SC = SPIRV::StorageClass::Function);
 
   SPIRVType *getOrCreateOpTypeImage(MachineIRBuilder &MIRBuilder,
-                                    SPIRVType *SampledType, Dim::Dim Dim,
+                                    SPIRVType *SampledType, SPIRV::Dim::Dim Dim,
                                     uint32_t Depth, uint32_t Arrayed,
                                     uint32_t Multisampled, uint32_t Sampled,
-                                    ImageFormat::ImageFormat ImageFormat,
+                                    SPIRV::ImageFormat::ImageFormat ImageFormat,
                                     AQ::AccessQualifier AccQual);
 
   SPIRVType *getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder);

@@ -99,6 +99,9 @@ public:
   // Add the given requirements to the lists. If constraints conflict, or these
   // requirements cannot be satisfied, then abort the compilation.
   void addRequirements(const Requirements &Req);
+  // Get requirement and add it to the list.
+  void getAndAddRequirements(SPIRV::OperandCategory::OperandCategory Category,
+                             uint32_t i, const SPIRVSubtarget &ST);
   // Check if all the requirements can be satisfied for the given subtarget, and
   // if not abort compilation.
   void checkSatisfiable(const SPIRVSubtarget &ST) const;

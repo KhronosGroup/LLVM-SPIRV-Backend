@@ -52,7 +52,7 @@ static unsigned getMetadataUInt(MDNode *MdNode, unsigned OpIndex,
 }
 
 static SPIRV::Requirements
-getSymbolicOperandRequirements(OperandCategory::OperandCategory Category,
+getSymbolicOperandRequirements(SPIRV::OperandCategory::OperandCategory Category,
                                unsigned i, const SPIRVSubtarget &ST) {
   unsigned ReqMinVer = getSymbolicOperandMinVersion(Category, i);
   unsigned ReqMaxVer = getSymbolicOperandMaxVersion(Category, i);
@@ -77,7 +77,7 @@ getSymbolicOperandRequirements(OperandCategory::OperandCategory Category,
   // capability requirements, use the list of extensions (if the subtarget
   // can handle them all).
   if (std::all_of(ReqExts.begin(), ReqExts.end(),
-                  [&ST](const Extension::Extension &Ext) {
+                  [&ST](const SPIRV::Extension::Extension &Ext) {
                     return ST.canUseExtension(Ext);
                   })) {
     return {true, {}, ReqExts, 0, 0}; // TODO: add versions to extensions.
@@ -99,21 +99,22 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
   // TODO: determine memory model from the configuratoin.
   if (auto MemModel = M.getNamedMetadata("spirv.MemoryModel")) {
     auto MemMD = MemModel->getOperand(0);
-    MAI.Addr = static_cast<AddressingModel::AddressingModel>(
+    MAI.Addr = static_cast<SPIRV::AddressingModel::AddressingModel>(
         getMetadataUInt(MemMD, 0));
-    MAI.Mem = static_cast<MemoryModel::MemoryModel>(getMetadataUInt(MemMD, 1));
+    MAI.Mem =
+        static_cast<SPIRV::MemoryModel::MemoryModel>(getMetadataUInt(MemMD, 1));
   } else {
-    MAI.Mem = MemoryModel::OpenCL;
+    MAI.Mem = SPIRV::MemoryModel::OpenCL;
     unsigned PtrSize = ST->getPointerSize();
-    MAI.Addr = PtrSize == 32   ? AddressingModel::Physical32
-               : PtrSize == 64 ? AddressingModel::Physical64
-                               : AddressingModel::Logical;
+    MAI.Addr = PtrSize == 32   ? SPIRV::AddressingModel::Physical32
+               : PtrSize == 64 ? SPIRV::AddressingModel::Physical64
+                               : SPIRV::AddressingModel::Logical;
   }
 
   // Get the OpenCL version number from metadata.
   // TODO: support other source languages.
   if (auto VerNode = M.getNamedMetadata("opencl.ocl.version")) {
-    MAI.SrcLang = SourceLanguage::OpenCL_C;
+    MAI.SrcLang = SPIRV::SourceLanguage::OpenCL_C;
     // Construct version literal in accordance with SPIRV-LLVM-Translator.
     // TODO: support multiple OCL version metadata.
     assert(VerNode->getNumOperands() > 0 && "Invalid SPIR");
@@ -123,7 +124,7 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
     unsigned RevNum = getMetadataUInt(VersionMD, 2);
     MAI.SrcLangVersion = (MajorNum * 100 + MinorNum) * 1000 + RevNum;
   } else {
-    MAI.SrcLang = SourceLanguage::Unknown;
+    MAI.SrcLang = SPIRV::SourceLanguage::Unknown;
     MAI.SrcLangVersion = 0;
   }
 
@@ -139,15 +140,15 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
 
   // Update required capabilities for this memory model, addressing model and
   // source language.
-  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
-      OperandCategory::MemoryModelOperand, MAI.Mem, *ST));
-  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
-      OperandCategory::SourceLanguageOperand, MAI.SrcLang, *ST));
-  MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
-      OperandCategory::AddressingModelOperand, MAI.Addr, *ST));
+  MAI.Reqs.getAndAddRequirements(SPIRV::OperandCategory::MemoryModelOperand,
+                                 MAI.Mem, *ST);
+  MAI.Reqs.getAndAddRequirements(SPIRV::OperandCategory::SourceLanguageOperand,
+                                 MAI.SrcLang, *ST);
+  MAI.Reqs.getAndAddRequirements(SPIRV::OperandCategory::AddressingModelOperand,
+                                 MAI.Addr, *ST);
 
   // TODO: check if it's required by default.
-  MAI.ExtInstSetMap[static_cast<unsigned>(InstructionSet::OpenCL_std)] =
+  MAI.ExtInstSetMap[static_cast<unsigned>(SPIRV::InstructionSet::OpenCL_std)] =
       Register::index2VirtReg(MAI.getNextID());
 }
 
@@ -232,11 +233,11 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
       for (MachineInstr &MI : MBB) {
         if (MI.getOpcode() == SPIRV::OpExtension) {
           // Here, OpExtension just has a single enum operand, not a string.
-          auto Ext = Extension::Extension(MI.getOperand(0).getImm());
+          auto Ext = SPIRV::Extension::Extension(MI.getOperand(0).getImm());
           MAI.Reqs.addExtension(Ext);
           MAI.setSkipEmission(&MI);
         } else if (MI.getOpcode() == SPIRV::OpCapability) {
-          auto Cap = Capability::Capability(MI.getOperand(0).getImm());
+          auto Cap = SPIRV::Capability::Capability(MI.getOperand(0).getImm());
           MAI.Reqs.addCapability(Cap);
           MAI.setSkipEmission(&MI);
         }
@@ -286,9 +287,9 @@ void SPIRVModuleAnalysis::collectFuncNames(MachineInstr &MI,
   if (MI.getOpcode() == SPIRV::OpDecorate) {
     // If it's got Import linkage.
     auto Dec = MI.getOperand(1).getImm();
-    if (Dec == Decoration::LinkageAttributes) {
+    if (Dec == SPIRV::Decoration::LinkageAttributes) {
       auto Lnk = MI.getOperand(MI.getNumOperands() - 1).getImm();
-      if (Lnk == LinkageType::Import) {
+      if (Lnk == SPIRV::LinkageType::Import) {
         // Map imported function name to function ID register.
         std::string Name = getStringImm(MI, 2);
         Register Target = MI.getOperand(0).getReg();
@@ -420,6 +421,12 @@ static void processSwitches(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
 }
 
 // RequirementHandler implementations.
+void SPIRV::RequirementHandler::getAndAddRequirements(
+    SPIRV::OperandCategory::OperandCategory Category, uint32_t i,
+    const SPIRVSubtarget &ST) {
+  addRequirements(getSymbolicOperandRequirements(Category, i, ST));
+}
+
 void SPIRV::RequirementHandler::pruneCapabilities(
     const CapabilityList &ToPrune) {
   for (const auto &Cap : ToPrune) {
@@ -541,7 +548,7 @@ static void addVariablePtrInstrReqs(const MachineInstr &MI,
     const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
     Register Type = MI.getOperand(1).getReg();
     if (MRI.getVRegDef(Type)->getOpcode() == SPIRV::OpTypePointer)
-      Reqs.addCapability(Capability::VariablePointers);
+      Reqs.addCapability(SPIRV::Capability::VariablePointers);
   }
 }
 
@@ -551,15 +558,15 @@ static void addOpDecorateReqs(const MachineInstr &MI, unsigned DecIndex,
                               SPIRV::RequirementHandler &Reqs,
                               const SPIRVSubtarget &ST) {
   int64_t DecOp = MI.getOperand(DecIndex).getImm();
-  auto Dec = static_cast<Decoration::Decoration>(DecOp);
+  auto Dec = static_cast<SPIRV::Decoration::Decoration>(DecOp);
   Reqs.addRequirements(getSymbolicOperandRequirements(
-      OperandCategory::DecorationOperand, Dec, ST));
+      SPIRV::OperandCategory::DecorationOperand, Dec, ST));
 
-  if (Dec == Decoration::BuiltIn) {
+  if (Dec == SPIRV::Decoration::BuiltIn) {
     int64_t BuiltInOp = MI.getOperand(DecIndex + 1).getImm();
-    auto BuiltIn = static_cast<BuiltIn::BuiltIn>(BuiltInOp);
+    auto BuiltIn = static_cast<SPIRV::BuiltIn::BuiltIn>(BuiltInOp);
     Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::BuiltInOperand, BuiltIn, ST));
+        SPIRV::OperandCategory::BuiltInOperand, BuiltIn, ST));
   }
 }
 
@@ -571,9 +578,9 @@ static void addOpTypeImageReqs(const MachineInstr &MI,
   // The operand indices used here are based on the OpTypeImage layout, which
   // the MachineInstr follows as well.
   int64_t ImgFormatOp = MI.getOperand(7).getImm();
-  auto ImgFormat = static_cast<ImageFormat::ImageFormat>(ImgFormatOp);
-  Reqs.addRequirements(getSymbolicOperandRequirements(
-      OperandCategory::ImageFormatOperand, ImgFormat, ST));
+  auto ImgFormat = static_cast<SPIRV::ImageFormat::ImageFormat>(ImgFormatOp);
+  Reqs.getAndAddRequirements(SPIRV::OperandCategory::ImageFormatOperand,
+                             ImgFormat, ST);
 
   bool IsArrayed = MI.getOperand(4).getImm() == 1;
   bool IsMultisampled = MI.getOperand(5).getImm() == 1;
@@ -581,39 +588,39 @@ static void addOpTypeImageReqs(const MachineInstr &MI,
   // Add dimension requirements.
   assert(MI.getOperand(2).isImm());
   switch (MI.getOperand(2).getImm()) {
-  case Dim::DIM_1D:
-    Reqs.addRequirements(NoSampler ? Capability::Image1D
-                                   : Capability::Sampled1D);
+  case SPIRV::Dim::DIM_1D:
+    Reqs.addRequirements(NoSampler ? SPIRV::Capability::Image1D
+                                   : SPIRV::Capability::Sampled1D);
     break;
-  case Dim::DIM_2D:
+  case SPIRV::Dim::DIM_2D:
     if (IsMultisampled && NoSampler)
-      Reqs.addRequirements(Capability::ImageMSArray);
+      Reqs.addRequirements(SPIRV::Capability::ImageMSArray);
     break;
-  case Dim::DIM_Cube:
-    Reqs.addRequirements(Capability::Shader);
+  case SPIRV::Dim::DIM_Cube:
+    Reqs.addRequirements(SPIRV::Capability::Shader);
     if (IsArrayed)
-      Reqs.addRequirements(NoSampler ? Capability::ImageCubeArray
-                                     : Capability::SampledCubeArray);
+      Reqs.addRequirements(NoSampler ? SPIRV::Capability::ImageCubeArray
+                                     : SPIRV::Capability::SampledCubeArray);
     break;
-  case Dim::DIM_Rect:
-    Reqs.addRequirements(NoSampler ? Capability::ImageRect
-                                   : Capability::SampledRect);
+  case SPIRV::Dim::DIM_Rect:
+    Reqs.addRequirements(NoSampler ? SPIRV::Capability::ImageRect
+                                   : SPIRV::Capability::SampledRect);
     break;
-  case Dim::DIM_Buffer:
-    Reqs.addRequirements(NoSampler ? Capability::ImageBuffer
-                                   : Capability::SampledBuffer);
+  case SPIRV::Dim::DIM_Buffer:
+    Reqs.addRequirements(NoSampler ? SPIRV::Capability::ImageBuffer
+                                   : SPIRV::Capability::SampledBuffer);
     break;
-  case Dim::DIM_SubpassData:
-    Reqs.addRequirements(Capability::InputAttachment);
+  case SPIRV::Dim::DIM_SubpassData:
+    Reqs.addRequirements(SPIRV::Capability::InputAttachment);
     break;
   }
 
   if (ST.isKernel()) {
     // Has optional access qualifier.
     if (MI.getNumOperands() > 8 && MI.getOperand(8).getImm() == AQ::ReadWrite)
-      Reqs.addRequirements(Capability::ImageReadWrite);
+      Reqs.addRequirements(SPIRV::Capability::ImageReadWrite);
     else
-      Reqs.addRequirements(Capability::ImageBasic);
+      Reqs.addRequirements(SPIRV::Capability::ImageBasic);
   }
 }
 
@@ -623,81 +630,81 @@ void addInstrRequirements(const MachineInstr &MI,
   switch (MI.getOpcode()) {
   case SPIRV::OpMemoryModel: {
     int64_t Addr = MI.getOperand(0).getImm();
-    Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::AddressingModelOperand, Addr, ST));
+    Reqs.getAndAddRequirements(SPIRV::OperandCategory::AddressingModelOperand,
+                               Addr, ST);
     int64_t Mem = MI.getOperand(1).getImm();
-    Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::MemoryModelOperand, Mem, ST));
+    Reqs.getAndAddRequirements(SPIRV::OperandCategory::MemoryModelOperand, Mem,
+                               ST);
     break;
   }
   case SPIRV::OpEntryPoint: {
     int64_t Exe = MI.getOperand(0).getImm();
-    Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::ExecutionModelOperand, Exe, ST));
+    Reqs.getAndAddRequirements(SPIRV::OperandCategory::ExecutionModelOperand,
+                               Exe, ST);
     break;
   }
   case SPIRV::OpExecutionMode:
   case SPIRV::OpExecutionModeId: {
     int64_t Exe = MI.getOperand(1).getImm();
-    Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::ExecutionModeOperand, Exe, ST));
+    Reqs.getAndAddRequirements(SPIRV::OperandCategory::ExecutionModeOperand,
+                               Exe, ST);
     break;
   }
   case SPIRV::OpTypeMatrix:
-    Reqs.addCapability(Capability::Matrix);
+    Reqs.addCapability(SPIRV::Capability::Matrix);
     break;
   case SPIRV::OpTypeInt: {
     unsigned BitWidth = MI.getOperand(1).getImm();
     if (BitWidth == 64)
-      Reqs.addCapability(Capability::Int64);
+      Reqs.addCapability(SPIRV::Capability::Int64);
     else if (BitWidth == 16)
-      Reqs.addCapability(Capability::Int16);
+      Reqs.addCapability(SPIRV::Capability::Int16);
     else if (BitWidth == 8)
-      Reqs.addCapability(Capability::Int8);
+      Reqs.addCapability(SPIRV::Capability::Int8);
     break;
   }
   case SPIRV::OpTypeFloat: {
     unsigned BitWidth = MI.getOperand(1).getImm();
     if (BitWidth == 64)
-      Reqs.addCapability(Capability::Float64);
+      Reqs.addCapability(SPIRV::Capability::Float64);
     else if (BitWidth == 16)
-      Reqs.addCapability(Capability::Float16);
+      Reqs.addCapability(SPIRV::Capability::Float16);
     break;
   }
   case SPIRV::OpTypeVector: {
     unsigned NumComponents = MI.getOperand(2).getImm();
     if (NumComponents == 8 || NumComponents == 16)
-      Reqs.addCapability(Capability::Vector16);
+      Reqs.addCapability(SPIRV::Capability::Vector16);
     break;
   }
   case SPIRV::OpTypePointer: {
     auto SC = MI.getOperand(1).getImm();
-    Reqs.addRequirements(getSymbolicOperandRequirements(
-        OperandCategory::StorageClassOperand, SC, ST));
+    Reqs.getAndAddRequirements(SPIRV::OperandCategory::StorageClassOperand, SC,
+                               ST);
     // If it's a type of pointer to float16, add Float16Buffer capability.
     assert(MI.getOperand(2).isReg());
     const MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
     SPIRVType *TypeDef = MRI.getVRegDef(MI.getOperand(2).getReg());
     if (TypeDef->getOpcode() == SPIRV::OpTypeFloat &&
         TypeDef->getOperand(1).getImm() == 16)
-      Reqs.addCapability(Capability::Float16Buffer);
+      Reqs.addCapability(SPIRV::Capability::Float16Buffer);
     break;
   }
   case SPIRV::OpBitReverse:
   case SPIRV::OpTypeRuntimeArray:
-    Reqs.addCapability(Capability::Shader);
+    Reqs.addCapability(SPIRV::Capability::Shader);
     break;
   case SPIRV::OpTypeOpaque:
   case SPIRV::OpTypeEvent:
-    Reqs.addCapability(Capability::Kernel);
+    Reqs.addCapability(SPIRV::Capability::Kernel);
     break;
   case SPIRV::OpTypePipe:
   case SPIRV::OpTypeReserveId:
-    Reqs.addCapability(Capability::Pipes);
+    Reqs.addCapability(SPIRV::Capability::Pipes);
     break;
   case SPIRV::OpTypeDeviceEvent:
   case SPIRV::OpTypeQueue:
-    Reqs.addCapability(Capability::DeviceEnqueue);
+    Reqs.addCapability(SPIRV::Capability::DeviceEnqueue);
     break;
   case SPIRV::OpDecorate:
   case SPIRV::OpDecorateId:
@@ -709,22 +716,22 @@ void addInstrRequirements(const MachineInstr &MI,
     addOpDecorateReqs(MI, 2, Reqs, ST);
     break;
   case SPIRV::OpInBoundsPtrAccessChain:
-    Reqs.addCapability(Capability::Addresses);
+    Reqs.addCapability(SPIRV::Capability::Addresses);
     break;
   case SPIRV::OpConstantSampler:
-    Reqs.addCapability(Capability::LiteralSampler);
+    Reqs.addCapability(SPIRV::Capability::LiteralSampler);
     break;
   case SPIRV::OpTypeImage:
     addOpTypeImageReqs(MI, Reqs, ST);
     break;
   case SPIRV::OpTypeSampler:
-    Reqs.addCapability(Capability::ImageBasic);
+    Reqs.addCapability(SPIRV::Capability::ImageBasic);
     break;
   case SPIRV::OpTypeForwardPointer:
     if (ST.isKernel())
-      Reqs.addCapability(Capability::Addresses);
+      Reqs.addCapability(SPIRV::Capability::Addresses);
     else
-      Reqs.addCapability(Capability::PhysicalStorageBufferAddressesEXT);
+      Reqs.addCapability(SPIRV::Capability::PhysicalStorageBufferAddressesEXT);
     break;
   // TODO: reconsider .td patterns to get rid of such a long switches maybe
   // just removing the pattern for OpSelect is enough, but binary ops may be
@@ -773,7 +780,7 @@ void addInstrRequirements(const MachineInstr &MI,
     if (TypeDef->getOpcode() == SPIRV::OpTypeInt) {
       unsigned BitWidth = TypeDef->getOperand(1).getImm();
       if (BitWidth == 64)
-        Reqs.addCapability(Capability::Int64Atomics);
+        Reqs.addCapability(SPIRV::Capability::Int64Atomics);
     }
     break;
   }
@@ -796,31 +803,31 @@ void addInstrRequirements(const MachineInstr &MI,
     assert(MI.getOperand(3).isImm());
     int64_t GroupOp = MI.getOperand(3).getImm();
     switch (GroupOp) {
-    case GroupOperation::Reduce:
-    case GroupOperation::InclusiveScan:
-    case GroupOperation::ExclusiveScan:
-      Reqs.addCapability(Capability::Kernel);
-      Reqs.addCapability(Capability::GroupNonUniformArithmetic);
-      Reqs.addCapability(Capability::GroupNonUniformBallot);
+    case SPIRV::GroupOperation::Reduce:
+    case SPIRV::GroupOperation::InclusiveScan:
+    case SPIRV::GroupOperation::ExclusiveScan:
+      Reqs.addCapability(SPIRV::Capability::Kernel);
+      Reqs.addCapability(SPIRV::Capability::GroupNonUniformArithmetic);
+      Reqs.addCapability(SPIRV::Capability::GroupNonUniformBallot);
       break;
-    case GroupOperation::ClusteredReduce:
-      Reqs.addCapability(Capability::GroupNonUniformClustered);
+    case SPIRV::GroupOperation::ClusteredReduce:
+      Reqs.addCapability(SPIRV::Capability::GroupNonUniformClustered);
       break;
-    case GroupOperation::PartitionedReduceNV:
-    case GroupOperation::PartitionedInclusiveScanNV:
-    case GroupOperation::PartitionedExclusiveScanNV:
-      Reqs.addCapability(Capability::GroupNonUniformPartitionedNV);
+    case SPIRV::GroupOperation::PartitionedReduceNV:
+    case SPIRV::GroupOperation::PartitionedInclusiveScanNV:
+    case SPIRV::GroupOperation::PartitionedExclusiveScanNV:
+      Reqs.addCapability(SPIRV::Capability::GroupNonUniformPartitionedNV);
       break;
     }
     break;
   }
   case SPIRV::OpGroupNonUniformShuffle:
   case SPIRV::OpGroupNonUniformShuffleXor:
-    Reqs.addCapability(Capability::GroupNonUniformShuffle);
+    Reqs.addCapability(SPIRV::Capability::GroupNonUniformShuffle);
     break;
   case SPIRV::OpGroupNonUniformShuffleUp:
   case SPIRV::OpGroupNonUniformShuffleDown:
-    Reqs.addCapability(Capability::GroupNonUniformShuffleRelative);
+    Reqs.addCapability(SPIRV::Capability::GroupNonUniformShuffleRelative);
     break;
   case SPIRV::OpGroupAll:
   case SPIRV::OpGroupAny:
@@ -833,15 +840,15 @@ void addInstrRequirements(const MachineInstr &MI,
   case SPIRV::OpGroupFMax:
   case SPIRV::OpGroupUMax:
   case SPIRV::OpGroupSMax:
-    Reqs.addCapability(Capability::Groups);
+    Reqs.addCapability(SPIRV::Capability::Groups);
     break;
   case SPIRV::OpGroupNonUniformElect:
-    Reqs.addCapability(Capability::GroupNonUniform);
+    Reqs.addCapability(SPIRV::Capability::GroupNonUniform);
     break;
   case SPIRV::OpGroupNonUniformAll:
   case SPIRV::OpGroupNonUniformAny:
   case SPIRV::OpGroupNonUniformAllEqual:
-    Reqs.addCapability(Capability::GroupNonUniformVote);
+    Reqs.addCapability(SPIRV::Capability::GroupNonUniformVote);
     break;
   case SPIRV::OpGroupNonUniformBroadcast:
   case SPIRV::OpGroupNonUniformBroadcastFirst:
@@ -851,7 +858,7 @@ void addInstrRequirements(const MachineInstr &MI,
   case SPIRV::OpGroupNonUniformBallotBitCount:
   case SPIRV::OpGroupNonUniformBallotFindLSB:
   case SPIRV::OpGroupNonUniformBallotFindMSB:
-    Reqs.addCapability(Capability::GroupNonUniformBallot);
+    Reqs.addCapability(SPIRV::Capability::GroupNonUniformBallot);
     break;
   default:
     break;
@@ -879,8 +886,8 @@ static void collectReqs(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
         Constant *C = CMeta->getValue();
         if (ConstantInt *Const = dyn_cast<ConstantInt>(C)) {
           auto EM = Const->getZExtValue();
-          MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
-              OperandCategory::ExecutionModeOperand, EM, ST));
+          MAI.Reqs.getAndAddRequirements(
+              SPIRV::OperandCategory::ExecutionModeOperand, EM, ST);
         }
       }
     }
@@ -890,61 +897,62 @@ static void collectReqs(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
     if (F.isDeclaration())
       continue;
     if (F.getMetadata("reqd_work_group_size"))
-      MAI.Reqs.addRequirements(getSymbolicOperandRequirements(
-          OperandCategory::ExecutionModeOperand, ExecutionMode::LocalSize, ST));
+      MAI.Reqs.getAndAddRequirements(
+          SPIRV::OperandCategory::ExecutionModeOperand,
+          SPIRV::ExecutionMode::LocalSize, ST);
     if (F.getMetadata("work_group_size_hint"))
-      MAI.Reqs.addRequirements(
-          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
-                                         ExecutionMode::LocalSizeHint, ST));
+      MAI.Reqs.getAndAddRequirements(
+          SPIRV::OperandCategory::ExecutionModeOperand,
+          SPIRV::ExecutionMode::LocalSizeHint, ST);
     if (F.getMetadata("intel_reqd_sub_group_size"))
-      MAI.Reqs.addRequirements(
-          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
-                                         ExecutionMode::SubgroupSize, ST));
+      MAI.Reqs.getAndAddRequirements(
+          SPIRV::OperandCategory::ExecutionModeOperand,
+          SPIRV::ExecutionMode::SubgroupSize, ST);
     if (F.getMetadata("vec_type_hint"))
-      MAI.Reqs.addRequirements(
-          getSymbolicOperandRequirements(OperandCategory::ExecutionModeOperand,
-                                         ExecutionMode::VecTypeHint, ST));
+      MAI.Reqs.getAndAddRequirements(
+          SPIRV::OperandCategory::ExecutionModeOperand,
+          SPIRV::ExecutionMode::VecTypeHint, ST);
   }
 }
 
 static unsigned getFastMathFlags(const MachineInstr &I) {
-  unsigned Flags = FPFastMathMode::None;
+  unsigned Flags = SPIRV::FPFastMathMode::None;
   if (I.getFlag(MachineInstr::MIFlag::FmNoNans))
-    Flags |= FPFastMathMode::NotNaN;
+    Flags |= SPIRV::FPFastMathMode::NotNaN;
   if (I.getFlag(MachineInstr::MIFlag::FmNoInfs))
-    Flags |= FPFastMathMode::NotInf;
+    Flags |= SPIRV::FPFastMathMode::NotInf;
   if (I.getFlag(MachineInstr::MIFlag::FmNsz))
-    Flags |= FPFastMathMode::NSZ;
+    Flags |= SPIRV::FPFastMathMode::NSZ;
   if (I.getFlag(MachineInstr::MIFlag::FmArcp))
-    Flags |= FPFastMathMode::AllowRecip;
+    Flags |= SPIRV::FPFastMathMode::AllowRecip;
   if (I.getFlag(MachineInstr::MIFlag::FmReassoc))
-    Flags |= FPFastMathMode::Fast;
+    Flags |= SPIRV::FPFastMathMode::Fast;
   return Flags;
 }
 
 static void handleMIFlagDecoration(MachineInstr &I, const SPIRVSubtarget &ST,
                                    const SPIRVInstrInfo &TII) {
   if (I.getFlag(MachineInstr::MIFlag::NoSWrap) && TII.canUseNSW(I) &&
-      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
-                                     Decoration::NoSignedWrap, ST)
-          .IsSatisfiable) {
-    buildOpDecorate(I.getOperand(0).getReg(), I, TII, Decoration::NoSignedWrap,
-                    {});
-  }
-  if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && TII.canUseNUW(I) &&
-      getSymbolicOperandRequirements(OperandCategory::DecorationOperand,
-                                     Decoration::NoUnsignedWrap, ST)
+      getSymbolicOperandRequirements(SPIRV::OperandCategory::DecorationOperand,
+                                     SPIRV::Decoration::NoSignedWrap, ST)
           .IsSatisfiable) {
     buildOpDecorate(I.getOperand(0).getReg(), I, TII,
-                    Decoration::NoUnsignedWrap, {});
+                    SPIRV::Decoration::NoSignedWrap, {});
+  }
+  if (I.getFlag(MachineInstr::MIFlag::NoUWrap) && TII.canUseNUW(I) &&
+      getSymbolicOperandRequirements(SPIRV::OperandCategory::DecorationOperand,
+                                     SPIRV::Decoration::NoUnsignedWrap, ST)
+          .IsSatisfiable) {
+    buildOpDecorate(I.getOperand(0).getReg(), I, TII,
+                    SPIRV::Decoration::NoUnsignedWrap, {});
   }
   if (!TII.canUseFastMathFlags(I))
     return;
   unsigned FMFlags = getFastMathFlags(I);
-  if (FMFlags == FPFastMathMode::None)
+  if (FMFlags == SPIRV::FPFastMathMode::None)
     return;
   Register DstReg = I.getOperand(0).getReg();
-  buildOpDecorate(DstReg, I, TII, Decoration::FPFastMathMode, {FMFlags});
+  buildOpDecorate(DstReg, I, TII, SPIRV::Decoration::FPFastMathMode, {FMFlags});
 }
 
 // Walk all functions and add decorations related to MI flags.
@@ -996,7 +1004,7 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
 
   // If there are no entry points, we need the Linkage capability.
   if (MAI.MS[SPIRV::MB_EntryPoints].empty())
-    MAI.Reqs.addCapability(Capability::Linkage);
+    MAI.Reqs.addCapability(SPIRV::Capability::Linkage);
 
   return false;
 }
