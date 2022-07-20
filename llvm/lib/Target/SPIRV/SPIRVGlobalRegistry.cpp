@@ -22,6 +22,8 @@
 #include "SPIRVUtils.h"
 
 using namespace llvm;
+using namespace SPIRV;
+
 SPIRVGlobalRegistry::SPIRVGlobalRegistry(unsigned PointerSize)
     : PointerSize(PointerSize) {}
 
@@ -887,60 +889,75 @@ SPIRVGlobalRegistry::checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
   return nullptr;
 }
 
+namespace {
+struct DemangledType {
+  StringRef Name;
+  uint32_t Opcode;
+};
+
+#define GET_DemangledTypes_DECL
+#define GET_DemangledTypes_IMPL
+
+struct ImageType {
+  StringRef Name;
+  ::AccessQualifier::AccessQualifier Qualifier;
+  ::Dim::Dim Dimensionality;
+  bool Arrayed;
+  bool Depth;
+};
+
+using namespace AccessQualifier;
+using namespace Dim;
+#define GET_ImageTypes_DECL
+#define GET_ImageTypes_IMPL
+
+struct PipeType {
+  StringRef Name;
+  ::AccessQualifier::AccessQualifier Qualifier;
+};
+
+#define GET_PipeTypes_DECL
+#define GET_PipeTypes_IMPL
+#include "SPIRVGenTables.inc"
+} // end anonymous namespace
+
 SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
     const StructType *Ty, MachineIRBuilder &MIRBuilder,
     AQ::AccessQualifier AccessQual) {
   const StringRef Name = Ty->getName();
-  assert(Name.startswith("opencl.") && "CL types should start with 'opencl.'");
-  auto TypeName = Name.substr(strlen("opencl."));
+  assert(Name.startswith("opencl.") &&
+         "OpenCL types must start with 'opencl.' prefix");
 
-  if (TypeName.startswith("image")) {
-    AQ::AccessQualifier NewAQ = AQ::ReadOnly;
-    if (TypeName.endswith("_ro_t"))
-      NewAQ = AQ::ReadOnly;
-    else if (TypeName.endswith("_wo_t") || AccessQual == AQ::WriteOnly)
-      NewAQ = AQ::WriteOnly;
-    else if (TypeName.endswith("_rw_t"))
-      NewAQ = AQ::ReadWrite;
-    char DimC = TypeName[strlen("image")];
-    if (DimC >= '1' && DimC <= '3') {
-      auto Dim = DimC == '1'   ? Dim::DIM_1D
-                 : DimC == '2' ? Dim::DIM_2D
-                               : Dim::DIM_3D;
-      unsigned Arrayed = 0;
-      unsigned Depth = 0;
-      if (TypeName.contains("buffer"))
-        Dim = Dim::DIM_Buffer;
-      if (TypeName.contains("array"))
-        Arrayed = 1;
-      if (TypeName.contains("depth"))
-        Depth = 1;
-      auto *VoidTy = getOrCreateSPIRVType(
-          Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
-          MIRBuilder);
-      return getOrCreateOpTypeImage(MIRBuilder, VoidTy, Dim, Depth, Arrayed, 0,
-                                    0, ImageFormat::Unknown, NewAQ);
-    }
-  } else if (TypeName.startswith("clk_event_t")) {
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeDeviceEvent);
-  } else if (TypeName.startswith("sampler_t")) {
+  // Lookup the demangled OpenCL type in the TableGen records.
+  const DemangledType *Builtin = lookupType(Name);
+
+  if (!Builtin)
+    report_fatal_error("Missing record for OpenCL type: " + Name);
+
+  switch (Builtin->Opcode) {
+  case OpTypeImage: {
+    // Lookup lowering details in ImageType TableGen records.
+    const ImageType *Record = lookupImageType(Name);
+    SPIRVType *VoidType = getOrCreateSPIRVType(
+        Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
+        MIRBuilder);
+    return getOrCreateOpTypeImage(
+        MIRBuilder, VoidType, Record->Dimensionality, Record->Depth,
+        Record->Arrayed, 0, 0, ImageFormat::Unknown,
+        AccessQual == AQ::WriteOnly ? AQ::WriteOnly : Record->Qualifier);
+  } break;
+  case OpTypePipe: {
+    // Lookup lowering details in PipeType TableGen records.
+    const PipeType *Record = lookupPipeType(Name);
+    return getOrCreateOpTypePipe(MIRBuilder, Record->Qualifier);
+  } break;
+  case OpTypeSampler: {
     return getOrCreateOpTypeSampler(MIRBuilder);
-  } else if (TypeName.startswith("pipe")) {
-    if (TypeName.endswith("_ro_t"))
-      AccessQual = AQ::ReadOnly;
-    else if (TypeName.endswith("_wo_t"))
-      AccessQual = AQ::WriteOnly;
-    else if (TypeName.endswith("_rw_t"))
-      AccessQual = AQ::ReadWrite;
-    return getOrCreateOpTypePipe(MIRBuilder, AccessQual);
-  } else if (TypeName.startswith("queue"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeQueue);
-  else if (TypeName.startswith("event_t"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeEvent);
-  else if (TypeName.startswith("reserve_id_t"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeReserveId);
-
-  report_fatal_error("Cannot generate OpenCL type: " + Name);
+  } break;
+  default: {
+    return getOpTypeByOpcode(Ty, MIRBuilder, Builtin->Opcode);
+  } break;
+  }
 }
 
 SPIRVType *
@@ -1021,7 +1038,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(
         TypeLiterals[7].getAsInteger(10, AccQual))
       llvm_unreachable("Unable to recognize Image type literals");
     return getOrCreateOpTypeImage(
-        MIRBuilder, SpirvType, Dim::Dim(Ddim), Depth, Arrayed, MS, Sampled,
+        MIRBuilder, SpirvType, ::Dim::Dim(Ddim), Depth, Arrayed, MS, Sampled,
         ImageFormat::ImageFormat(ImageFormat), AQ::AccessQualifier(AccQual));
   } else if (TypeName.startswith("SampledImage.")) {
     // Find corresponding Image type.

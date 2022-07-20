@@ -65,7 +65,6 @@ def VectorLoadStore : BuiltinGroup;
 // minNumArgs is the minimum required number of arguments for lowering.
 // maxNumArgs specifies the maximum used number of arguments for lowering.
 //===----------------------------------------------------------------------===//
-
 class DemangledBuiltin<string name, InstructionSet set, BuiltinGroup group, bits<8> minNumArgs, bits<8> maxNumArgs> {
   string Name = name;
   InstructionSet Set = set;
@@ -1080,6 +1079,125 @@ foreach i = ["", "2", "3", "4", "8", "16"] in {
     }   
     defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstorea_half", i, j), 3, 3, 181>; 
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Class defining implementation details of demangled builtin types. The info
+// in the record is used for lowering into OpType.
+//
+// name is the demangled name of the given builtin.
+// operation specifies the SPIR-V opcode the StructType should be lowered to.
+//===----------------------------------------------------------------------===//
+class DemangledType<string name, Op operation> {
+  string Name = name;
+  Op Opcode = operation;
+}
+
+// Table gathering all the demangled type records.
+def DemangledTypes : GenericTable {
+  let FilterClass = "DemangledType";
+  let Fields = ["Name", "Opcode"];
+}
+
+// Function to lookup builtin types by their demangled name.
+def lookupType : SearchIndex {
+  let Table = DemangledTypes;
+  let Key = ["Name"];
+}
+
+// OpenCL builtin types:
+def : DemangledType<"opencl.reserve_id_t", OpTypeReserveId>;
+def : DemangledType<"opencl.event_t", OpTypeEvent>;
+def : DemangledType<"opencl.queue_t", OpTypeQueue>;
+def : DemangledType<"opencl.sampler_t", OpTypeSampler>;
+def : DemangledType<"opencl.clk_event_t", OpTypeDeviceEvent>;
+def : DemangledType<"opencl.clk_event_t", OpTypeDeviceEvent>;
+
+// Class definining lowering details for various variants of image type indentifiers.
+class ImageType<string name> {
+  string Name = name;
+  AccessQualifier Qualifier = !cond(!not(!eq(!find(name, "_ro_t"), -1)) : ReadOnly,
+                                  !not(!eq(!find(name, "_wo_t"), -1)) : WriteOnly,
+                                  !not(!eq(!find(name, "_rw_t"), -1)) : ReadWrite,
+                                  true : ReadOnly);
+  Dim Dimensionality = !cond(!not(!eq(!find(name, "buffer"), -1)) : DIM_Buffer,
+                                  !not(!eq(!find(name, "image1"), -1)) : DIM_1D,
+                                  !not(!eq(!find(name, "image2"), -1)) : DIM_2D,
+                                  !not(!eq(!find(name, "image3"), -1)) : DIM_3D);
+  bit Arrayed = !not(!eq(!find(name, "array"), -1));
+  bit Depth = !not(!eq(!find(name, "depth"), -1));
+}
+
+// Table gathering all the image type records.
+def ImageTypes : GenericTable {
+  let FilterClass = "ImageType";
+  let Fields = ["Name", "Qualifier", "Dimensionality", "Arrayed", "Depth"];
+  string TypeOf_Qualifier = "AccessQualifier";
+  string TypeOf_Dimensionality = "Dim";
+}
+
+// Function to lookup builtin image types by their demangled name.
+def lookupImageType : SearchIndex {
+  let Table = ImageTypes;
+  let Key = ["Name"];
+}
+
+// Multiclass used to define at the same time a DemangledType record used
+// for matching an incoming demangled string to the OpTypeImage opcode and
+// ImageType conatining the lowering details.
+multiclass DemangledImageType<string name> {
+  def : DemangledType<name, OpTypeImage>;
+  def : ImageType<name>;
+}
+
+foreach aq = ["_t", "_ro_t", "_wo_t", "_rw_t"] in {
+  defm : DemangledImageType<!strconcat("opencl.image1d", aq)>;
+  defm : DemangledImageType<!strconcat("opencl.image1d_array", aq)>;
+  defm : DemangledImageType<!strconcat("opencl.image1d_buffer", aq)>;
+
+  foreach a1 = ["", "_array"] in {
+    foreach a2 = ["", "_msaa"] in {
+      foreach a3 = ["", "_depth"] in {
+        defm : DemangledImageType<!strconcat("opencl.image2d", a1, a2, a3, aq)>;
+      }
+    }
+  }
+
+  defm : DemangledImageType<!strconcat("opencl.image3d", aq)>;
+}
+
+// Class definining lowering details for various variants of pipe type indentifiers.
+class PipeType<string name> {
+  string Name = name;
+  AccessQualifier Qualifier = !cond(!not(!eq(!find(name, "_ro_t"), -1)) : ReadOnly,
+                                  !not(!eq(!find(name, "_wo_t"), -1)) : WriteOnly,
+                                  !not(!eq(!find(name, "_rw_t"), -1)) : ReadWrite,
+                                  true : ReadOnly);
+}
+
+// Table gathering all the pipe type records.
+def PipeTypes : GenericTable {
+  let FilterClass = "PipeType";
+  let Fields = ["Name", "Qualifier"];
+  string TypeOf_Qualifier = "AccessQualifier";
+}
+
+// Function to lookup builtin pipe types by their demangled name.
+def lookupPipeType : SearchIndex {
+  let Table = PipeTypes;
+  let Key = ["Name"];
+}
+
+// Multiclass used to define at the same time a DemangledType record used
+// for matching an incoming demangled string to the OpTypePipe opcode and
+// PipeType conatining the lowering details.
+multiclass DemangledPipeType<string name> {
+  def : DemangledType<name, OpTypePipe>;
+  def : PipeType<name>;
+}
+
+foreach aq = ["_ro_t", "_wo_t", "_rw_t"] in {
+  defm : DemangledPipeType<!strconcat("opencl.pipe", aq)>;
 }
 
 //===----------------------------------------------------------------------===//

@@ -651,7 +651,7 @@ class Dim<string name, bits<32> value> {
 }
 
 multiclass DimOperand<bits<32> value, string mnemonic, list<Capability> reqCapabilities> {
-  def : Dim<NAME, value>;
+  def NAME : Dim<NAME, value>;
   defm : SymbolicOperandWithRequirements<DimOperand, value, mnemonic, 0, 0, [], reqCapabilities>;
 }
 
@@ -999,7 +999,7 @@ class AccessQualifier<string name, bits<32> value> {
 }
 
 multiclass AccessQualifierOperand<bits<32> value, list<Capability> reqCapabilities> {
-  def : AccessQualifier<NAME, value>;
+  def NAME : AccessQualifier<NAME, value>;
   defm : SymbolicOperandWithRequirements<AccessQualifierOperand, value, NAME, 0, 0, [], reqCapabilities>;
 }
 
