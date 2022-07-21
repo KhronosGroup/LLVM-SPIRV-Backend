@@ -1196,7 +1196,7 @@ multiclass DemangledPipeType<string name> {
   def : PipeType<name>;
 }
 
-foreach aq = ["_ro_t", "_wo_t", "_rw_t"] in {
+foreach aq = ["_t", "_ro_t", "_wo_t", "_rw_t"] in {
   defm : DemangledPipeType<!strconcat("opencl.pipe", aq)>;
 }
 
