@@ -29,7 +29,6 @@ namespace SPIRV {
 #define GET_BuiltinGroup_DECL
 #include "SPIRVGenTables.inc"
 
-// Struct holding a demangled builtin record.
 struct DemangledBuiltin {
   StringRef Name;
   InstructionSet::InstructionSet Set;
