@@ -889,7 +889,8 @@ SPIRVGlobalRegistry::checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
   return nullptr;
 }
 
-namespace {
+namespace llvm {
+namespace SPIRV {
 struct DemangledType {
   StringRef Name;
   uint32_t Opcode;
@@ -900,8 +901,8 @@ struct DemangledType {
 
 struct ImageType {
   StringRef Name;
-  ::AccessQualifier::AccessQualifier Qualifier;
-  ::Dim::Dim Dimensionality;
+  AccessQualifier::AccessQualifier Qualifier;
+  Dim::Dim Dimensionality;
   bool Arrayed;
   bool Depth;
 };
@@ -913,13 +914,14 @@ using namespace Dim;
 
 struct PipeType {
   StringRef Name;
-  ::AccessQualifier::AccessQualifier Qualifier;
+  AccessQualifier::AccessQualifier Qualifier;
 };
 
 #define GET_PipeTypes_DECL
 #define GET_PipeTypes_IMPL
 #include "SPIRVGenTables.inc"
-} // end anonymous namespace
+} // namespace SPIRV
+} // namespace llvm
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
     const StructType *Ty, MachineIRBuilder &MIRBuilder,
