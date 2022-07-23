@@ -19,6 +19,8 @@
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
+namespace llvm {
+namespace SPIRV {
 namespace OperandCategory {
 #define GET_OperandCategory_DECL
 #include "SPIRVGenTables.inc"
@@ -199,32 +201,41 @@ namespace Opcode {
 #include "SPIRVGenTables.inc"
 } // namespace Opcode
 
-using CapabilityList = llvm::SmallVector<Capability::Capability, 8>;
-using ExtensionList = llvm::SmallVector<Extension::Extension, 8>;
+struct ExtendedBuiltin {
+  StringRef Name;
+  InstructionSet::InstructionSet Set;
+  uint32_t Number;
+};
+#define GET_ExtendedBuiltins_DECL
+} // namespace SPIRV
+
+using CapabilityList = SmallVector<SPIRV::Capability::Capability, 8>;
+using ExtensionList = SmallVector<SPIRV::Extension::Extension, 8>;
 
 std::string
-getSymbolicOperandMnemonic(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMnemonic(SPIRV::OperandCategory::OperandCategory Category,
                            int32_t Value);
 uint32_t
-getSymbolicOperandMinVersion(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMinVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value);
 uint32_t
-getSymbolicOperandMaxVersion(::OperandCategory::OperandCategory Category,
+getSymbolicOperandMaxVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value);
 CapabilityList
-getSymbolicOperandCapabilities(::OperandCategory::OperandCategory Category,
+getSymbolicOperandCapabilities(SPIRV::OperandCategory::OperandCategory Category,
                                uint32_t Value);
 ExtensionList
-getSymbolicOperandExtensions(::OperandCategory::OperandCategory Category,
+getSymbolicOperandExtensions(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value);
-std::string getLinkStringForBuiltIn(::BuiltIn::BuiltIn BuiltInValue);
+std::string getLinkStringForBuiltIn(SPIRV::BuiltIn::BuiltIn BuiltInValue);
 
 // TODO: Remove function after new SPIRVOpenCLBIFs is merged.
-bool getSpirvBuiltInIdByName(llvm::StringRef Name, BuiltIn::BuiltIn &BI);
+bool getSpirvBuiltInIdByName(StringRef Name, SPIRV::BuiltIn::BuiltIn &BI);
 
-std::string getExtInstSetName(InstructionSet::InstructionSet Set);
-InstructionSet::InstructionSet getExtInstSetFromString(std::string SetName);
-std::string getExtInstName(InstructionSet::InstructionSet Set,
+std::string getExtInstSetName(SPIRV::InstructionSet::InstructionSet Set);
+SPIRV::InstructionSet::InstructionSet
+getExtInstSetFromString(std::string SetName);
+std::string getExtInstName(SPIRV::InstructionSet::InstructionSet Set,
                            uint32_t InstructionNumber);
 
 // Return a string representation of the operands from startIndex onwards.
@@ -253,5 +264,5 @@ std::string getSPIRVStringOperand(const InstType &MI, unsigned StartIndex) {
   }
   return s;
 }
-
+} // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVSYMBOLICOPERANDS_H

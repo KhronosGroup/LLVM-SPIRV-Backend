@@ -49,9 +49,9 @@ private:
   bool OpenCLFullProfile;
   bool OpenCLImageSupport;
 
-  std::set<Extension::Extension> AvailableExtensions;
-  std::set<InstructionSet::InstructionSet> AvailableExtInstSets;
-  std::set<Capability::Capability> AvailableCaps;
+  std::set<SPIRV::Extension::Extension> AvailableExtensions;
+  std::set<SPIRV::InstructionSet::InstructionSet> AvailableExtInstSets;
+  std::set<SPIRV::Capability::Capability> AvailableCaps;
 
   std::unique_ptr<SPIRVGlobalRegistry> GR;
 
@@ -94,9 +94,9 @@ public:
   bool isShader() const;
   uint32_t getTargetSPIRVVersion() const { return TargetSPIRVVersion; };
 
-  bool canUseCapability(Capability::Capability C) const;
-  bool canUseExtension(Extension::Extension E) const;
-  bool canUseExtInstSet(InstructionSet::InstructionSet E) const;
+  bool canUseCapability(SPIRV::Capability::Capability C) const;
+  bool canUseExtension(SPIRV::Extension::Extension E) const;
+  bool canUseExtInstSet(SPIRV::InstructionSet::InstructionSet E) const;
 
   SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
 

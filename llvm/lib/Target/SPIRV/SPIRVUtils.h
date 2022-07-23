@@ -50,20 +50,21 @@ void buildOpName(llvm::Register Target, const llvm::StringRef &Name,
 
 // Add an OpDecorate instruction for the given Reg.
 void buildOpDecorate(llvm::Register Reg, llvm::MachineIRBuilder &MIRBuilder,
-                     Decoration::Decoration Dec,
+                     llvm::SPIRV::Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs,
                      llvm::StringRef StrImm = "");
 void buildOpDecorate(llvm::Register Reg, llvm::MachineInstr &I,
                      const llvm::SPIRVInstrInfo &TII,
-                     Decoration::Decoration Dec,
+                     llvm::SPIRV::Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs,
                      llvm::StringRef StrImm = "");
 
 // Convert a SPIR-V storage class to the corresponding LLVM IR address space.
-unsigned storageClassToAddressSpace(StorageClass::StorageClass SC);
+unsigned storageClassToAddressSpace(llvm::SPIRV::StorageClass::StorageClass SC);
 
 // Convert an LLVM IR address space to a SPIR-V storage class.
-StorageClass::StorageClass addressSpaceToStorageClass(unsigned AddrSpace);
+llvm::SPIRV::StorageClass::StorageClass
+addressSpaceToStorageClass(unsigned AddrSpace);
 
 // Utility method to constrain an instruction's operands to the correct
 // register classes, and return true if this worked.
@@ -71,10 +72,11 @@ StorageClass::StorageClass addressSpaceToStorageClass(unsigned AddrSpace);
 bool constrainRegOperands(llvm::MachineInstrBuilder &MIB,
                           llvm::MachineFunction *MF = nullptr);
 
-MemorySemantics::MemorySemantics
-getMemSemanticsForStorageClass(StorageClass::StorageClass sc);
+llvm::SPIRV::MemorySemantics::MemorySemantics
+getMemSemanticsForStorageClass(llvm::SPIRV::StorageClass::StorageClass SC);
 
-MemorySemantics::MemorySemantics getMemSemantics(llvm::AtomicOrdering Ord);
+llvm::SPIRV::MemorySemantics::MemorySemantics
+getMemSemantics(llvm::AtomicOrdering Ord);
 
 // Find def instruction for the given ConstReg, walking through
 // spv_track_constant and ASSIGN_TYPE instructions. Updates ConstReg by def

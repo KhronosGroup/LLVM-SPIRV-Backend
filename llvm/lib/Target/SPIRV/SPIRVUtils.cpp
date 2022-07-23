@@ -115,14 +115,14 @@ static void finishBuildOpDecorate(MachineInstrBuilder &MIB,
 }
 
 void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
-                     Decoration::Decoration Dec,
+                     SPIRV::Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpDecorate).addUse(Reg).addImm(Dec);
   finishBuildOpDecorate(MIB, DecArgs, StrImm);
 }
 
 void buildOpDecorate(Register Reg, MachineInstr &I, const SPIRVInstrInfo &TII,
-                     Decoration::Decoration Dec,
+                     SPIRV::Decoration::Decoration Dec,
                      const std::vector<uint32_t> &DecArgs, StringRef StrImm) {
   MachineBasicBlock &MBB = *I.getParent();
   auto MIB = BuildMI(MBB, I, I.getDebugLoc(), TII.get(SPIRV::OpDecorate))
@@ -133,77 +133,78 @@ void buildOpDecorate(Register Reg, MachineInstr &I, const SPIRVInstrInfo &TII,
 
 // TODO: maybe the following two functions should be handled in the subtarget
 // to allow for different OpenCL vs Vulkan handling.
-unsigned storageClassToAddressSpace(StorageClass::StorageClass SC) {
+unsigned storageClassToAddressSpace(SPIRV::StorageClass::StorageClass SC) {
   switch (SC) {
-  case StorageClass::Function:
+  case SPIRV::StorageClass::Function:
     return 0;
-  case StorageClass::CrossWorkgroup:
+  case SPIRV::StorageClass::CrossWorkgroup:
     return 1;
-  case StorageClass::UniformConstant:
+  case SPIRV::StorageClass::UniformConstant:
     return 2;
-  case StorageClass::Workgroup:
+  case SPIRV::StorageClass::Workgroup:
     return 3;
-  case StorageClass::Generic:
+  case SPIRV::StorageClass::Generic:
     return 4;
-  case StorageClass::Input:
+  case SPIRV::StorageClass::Input:
     return 7;
   default:
     llvm_unreachable("Unable to get address space id");
   }
 }
 
-StorageClass::StorageClass addressSpaceToStorageClass(unsigned AddrSpace) {
+SPIRV::StorageClass::StorageClass
+addressSpaceToStorageClass(unsigned AddrSpace) {
   switch (AddrSpace) {
   case 0:
-    return StorageClass::Function;
+    return SPIRV::StorageClass::Function;
   case 1:
-    return StorageClass::CrossWorkgroup;
+    return SPIRV::StorageClass::CrossWorkgroup;
   case 2:
-    return StorageClass::UniformConstant;
+    return SPIRV::StorageClass::UniformConstant;
   case 3:
-    return StorageClass::Workgroup;
+    return SPIRV::StorageClass::Workgroup;
   case 4:
-    return StorageClass::Generic;
+    return SPIRV::StorageClass::Generic;
   case 7:
-    return StorageClass::Input;
+    return SPIRV::StorageClass::Input;
   default:
     llvm_unreachable("Unknown address space");
   }
 }
 
-MemorySemantics::MemorySemantics
-getMemSemanticsForStorageClass(StorageClass::StorageClass sc) {
+SPIRV::MemorySemantics::MemorySemantics
+getMemSemanticsForStorageClass(SPIRV::StorageClass::StorageClass sc) {
   switch (sc) {
-  case StorageClass::StorageBuffer:
-  case StorageClass::Uniform:
-    return MemorySemantics::UniformMemory;
-  case StorageClass::Workgroup:
-    return MemorySemantics::WorkgroupMemory;
-  case StorageClass::CrossWorkgroup:
-    return MemorySemantics::CrossWorkgroupMemory;
-  case StorageClass::AtomicCounter:
-    return MemorySemantics::AtomicCounterMemory;
-  case StorageClass::Image:
-    return MemorySemantics::ImageMemory;
+  case SPIRV::StorageClass::StorageBuffer:
+  case SPIRV::StorageClass::Uniform:
+    return SPIRV::MemorySemantics::UniformMemory;
+  case SPIRV::StorageClass::Workgroup:
+    return SPIRV::MemorySemantics::WorkgroupMemory;
+  case SPIRV::StorageClass::CrossWorkgroup:
+    return SPIRV::MemorySemantics::CrossWorkgroupMemory;
+  case SPIRV::StorageClass::AtomicCounter:
+    return SPIRV::MemorySemantics::AtomicCounterMemory;
+  case SPIRV::StorageClass::Image:
+    return SPIRV::MemorySemantics::ImageMemory;
   default:
-    return MemorySemantics::None;
+    return SPIRV::MemorySemantics::None;
   }
 }
 
-MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
+SPIRV::MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
   switch (Ord) {
   case AtomicOrdering::Acquire:
-    return MemorySemantics::Acquire;
+    return SPIRV::MemorySemantics::Acquire;
   case AtomicOrdering::Release:
-    return MemorySemantics::Release;
+    return SPIRV::MemorySemantics::Release;
   case AtomicOrdering::AcquireRelease:
-    return MemorySemantics::AcquireRelease;
+    return SPIRV::MemorySemantics::AcquireRelease;
   case AtomicOrdering::SequentiallyConsistent:
-    return MemorySemantics::SequentiallyConsistent;
+    return SPIRV::MemorySemantics::SequentiallyConsistent;
   case AtomicOrdering::Unordered:
   case AtomicOrdering::Monotonic:
   case AtomicOrdering::NotAtomic:
-    return MemorySemantics::None;
+    return SPIRV::MemorySemantics::None;
   }
 }
 

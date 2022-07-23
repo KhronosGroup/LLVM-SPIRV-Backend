@@ -1,31 +1,23 @@
-//===-- SPIRVBuiltins.h - SPIR-V Built-in Functions --------------*- C++ -*-===//
- //
- // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
- // See https://llvm.org/LICENSE.txt for license information.
- // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
- //
- //===----------------------------------------------------------------------===//
- //
- // Lowering builtin function calls and types using their demangled names.
- //
- //===----------------------------------------------------------------------===//
+//===-- SPIRVBuiltins.h - SPIR-V Built-in Functions -------------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Lowering builtin function calls and types using their demangled names.
+//
+//===----------------------------------------------------------------------===//
 
- #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
- #define LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
+#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
+#define LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
 
 #include "SPIRVGlobalRegistry.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
-namespace AQ = AccessQualifier;
-
 namespace llvm {
-
-struct ExternalInstructionSet {
-#define GET_InstructionSet_DECL
-#include "SPIRVGenTables.inc"
-};
-
 /// Lowers a builtin funtion call using the provided \p DemangledCall skeleton
 /// and external instruction \p Set.
 ///
@@ -37,11 +29,10 @@ struct ExternalInstructionSet {
 /// Register(0) otherwise. \p OrigRetTy is the type of the \p OrigRet. \p Args
 /// are the arguments of the lowered builtin call.
 bool lowerBuiltin(const StringRef DemangledCall,
-                  ExternalInstructionSet::InstructionSet Set,
+                  SPIRV::InstructionSet::InstructionSet Set,
                   MachineIRBuilder &MIRBuilder, const Register OrigRet,
                   const Type *OrigRetTy, const SmallVectorImpl<Register> &Args,
                   SPIRVGlobalRegistry *GR);
 
 } // end namespace llvm
-
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H

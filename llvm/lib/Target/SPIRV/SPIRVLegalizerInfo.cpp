@@ -312,7 +312,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_FPOWI).legalForCartesianProduct(
       allFloatScalarsAndVectors, allIntScalarsAndVectors);
 
-  if (ST.canUseExtInstSet(InstructionSet::OpenCL_std)) {
+  if (ST.canUseExtInstSet(SPIRV::InstructionSet::OpenCL_std)) {
     getActionDefinitionsBuilder(G_FLOG10).legalFor(allFloatScalarsAndVectors);
 
     getActionDefinitionsBuilder(

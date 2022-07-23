@@ -23,6 +23,7 @@
 #include "llvm/Support/FormattedStream.h"
 
 using namespace llvm;
+using namespace llvm::SPIRV;
 
 #define DEBUG_TYPE "asm-printer"
 

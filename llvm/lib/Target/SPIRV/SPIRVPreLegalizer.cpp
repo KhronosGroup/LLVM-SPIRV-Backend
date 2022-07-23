@@ -197,6 +197,7 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
 // provided, use it as SPIRVType in ASSIGN_TYPE, otherwise create it from Ty.
 // It's used also in SPIRVBuiltins.cpp.
 // TODO: maybe move to SPIRVUtils.
+namespace llvm {
 Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
                            SPIRVGlobalRegistry *GR, MachineIRBuilder &MIB,
                            MachineRegisterInfo &MRI) {
@@ -225,6 +226,7 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   MRI.setRegClass(Reg, &SPIRV::ANYIDRegClass);
   return NewReg;
 }
+} // namespace llvm
 
 static void generateAssignInstrs(MachineFunction &MF, SPIRVGlobalRegistry *GR,
                                  MachineIRBuilder MIB) {
