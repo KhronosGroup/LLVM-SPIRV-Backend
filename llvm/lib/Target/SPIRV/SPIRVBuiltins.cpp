@@ -131,6 +131,7 @@ using namespace InstructionSet;
 #define GET_CLMemoryScope_DECL
 #define GET_CLSamplerAddressingMode_DECL
 #define GET_CLMemoryFenceFlags_DECL
+#define GET_ExtendedBuiltins_DECL
 #include "SPIRVGenTables.inc"
 } // namespace SPIRV
 

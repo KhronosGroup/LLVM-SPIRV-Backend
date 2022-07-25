@@ -21,7 +21,7 @@
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/IntrinsicsSPIRV.h"
 
-using namespace llvm;
+namespace llvm {
 
 // The following functions are used to add these string literals as a series of
 // 32-bit integer operands with the correct format, and unpack them if necessary
@@ -173,8 +173,8 @@ addressSpaceToStorageClass(unsigned AddrSpace) {
 }
 
 SPIRV::MemorySemantics::MemorySemantics
-getMemSemanticsForStorageClass(SPIRV::StorageClass::StorageClass sc) {
-  switch (sc) {
+getMemSemanticsForStorageClass(SPIRV::StorageClass::StorageClass SC) {
+  switch (SC) {
   case SPIRV::StorageClass::StorageBuffer:
   case SPIRV::StorageClass::Uniform:
     return SPIRV::MemorySemantics::UniformMemory;
@@ -204,6 +204,7 @@ SPIRV::MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
   case AtomicOrdering::Unordered:
   case AtomicOrdering::Monotonic:
   case AtomicOrdering::NotAtomic:
+  default:
     return SPIRV::MemorySemantics::None;
   }
 }
@@ -339,3 +340,4 @@ std::string isOclOrSpirvBuiltin(StringRef Name) {
       .getAsInteger(10, Len);
   return Name.substr(Start, Len).str();
 }
+} // namespace llvm
