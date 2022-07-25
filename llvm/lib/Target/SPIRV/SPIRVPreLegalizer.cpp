@@ -484,6 +484,8 @@ static void processSwitches(MachineFunction &MF, SPIRVGlobalRegistry *GR,
         Register CReg = MI.getOperand(i).getReg();
         uint64_t Val = getIConstVal(CReg, &MRI);
         MachineInstr *ConstInstr = getDefInstrMaybeConstant(CReg, &MRI);
+        if (!SwitchRegToMBB[Reg][Val])
+          continue;
         Vals.push_back(ConstInstr->getOperand(1).getCImm());
         MBBs.push_back(SwitchRegToMBB[Reg][Val]);
       }
