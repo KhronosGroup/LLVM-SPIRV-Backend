@@ -907,16 +907,15 @@ struct ImageType {
   bool Depth;
 };
 
-using namespace AccessQualifier;
-using namespace Dim;
-#define GET_ImageTypes_DECL
-#define GET_ImageTypes_IMPL
-
 struct PipeType {
   StringRef Name;
   AccessQualifier::AccessQualifier Qualifier;
 };
 
+using namespace AccessQualifier;
+using namespace Dim;
+#define GET_ImageTypes_DECL
+#define GET_ImageTypes_IMPL
 #define GET_PipeTypes_DECL
 #define GET_PipeTypes_IMPL
 #include "SPIRVGenTables.inc"

@@ -112,10 +112,6 @@ struct ConvertBuiltin {
   FPRoundingMode::FPRoundingMode RoundingMode;
 };
 
-using namespace FPRoundingMode;
-#define GET_ConvertBuiltins_DECL
-#define GET_ConvertBuiltins_IMPL
-
 struct VectorLoadStoreBuiltin {
   StringRef Name;
   InstructionSet::InstructionSet Set;
@@ -123,6 +119,10 @@ struct VectorLoadStoreBuiltin {
   bool IsRounded;
   FPRoundingMode::FPRoundingMode RoundingMode;
 };
+
+using namespace FPRoundingMode;
+#define GET_ConvertBuiltins_DECL
+#define GET_ConvertBuiltins_IMPL
 
 using namespace InstructionSet;
 #define GET_VectorLoadStoreBuiltins_DECL

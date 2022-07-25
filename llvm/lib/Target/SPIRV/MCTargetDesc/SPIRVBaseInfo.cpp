@@ -18,11 +18,6 @@
 
 namespace llvm {
 namespace SPIRV {
-using namespace OperandCategory;
-using namespace Extension;
-using namespace Capability;
-using namespace InstructionSet;
-
 struct SymbolicOperand {
   OperandCategory::OperandCategory Category;
   uint32_t Value;
@@ -43,6 +38,10 @@ struct CapabilityEntry {
   Capability::Capability ReqCapability;
 };
 
+using namespace OperandCategory;
+using namespace Extension;
+using namespace Capability;
+using namespace InstructionSet;
 #define GET_SymbolicOperands_DECL
 #define GET_SymbolicOperands_IMPL
 #define GET_ExtensionEntries_DECL
