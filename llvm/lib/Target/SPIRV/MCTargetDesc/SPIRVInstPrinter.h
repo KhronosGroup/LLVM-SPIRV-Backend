@@ -52,4 +52,4 @@ public:
 };
 } // namespace llvm
 
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_INSTPRINTER_SPIRVINSTPRINTER_H

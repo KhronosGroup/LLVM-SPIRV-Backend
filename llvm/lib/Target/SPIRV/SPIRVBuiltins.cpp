@@ -112,10 +112,6 @@ struct ConvertBuiltin {
   FPRoundingMode::FPRoundingMode RoundingMode;
 };
 
-using namespace FPRoundingMode;
-#define GET_ConvertBuiltins_DECL
-#define GET_ConvertBuiltins_IMPL
-
 struct VectorLoadStoreBuiltin {
   StringRef Name;
   InstructionSet::InstructionSet Set;
@@ -124,6 +120,10 @@ struct VectorLoadStoreBuiltin {
   FPRoundingMode::FPRoundingMode RoundingMode;
 };
 
+using namespace FPRoundingMode;
+#define GET_ConvertBuiltins_DECL
+#define GET_ConvertBuiltins_IMPL
+
 using namespace InstructionSet;
 #define GET_VectorLoadStoreBuiltins_DECL
 #define GET_VectorLoadStoreBuiltins_IMPL
@@ -131,6 +131,7 @@ using namespace InstructionSet;
 #define GET_CLMemoryScope_DECL
 #define GET_CLSamplerAddressingMode_DECL
 #define GET_CLMemoryFenceFlags_DECL
+#define GET_ExtendedBuiltins_DECL
 #include "SPIRVGenTables.inc"
 } // namespace SPIRV
 

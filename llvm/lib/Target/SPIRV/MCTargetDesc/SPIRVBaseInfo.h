@@ -206,7 +206,6 @@ struct ExtendedBuiltin {
   InstructionSet::InstructionSet Set;
   uint32_t Number;
 };
-#define GET_ExtendedBuiltins_DECL
 } // namespace SPIRV
 
 using CapabilityList = SmallVector<SPIRV::Capability::Capability, 8>;
@@ -257,9 +256,8 @@ std::string getSPIRVStringOperand(const InstType &MI, unsigned StartIndex) {
       if (c == 0) { // Stop if we hit a null-terminator character.
         IsFinished = true;
         break;
-      } else {
-        s += c; // Otherwise, append the character to the result string.
       }
+      s += c; // Otherwise, append the character to the result string.
     }
   }
   return s;

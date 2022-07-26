@@ -18,11 +18,6 @@
 
 namespace llvm {
 namespace SPIRV {
-using namespace OperandCategory;
-using namespace Extension;
-using namespace Capability;
-using namespace InstructionSet;
-
 struct SymbolicOperand {
   OperandCategory::OperandCategory Category;
   uint32_t Value;
@@ -43,6 +38,10 @@ struct CapabilityEntry {
   Capability::Capability ReqCapability;
 };
 
+using namespace OperandCategory;
+using namespace Extension;
+using namespace Capability;
+using namespace InstructionSet;
 #define GET_SymbolicOperands_DECL
 #define GET_SymbolicOperands_IMPL
 #define GET_ExtensionEntries_DECL
@@ -59,39 +58,34 @@ getSymbolicOperandMnemonic(SPIRV::OperandCategory::OperandCategory Category,
                            int32_t Value) {
   const SPIRV::SymbolicOperand *Lookup =
       SPIRV::lookupSymbolicOperandByCategoryAndValue(Category, Value);
-
-  if (Lookup) {
-    // Value that encodes just one enum value
+  // Value that encodes just one enum value.
+  if (Lookup)
     return Lookup->Mnemonic.str();
-  } else if (Category == SPIRV::OperandCategory::ImageOperandOperand ||
-             Category == SPIRV::OperandCategory::FPFastMathModeOperand ||
-             Category == SPIRV::OperandCategory::SelectionControlOperand ||
-             Category == SPIRV::OperandCategory::LoopControlOperand ||
-             Category == SPIRV::OperandCategory::FunctionControlOperand ||
-             Category == SPIRV::OperandCategory::MemorySemanticsOperand ||
-             Category == SPIRV::OperandCategory::MemoryOperandOperand ||
-             Category == SPIRV::OperandCategory::KernelProfilingInfoOperand) {
-    // Value that encodes many enum values (one bit per enum value)
-    std::string Name;
-    std::string Separator;
+  if (Category != SPIRV::OperandCategory::ImageOperandOperand &&
+      Category != SPIRV::OperandCategory::FPFastMathModeOperand &&
+      Category != SPIRV::OperandCategory::SelectionControlOperand &&
+      Category != SPIRV::OperandCategory::LoopControlOperand &&
+      Category != SPIRV::OperandCategory::FunctionControlOperand &&
+      Category != SPIRV::OperandCategory::MemorySemanticsOperand &&
+      Category != SPIRV::OperandCategory::MemoryOperandOperand &&
+      Category != SPIRV::OperandCategory::KernelProfilingInfoOperand)
+    return "UNKNOWN";
+  // Value that encodes many enum values (one bit per enum value).
+  std::string Name;
+  std::string Separator;
+  const SPIRV::SymbolicOperand *EnumValueInCategory =
+      SPIRV::lookupSymbolicOperandByCategory(Category);
 
-    const SPIRV::SymbolicOperand *EnumValueInCategory =
-        SPIRV::lookupSymbolicOperandByCategory(Category);
-
-    while (EnumValueInCategory && EnumValueInCategory->Category == Category) {
-      if ((EnumValueInCategory->Value != 0) &&
-          (Value & EnumValueInCategory->Value)) {
-        Name += Separator + EnumValueInCategory->Mnemonic.str();
-        Separator = "|";
-      }
-
-      ++EnumValueInCategory;
+  while (EnumValueInCategory && EnumValueInCategory->Category == Category) {
+    if ((EnumValueInCategory->Value != 0) &&
+        (Value & EnumValueInCategory->Value)) {
+      Name += Separator + EnumValueInCategory->Mnemonic.str();
+      Separator = "|";
     }
-
-    return Name;
+    ++EnumValueInCategory;
   }
 
-  return "UNKNOWN";
+  return Name;
 }
 
 uint32_t
@@ -159,8 +153,7 @@ std::string getLinkStringForBuiltIn(SPIRV::BuiltIn::BuiltIn BuiltInValue) {
 
   if (Lookup)
     return "__spirv_BuiltIn" + Lookup->Mnemonic.str();
-  else
-    return "UNKNOWN_BUILTIN";
+  return "UNKNOWN_BUILTIN";
 }
 
 // TODO: Remove function after new SPIRVOpenCLBIFs is merged
