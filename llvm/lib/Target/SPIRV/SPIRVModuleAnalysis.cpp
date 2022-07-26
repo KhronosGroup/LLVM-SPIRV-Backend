@@ -404,7 +404,14 @@ static void processSwitches(const Module &M, SPIRV::ModuleAnalysisInfo &MAI,
           assert(MI.getOperand(0).isReg());
           SwitchRegs.insert(MI.getOperand(0).getReg());
         }
-        if (MI.getOpcode() != SPIRV::OpIEqual || !MI.getOperand(2).isReg() ||
+        if (MI.getOpcode() == SPIRV::OpISubS &&
+            SwitchRegs.contains(MI.getOperand(2).getReg())) {
+          SwitchRegs.insert(MI.getOperand(0).getReg());
+          MAI.setSkipEmission(&MI);
+        }
+        if ((MI.getOpcode() != SPIRV::OpIEqual &&
+             MI.getOpcode() != SPIRV::OpULessThanEqual) ||
+            !MI.getOperand(2).isReg() ||
             !SwitchRegs.contains(MI.getOperand(2).getReg()))
           continue;
         Register CmpReg = MI.getOperand(0).getReg();
