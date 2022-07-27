@@ -1430,6 +1430,9 @@ bool SPIRVInstructionSelector::selectIntrinsic(Register ResVReg,
   case Intrinsic::spv_cmpxchg:
     return selectAtomicCmpXchg(ResVReg, ResType, I);
     break;
+  case Intrinsic::spv_unreachable:
+    BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpUnreachable));
+    break;
   default:
     llvm_unreachable("Intrinsic selection not implemented");
   }

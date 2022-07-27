@@ -88,6 +88,7 @@ public:
   Instruction *visitStoreInst(StoreInst &I);
   Instruction *visitAllocaInst(AllocaInst &I);
   Instruction *visitAtomicCmpXchgInst(AtomicCmpXchgInst &I);
+  Instruction *visitUnreachableInst(UnreachableInst &I);
   bool runOnFunction(Function &F) override;
 };
 } // namespace
@@ -334,6 +335,12 @@ Instruction *SPIRVEmitIntrinsics::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I) {
                                     {I.getPointerOperand()->getType()}, {Args});
   replaceMemInstrUses(&I, NewI);
   return NewI;
+}
+
+Instruction *SPIRVEmitIntrinsics::visitUnreachableInst(UnreachableInst &I) {
+  IRB->SetInsertPoint(&I);
+  IRB->CreateIntrinsic(Intrinsic::spv_unreachable, {}, {});
+  return &I;
 }
 
 void SPIRVEmitIntrinsics::processGlobalValue(GlobalVariable &GV) {
