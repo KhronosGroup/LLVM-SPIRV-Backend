@@ -243,6 +243,11 @@ private:
       uint64_t Val, SPIRVType *SpvType, MachineIRBuilder *MIRBuilder,
       MachineInstr *I = nullptr, const SPIRVInstrInfo *TII = nullptr);
   SPIRVType *finishCreatingSPIRVType(const Type *LLVMTy, SPIRVType *SpirvType);
+  Register getOrCreateIntCompositeOrNull(uint64_t Val, MachineInstr &I,
+                                         SPIRVType *SpvType,
+                                         const SPIRVInstrInfo &TII,
+                                         Constant *CA, unsigned BitWidth,
+                                         unsigned ElemCnt);
 
 public:
   Register buildConstantInt(uint64_t Val, MachineIRBuilder &MIRBuilder,
@@ -256,18 +261,23 @@ public:
   Register getOrCreateConsIntVector(uint64_t Val, MachineInstr &I,
                                     SPIRVType *SpvType,
                                     const SPIRVInstrInfo &TII);
+  Register getOrCreateConsIntArray(uint64_t Val, MachineInstr &I,
+                                   SPIRVType *SpvType,
+                                   const SPIRVInstrInfo &TII);
   Register buildConstantSampler(Register Res, unsigned AddrMode, unsigned Param,
                                 unsigned FilerMode,
                                 MachineIRBuilder &MIRBuilder,
                                 SPIRVType *SpvType);
   Register getOrCreateUndef(MachineInstr &I, SPIRVType *SpvType,
                             const SPIRVInstrInfo &TII);
-  Register
-  buildGlobalVariable(Register Reg, SPIRVType *BaseType, StringRef Name,
-                      const GlobalValue *GV, SPIRV::StorageClass::StorageClass Storage,
-                      const MachineInstr *Init, bool IsConst, bool HasLinkageTy,
-                      SPIRV::LinkageType::LinkageType LinkageType,
-                      MachineIRBuilder &MIRBuilder, bool IsInstSelector);
+  Register buildGlobalVariable(Register Reg, SPIRVType *BaseType,
+                               StringRef Name, const GlobalValue *GV,
+                               SPIRV::StorageClass::StorageClass Storage,
+                               const MachineInstr *Init, bool IsConst,
+                               bool HasLinkageTy,
+                               SPIRV::LinkageType::LinkageType LinkageType,
+                               MachineIRBuilder &MIRBuilder,
+                               bool IsInstSelector);
 
   // Convenient helpers for getting types with check for duplicates.
   SPIRVType *getOrCreateSPIRVIntegerType(unsigned BitWidth,
@@ -283,6 +293,10 @@ public:
   SPIRVType *getOrCreateSPIRVVectorType(SPIRVType *BaseType,
                                         unsigned NumElements, MachineInstr &I,
                                         const SPIRVInstrInfo &TII);
+  SPIRVType *getOrCreateSPIRVArrayType(SPIRVType *BaseType,
+                                       unsigned NumElements, MachineInstr &I,
+                                       const SPIRVInstrInfo &TII);
+
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineIRBuilder &MIRBuilder,
       SPIRV::StorageClass::StorageClass SClass = SPIRV::StorageClass::Function);

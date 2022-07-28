@@ -162,6 +162,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE})
       .legalIf(all(typeInSet(0, allWritablePtrs), typeInSet(1, allPtrs)));
 
+  getActionDefinitionsBuilder(G_MEMSET)
+      .legalIf(all(typeInSet(0, allWritablePtrs), typeInSet(1, allIntScalars)));
+
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
 
