@@ -1,20 +1,20 @@
 ; RUN: llc -O0 %s -o - | FileCheck %s --check-prefix=CHECK-SPIRV
 
 ; CHECK-SPIRV: OpDecorate %[[#NonConstMemset:]] LinkageAttributes "spirv.llvm_memset_p3i8_i32"
+; CHECK-SPIRV: %[[Int32:[0-9]+]] = OpTypeInt 32 0
 ; CHECK-SPIRV: %[[Int8:[0-9]+]] = OpTypeInt 8 0
-; CHECK-SPIRV: %[[Lenmemset21:[0-9]+]] = OpConstant %{{[0-9]+}} 4
-; CHECK-SPIRV: %[[Lenmemset0:[0-9]+]] = OpConstant %{{[0-9]+}} 12
-; CHECK-SPIRV: %[[Const21:[0-9]+]] = OpConstant %{{[0-9]+}} 21
-; CHECK-SPIRV: %[[Int8x4:[0-9]+]] = OpTypeArray %[[Int8]] %[[Lenmemset21]]
 ; CHECK-SPIRV: %[[Int8Ptr:[0-9]+]] = OpTypePointer Generic %[[Int8]]
-; CHECK-SPIRV: %[[Int8x12:[0-9]+]] = OpTypeArray %[[Int8]] %[[Lenmemset0]]
+; CHECK-SPIRV: %[[Lenmemset21:[0-9]+]] = OpConstant %{{[0-9]+}} 4
+; CHECK-SPIRV: %[[Int8x4:[0-9]+]] = OpTypeArray %[[Int8]] %[[Lenmemset21]]
 ; CHECK-SPIRV: %[[Int8PtrConst:[0-9]+]] = OpTypePointer UniformConstant %[[Int8]]
-
-; CHECK-SPIRV: %[[Init:[0-9]+]] = OpConstantNull %[[Int8x12]]
-; CHECK-SPIRV: %[[Val:[0-9]+]] = OpVariable %{{[0-9]+}} UniformConstant %[[Init]]
-; CHECK-SPIRV: %[[InitComp:[0-9]+]] = OpConstantComposite %[[Int8x4]] %[[Const21]] %[[Const21]] %[[Const21]] %[[Const21]]
-; CHECK-SPIRV: %[[ValComp:[0-9]+]] = OpVariable %{{[0-9]+}} UniformConstant %[[InitComp]]
+; CHECK-SPIRV: %[[Lenmemset0:[0-9]+]] = OpConstant %[[Int32]] 12
+; CHECK-SPIRV: %[[Int8x12:[0-9]+]] = OpTypeArray %[[Int8]] %[[Lenmemset0]]
+; CHECK-SPIRV: %[[Const21:[0-9]+]] = OpConstant %{{[0-9]+}} 21
 ; CHECK-SPIRV: %[[#False:]] = OpConstantFalse %[[#]]
+; CHECK-SPIRV: %[[InitComp:[0-9]+]] = OpConstantComposite %[[Int8x4]] %[[Const21]] %[[Const21]] %[[Const21]] %[[Const21]]
+; CHECK-SPIRV: %[[Init:[0-9]+]] = OpConstantNull %[[Int8x12]]
+; CHECK-SPIRV: %[[ValComp:[0-9]+]] = OpVariable %{{[0-9]+}} UniformConstant %[[InitComp]]
+; CHECK-SPIRV: %[[Val:[0-9]+]] = OpVariable %{{[0-9]+}} UniformConstant %[[Init]]
 
 ; CHECK-SPIRV: %[[Target:[0-9]+]] = OpBitcast %[[Int8Ptr]] %{{[0-9]+}}
 ; CHECK-SPIRV: %[[Source:[0-9]+]] = OpBitcast %[[Int8PtrConst]] %[[Val]]

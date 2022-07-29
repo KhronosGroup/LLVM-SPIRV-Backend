@@ -301,6 +301,7 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
   }
   case TargetOpcode::G_MEMMOVE:
   case TargetOpcode::G_MEMCPY:
+  case TargetOpcode::G_MEMSET:
     return selectMemOperation(ResVReg, I);
 
   case TargetOpcode::G_ICMP:
@@ -650,9 +651,39 @@ bool SPIRVInstructionSelector::selectStore(MachineInstr &I) const {
 bool SPIRVInstructionSelector::selectMemOperation(Register ResVReg,
                                                   MachineInstr &I) const {
   MachineBasicBlock &BB = *I.getParent();
+  Register SrcReg = I.getOperand(1).getReg();
+  if (I.getOpcode() == TargetOpcode::G_MEMSET) {
+    assert(I.getOperand(1).isReg() && I.getOperand(2).isReg());
+    unsigned Val = getIConstVal(I.getOperand(1).getReg(), MRI);
+    unsigned Num = getIConstVal(I.getOperand(2).getReg(), MRI);
+    SPIRVType *ValTy = GR.getOrCreateSPIRVIntegerType(8, I, TII);
+    SPIRVType *ArrTy = GR.getOrCreateSPIRVArrayType(ValTy, Num, I, TII);
+    Register Const = GR.getOrCreateConsIntArray(Val, I, ArrTy, TII);
+    SPIRVType *VarTy = GR.getOrCreateSPIRVPointerType(
+        ArrTy, I, TII, SPIRV::StorageClass::UniformConstant);
+    // TODO: check if we have such GV, add init, use buildGlobalVariable.
+    Type *LLVMArrTy = ArrayType::get(
+        IntegerType::get(GR.CurMF->getFunction().getContext(), 8), Num);
+    GlobalVariable *GV =
+        new GlobalVariable(LLVMArrTy, true, GlobalValue::InternalLinkage);
+    Register VarReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+    GR.add(GV, GR.CurMF, VarReg);
+
+    buildOpDecorate(VarReg, I, TII, SPIRV::Decoration::Constant, {});
+    BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(SPIRV::OpVariable))
+        .addDef(VarReg)
+        .addUse(GR.getSPIRVTypeID(VarTy))
+        .addImm(SPIRV::StorageClass::UniformConstant)
+        .addUse(Const)
+        .constrainAllUses(TII, TRI, RBI);
+    SPIRVType *SourceTy = GR.getOrCreateSPIRVPointerType(
+        ValTy, I, TII, SPIRV::StorageClass::UniformConstant);
+    SrcReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+    selectUnOpWithSrc(SrcReg, SourceTy, I, VarReg, SPIRV::OpBitcast);
+  }
   auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpCopyMemorySized))
                  .addUse(I.getOperand(0).getReg())
-                 .addUse(I.getOperand(1).getReg())
+                 .addUse(SrcReg)
                  .addUse(I.getOperand(2).getReg());
   if (I.getNumMemOperands())
     addMemoryOperands(*I.memoperands_begin(), MIB);
