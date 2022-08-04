@@ -80,12 +80,10 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
   ParseSubtargetFeatures(CPU, /*TuneCPU=*/CPU, FS);
-
   if (SPIRVVersion == 0)
     SPIRVVersion = 14;
   if (OpenCLVersion == 0)
     OpenCLVersion = 22;
-
   return *this;
 }
 
@@ -102,7 +100,7 @@ bool SPIRVSubtarget::canUseExtInstSet(
 
 bool SPIRVSubtarget::isOpenCLEnv() const {
   // TODO: this env is not implemented in llvm-project, we need to decide
-  // how to standartize its support. For now assume that we we always
+  // how to standartize its support. For now, let's assume that we always
   // operate with OpenCL.
   return true; // TargetTriple.isOpenCLEnvironment();
 }

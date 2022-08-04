@@ -13,10 +13,8 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVSUBTARGET_H
 
-#include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVCallLowering.h"
 #include "SPIRVFrameLowering.h"
-#include "SPIRVGlobalRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVInstrInfo.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
@@ -32,14 +30,12 @@
 
 namespace llvm {
 class StringRef;
-
 class SPIRVTargetMachine;
 
 class SPIRVSubtarget : public SPIRVGenSubtargetInfo {
 private:
   Triple TargetTriple;
   const unsigned PointerSize;
-
   uint32_t SPIRVVersion;
   uint32_t OpenCLVersion;
   uint32_t VulkanVersion;
