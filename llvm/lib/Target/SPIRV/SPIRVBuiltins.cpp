@@ -1479,6 +1479,7 @@ static bool generateEnqueueInst(const SPIRV::IncomingCall *Call,
   case SPIRV::OpReleaseEvent:
     return MIRBuilder.buildInstr(Opcode).addUse(Call->Arguments[0]);
   case SPIRV::OpCreateUserEvent:
+  case SPIRV::OpGetDefaultQueue:
     return MIRBuilder.buildInstr(Opcode)
         .addDef(Call->ReturnRegister)
         .addUse(GR->getSPIRVTypeID(Call->ReturnType));
@@ -1496,6 +1497,28 @@ static bool generateEnqueueInst(const SPIRV::IncomingCall *Call,
         .addUse(Call->Arguments[0])
         .addUse(Call->Arguments[1])
         .addUse(Call->Arguments[2]);
+  case SPIRV::OpBuildNDRange: {
+    const auto MRI = MIRBuilder.getMRI();
+    SPIRVType *PtrType = GR->getSPIRVTypeForVReg(Call->Arguments[0]);
+    assert(PtrType->getOpcode() == SPIRV::OpTypePointer &&
+           PtrType->getOperand(2).isReg());
+    Register TypeReg = PtrType->getOperand(2).getReg();
+    SPIRVType *StructType = GR->getSPIRVTypeForVReg(TypeReg);
+    Register TmpReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+    GR->assignSPIRVTypeToVReg(StructType, TmpReg, MIRBuilder.getMF());
+    auto MIB = MIRBuilder.buildInstr(Opcode).addDef(TmpReg).addUse(TypeReg);
+    // Skip the first arg, it's the destination pointer. OpBuildNDRange takes
+    // three other arguments, so pass zero constant on absence.
+    // TODO: substitute array constants for 2D and 3D case.
+    unsigned NumArgs = Call->Arguments.size();
+    const auto I32Ty = GR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
+    for (unsigned i = 1; i < 4; i++)
+      MIB.addUse(i < NumArgs ? Call->Arguments[i]
+                             : GR->buildConstantInt(0, MIRBuilder, I32Ty));
+    return MIRBuilder.buildInstr(SPIRV::OpStore)
+        .addUse(Call->Arguments[0])
+        .addUse(TmpReg);
+  }
   default:
     return false;
   }

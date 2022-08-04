@@ -150,20 +150,20 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
                     v4s32, v4s64,  v8s1,   v8s8,  v8s16, v8s32, v8s64, v16s1,
                     v16s8, v16s16, v16s32, v16s64};
 
-  // TODO: add legalization rules for all opcodes
+  // TODO: add legalization rules for all opcodes.
   for (auto Opc : TypeFoldingSupportingOpcs)
     getActionDefinitionsBuilder(Opc).alwaysLegal();
 
   getActionDefinitionsBuilder(G_GLOBAL_VALUE).alwaysLegal();
 
-  // TODO: add proper rules for vectors legalization
+  // TODO: add proper rules for vectors legalization.
   getActionDefinitionsBuilder({G_BUILD_VECTOR, G_SHUFFLE_VECTOR}).alwaysLegal();
 
   getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE})
       .legalIf(all(typeInSet(0, allWritablePtrs), typeInSet(1, allPtrs)));
 
-  getActionDefinitionsBuilder(G_MEMSET)
-      .legalIf(all(typeInSet(0, allWritablePtrs), typeInSet(1, allIntScalars)));
+  getActionDefinitionsBuilder(G_MEMSET).legalIf(
+      all(typeInSet(0, allWritablePtrs), typeInSet(1, allIntScalars)));
 
   getActionDefinitionsBuilder(G_ADDRSPACE_CAST)
       .legalForCartesianProduct(allPtrs, allPtrs);
@@ -262,17 +262,17 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
       .legalForCartesianProduct(allFloatAndIntScalars, allWritablePtrs);
 
   getActionDefinitionsBuilder(G_ATOMIC_CMPXCHG_WITH_SUCCESS).lower();
-  // TODO: add proper legalization rules
+  // TODO: add proper legalization rules.
   getActionDefinitionsBuilder(G_ATOMIC_CMPXCHG).alwaysLegal();
 
   getActionDefinitionsBuilder({G_UADDO, G_USUBO, G_SMULO, G_UMULO})
       .alwaysLegal();
 
-  // Extensions
+  // Extensions.
   getActionDefinitionsBuilder({G_TRUNC, G_ZEXT, G_SEXT, G_ANYEXT})
       .legalForCartesianProduct(allScalarsAndVectors);
 
-  // FP conversions
+  // FP conversions.
   getActionDefinitionsBuilder({G_FPTRUNC, G_FPEXT})
       .legalForCartesianProduct(allFloatScalarsAndVectors);
 
@@ -280,10 +280,10 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // getActionDefinitionsBuilder(G_SELECT).legalIf(
   //     typeInSet(1, allBoolScalarsAndVectors));
 
-  // Pointer-handling
+  // Pointer-handling.
   getActionDefinitionsBuilder(G_FRAME_INDEX).legalFor({p0});
 
-  // Control-flow
+  // Control-flow.
   getActionDefinitionsBuilder(G_BRCOND).legalFor({s1});
 
   getActionDefinitionsBuilder({G_FPOW,
