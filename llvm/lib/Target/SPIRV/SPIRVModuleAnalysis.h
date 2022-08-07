@@ -68,6 +68,7 @@ private:
   SmallSet<Extension::Extension, 4> AllExtensions;
   unsigned MinVersion; // 0 if no min version is defined.
   unsigned MaxVersion; // 0 if no max version is defined.
+  DenseSet<unsigned> AvailableCaps;
   // Remove a list of capabilities from dedupedCaps and add them to AllCaps,
   // recursing through their implicitly declared capabilities too.
   void pruneCapabilities(const CapabilityList &ToPrune);
@@ -77,6 +78,7 @@ public:
   void clear() {
     MinimalCaps.clear();
     AllCaps.clear();
+    AvailableCaps.clear();
     AllExtensions.clear();
     MinVersion = 0;
     MaxVersion = 0;
@@ -105,6 +107,13 @@ public:
   // Check if all the requirements can be satisfied for the given subtarget, and
   // if not abort compilation.
   void checkSatisfiable(const SPIRVSubtarget &ST) const;
+  void initAvailableCapabilities(const SPIRVSubtarget &ST);
+  // Add the given capabilities to available and all their implicitly defined
+  // capabilities too.
+  void addAvailableCaps(const CapabilityList &ToAdd);
+  bool isCapabilityAvailable(Capability::Capability Cap) const {
+    return AvailableCaps.contains(Cap);
+  }
 };
 
 using InstrList = SmallVector<MachineInstr *>;

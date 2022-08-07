@@ -27,54 +27,47 @@ using namespace llvm;
 #define GET_SUBTARGETINFO_CTOR
 #include "SPIRVGenSubtargetInfo.inc"
 
-// Format version numbers as 32-bit integers |0|Maj|Min|Rev|
+// Format version numbers as 32-bit integers |0|Maj|Min|Rev|.
 static uint32_t v(uint8_t Maj, uint8_t Min, uint8_t Rev = 0) {
   return (uint32_t(Maj) << 16) | uint32_t(Min) << 8 | uint32_t(Rev);
 }
 
-// Compare version numbers, but allow 0 to mean unspecified
+// Compare version numbers, but allow 0 to mean unspecified.
 static bool isAtLeastVer(uint32_t Target, uint32_t VerToCompareTo) {
   return Target == 0 || Target >= VerToCompareTo;
 }
 
 static unsigned computePointerSize(const Triple &TT) {
   const auto Arch = TT.getArch();
-  // TODO: unify this with pointers legalization
+  // TODO: unify this with pointers legalization.
   assert(TT.isSPIRV());
   return Arch == Triple::spirv32 ? 32 : Arch == Triple::spirv64 ? 64 : 8;
 }
 
-// TODO use command line args for this rather than defaulting to 1.1
+// TODO: implement command line args or other ways to determine this.
 static uint32_t computeTargetVulkanVersion(const Triple &TT) {
-  if (TT.isVulkanEnvironment()) {
+  if (TT.isVulkanEnvironment())
     return v(1, 1);
-  } else {
-    return 0;
-  }
+  return 0;
 }
 
-// TODO use command line args for this rather than defaulting to true
+// TODO: implement command line args or other ways to determine this.
 static bool computeOpenCLImageSupport(const Triple &TT) { return true; }
 
-// TODO use command line args for this rather than defaulting to true
+// TODO: implement command line args or other ways to determine this.
 static bool computeOpenCLFullProfile(const Triple &TT) { return true; }
 
 SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
                                const std::string &FS,
                                const SPIRVTargetMachine &TM)
-    : SPIRVGenSubtargetInfo(TT, CPU, /*TuneCPU=*/CPU, FS),
-      PointerSize(computePointerSize(TT)),
-      UsesLogicalAddressing(TT.isSPIRVLogical()),
-      UsesVulkanEnv(TT.isVulkanEnvironment()),
-      UsesOpenCLEnv(TT.isOpenCLEnvironment()), TargetSPIRVVersion(0),
-      TargetOpenCLVersion(0),
-      TargetVulkanVersion(computeTargetVulkanVersion(TT)),
+    : SPIRVGenSubtargetInfo(TT, CPU, /*TuneCPU=*/CPU, FS), TargetTriple(TT),
+      PointerSize(computePointerSize(TT)), SPIRVVersion(0), OpenCLVersion(0),
+      VulkanVersion(computeTargetVulkanVersion(TT)),
       OpenCLFullProfile(computeOpenCLFullProfile(TT)),
       OpenCLImageSupport(computeOpenCLImageSupport(TT)), InstrInfo(),
       FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this) {
   initAvailableExtensions(TT);
   initAvailableExtInstSets(TT);
-  initAvailableCapabilities(TT);
 
   GR = std::make_unique<SPIRVGlobalRegistry>(PointerSize);
   CallLoweringInfo = std::make_unique<SPIRVCallLowering>(TLInfo, GR.get());
@@ -87,18 +80,11 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
 SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
                                                           StringRef FS) {
   ParseSubtargetFeatures(CPU, /*TuneCPU=*/CPU, FS);
-
-  if (TargetSPIRVVersion == 0)
-    TargetSPIRVVersion = 14;
-  if (TargetOpenCLVersion == 0)
-    TargetOpenCLVersion = 22;
-
+  if (SPIRVVersion == 0)
+    SPIRVVersion = 14;
+  if (OpenCLVersion == 0)
+    OpenCLVersion = 22;
   return *this;
-}
-
-bool SPIRVSubtarget::canUseCapability(SPIRV::Capability::Capability C) const {
-  const auto &Caps = AvailableCaps;
-  return std::find(Caps.begin(), Caps.end(), C) != Caps.end();
 }
 
 bool SPIRVSubtarget::canUseExtension(SPIRV::Extension::Extension E) const {
@@ -112,94 +98,59 @@ bool SPIRVSubtarget::canUseExtInstSet(
   return std::find(Sets.begin(), Sets.end(), E) != Sets.end();
 }
 
+bool SPIRVSubtarget::isOpenCLEnv() const {
+  // TODO: this env is not implemented in llvm-project, we need to decide
+  // how to standartize its support. For now, let's assume that we always
+  // operate with OpenCL.
+  return true; // TargetTriple.isOpenCLEnvironment();
+}
+
+bool SPIRVSubtarget::isVulkanEnv() const {
+  // TODO: this env is not implemented in llvm-project, we need to decide
+  // how to standartize its support.
+  return TargetTriple.isVulkanEnvironment();
+}
+
 bool SPIRVSubtarget::isLogicalAddressing() const {
-  return UsesLogicalAddressing;
+  return TargetTriple.isSPIRVLogical();
 }
 
 bool SPIRVSubtarget::isKernel() const {
-  return UsesOpenCLEnv || !UsesLogicalAddressing;
+  return isOpenCLEnv() || !isLogicalAddressing();
 }
 
 bool SPIRVSubtarget::isShader() const {
-  return UsesVulkanEnv || UsesLogicalAddressing;
+  return isVulkanEnv() || isLogicalAddressing();
 }
 
-// If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual
+bool SPIRVSubtarget::isAtLeastSPIRVVer(uint32_t VerToCompareTo) const {
+  return isAtLeastVer(SPIRVVersion, VerToCompareTo);
+}
+
+bool SPIRVSubtarget::isAtLeastOpenCLVer(uint32_t VerToCompareTo) const {
+  return isAtLeastVer(OpenCLVersion, VerToCompareTo);
+}
+
+// If the SPIR-V version is >= 1.4 we can call OpPtrEqual and OpPtrNotEqual.
 bool SPIRVSubtarget::canDirectlyComparePointers() const {
-  return isAtLeastVer(TargetSPIRVVersion, 14);
+  return isAtLeastVer(SPIRVVersion, 14);
 }
 
-// TODO use command line args for this rather than defaults
+// TODO: use command line args for this rather than defaults.
 void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
   if (TT.isVulkanEnvironment()) {
     AvailableExtensions = {};
   } else {
-    // A default extension for testing - should use command line args
+    // A default extension for testing - should use command line args.
     AvailableExtensions = {
         SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration};
   }
 }
 
-// Add the given capabilities and all their implicitly defined capabilities too
-static void addCaps(std::set<SPIRV::Capability::Capability> &Caps,
-                    const CapabilityList &ToAdd) {
-  for (const auto cap : ToAdd) {
-    if (Caps.insert(cap).second) {
-      addCaps(Caps, getSymbolicOperandCapabilities(
-                        SPIRV::OperandCategory::CapabilityOperand, cap));
-    }
-  }
-}
-
-// TODO use command line args for this rather than defaults
-// Must have called initAvailableExtensions first.
-void SPIRVSubtarget::initAvailableCapabilities(const Triple &TT) {
-  using namespace SPIRV::Capability;
-  if (TT.isVulkanEnvironment()) {
-    // These are the min requirements
-    addCaps(AvailableCaps,
-            {Matrix, Shader, InputAttachment, Sampled1D, Image1D, SampledBuffer,
-             ImageBuffer, ImageQuery, DerivativeControl});
-  } else {
-    // Add the min requirements for different OpenCL and SPIR-V versions
-    addCaps(AvailableCaps, {Addresses, Float16Buffer, Int16, Int8, Kernel,
-                            Linkage, Vector16, Groups, GenericPointer, Shader});
-    if (OpenCLFullProfile) {
-      addCaps(AvailableCaps, {Int64, Int64Atomics});
-    }
-    if (OpenCLImageSupport) {
-      addCaps(AvailableCaps, {ImageBasic, LiteralSampler, Image1D,
-                              SampledBuffer, ImageBuffer});
-      if (isAtLeastVer(TargetOpenCLVersion, 20)) {
-        addCaps(AvailableCaps, {ImageReadWrite});
-      }
-    }
-    if (isAtLeastVer(TargetSPIRVVersion, 11) &&
-        isAtLeastVer(TargetOpenCLVersion, 22)) {
-      addCaps(AvailableCaps, {SubgroupDispatch, PipeStorage});
-    }
-    if (isAtLeastVer(TargetSPIRVVersion, 13)) {
-      addCaps(AvailableCaps,
-              {GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic,
-               GroupNonUniformBallot, GroupNonUniformClustered,
-               GroupNonUniformShuffle, GroupNonUniformShuffleRelative});
-    }
-    if (isAtLeastVer(TargetSPIRVVersion, 14))
-      addCaps(AvailableCaps,
-              {DenormPreserve, DenormFlushToZero, SignedZeroInfNanPreserve,
-               RoundingModeRTE, RoundingModeRTZ});
-
-    // TODO Remove this - it's only here because the tests assume it's supported
-    addCaps(AvailableCaps, {Float16, Float64});
-
-    // TODO add OpenCL extensions
-  }
-}
-
-// TODO use command line args for this rather than just defaults
+// TODO: use command line args for this rather than just defaults.
 // Must have called initAvailableExtensions first.
 void SPIRVSubtarget::initAvailableExtInstSets(const Triple &TT) {
-  if (UsesVulkanEnv) {
+  if (isVulkanEnv()) {
     AvailableExtInstSets.insert(SPIRV::InstructionSet::GLSL_std_450);
   } else {
     AvailableExtInstSets.insert(SPIRV::InstructionSet::OpenCL_std);

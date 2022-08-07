@@ -296,7 +296,7 @@ void SPIRVAsmPrinter::outputEntryPoints() {
     // the Input and Output storage classes. Starting with version 1.4,
     // the interface's storage classes are all storage classes used in
     // declaring all global variables referenced by the entry point call tree.
-    if (ST->getTargetSPIRVVersion() >= 14 || SC == SPIRV::StorageClass::Input ||
+    if (ST->getSPIRVVersion() >= 14 || SC == SPIRV::StorageClass::Input ||
         SC == SPIRV::StorageClass::Output) {
       MachineFunction *MF = MI->getMF();
       Register Reg = MAI->getRegisterAlias(MF, MI->getOperand(0).getReg());

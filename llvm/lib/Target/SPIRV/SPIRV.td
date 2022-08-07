@@ -20,24 +20,24 @@ class Proc<string Name, list<SubtargetFeature> Features>
 
 def : Proc<"generic", []>;
 
-def SPIRV10 : SubtargetFeature<"spirv1.0", "TargetSPIRVVersion", "10",
+def SPIRV10 : SubtargetFeature<"spirv1.0", "SPIRVVersion", "10",
                              "Use SPIR-V version 1.0">;
-def SPIRV11 : SubtargetFeature<"spirv1.1", "TargetSPIRVVersion", "11",
+def SPIRV11 : SubtargetFeature<"spirv1.1", "SPIRVVersion", "11",
                              "Use SPIR-V version 1.1">;
-def SPIRV12 : SubtargetFeature<"spirv1.2", "TargetSPIRVVersion", "12",
+def SPIRV12 : SubtargetFeature<"spirv1.2", "SPIRVVersion", "12",
                              "Use SPIR-V version 1.2">;
-def SPIRV13 : SubtargetFeature<"spirv1.3", "TargetSPIRVVersion", "13",
+def SPIRV13 : SubtargetFeature<"spirv1.3", "SPIRVVersion", "13",
                              "Use SPIR-V version 1.3">;
-def SPIRV14 : SubtargetFeature<"spirv1.4", "TargetSPIRVVersion", "14",
+def SPIRV14 : SubtargetFeature<"spirv1.4", "SPIRVVersion", "14",
                              "Use SPIR-V version 1.4">;
-def SPIRV15 : SubtargetFeature<"spirv1.5", "TargetSPIRVVersion", "15",
+def SPIRV15 : SubtargetFeature<"spirv1.5", "SPIRVVersion", "15",
                              "Use SPIR-V version 1.5">;
 
-def OCL12 : SubtargetFeature<"CL1.2", "TargetOpenCLVersion", "12",
+def OCL12 : SubtargetFeature<"CL1.2", "OpenCLVersion", "12",
                              "Use OpenCL version 1.2">;
-def OCL20 : SubtargetFeature<"CL2.0", "TargetOpenCLVersion", "20",
+def OCL20 : SubtargetFeature<"CL2.0", "OpenCLVersion", "20",
                              "Use OpenCL version 2.0">;
-def OCL22 : SubtargetFeature<"CL2.2", "TargetOpenCLVersion", "22",
+def OCL22 : SubtargetFeature<"CL2.2", "OpenCLVersion", "22",
                              "Use OpenCL version 2.2">;
 
 def SPIRVInstPrinter : AsmWriter {
