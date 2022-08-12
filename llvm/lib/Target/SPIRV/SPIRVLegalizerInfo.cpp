@@ -283,8 +283,8 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   // Pointer-handling.
   getActionDefinitionsBuilder(G_FRAME_INDEX).legalFor({p0});
 
-  // Control-flow.
-  getActionDefinitionsBuilder(G_BRCOND).legalFor({s1});
+  // Control-flow. In some cases (e.g. constants) s1 may be promoted to s32
+  getActionDefinitionsBuilder(G_BRCOND).legalFor({s1, s32});
 
   getActionDefinitionsBuilder({G_FPOW,
                                G_FEXP,

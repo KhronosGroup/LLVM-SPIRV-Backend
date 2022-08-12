@@ -248,6 +248,11 @@ private:
                                          const SPIRVInstrInfo &TII,
                                          Constant *CA, unsigned BitWidth,
                                          unsigned ElemCnt);
+  Register getOrCreateIntCompositeOrNull(uint64_t Val,
+                                         MachineIRBuilder &MIRBuilder,
+                                         SPIRVType *SpvType, bool EmitIR,
+                                         Constant *CA, unsigned BitWidth,
+                                         unsigned ElemCnt);
 
 public:
   Register buildConstantInt(uint64_t Val, MachineIRBuilder &MIRBuilder,
@@ -256,14 +261,16 @@ public:
                                SPIRVType *SpvType, const SPIRVInstrInfo &TII);
   Register buildConstantFP(APFloat Val, MachineIRBuilder &MIRBuilder,
                            SPIRVType *SpvType = nullptr);
-  Register buildConstantIntVector(uint64_t Val, MachineIRBuilder &MIRBuilder,
-                                  SPIRVType *SpvType, bool EmitIR = true);
   Register getOrCreateConsIntVector(uint64_t Val, MachineInstr &I,
                                     SPIRVType *SpvType,
                                     const SPIRVInstrInfo &TII);
   Register getOrCreateConsIntArray(uint64_t Val, MachineInstr &I,
                                    SPIRVType *SpvType,
                                    const SPIRVInstrInfo &TII);
+  Register getOrCreateConsIntVector(uint64_t Val, MachineIRBuilder &MIRBuilder,
+                                    SPIRVType *SpvType, bool EmitIR = true);
+  Register getOrCreateConsIntArray(uint64_t Val, MachineIRBuilder &MIRBuilder,
+                                   SPIRVType *SpvType, bool EmitIR = true);
   Register buildConstantSampler(Register Res, unsigned AddrMode, unsigned Param,
                                 unsigned FilerMode,
                                 MachineIRBuilder &MIRBuilder,

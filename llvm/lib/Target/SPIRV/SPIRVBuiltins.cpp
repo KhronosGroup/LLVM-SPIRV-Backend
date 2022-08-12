@@ -331,8 +331,8 @@ static bool buildSelectInst(MachineIRBuilder &MIRBuilder,
 
   if (ReturnType->getOpcode() == SPIRV::OpTypeVector) {
     auto AllOnes = APInt::getAllOnesValue(Bits).getZExtValue();
-    TrueConst = GR->buildConstantIntVector(AllOnes, MIRBuilder, ReturnType);
-    FalseConst = GR->buildConstantIntVector(0, MIRBuilder, ReturnType);
+    TrueConst = GR->getOrCreateConsIntVector(AllOnes, MIRBuilder, ReturnType);
+    FalseConst = GR->getOrCreateConsIntVector(0, MIRBuilder, ReturnType);
   } else {
     TrueConst = GR->buildConstantInt(1, MIRBuilder, ReturnType);
     FalseConst = GR->buildConstantInt(0, MIRBuilder, ReturnType);
@@ -1506,15 +1506,52 @@ static bool generateEnqueueInst(const SPIRV::IncomingCall *Call,
     SPIRVType *StructType = GR->getSPIRVTypeForVReg(TypeReg);
     Register TmpReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
     GR->assignSPIRVTypeToVReg(StructType, TmpReg, MIRBuilder.getMF());
-    auto MIB = MIRBuilder.buildInstr(Opcode).addDef(TmpReg).addUse(TypeReg);
     // Skip the first arg, it's the destination pointer. OpBuildNDRange takes
     // three other arguments, so pass zero constant on absence.
     // TODO: substitute array constants for 2D and 3D case.
     unsigned NumArgs = Call->Arguments.size();
-    const auto I32Ty = GR->getOrCreateSPIRVIntegerType(32, MIRBuilder);
-    for (unsigned i = 1; i < 4; i++)
-      MIB.addUse(i < NumArgs ? Call->Arguments[i]
-                             : GR->buildConstantInt(0, MIRBuilder, I32Ty));
+    assert(NumArgs >= 2);
+    Register GlobalWorkSize = Call->Arguments[NumArgs < 4 ? 1 : 2];
+    Register LocalWorkSize =
+        NumArgs == 2 ? Register(0) : Call->Arguments[NumArgs < 4 ? 2 : 3];
+    Register GlobalWorkOffset = NumArgs <= 3 ? Register(0) : Call->Arguments[1];
+    if (NumArgs < 4) {
+      Register Const;
+      SPIRVType *SpvTy = GR->getSPIRVTypeForVReg(GlobalWorkSize);
+      if (SpvTy->getOpcode() == SPIRV::OpTypePointer) {
+        MachineInstr *DefInstr = MRI->getUniqueVRegDef(GlobalWorkSize);
+        assert(DefInstr && isSpvIntrinsic(*DefInstr, Intrinsic::spv_gep) &&
+               DefInstr->getOperand(3).isReg());
+        Register GWSPtr = DefInstr->getOperand(3).getReg();
+        // TODO: Maybe simplify generation of the type of the fields.
+        unsigned Size = Call->Builtin->Name.equals("ndrange_3D") ? 3 : 2;
+        unsigned BitWidth = GR->getPointerSize() == 64 ? 64 : 32;
+        Type *BaseTy = IntegerType::get(
+            MIRBuilder.getMF().getFunction().getContext(), BitWidth);
+        Type *FieldTy = ArrayType::get(BaseTy, Size);
+        SPIRVType *SpvFieldTy = GR->getOrCreateSPIRVType(FieldTy, MIRBuilder);
+        GlobalWorkSize = MRI->createVirtualRegister(&SPIRV::IDRegClass);
+        GR->assignSPIRVTypeToVReg(SpvFieldTy, GlobalWorkSize,
+                                  MIRBuilder.getMF());
+        MIRBuilder.buildInstr(SPIRV::OpLoad)
+            .addDef(GlobalWorkSize)
+            .addUse(GR->getSPIRVTypeID(SpvFieldTy))
+            .addUse(GWSPtr);
+        Const = GR->getOrCreateConsIntArray(0, MIRBuilder, SpvFieldTy);
+      } else {
+        Const = GR->buildConstantInt(0, MIRBuilder, SpvTy);
+      }
+      if (!LocalWorkSize.isValid())
+        LocalWorkSize = Const;
+      if (!GlobalWorkOffset.isValid())
+        GlobalWorkOffset = Const;
+    }
+    MIRBuilder.buildInstr(Opcode)
+        .addDef(TmpReg)
+        .addUse(TypeReg)
+        .addUse(GlobalWorkSize)
+        .addUse(LocalWorkSize)
+        .addUse(GlobalWorkOffset);
     return MIRBuilder.buildInstr(SPIRV::OpStore)
         .addUse(Call->Arguments[0])
         .addUse(TmpReg);
