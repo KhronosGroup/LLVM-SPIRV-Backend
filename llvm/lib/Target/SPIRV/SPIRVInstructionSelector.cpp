@@ -1464,6 +1464,9 @@ bool SPIRVInstructionSelector::selectIntrinsic(Register ResVReg,
   case Intrinsic::spv_unreachable:
     BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpUnreachable));
     break;
+  case Intrinsic::spv_alloca:
+    return selectFrameIndex(ResVReg, ResType, I);
+    break;
   default:
     llvm_unreachable("Intrinsic selection not implemented");
   }

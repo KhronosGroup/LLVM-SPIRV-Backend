@@ -320,7 +320,13 @@ Instruction *SPIRVEmitIntrinsics::visitStoreInst(StoreInst &I) {
 
 Instruction *SPIRVEmitIntrinsics::visitAllocaInst(AllocaInst &I) {
   TrackConstants = false;
-  return &I;
+  Type *PtrTy = I.getType();
+  auto *NewI = IRB->CreateIntrinsic(Intrinsic::spv_alloca, {PtrTy}, {});
+  std::string InstName = I.hasName() ? I.getName().str() : "";
+  I.replaceAllUsesWith(NewI);
+  I.eraseFromParent();
+  NewI->setName(InstName);
+  return NewI;
 }
 
 Instruction *SPIRVEmitIntrinsics::visitAtomicCmpXchgInst(AtomicCmpXchgInst &I) {
@@ -379,7 +385,7 @@ void SPIRVEmitIntrinsics::insertAssignTypeIntrs(Instruction *I) {
     if (isa<ConstantPointerNull>(Op) || isa<UndefValue>(Op) ||
         // Check GetElementPtrConstantExpr case.
         (isa<ConstantExpr>(Op) && isa<GEPOperator>(Op))) {
-      IRB->SetInsertPoint(I);
+      setInsertPointSkippingPhis(*IRB, I);
       if (isa<UndefValue>(Op) && Op->getType()->isAggregateType())
         buildIntrWithMD(Intrinsic::spv_assign_type, {IRB->getInt32Ty()}, Op,
                         UndefValue::get(IRB->getInt32Ty()));
