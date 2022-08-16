@@ -22,7 +22,7 @@ void SPIRVGeneralDuplicatesTracker::prebuildReg2Entry(
     for (auto &RegPair : TPair.second) {
       const MachineFunction *MF = RegPair.first;
       Register R = RegPair.second;
-      MachineInstr *MI = MF->getRegInfo().getVRegDef(R);
+      MachineInstr *MI = MF->getRegInfo().getUniqueVRegDef(R);
       if (!MI)
         continue;
       Reg2Entry[&MI->getOperand(0)] = &TPair.second;
@@ -71,6 +71,7 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
     }
   }
 
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   if (MMI) {
     const Module *M = MMI->getModule();
     for (auto F = M->begin(), E = M->end(); F != E; ++F) {
@@ -93,4 +94,5 @@ void SPIRVGeneralDuplicatesTracker::buildDepsGraph(
       }
     }
   }
+#endif
 }

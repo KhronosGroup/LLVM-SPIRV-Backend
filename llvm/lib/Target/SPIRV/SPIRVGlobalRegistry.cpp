@@ -416,7 +416,6 @@ Register SPIRVGlobalRegistry::buildConstantSampler(
                  .addImm(AddrMode)
                  .addImm(Param)
                  .addImm(FilerMode);
-  constrainRegOperands(Res);
   assert(Res->getOperand(0).isReg());
   return Res->getOperand(0).getReg();
 }
@@ -908,7 +907,6 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeSampledImage)
                  .addDef(ResVReg)
                  .addUse(getSPIRVTypeID(ImageType));
-  constrainRegOperands(MIB);
   DT.add(TD, &MIRBuilder.getMF(), ResVReg);
 
   return MIB;
@@ -1008,6 +1006,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
   }
 }
 
+// TODO: maybe use tablegen to implement this.
 SPIRVType *
 SPIRVGlobalRegistry::getOrCreateSPIRVTypeByName(StringRef TypeStr,
                                                 MachineIRBuilder &MIRBuilder) {

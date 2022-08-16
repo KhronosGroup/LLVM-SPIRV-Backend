@@ -66,8 +66,9 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
       OpenCLFullProfile(computeOpenCLFullProfile(TT)),
       OpenCLImageSupport(computeOpenCLImageSupport(TT)), InstrInfo(),
       FrameLowering(initSubtargetDependencies(CPU, FS)), TLInfo(TM, *this) {
-  initAvailableExtensions(TT);
-  initAvailableExtInstSets(TT);
+  // The order of initialization is important.
+  initAvailableExtensions();
+  initAvailableExtInstSets();
 
   GR = std::make_unique<SPIRVGlobalRegistry>(PointerSize);
   CallLoweringInfo = std::make_unique<SPIRVCallLowering>(TLInfo, GR.get());
@@ -88,14 +89,12 @@ SPIRVSubtarget &SPIRVSubtarget::initSubtargetDependencies(StringRef CPU,
 }
 
 bool SPIRVSubtarget::canUseExtension(SPIRV::Extension::Extension E) const {
-  const auto &Exts = AvailableExtensions;
-  return std::find(Exts.begin(), Exts.end(), E) != Exts.end();
+  return AvailableExtensions.contains(E);
 }
 
 bool SPIRVSubtarget::canUseExtInstSet(
     SPIRV::InstructionSet::InstructionSet E) const {
-  const auto &Sets = AvailableExtInstSets;
-  return std::find(Sets.begin(), Sets.end(), E) != Sets.end();
+  return AvailableExtInstSets.contains(E);
 }
 
 bool SPIRVSubtarget::isOpenCLEnv() const {
@@ -137,24 +136,23 @@ bool SPIRVSubtarget::canDirectlyComparePointers() const {
 }
 
 // TODO: use command line args for this rather than defaults.
-void SPIRVSubtarget::initAvailableExtensions(const Triple &TT) {
-  if (TT.isVulkanEnvironment()) {
-    AvailableExtensions = {};
-  } else {
-    // A default extension for testing - should use command line args.
-    AvailableExtensions = {
-        SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration};
-  }
+void SPIRVSubtarget::initAvailableExtensions() {
+  AvailableExtensions.clear();
+  if (!isOpenCLEnv())
+    return;
+  // A default extension for testing.
+  AvailableExtensions.insert(
+      SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration);
 }
 
 // TODO: use command line args for this rather than just defaults.
 // Must have called initAvailableExtensions first.
-void SPIRVSubtarget::initAvailableExtInstSets(const Triple &TT) {
-  if (isVulkanEnv()) {
+void SPIRVSubtarget::initAvailableExtInstSets() {
+  AvailableExtInstSets.clear();
+  if (!isOpenCLEnv())
     AvailableExtInstSets.insert(SPIRV::InstructionSet::GLSL_std_450);
-  } else {
+  else
     AvailableExtInstSets.insert(SPIRV::InstructionSet::OpenCL_std);
-  }
 
   // Handle extended instruction sets from extensions.
   if (canUseExtension(
