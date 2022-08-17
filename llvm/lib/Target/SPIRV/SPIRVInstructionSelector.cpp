@@ -238,11 +238,12 @@ bool SPIRVInstructionSelector::select(MachineInstr &I) {
       }
       MRI->replaceRegWith(I.getOperand(1).getReg(), I.getOperand(0).getReg());
       I.removeFromParent();
+      return true;
     } else if (I.getNumDefs() == 1) {
       // Make all vregs 32 bits (for SPIR-V IDs).
       MRI->setType(I.getOperand(0).getReg(), LLT::scalar(32));
     }
-    return true;
+    return constrainSelectedInstRegOperands(I, TII, TRI, RBI);
   }
 
   if (I.getNumOperands() != I.getNumExplicitOperands()) {
@@ -1515,7 +1516,6 @@ bool SPIRVInstructionSelector::selectBranchCond(MachineInstr &I) const {
   // basic block that LLVM would fall through to.
   const MachineInstr *NextI = I.getNextNode();
   // Check if this has already been successfully selected.
-  //   }d
   if (NextI != nullptr && NextI->getOpcode() == SPIRV::OpBranchConditional)
     return true;
   // Must be relying on implicit block fallthrough, so generate an

@@ -302,4 +302,4 @@ public:
   const SPIRVDuplicatesTracker<Type> *getTypes() { return &TT; }
 };
 } // namespace llvm
-#endif
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVDUPLICATESTRACKER_H

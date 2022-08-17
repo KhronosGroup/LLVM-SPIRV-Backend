@@ -42,9 +42,8 @@ private:
   bool OpenCLFullProfile;
   bool OpenCLImageSupport;
 
-  std::set<SPIRV::Extension::Extension> AvailableExtensions;
-  std::set<SPIRV::InstructionSet::InstructionSet> AvailableExtInstSets;
-
+  SmallSet<SPIRV::Extension::Extension, 4> AvailableExtensions;
+  SmallSet<SPIRV::InstructionSet::InstructionSet, 4> AvailableExtInstSets;
   std::unique_ptr<SPIRVGlobalRegistry> GR;
 
   SPIRVInstrInfo InstrInfo;
@@ -57,15 +56,10 @@ private:
   std::unique_ptr<LegalizerInfo> Legalizer;
   std::unique_ptr<InstructionSelector> InstSelector;
 
-private:
-  // Initialise the available extensions, extended instruction sets
-  // based on the environment settings (i.e. the previous properties of
-  // SPIRVSubtarget).
-  //
-  // These functions must be called in the order they are declared to satisfy
-  // dependencies during initialisation.
-  void initAvailableExtensions(const Triple &TT);
-  void initAvailableExtInstSets(const Triple &TT);
+  // TODO: Initialise the available extensions, extended instruction sets
+  // based on the environment settings.
+  void initAvailableExtensions();
+  void initAvailableExtInstSets();
 
 public:
   // This constructor initializes the data members to match that
