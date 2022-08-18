@@ -292,13 +292,14 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       for (auto Arg : Info.OrigArgs) {
         assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
         ArgVRegs.push_back(Arg.Regs[0]);
-        auto SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
+        SPIRVType *SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
         GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
       }
-      return lowerBuiltin(DemangledName, SPIRV::InstructionSet::OpenCL_std,
-                          MIRBuilder, ResVReg, OrigRetTy, ArgVRegs, GR);
+      auto Res = lowerBuiltin(DemangledName, SPIRV::InstructionSet::OpenCL_std,
+                              MIRBuilder, ResVReg, OrigRetTy, ArgVRegs, GR);
+      if (Res.first)
+        return Res.second;
     }
-    llvm_unreachable("Unable to handle this environment's built-in funcs.");
   }
 
   if (CF && CF->isDeclaration() &&
