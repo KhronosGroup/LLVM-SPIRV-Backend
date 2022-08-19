@@ -189,6 +189,29 @@ getKernelArgTypeQual(const Function &F, unsigned ArgIdx) {
   return {};
 }
 
+static Type *getArgType(const Function &F, unsigned ArgIdx) {
+  if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+    MDNode *KernelArgTypes = getKernelMetadata(F, "kernel_arg_type");
+    std::string a = cast<MDString>(KernelArgTypes->getOperand(ArgIdx))->getString().str();
+    if (KernelArgTypes && ArgIdx < KernelArgTypes->getNumOperands() &&
+        cast<MDString>(KernelArgTypes->getOperand(ArgIdx))
+            ->getString()
+            .endswith("_t")) {
+      std::string KernelArgTypeStr =
+          "opencl." +
+          cast<MDString>(KernelArgTypes->getOperand(ArgIdx))->getString().str();
+
+      Type *ExistingOpaqueType =
+          StructType::getTypeByName(F.getContext(), KernelArgTypeStr);
+      return ExistingOpaqueType
+                 ? ExistingOpaqueType
+                 : StructType::create(F.getContext(), KernelArgTypeStr);
+    }
+  }
+
+  return getOriginalFunctionType(F)->getParamType(ArgIdx);
+}
+
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
@@ -205,8 +228,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
 
       SPIRV::AccessQualifier::AccessQualifier ArgAccessQual = getArgAccessQual(F, i);
-      Type *ArgTy = FTy->getParamType(i);
-      auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder, ArgAccessQual);
+      auto *SpirvTy = GR->assignTypeToVReg(getArgType(F, i), VRegs[i][0],
+                                           MIRBuilder, ArgAccessQual);
       ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
