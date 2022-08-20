@@ -38,10 +38,12 @@ add_llvm_target(SPIRVCodeGen
   SPIRVUtils.cpp
 
   LINK_COMPONENTS
-  AsmPrinter
   Analysis
+  AsmPrinter
   CodeGen
   Core
+  Demangle
+  GlobalISel
   MC
   SPIRVDesc
   SPIRVInfo
@@ -49,8 +51,6 @@ add_llvm_target(SPIRVCodeGen
   Support
   Target
   TransformUtils
-  GlobalISel
-  Demangle
 
   ADD_TO_COMPONENT
   SPIRV
