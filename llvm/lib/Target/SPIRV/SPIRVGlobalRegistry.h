@@ -216,28 +216,9 @@ private:
                                const SmallVectorImpl<SPIRVType *> &ArgTypes,
                                MachineIRBuilder &MIRBuilder);
 
-  SPIRVType *getOpTypeByOpcode(const Type *Ty, MachineIRBuilder &MIRBuilder,
-                               unsigned Opcode);
   SPIRVType *getOrCreateSpecialType(const Type *Ty,
                                     MachineIRBuilder &MIRBuilder,
                                     AQ::AccessQualifier AccQual);
-
-  SPIRVType *handleOpenCLBuiltin(const StructType *Ty,
-                                 MachineIRBuilder &MIRBuilder,
-                                 AQ::AccessQualifier AccQual);
-
-  SPIRVType *
-  getOrCreateOpenCLOpaqueType(const StructType *Ty,
-                              MachineIRBuilder &MIRBuilder,
-                              AQ::AccessQualifier AccQual = AQ::ReadWrite);
-
-  SPIRVType *handleSPIRVBuiltin(const StructType *Ty,
-                                MachineIRBuilder &MIRBuilder,
-                                AQ::AccessQualifier AccQual);
-
-  SPIRVType *
-  getOrCreateSPIRVOpaqueType(const StructType *Ty, MachineIRBuilder &MIRBuilder,
-                             AQ::AccessQualifier AccQual = AQ::ReadWrite);
 
   std::tuple<Register, ConstantInt *, bool> getOrCreateConstIntReg(
       uint64_t Val, SPIRVType *SpvType, MachineIRBuilder *MIRBuilder,
@@ -329,6 +310,10 @@ public:
       const Type *Ty, SPIRVType *RetType,
       const SmallVectorImpl<SPIRVType *> &ArgTypes,
       MachineIRBuilder &MIRBuilder);
+
+  SPIRVType *getOrCreateOpTypeByOpcode(const Type *Ty,
+                                       MachineIRBuilder &MIRBuilder,
+                                       unsigned Opcode);
 };
 } // end namespace llvm
 #endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
