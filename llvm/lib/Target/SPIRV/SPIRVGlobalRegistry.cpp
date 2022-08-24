@@ -581,22 +581,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSpecialType(
   }
   auto SType = cast<StructType>(Ty);
   assert(isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType));
-  if (isOpenCLBuiltinType(SType))
-    return handleOpenCLBuiltin(SType, MIRBuilder, AccQual);
-  else
-    return handleSPIRVBuiltin(SType, MIRBuilder, AccQual);
-}
-
-SPIRVType *
-SPIRVGlobalRegistry::handleOpenCLBuiltin(const StructType *Ty,
-                                         MachineIRBuilder &MIRBuilder,
-                                         AQ::AccessQualifier AccQual) {
-  assert(Ty->hasName());
-  unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
-  auto NewTy = getOrCreateOpenCLOpaqueType(Ty, MIRBuilder, AccQual);
-  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
-    buildOpName(getSPIRVTypeID(NewTy), Ty->getName(), MIRBuilder);
-  return NewTy;
+  return lowerBuiltinType(SType, AccQual, MIRBuilder, this);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(
@@ -912,9 +897,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
   return MIB;
 }
 
-SPIRVType *SPIRVGlobalRegistry::getOpTypeByOpcode(const Type *Ty,
-                                                  MachineIRBuilder &MIRBuilder,
-                                                  unsigned Opcode) {
+SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeByOpcode(
+    const Type *Ty, MachineIRBuilder &MIRBuilder, unsigned Opcode) {
   Register ResVReg = DT.find(Ty, &MIRBuilder.getMF());
   if (ResVReg.isValid())
     return MIRBuilder.getMF().getRegInfo().getUniqueVRegDef(ResVReg);
@@ -932,78 +916,6 @@ SPIRVGlobalRegistry::checkSpecialInstr(const SPIRV::SpecialTypeDescriptor &TD,
   if (Reg.isValid())
     return MIRBuilder.getMF().getRegInfo().getUniqueVRegDef(Reg);
   return nullptr;
-}
-
-namespace llvm {
-namespace SPIRV {
-struct DemangledType {
-  StringRef Name;
-  uint32_t Opcode;
-};
-
-#define GET_DemangledTypes_DECL
-#define GET_DemangledTypes_IMPL
-
-struct ImageType {
-  StringRef Name;
-  AccessQualifier::AccessQualifier Qualifier;
-  Dim::Dim Dimensionality;
-  bool Arrayed;
-  bool Depth;
-};
-
-struct PipeType {
-  StringRef Name;
-  AccessQualifier::AccessQualifier Qualifier;
-};
-
-using namespace AccessQualifier;
-using namespace Dim;
-#define GET_ImageTypes_DECL
-#define GET_ImageTypes_IMPL
-#define GET_PipeTypes_DECL
-#define GET_PipeTypes_IMPL
-#include "SPIRVGenTables.inc"
-} // namespace SPIRV
-} // namespace llvm
-
-SPIRVType *SPIRVGlobalRegistry::getOrCreateOpenCLOpaqueType(
-    const StructType *Ty, MachineIRBuilder &MIRBuilder,
-    AQ::AccessQualifier AccessQual) {
-  const StringRef Name = Ty->getName();
-  assert(Name.startswith("opencl.") &&
-         "OpenCL types must start with 'opencl.' prefix");
-
-  // Lookup the demangled OpenCL type in the TableGen records.
-  const DemangledType *Builtin = lookupType(Name);
-
-  if (!Builtin)
-    report_fatal_error("Missing record for OpenCL type: " + Name);
-
-  switch (Builtin->Opcode) {
-  case SPIRV::OpTypeImage: {
-    // Lookup lowering details in ImageType TableGen records.
-    const ImageType *Record = lookupImageType(Name);
-    SPIRVType *VoidType = getOrCreateSPIRVType(
-        Type::getVoidTy(MIRBuilder.getMF().getFunction().getContext()),
-        MIRBuilder);
-    return getOrCreateOpTypeImage(
-        MIRBuilder, VoidType, Record->Dimensionality, Record->Depth,
-        Record->Arrayed, 0, 0, ImageFormat::Unknown,
-        AccessQual == AQ::WriteOnly ? AQ::WriteOnly : Record->Qualifier);
-  } break;
-  case SPIRV::OpTypePipe: {
-    // Lookup lowering details in PipeType TableGen records.
-    const PipeType *Record = lookupPipeType(Name);
-    return getOrCreateOpTypePipe(MIRBuilder, Record->Qualifier);
-  } break;
-  case SPIRV::OpTypeSampler: {
-    return getOrCreateOpTypeSampler(MIRBuilder);
-  } break;
-  default: {
-    return getOpTypeByOpcode(Ty, MIRBuilder, Builtin->Opcode);
-  } break;
-  }
 }
 
 // TODO: maybe use tablegen to implement this.
@@ -1042,82 +954,6 @@ SPIRVGlobalRegistry::getOrCreateSPIRVTypeByName(StringRef TypeStr,
   if (VecElts > 0)
     SpirvTy = getOrCreateSPIRVVectorType(SpirvTy, VecElts, MIRBuilder);
   return SpirvTy;
-}
-
-SPIRVType *
-SPIRVGlobalRegistry::handleSPIRVBuiltin(const StructType *Ty,
-                                        MachineIRBuilder &MIRBuilder,
-                                        AQ::AccessQualifier AccQual) {
-  assert(Ty->hasName());
-  unsigned NumStartingVRegs = MIRBuilder.getMRI()->getNumVirtRegs();
-  auto NewTy = getOrCreateSPIRVOpaqueType(Ty, MIRBuilder, AccQual);
-  if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
-    buildOpName(getSPIRVTypeID(NewTy), Ty->getName(), MIRBuilder);
-  return NewTy;
-}
-
-SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVOpaqueType(
-    const StructType *Ty, MachineIRBuilder &MIRBuilder,
-    AQ::AccessQualifier AccessQual) {
-  const StringRef Name = Ty->getName();
-  assert(Name.startswith("spirv.") && "CL types should start with 'spirv.'");
-  auto TypeName = Name.substr(strlen("spirv."));
-
-  if (TypeName.startswith("Image.")) {
-    // Parse SPIRV ImageType which has following format in LLVM:
-    // Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
-    // e.g. %spirv.Image._void_1_0_0_0_0_0_0.
-    auto TypeLiteralStr = TypeName.substr(strlen("Image."));
-    SmallVector<StringRef> TypeLiterals;
-    SplitString(TypeLiteralStr, TypeLiterals, "_");
-    assert(TypeLiterals.size() == 8 &&
-           "Wrong number of literals in Image type");
-    auto *SpirvType = getOrCreateSPIRVTypeByName(TypeLiterals[0], MIRBuilder);
-
-    unsigned Ddim = 0, Depth = 0, Arrayed = 0, MS = 0, Sampled = 0;
-    unsigned ImageFormat = 0, AccQual = 0;
-    if (TypeLiterals[1].getAsInteger(10, Ddim) ||
-        TypeLiterals[2].getAsInteger(10, Depth) ||
-        TypeLiterals[3].getAsInteger(10, Arrayed) ||
-        TypeLiterals[4].getAsInteger(10, MS) ||
-        TypeLiterals[5].getAsInteger(10, Sampled) ||
-        TypeLiterals[6].getAsInteger(10, ImageFormat) ||
-        TypeLiterals[7].getAsInteger(10, AccQual))
-      llvm_unreachable("Unable to recognize Image type literals");
-    return getOrCreateOpTypeImage(MIRBuilder, SpirvType, SPIRV::Dim::Dim(Ddim),
-                                  Depth, Arrayed, MS, Sampled,
-                                  SPIRV::ImageFormat::ImageFormat(ImageFormat),
-                                  AQ::AccessQualifier(AccQual));
-  } else if (TypeName.startswith("SampledImage.")) {
-    // Find corresponding Image type.
-    auto Literals = TypeName.substr(strlen("SampledImage."));
-    auto &Ctx = MIRBuilder.getMF().getFunction().getContext();
-    Type *ImgTy =
-        StructType::getTypeByName(Ctx, "spirv.Image." + Literals.str());
-    SPIRVType *SpirvImageType = getOrCreateSPIRVType(ImgTy, MIRBuilder);
-    return getOrCreateOpTypeSampledImage(SpirvImageType, MIRBuilder);
-  } else if (TypeName.startswith("DeviceEvent"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeDeviceEvent);
-  else if (TypeName.startswith("Sampler"))
-    return getOrCreateOpTypeSampler(MIRBuilder);
-  else if (TypeName.startswith("Event"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeEvent);
-  else if (TypeName.startswith("Queue"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeQueue);
-  else if (TypeName.startswith("Pipe.")) {
-    if (TypeName.endswith("_0"))
-      AccessQual = AQ::ReadOnly;
-    else if (TypeName.endswith("_1"))
-      AccessQual = AQ::WriteOnly;
-    else if (TypeName.endswith("_2"))
-      AccessQual = AQ::ReadWrite;
-    return getOrCreateOpTypePipe(MIRBuilder, AccessQual);
-  } else if (TypeName.startswith("PipeStorage"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypePipeStorage);
-  else if (TypeName.startswith("ReserveId"))
-    return getOpTypeByOpcode(Ty, MIRBuilder, SPIRV::OpTypeReserveId);
-
-  report_fatal_error("Cannot generate SPIRV built-in type: " + Name);
 }
 
 SPIRVType *
