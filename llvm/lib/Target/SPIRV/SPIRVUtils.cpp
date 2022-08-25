@@ -340,4 +340,24 @@ std::string isOclOrSpirvBuiltin(StringRef Name) {
       .getAsInteger(10, Len);
   return Name.substr(Start, Len).str();
 }
+
+static bool isOpenCLBuiltinType(const StructType *SType) {
+  return SType->isOpaque() && SType->hasName() &&
+         SType->getName().startswith("opencl.");
+}
+
+static bool isSPIRVBuiltinType(const StructType *SType) {
+  return SType->isOpaque() && SType->hasName() &&
+         SType->getName().startswith("spirv.");
+}
+
+bool isSpecialOpaqueType(const Type *Ty) {
+  if (auto PType = dyn_cast<PointerType>(Ty)) {
+    if (!PType->isOpaque())
+      Ty = PType->getPointerElementType();
+  }
+  if (auto SType = dyn_cast<StructType>(Ty))
+    return isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType);
+  return false;
+}
 } // namespace llvm

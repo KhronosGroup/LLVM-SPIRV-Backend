@@ -93,5 +93,8 @@ Type *getMDOperandAsType(const MDNode *N, unsigned I);
 // Return a demangled name with arg type info by itaniumDemangle().
 // If the parser fails, return only function name.
 std::string isOclOrSpirvBuiltin(StringRef Name);
+
+// Check if given LLVM type is a special opaque builtin type.
+bool isSpecialOpaqueType(const Type *Ty);
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H
