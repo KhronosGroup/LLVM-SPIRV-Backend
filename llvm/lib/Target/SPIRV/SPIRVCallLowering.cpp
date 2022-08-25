@@ -200,6 +200,29 @@ getKernelArgTypeQual(const Function &KernelFunction, unsigned ArgIdx) {
   return {};
 }
 
+static Type *getArgType(const Function &F, unsigned ArgIdx) {
+  Type *OriginalArgType = getOriginalFunctionType(F)->getParamType(ArgIdx);
+
+  if (F.getCallingConv() == CallingConv::SPIR_KERNEL &&
+      !isSpecialOpaqueType(OriginalArgType)) {
+
+    MDString *MDKernelArgType =
+        getKernelArgAttribute(F, ArgIdx, "kernel_arg_type");
+    if (MDKernelArgType && MDKernelArgType->getString().endswith("_t")) {
+      std::string KernelArgTypeStr =
+          "opencl." + MDKernelArgType->getString().str();
+
+      Type *ExistingOpaqueType =
+          StructType::getTypeByName(F.getContext(), KernelArgTypeStr);
+      return ExistingOpaqueType
+                 ? ExistingOpaqueType
+                 : StructType::create(F.getContext(), KernelArgTypeStr);
+    }
+  }
+
+  return OriginalArgType;
+}
+
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
@@ -217,9 +240,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
       SPIRV::AccessQualifier::AccessQualifier ArgAccessQual =
           getArgAccessQual(F, i);
-      Type *ArgTy = FTy->getParamType(i);
-      auto *SpirvTy =
-          GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder, ArgAccessQual);
+      auto *SpirvTy = GR->assignTypeToVReg(getArgType(F, i), VRegs[i][0],
+                                           MIRBuilder, ArgAccessQual);
       ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
