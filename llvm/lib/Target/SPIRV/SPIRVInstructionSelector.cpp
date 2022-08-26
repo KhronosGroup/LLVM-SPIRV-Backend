@@ -705,12 +705,11 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register ResVReg,
   Register ScopeReg = buildI32Constant(Scope, I);
 
   Register Ptr = I.getOperand(1).getReg();
-  // Changed as it's implemented in the translator. See test/atomicrmw.ll
+  // TODO: Changed as it's implemented in the translator. See test/atomicrmw.ll
   // auto ScSem =
   // getMemSemanticsForStorageClass(GR.getPointerStorageClass(Ptr));
-
-  SPIRV::MemorySemantics::MemorySemantics MemSem =
-      getMemSemantics(MemOp->getSuccessOrdering());
+  AtomicOrdering AO = MemOp->getSuccessOrdering();
+  uint32_t MemSem = static_cast<uint32_t>(getMemSemantics(AO));
   Register MemSemReg = buildI32Constant(MemSem /*| ScSem*/, I);
 
   return BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(NewOpcode))
@@ -724,6 +723,7 @@ bool SPIRVInstructionSelector::selectAtomicRMW(Register ResVReg,
 }
 
 bool SPIRVInstructionSelector::selectFence(MachineInstr &I) const {
+
   SPIRV::MemorySemantics::MemorySemantics MemSem =
       getMemSemantics(AtomicOrdering(I.getOperand(0).getImm()));
   Register MemSemReg = buildI32Constant(MemSem, I);
@@ -807,8 +807,8 @@ bool SPIRVInstructionSelector::selectAtomicCmpXchg(Register ResVReg,
   return Result;
 }
 
-static bool isGenericCastablePtr(SPIRV::StorageClass::StorageClass Sc) {
-  switch (Sc) {
+static bool isGenericCastablePtr(SPIRV::StorageClass::StorageClass SC) {
+  switch (SC) {
   case SPIRV::StorageClass::Workgroup:
   case SPIRV::StorageClass::CrossWorkgroup:
   case SPIRV::StorageClass::Function:

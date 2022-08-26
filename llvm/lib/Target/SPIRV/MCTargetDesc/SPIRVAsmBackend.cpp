@@ -30,7 +30,7 @@ public:
     return createSPIRVObjectTargetWriter();
   }
 
-  // No instruction requires relaxation
+  // No instruction requires relaxation.
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
                             const MCRelaxableFragment *DF,
                             const MCAsmLayout &Layout) const override {

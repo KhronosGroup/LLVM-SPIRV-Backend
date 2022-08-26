@@ -340,22 +340,17 @@ Register SPIRVGlobalRegistry::getOrCreateIntCompositeOrNull(
     if (EmitIR) {
       MIRBuilder.buildSplatVector(SpvVecConst, SpvScalConst);
     } else {
-      MachineInstrBuilder MIB;
       if (Val) {
-        MIB = MIRBuilder.buildInstr(SPIRV::OpConstantComposite)
-                  .addDef(SpvVecConst)
-                  .addUse(getSPIRVTypeID(SpvType));
+        auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantComposite)
+                       .addDef(SpvVecConst)
+                       .addUse(getSPIRVTypeID(SpvType));
         for (unsigned i = 0; i < ElemCnt; ++i)
           MIB.addUse(SpvScalConst);
       } else {
-        MIB = MIRBuilder.buildInstr(SPIRV::OpConstantNull)
-                  .addDef(SpvVecConst)
-                  .addUse(getSPIRVTypeID(SpvType));
+        MIRBuilder.buildInstr(SPIRV::OpConstantNull)
+            .addDef(SpvVecConst)
+            .addUse(getSPIRVTypeID(SpvType));
       }
-      const auto &Subtarget = CurMF->getSubtarget();
-      constrainSelectedInstRegOperands(*MIB, *Subtarget.getInstrInfo(),
-                                       *Subtarget.getRegisterInfo(),
-                                       *Subtarget.getRegBankInfo());
     }
     return SpvVecConst;
   }
@@ -581,7 +576,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSpecialType(
   }
   auto SType = cast<StructType>(Ty);
   assert(isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType));
-  return lowerBuiltinType(SType, AccQual, MIRBuilder, this);
+  return SPIRV::lowerBuiltinType(SType, AccQual, MIRBuilder, this);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(
@@ -839,18 +834,17 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeImage(
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeImage)
-                 .addDef(ResVReg)
-                 .addUse(getSPIRVTypeID(SampledType))
-                 .addImm(Dim)
-                 .addImm(Depth)   // Depth (whether or not it is a Depth image)
-                 .addImm(Arrayed) // Arrayed
-                 .addImm(Multisampled) // Multisampled (0 = only single-sample)
-                 .addImm(Sampled)      // Sampled (0 = usage known at runtime)
-                 .addImm(ImageFormat)
-                 .addImm(AccessQual);
   DT.add(TD, &MIRBuilder.getMF(), ResVReg);
-  return MIB;
+  return MIRBuilder.buildInstr(SPIRV::OpTypeImage)
+      .addDef(ResVReg)
+      .addUse(getSPIRVTypeID(SampledType))
+      .addImm(Dim)
+      .addImm(Depth)        // Depth (whether or not it is a Depth image).
+      .addImm(Arrayed)      // Arrayed.
+      .addImm(Multisampled) // Multisampled (0 = only single-sample).
+      .addImm(Sampled)      // Sampled (0 = usage known at runtime).
+      .addImm(ImageFormat)
+      .addImm(AccessQual);
 }
 
 SPIRVType *
@@ -859,10 +853,8 @@ SPIRVGlobalRegistry::getOrCreateOpTypeSampler(MachineIRBuilder &MIRBuilder) {
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeSampler).addDef(ResVReg);
-  constrainRegOperands(MIB);
   DT.add(TD, &MIRBuilder.getMF(), ResVReg);
-  return MIB;
+  return MIRBuilder.buildInstr(SPIRV::OpTypeSampler).addDef(ResVReg);
 }
 
 SPIRVType *
@@ -872,12 +864,10 @@ SPIRVGlobalRegistry::getOrCreateOpTypePipe(MachineIRBuilder &MIRBuilder,
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypePipe)
-                 .addDef(ResVReg)
-                 .addImm(AccessQual);
-  constrainRegOperands(MIB);
   DT.add(TD, &MIRBuilder.getMF(), ResVReg);
-  return MIB;
+  return MIRBuilder.buildInstr(SPIRV::OpTypePipe)
+      .addDef(ResVReg)
+      .addImm(AccessQual);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
@@ -889,12 +879,10 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeSampledImage(
   if (auto *Res = checkSpecialInstr(TD, MIRBuilder))
     return Res;
   Register ResVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeSampledImage)
-                 .addDef(ResVReg)
-                 .addUse(getSPIRVTypeID(ImageType));
   DT.add(TD, &MIRBuilder.getMF(), ResVReg);
-
-  return MIB;
+  return MIRBuilder.buildInstr(SPIRV::OpTypeSampledImage)
+      .addDef(ResVReg)
+      .addUse(getSPIRVTypeID(ImageType));
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeByOpcode(
@@ -903,10 +891,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateOpTypeByOpcode(
   if (ResVReg.isValid())
     return MIRBuilder.getMF().getRegInfo().getUniqueVRegDef(ResVReg);
   ResVReg = createTypeVReg(MIRBuilder);
-  auto MIB = MIRBuilder.buildInstr(Opcode).addDef(ResVReg);
-  constrainRegOperands(MIB);
   DT.add(Ty, &MIRBuilder.getMF(), ResVReg);
-  return MIB;
+  return MIRBuilder.buildInstr(Opcode).addDef(ResVReg);
 }
 
 const MachineInstr *

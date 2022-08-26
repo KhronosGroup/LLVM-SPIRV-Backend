@@ -6,7 +6,7 @@
  //
  //===----------------------------------------------------------------------===//
  //
- // TableGen records defining implementation details of demangled builtin 
+ // TableGen records defining implementation details of demangled builtin
  // functions and types.
  //
  //===----------------------------------------------------------------------===//
@@ -577,22 +577,22 @@ class GroupBuiltin<string name, Op operation> {
                                   !not(!eq(!find(name, "group_clustered_reduce_logical"), -1)) : ClusteredReduce.Value,
                                   true : 0);
   bit IsElect = !eq(operation, OpGroupNonUniformElect);
-  bit IsAllOrAny = !or(!eq(operation, OpGroupAll), 
-                       !eq(operation, OpGroupAny), 
-                       !eq(operation, OpGroupNonUniformAll), 
+  bit IsAllOrAny = !or(!eq(operation, OpGroupAll),
+                       !eq(operation, OpGroupAny),
+                       !eq(operation, OpGroupNonUniformAll),
                        !eq(operation, OpGroupNonUniformAny));
   bit IsAllEqual = !eq(operation, OpGroupNonUniformAllEqual);
   bit IsBallot = !eq(operation, OpGroupNonUniformBallot);
   bit IsInverseBallot = !eq(operation, OpGroupNonUniformInverseBallot);
   bit IsBallotBitExtract = !eq(operation, OpGroupNonUniformBallotBitExtract);
-  bit IsBallotFindBit = !or(!eq(operation, OpGroupNonUniformBallotFindLSB), 
+  bit IsBallotFindBit = !or(!eq(operation, OpGroupNonUniformBallotFindLSB),
                             !eq(operation, OpGroupNonUniformBallotFindMSB));
-  bit IsLogical = !or(!eq(operation, OpGroupNonUniformLogicalAnd), 
-                      !eq(operation, OpGroupNonUniformLogicalOr), 
+  bit IsLogical = !or(!eq(operation, OpGroupNonUniformLogicalAnd),
+                      !eq(operation, OpGroupNonUniformLogicalOr),
                       !eq(operation, OpGroupNonUniformLogicalXor));
-  bit NoGroupOperation = !or(IsElect, IsAllOrAny, IsAllEqual, 
-                             IsBallot, IsInverseBallot, 
-                             IsBallotBitExtract, IsBallotFindBit, 
+  bit NoGroupOperation = !or(IsElect, IsAllOrAny, IsAllEqual,
+                             IsBallot, IsInverseBallot,
+                             IsBallotBitExtract, IsBallotFindBit,
                              !eq(operation, OpGroupNonUniformShuffle),
                              !eq(operation, OpGroupNonUniformShuffleXor),
                              !eq(operation, OpGroupNonUniformShuffleUp),
@@ -864,7 +864,7 @@ defm : DemangledGroupBuiltin<"group_clustered_reduce_logical_xor", WorkOrSub, Op
 //
 // name is the demangled name of the given builtin.
 // set specifies which external instruction set the builtin belongs to.
-// value specifies the value of the BuiltIn enum. 
+// value specifies the value of the BuiltIn enum.
 //===----------------------------------------------------------------------===//
 class GetBuiltin<string name, InstructionSet set, BuiltIn value> {
   string Name = name;
@@ -912,7 +912,7 @@ defm : DemangledGetBuiltin<"get_enqueued_local_size", OpenCL_std, GetQuery, Enqu
 defm : DemangledGetBuiltin<"get_num_groups", OpenCL_std, GetQuery, NumWorkgroups>;
 
 //===----------------------------------------------------------------------===//
-// Class defining an image query builtin record used for lowering the OpenCL 
+// Class defining an image query builtin record used for lowering the OpenCL
 // "get_image_*" calls into OpImageQuerySize/OpImageQuerySizeLod instructions.
 //
 // name is the demangled name of the given builtin.
@@ -998,7 +998,7 @@ multiclass DemangledConvertBuiltin<string name, InstructionSet set> {
       def : DemangledBuiltin<!strconcat(name, i, j), set, Convert, 1, 1>;
       def : ConvertBuiltin<!strconcat(name, i, j), set>;
 
-      // Create records with the "_sat" modifier for all conversions except 
+      // Create records with the "_sat" modifier for all conversions except
       // those targeting floating-point types.
       if !eq(!find(name, "float"), -1) then {
         def : DemangledBuiltin<!strconcat(name, i, "_sat", j), set, Convert, 1, 1>;
@@ -1080,8 +1080,8 @@ foreach i = ["", "2", "3", "4", "8", "16"] in {
       defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore_half", j), 3, 3, 176>;
     } else {
       defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstore_half", i, j), 3, 3, 178>;
-    }   
-    defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstorea_half", i, j), 3, 3, 181>; 
+    }
+    defm : DemangledVectorLoadStoreBuiltin<!strconcat("vstorea_half", i, j), 3, 3, 181>;
   }
 }
 
@@ -1129,7 +1129,6 @@ def : DemangledType<"spirv.DeviceEvent", OpTypeDeviceEvent>;
 def : DemangledType<"spirv.Image", OpTypeImage>;
 def : DemangledType<"spirv.SampledImage", OpTypeSampledImage>;
 def : DemangledType<"spirv.Pipe", OpTypePipe>;
-
 
 // Class definining lowering details for various variants of image type indentifiers.
 class ImageType<string name> {

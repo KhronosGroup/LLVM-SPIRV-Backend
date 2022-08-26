@@ -62,6 +62,10 @@ class SPIRVGlobalRegistry {
                                    AQ::AccessQualifier AccessQual, bool EmitIR);
 
 public:
+  SPIRVGlobalRegistry(unsigned PointerSize);
+
+  MachineFunction *CurMF;
+
   void add(const Constant *C, MachineFunction *MF, Register R) {
     DT.add(C, MF, R);
   }
@@ -103,10 +107,6 @@ public:
   // SpecialInstrMapTy &getSpecialTypesAndConstsMap() {
   //   return SpecialTypesAndConstsMap;
   // }
-
-  SPIRVGlobalRegistry(unsigned PointerSize);
-
-  MachineFunction *CurMF;
 
   // Get or create a SPIR-V type corresponding the given LLVM IR type,
   // and map it to the given VReg by creating an ASSIGN_TYPE instruction.
@@ -290,7 +290,7 @@ public:
       SPIRV::StorageClass::StorageClass SClass = SPIRV::StorageClass::Function);
   SPIRVType *getOrCreateSPIRVPointerType(
       SPIRVType *BaseType, MachineInstr &I, const SPIRVInstrInfo &TII,
-      SPIRV::StorageClass::StorageClass SC = SPIRV::StorageClass::Function);
+      SPIRV::StorageClass::StorageClass SClass = SPIRV::StorageClass::Function);
 
   SPIRVType *getOrCreateOpTypeImage(MachineIRBuilder &MIRBuilder,
                                     SPIRVType *SampledType, SPIRV::Dim::Dim Dim,
@@ -310,7 +310,6 @@ public:
       const Type *Ty, SPIRVType *RetType,
       const SmallVectorImpl<SPIRVType *> &ArgTypes,
       MachineIRBuilder &MIRBuilder);
-
   SPIRVType *getOrCreateOpTypeByOpcode(const Type *Ty,
                                        MachineIRBuilder &MIRBuilder,
                                        unsigned Opcode);

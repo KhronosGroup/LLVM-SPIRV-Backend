@@ -323,7 +323,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
         .legalForCartesianProduct(allIntScalarsAndVectors,
                                   allIntScalarsAndVectors);
 
-    // Struct return types become a single scalar, so cannot easily legalize
+    // Struct return types become a single scalar, so cannot easily legalize.
     getActionDefinitionsBuilder({G_SMULH, G_UMULH}).alwaysLegal();
   }
 

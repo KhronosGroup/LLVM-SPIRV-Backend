@@ -119,9 +119,9 @@ FunctionPass *SPIRVPassConfig::createTargetRegisterAllocator(bool) {
   return nullptr;
 }
 
-// Disable passes that break from assuming no virtual registers exist
+// Disable passes that break from assuming no virtual registers exist.
 void SPIRVPassConfig::addPostRegAlloc() {
-  // Do not work with vregs instead of physical regs
+  // Do not work with vregs instead of physical regs.
   disablePass(&MachineCopyPropagationID);
   disablePass(&PostRAMachineSinkingID);
   disablePass(&PostRASchedulerID);
@@ -131,7 +131,7 @@ void SPIRVPassConfig::addPostRegAlloc() {
   disablePass(&ShrinkWrapID);
   disablePass(&LiveDebugValuesID);
 
-  // Do not work with OpPhi
+  // Do not work with OpPhi.
   disablePass(&BranchFolderPassID);
   disablePass(&MachineBlockPlacementID);
 
@@ -155,8 +155,7 @@ void SPIRVPassConfig::addIRPasses() {
 }
 
 void SPIRVPassConfig::addISelPrepare() {
-  auto *TM = &getTM<SPIRVTargetMachine>();
-  addPass(createSPIRVEmitIntrinsicsPass(TM));
+  addPass(createSPIRVEmitIntrinsicsPass(&getTM<SPIRVTargetMachine>()));
   TargetPassConfig::addISelPrepare();
   addPass(createSPIRVBasicBlockDominancePass());
 }
@@ -170,13 +169,13 @@ void SPIRVPassConfig::addPreLegalizeMachineIR() {
   addPass(createSPIRVPreLegalizerPass());
 }
 
-// Use a default legalizer
+// Use a default legalizer.
 bool SPIRVPassConfig::addLegalizeMachineIR() {
   addPass(new Legalizer());
   return false;
 }
 
-// Do not add a RegBankSelect pass, as we only ever need virtual registers
+// Do not add a RegBankSelect pass, as we only ever need virtual registers.
 bool SPIRVPassConfig::addRegBankSelect() {
   disablePass(&RegBankSelect::ID);
   return false;
@@ -184,10 +183,8 @@ bool SPIRVPassConfig::addRegBankSelect() {
 
 namespace {
 // A custom subclass of InstructionSelect, which is mostly the same except from
-// not requiring RegBankSelect to occur previously, and making sure a
-// SPIRVGlobalRegistry is initialized before and reset after each run.
+// not requiring RegBankSelect to occur previously.
 class SPIRVInstructionSelect : public InstructionSelect {
-
   // We don't use register banks, so unset the requirement for them
   MachineFunctionProperties getRequiredProperties() const override {
     return InstructionSelect::getRequiredProperties().reset(
@@ -196,7 +193,7 @@ class SPIRVInstructionSelect : public InstructionSelect {
 };
 } // namespace
 
-// Add the custom SPIRVInstructionSelect from above
+// Add the custom SPIRVInstructionSelect from above.
 bool SPIRVPassConfig::addGlobalInstructionSelect() {
   addPass(new SPIRVInstructionSelect());
   return false;

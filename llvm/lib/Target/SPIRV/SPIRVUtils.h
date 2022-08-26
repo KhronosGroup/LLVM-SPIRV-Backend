@@ -64,12 +64,6 @@ unsigned storageClassToAddressSpace(SPIRV::StorageClass::StorageClass SC);
 SPIRV::StorageClass::StorageClass
 addressSpaceToStorageClass(unsigned AddrSpace);
 
-// Utility method to constrain an instruction's operands to the correct
-// register classes, and return true if this worked.
-// TODO: get rid of using this function.
-bool constrainRegOperands(MachineInstrBuilder &MIB,
-                          MachineFunction *MF = nullptr);
-
 SPIRV::MemorySemantics::MemorySemantics
 getMemSemanticsForStorageClass(SPIRV::StorageClass::StorageClass SC);
 
@@ -92,6 +86,6 @@ Type *getMDOperandAsType(const MDNode *N, unsigned I);
 
 // Return a demangled name with arg type info by itaniumDemangle().
 // If the parser fails, return only function name.
-std::string isOclOrSpirvBuiltin(StringRef Name);
+std::string mayBeOclOrSpirvBuiltin(StringRef Name);
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVUTILS_H

@@ -1533,10 +1533,12 @@ static bool generateVectorLoadStoreInst(const SPIRV::IncomingCall *Call,
 
 /// Lowers a builtin funtion call using the provided \p DemangledCall skeleton
 /// and external instruction \p Set.
-std::pair<bool, bool> lowerBuiltin(
-    const StringRef DemangledCall, SPIRV::InstructionSet::InstructionSet Set,
-    MachineIRBuilder &MIRBuilder, const Register OrigRet, const Type *OrigRetTy,
-    const SmallVectorImpl<Register> &Args, SPIRVGlobalRegistry *GR) {
+namespace SPIRV {
+std::pair<bool, bool>
+lowerBuiltin(const StringRef DemangledCall, InstructionSet::InstructionSet Set,
+             MachineIRBuilder &MIRBuilder, const Register OrigRet,
+             const Type *OrigRetTy, const SmallVectorImpl<Register> &Args,
+             SPIRVGlobalRegistry *GR) {
   LLVM_DEBUG(dbgs() << "Lowering builtin call: " << DemangledCall << "\n");
 
   // SPIR-V type and return register.
@@ -1545,14 +1547,13 @@ std::pair<bool, bool> lowerBuiltin(
   if (OrigRetTy && !OrigRetTy->isVoidTy()) {
     ReturnType = GR->assignTypeToVReg(OrigRetTy, OrigRet, MIRBuilder);
   } else if (OrigRetTy && OrigRetTy->isVoidTy()) {
-    ReturnRegister =
-        MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+    ReturnRegister = MIRBuilder.getMRI()->createVirtualRegister(&IDRegClass);
     MIRBuilder.getMRI()->setType(ReturnRegister, LLT::scalar(32));
     ReturnType = GR->assignTypeToVReg(OrigRetTy, ReturnRegister, MIRBuilder);
   }
 
-  // Lookup the builtin in the TableGen records
-  std::unique_ptr<const SPIRV::IncomingCall> Call =
+  // Lookup the builtin in the TableGen records.
+  std::unique_ptr<const IncomingCall> Call =
       lookupBuiltin(DemangledCall, Set, ReturnRegister, ReturnType, Args);
 
   if (!Call) {
@@ -1613,7 +1614,6 @@ std::pair<bool, bool> lowerBuiltin(
   return {true, false};
 }
 
-namespace SPIRV {
 struct DemangledType {
   StringRef Name;
   uint32_t Opcode;
@@ -1654,19 +1654,18 @@ using namespace ImageFormat;
 // details in TableGenerated tables.
 //===----------------------------------------------------------------------===//
 
-static const SPIRV::DemangledType *lookupBuiltinType(StringRef Name) {
-  if (Name.startswith("opencl.")) {
+static const SPIRV::DemangledType *findBuiltinType(StringRef Name) {
+  if (Name.startswith("opencl."))
     return SPIRV::lookupBuiltinType(Name);
-  } else if (Name.startswith("spirv.")) {
-    // Some SPIR-V builtin types have a complex list of parameters as part of
-    // their name (e.g. spirv.Image._void_1_0_0_0_0_0_0). Those parameters often
-    // are numeric literals which cannot be easily represented by TableGen
-    // records and should be parsed instead.
-    unsigned BaseTypeNameLength =
-        Name.contains('_') ? Name.find('_') - 1 : Name.size();
-    return SPIRV::lookupBuiltinType(Name.substr(0, BaseTypeNameLength).str());
-  }
-  return nullptr;
+  if (!Name.startswith("spirv."))
+    return nullptr;
+  // Some SPIR-V builtin types have a complex list of parameters as part of
+  // their name (e.g. spirv.Image._void_1_0_0_0_0_0_0). Those parameters often
+  // are numeric literals which cannot be easily represented by TableGen
+  // records and should be parsed instead.
+  unsigned BaseTypeNameLength =
+      Name.contains('_') ? Name.find('_') - 1 : Name.size();
+  return SPIRV::lookupBuiltinType(Name.substr(0, BaseTypeNameLength).str());
 }
 
 static std::unique_ptr<const SPIRV::ImageType>
@@ -1675,37 +1674,37 @@ lookupOrParseBuiltinImageType(StringRef Name) {
     // Lookup OpenCL builtin image type lowering details in TableGen records.
     const SPIRV::ImageType *Record = SPIRV::lookupImageType(Name);
     return std::unique_ptr<SPIRV::ImageType>(new SPIRV::ImageType(*Record));
-  } else if (Name.startswith("spirv.")) {
-    // Parse the literals of SPIR-V image builtin parameters. The name should
-    // have the following format:
-    // spirv.Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
-    // e.g. %spirv.Image._void_1_0_0_0_0_0_0
-    StringRef TypeParametersString = Name.substr(strlen("spirv.Image."));
-    SmallVector<StringRef> TypeParameters;
-    SplitString(TypeParametersString, TypeParameters, "_");
-    assert(TypeParameters.size() == 8 &&
-           "Wrong number of literals in SPIR-V builtin image type");
-
-    StringRef SampledType = TypeParameters[0];
-    unsigned Dim, Depth, Arrayed, Multisampled, Sampled, Format, AccessQual;
-    bool AreParameterLiteralsValid =
-        !(TypeParameters[1].getAsInteger(10, Dim) ||
-          TypeParameters[2].getAsInteger(10, Depth) ||
-          TypeParameters[3].getAsInteger(10, Arrayed) ||
-          TypeParameters[4].getAsInteger(10, Multisampled) ||
-          TypeParameters[5].getAsInteger(10, Sampled) ||
-          TypeParameters[6].getAsInteger(10, Format) ||
-          TypeParameters[7].getAsInteger(10, AccessQual));
-    assert(AreParameterLiteralsValid &&
-           "Invalid format of SPIR-V image type parameter literals.");
-
-    return std::unique_ptr<SPIRV::ImageType>(new SPIRV::ImageType{
-        Name, SampledType, SPIRV::AccessQualifier::AccessQualifier(AccessQual),
-        SPIRV::Dim::Dim(Dim), static_cast<bool>(Arrayed),
-        static_cast<bool>(Depth), static_cast<bool>(Multisampled),
-        static_cast<bool>(Sampled), SPIRV::ImageFormat::ImageFormat(Format)});
   }
-  llvm_unreachable("Unknown builtin image type name/literal");
+  if (!Name.startswith("spirv."))
+    llvm_unreachable("Unknown builtin image type name/literal");
+  // Parse the literals of SPIR-V image builtin parameters. The name should
+  // have the following format:
+  // spirv.Image._Type_Dim_Depth_Arrayed_MS_Sampled_ImageFormat_AccessQualifier
+  // e.g. %spirv.Image._void_1_0_0_0_0_0_0
+  StringRef TypeParametersString = Name.substr(strlen("spirv.Image."));
+  SmallVector<StringRef> TypeParameters;
+  SplitString(TypeParametersString, TypeParameters, "_");
+  assert(TypeParameters.size() == 8 &&
+         "Wrong number of literals in SPIR-V builtin image type");
+
+  StringRef SampledType = TypeParameters[0];
+  unsigned Dim, Depth, Arrayed, Multisampled, Sampled, Format, AccessQual;
+  bool AreParameterLiteralsValid =
+      !(TypeParameters[1].getAsInteger(10, Dim) ||
+        TypeParameters[2].getAsInteger(10, Depth) ||
+        TypeParameters[3].getAsInteger(10, Arrayed) ||
+        TypeParameters[4].getAsInteger(10, Multisampled) ||
+        TypeParameters[5].getAsInteger(10, Sampled) ||
+        TypeParameters[6].getAsInteger(10, Format) ||
+        TypeParameters[7].getAsInteger(10, AccessQual));
+  assert(AreParameterLiteralsValid &&
+         "Invalid format of SPIR-V image type parameter literals.");
+
+  return std::unique_ptr<SPIRV::ImageType>(new SPIRV::ImageType{
+      Name, SampledType, SPIRV::AccessQualifier::AccessQualifier(AccessQual),
+      SPIRV::Dim::Dim(Dim), static_cast<bool>(Arrayed),
+      static_cast<bool>(Depth), static_cast<bool>(Multisampled),
+      static_cast<bool>(Sampled), SPIRV::ImageFormat::ImageFormat(Format)});
 }
 
 static std::unique_ptr<const SPIRV::PipeType>
@@ -1714,24 +1713,23 @@ lookupOrParseBuiltinPipeType(StringRef Name) {
     // Lookup OpenCL builtin pipe type lowering details in TableGen records.
     const SPIRV::PipeType *Record = SPIRV::lookupPipeType(Name);
     return std::unique_ptr<SPIRV::PipeType>(new SPIRV::PipeType(*Record));
-  } else if (Name.startswith("spirv.")) {
-    // Parse the access qualifier literal in the name of the SPIR-V pipe type.
-    // The name should have the following format:
-    // spirv.Pipe._AccessQualifier
-    // e.g. %spirv.Pipe._1
-    if (Name.endswith("_0"))
-      return std::unique_ptr<SPIRV::PipeType>(
-          new SPIRV::PipeType{Name, SPIRV::AccessQualifier::ReadOnly});
-    else if (Name.endswith("_1"))
-      return std::unique_ptr<SPIRV::PipeType>(
-          new SPIRV::PipeType{Name, SPIRV::AccessQualifier::WriteOnly});
-    else if (Name.endswith("_2"))
-      return std::unique_ptr<SPIRV::PipeType>(
-          new SPIRV::PipeType{Name, SPIRV::AccessQualifier::ReadWrite});
-    else
-      llvm_unreachable("Unknown pipe type access qualifier literal");
   }
-  llvm_unreachable("Unknown builtin pipe type name/literal");
+  if (!Name.startswith("spirv."))
+    llvm_unreachable("Unknown builtin pipe type name/literal");
+  // Parse the access qualifier literal in the name of the SPIR-V pipe type.
+  // The name should have the following format:
+  // spirv.Pipe._AccessQualifier
+  // e.g. %spirv.Pipe._1
+  if (Name.endswith("_0"))
+    return std::unique_ptr<SPIRV::PipeType>(
+        new SPIRV::PipeType{Name, SPIRV::AccessQualifier::ReadOnly});
+  if (Name.endswith("_1"))
+    return std::unique_ptr<SPIRV::PipeType>(
+        new SPIRV::PipeType{Name, SPIRV::AccessQualifier::WriteOnly});
+  if (Name.endswith("_2"))
+    return std::unique_ptr<SPIRV::PipeType>(
+        new SPIRV::PipeType{Name, SPIRV::AccessQualifier::ReadWrite});
+  llvm_unreachable("Unknown pipe type access qualifier literal");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1795,8 +1793,9 @@ SPIRVType *getSampledImageType(const StructType *OpaqueType,
   return GR->getOrCreateOpTypeSampledImage(TargetImageType, MIRBuilder);
 }
 
+namespace SPIRV {
 SPIRVType *lowerBuiltinType(const StructType *OpaqueType,
-                            SPIRV::AccessQualifier::AccessQualifier AccessQual,
+                            AccessQualifier::AccessQualifier AccessQual,
                             MachineIRBuilder &MIRBuilder,
                             SPIRVGlobalRegistry *GR) {
   assert(OpaqueType->hasName() &&
@@ -1807,7 +1806,7 @@ SPIRVType *lowerBuiltinType(const StructType *OpaqueType,
   LLVM_DEBUG(dbgs() << "Lowering builtin type: " << Name << "\n");
 
   // Lookup the demangled builtin type in the TableGen records.
-  const SPIRV::DemangledType *TypeRecord = lookupBuiltinType(Name);
+  const SPIRV::DemangledType *TypeRecord = findBuiltinType(Name);
   if (!TypeRecord)
     report_fatal_error("Missing TableGen record for builtin type: " + Name);
 
@@ -1817,21 +1816,21 @@ SPIRVType *lowerBuiltinType(const StructType *OpaqueType,
   // from GlobalRegistry.
   SPIRVType *TargetType;
   switch (TypeRecord->Opcode) {
-  case SPIRV::OpTypeImage: {
+  case SPIRV::OpTypeImage:
     TargetType = getImageType(OpaqueType, AccessQual, MIRBuilder, GR);
-  } break;
-  case SPIRV::OpTypePipe: {
+    break;
+  case SPIRV::OpTypePipe:
     TargetType = getPipeType(OpaqueType, MIRBuilder, GR);
-  } break;
-  case SPIRV::OpTypeSampler: {
+    break;
+  case SPIRV::OpTypeSampler:
     TargetType = getSamplerType(MIRBuilder, GR);
-  } break;
-  case SPIRV::OpTypeSampledImage: {
+    break;
+  case SPIRV::OpTypeSampledImage:
     TargetType = getSampledImageType(OpaqueType, MIRBuilder, GR);
-  } break;
-  default: {
+    break;
+  default:
     TargetType = getNonParametrizedType(OpaqueType, TypeRecord, MIRBuilder, GR);
-  } break;
+    break;
   }
 
   // Emit OpName instruction if a new OpType<...> instruction was added
@@ -1842,4 +1841,5 @@ SPIRVType *lowerBuiltinType(const StructType *OpaqueType,
 
   return TargetType;
 }
+} // namespace SPIRV
 } // namespace llvm
