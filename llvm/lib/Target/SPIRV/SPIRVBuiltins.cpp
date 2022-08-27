@@ -1736,23 +1736,24 @@ lookupOrParseBuiltinPipeType(StringRef Name) {
 // Implementation functions for builtin types.
 //===----------------------------------------------------------------------===//
 
-SPIRVType *getNonParametrizedType(const StructType *OpaqueType,
-                                  const SPIRV::DemangledType *TypeRecord,
-                                  MachineIRBuilder &MIRBuilder,
-                                  SPIRVGlobalRegistry *GR) {
+static SPIRVType *getNonParametrizedType(const StructType *OpaqueType,
+                                         const SPIRV::DemangledType *TypeRecord,
+                                         MachineIRBuilder &MIRBuilder,
+                                         SPIRVGlobalRegistry *GR) {
   unsigned Opcode = TypeRecord->Opcode;
   // Create or get an existing type from GlobalRegistry.
   return GR->getOrCreateOpTypeByOpcode(OpaqueType, MIRBuilder, Opcode);
 }
 
-SPIRVType *getSamplerType(MachineIRBuilder &MIRBuilder,
-                          SPIRVGlobalRegistry *GR) {
+static SPIRVType *getSamplerType(MachineIRBuilder &MIRBuilder,
+                                 SPIRVGlobalRegistry *GR) {
   // Create or get an existing type from GlobalRegistry.
   return GR->getOrCreateOpTypeSampler(MIRBuilder);
 }
 
-SPIRVType *getPipeType(const StructType *OpaqueType,
-                       MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
+static SPIRVType *getPipeType(const StructType *OpaqueType,
+                              MachineIRBuilder &MIRBuilder,
+                              SPIRVGlobalRegistry *GR) {
   // Lookup pipe type lowering details in TableGen records or parse the
   // name/literal for details.
   std::unique_ptr<const SPIRV::PipeType> Record =
@@ -1761,9 +1762,10 @@ SPIRVType *getPipeType(const StructType *OpaqueType,
   return GR->getOrCreateOpTypePipe(MIRBuilder, Record.get()->Qualifier);
 }
 
-SPIRVType *getImageType(const StructType *OpaqueType,
-                        SPIRV::AccessQualifier::AccessQualifier AccessQual,
-                        MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
+static SPIRVType *
+getImageType(const StructType *OpaqueType,
+             SPIRV::AccessQualifier::AccessQualifier AccessQual,
+             MachineIRBuilder &MIRBuilder, SPIRVGlobalRegistry *GR) {
   // Lookup image type lowering details in TableGen records or parse the
   // name/literal for details.
   std::unique_ptr<const SPIRV::ImageType> Record =
@@ -1780,9 +1782,9 @@ SPIRVType *getImageType(const StructType *OpaqueType,
           : Record.get()->Qualifier);
 }
 
-SPIRVType *getSampledImageType(const StructType *OpaqueType,
-                               MachineIRBuilder &MIRBuilder,
-                               SPIRVGlobalRegistry *GR) {
+static SPIRVType *getSampledImageType(const StructType *OpaqueType,
+                                      MachineIRBuilder &MIRBuilder,
+                                      SPIRVGlobalRegistry *GR) {
   StringRef TypeParametersString =
       OpaqueType->getName().substr(strlen("spirv.SampledImage."));
   LLVMContext &Context = MIRBuilder.getMF().getFunction().getContext();
