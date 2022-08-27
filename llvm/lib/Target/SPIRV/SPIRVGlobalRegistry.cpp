@@ -546,26 +546,6 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeStruct(const StructType *Ty,
   return MIB;
 }
 
-static bool isOpenCLBuiltinType(const StructType *SType) {
-  return SType->isOpaque() && SType->hasName() &&
-         SType->getName().startswith("opencl.");
-}
-
-static bool isSPIRVBuiltinType(const StructType *SType) {
-  return SType->isOpaque() && SType->hasName() &&
-         SType->getName().startswith("spirv.");
-}
-
-static bool isSpecialType(const Type *Ty) {
-  if (auto PType = dyn_cast<PointerType>(Ty)) {
-    if (!PType->isOpaque())
-      Ty = PType->getPointerElementType();
-  }
-  if (auto SType = dyn_cast<StructType>(Ty))
-    return isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType);
-  return false;
-}
-
 SPIRVType *SPIRVGlobalRegistry::getOrCreateSpecialType(
     const Type *Ty, MachineIRBuilder &MIRBuilder, AQ::AccessQualifier AccQual) {
   // Some OpenCL and SPIRV builtins like image2d_t are passed in as
@@ -575,7 +555,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSpecialType(
     Ty = PType->getPointerElementType();
   }
   auto SType = cast<StructType>(Ty);
-  assert(isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType));
+  assert(isSpecialOpaqueType(SType) && "Not a special opaque builtin type");
   return SPIRV::lowerBuiltinType(SType, AccQual, MIRBuilder, this);
 }
 
@@ -642,7 +622,7 @@ SPIRVType *SPIRVGlobalRegistry::createSPIRVType(const Type *Ty,
                                                 MachineIRBuilder &MIRBuilder,
                                                 AQ::AccessQualifier AccQual,
                                                 bool EmitIR) {
-  if (isSpecialType(Ty))
+  if (isSpecialOpaqueType(Ty))
     return getOrCreateSpecialType(Ty, MIRBuilder, AccQual);
   auto &TypeToSPIRVTypeMap = DT.getTypes()->getAllUses();
   auto t = TypeToSPIRVTypeMap.find(Ty);
@@ -728,7 +708,7 @@ SPIRVType *SPIRVGlobalRegistry::restOfCreateSPIRVType(
   // Do not add OpTypeForwardPointer to DT, a corresponding normal pointer type
   // will be added later. For special types it is already added to DT.
   if (SpirvType->getOpcode() != SPIRV::OpTypeForwardPointer && !Reg.isValid() &&
-      !isSpecialType(Ty))
+      !isSpecialOpaqueType(Ty))
     DT.add(Ty, &MIRBuilder.getMF(), getSPIRVTypeID(SpirvType));
 
   return SpirvType;
@@ -748,7 +728,7 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSPIRVType(
     const Type *Ty, MachineIRBuilder &MIRBuilder,
     AQ::AccessQualifier AccessQual, bool EmitIR) {
   Register Reg = DT.find(Ty, &MIRBuilder.getMF());
-  if (Reg.isValid() && !isSpecialType(Ty))
+  if (Reg.isValid() && !isSpecialOpaqueType(Ty))
     return getSPIRVTypeForVReg(Reg);
   TypesInProcessing.clear();
   SPIRVType *STy = restOfCreateSPIRVType(Ty, MIRBuilder, AccessQual, EmitIR);

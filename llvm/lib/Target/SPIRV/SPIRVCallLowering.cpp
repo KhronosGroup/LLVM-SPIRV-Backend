@@ -112,6 +112,117 @@ static FunctionType *getOriginalFunctionType(const Function &F) {
   return FunctionType::get(RetTy, ArgTypes, F.isVarArg());
 }
 
+static MDString *getKernelArgAttribute(const Function &KernelFunction,
+                                       unsigned ArgIdx,
+                                       const StringRef AttributeName) {
+  assert(KernelFunction.getCallingConv() == CallingConv::SPIR_KERNEL &&
+         "Kernel attributes are only attached/belong to kernel functions.");
+
+  // Lookup the argument attribute in metadata attached to the kernel function.
+  MDNode *Node = KernelFunction.getMetadata(AttributeName);
+  if (Node && ArgIdx < Node->getNumOperands())
+    return cast<MDString>(Node->getOperand(ArgIdx));
+
+  // Sometimes metadata containing kernel attributes is not attached to the
+  // function, but can be found in the named module-level metadata instead. For
+  // example:
+  // !opencl.kernels = !{!0}
+  // !0 = !{void ()* @someKernelFunction, !1, ...}
+  // !1 = !{!"kernel_arg_addr_space", ...}
+  //
+  // In this case the actual index of searched argument attribute is ArgIdx + 1,
+  // since the first metadata node operand is occupied by attribute name
+  // ("kernel_arg_addr_space" in the example above).
+  unsigned MDArgIdx = ArgIdx + 1;
+  NamedMDNode *OpenCLKernelsMD =
+      KernelFunction.getParent()->getNamedMetadata("opencl.kernels");
+  if (!OpenCLKernelsMD || OpenCLKernelsMD->getNumOperands() == 0)
+    return nullptr;
+
+  MDNode *KernelToMDNodeList = OpenCLKernelsMD->getOperand(0);
+  // KernelToMDNodeList contains kernel function declarations followed by
+  // corresponding MDNodes for each attribute. Search only MDNodes "belonging"
+  // to the currently lowered kernel function.
+  bool FoundLoweredKernelFunction = false;
+  for (const MDOperand &Operand : KernelToMDNodeList->operands()) {
+    ValueAsMetadata *MaybeValue = dyn_cast<ValueAsMetadata>(Operand);
+    if (MaybeValue &&
+        dyn_cast_or_null<Function>(MaybeValue->getValue())->getName() ==
+            KernelFunction.getName()) {
+      FoundLoweredKernelFunction = true;
+      continue;
+    } else if (MaybeValue && FoundLoweredKernelFunction) {
+      return nullptr;
+    }
+
+    MDNode *MaybeNode = dyn_cast<MDNode>(Operand);
+    if (FoundLoweredKernelFunction && MaybeNode &&
+        cast<MDString>(MaybeNode->getOperand(0))->getString() ==
+            AttributeName &&
+        MDArgIdx < MaybeNode->getNumOperands())
+      return cast<MDString>(MaybeNode->getOperand(MDArgIdx));
+  }
+
+  return nullptr;
+}
+
+static SPIRV::AccessQualifier::AccessQualifier
+getArgAccessQual(const Function &F, unsigned ArgIdx) {
+  SPIRV::AccessQualifier::AccessQualifier AQ =
+      SPIRV::AccessQualifier::ReadWrite;
+
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL)
+    return AQ;
+
+  MDString *ArgAttribute =
+      getKernelArgAttribute(F, ArgIdx, "kernel_arg_access_qual");
+  if (ArgAttribute) {
+    StringRef AQString = ArgAttribute->getString();
+    if (AQString.compare("read_only") == 0)
+      AQ = SPIRV::AccessQualifier::ReadOnly;
+    else if (AQString.compare("write_only") == 0)
+      AQ = SPIRV::AccessQualifier::WriteOnly;
+  }
+
+  return AQ;
+}
+
+static std::vector<SPIRV::Decoration::Decoration>
+getKernelArgTypeQual(const Function &KernelFunction, unsigned ArgIdx) {
+  MDString *ArgAttribute =
+      getKernelArgAttribute(KernelFunction, ArgIdx, "kernel_arg_type_qual");
+  if (ArgAttribute) {
+    StringRef TypeQual = ArgAttribute->getString();
+    if (TypeQual.compare("volatile") == 0)
+      return {SPIRV::Decoration::Volatile};
+  }
+
+  return {};
+}
+
+static Type *getArgType(const Function &F, unsigned ArgIdx) {
+  Type *OriginalArgType = getOriginalFunctionType(F)->getParamType(ArgIdx);
+
+  if (F.getCallingConv() == CallingConv::SPIR_KERNEL &&
+      !isSpecialOpaqueType(OriginalArgType)) {
+
+    MDString *MDKernelArgType =
+        getKernelArgAttribute(F, ArgIdx, "kernel_arg_type");
+    if (MDKernelArgType && MDKernelArgType->getString().endswith("_t")) {
+      std::string KernelArgTypeStr =
+          "opencl." + MDKernelArgType->getString().str();
+
+      Type *ExistingOpaqueType =
+          StructType::getTypeByName(F.getContext(), KernelArgTypeStr);
+      return ExistingOpaqueType
+                 ? ExistingOpaqueType
+                 : StructType::create(F.getContext(), KernelArgTypeStr);
+    }
+  }
+
+  return OriginalArgType;
+}
+
 bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
@@ -126,21 +237,11 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     unsigned i = 0;
     for (const auto &Arg : F.args()) {
       assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-      // auto *SpirvTy = GR->getOrCreateSPIRVType(Arg.getType(), MIRBuilder);
-      // SPIRVType *SpirvTy = GR->getSPIRVTypeForVReg(VRegs[i][0]);
-      // if (!SpirvTy)
-      Type *ArgTy = FTy->getParamType(i);
-      SPIRV::AccessQualifier::AccessQualifier AQ =
-          SPIRV::AccessQualifier::ReadWrite;
-      MDNode *Node = F.getMetadata("kernel_arg_access_qual");
-      if (Node && i < Node->getNumOperands()) {
-        StringRef AQString = cast<MDString>(Node->getOperand(i))->getString();
-        if (AQString.compare("read_only") == 0)
-          AQ = SPIRV::AccessQualifier::ReadOnly;
-        else if (AQString.compare("write_only") == 0)
-          AQ = SPIRV::AccessQualifier::WriteOnly;
-      }
-      auto *SpirvTy = GR->assignTypeToVReg(ArgTy, VRegs[i][0], MIRBuilder, AQ);
+
+      SPIRV::AccessQualifier::AccessQualifier ArgAccessQual =
+          getArgAccessQual(F, i);
+      auto *SpirvTy = GR->assignTypeToVReg(getArgType(F, i), VRegs[i][0],
+                                           MIRBuilder, ArgAccessQual);
       ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
@@ -173,14 +274,14 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                         {SPIRV::FunctionParameterAttribute::NoAlias});
       }
 
-      Node = F.getMetadata("kernel_arg_type_qual");
-      if (Node && i < Node->getNumOperands()) {
-        StringRef TypeQual = cast<MDString>(Node->getOperand(i))->getString();
-        if (TypeQual.compare("volatile") == 0)
-          buildOpDecorate(VRegs[i][0], MIRBuilder, SPIRV::Decoration::Volatile,
-                          {});
+      if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+        std::vector<SPIRV::Decoration::Decoration> ArgTypeQualDecs =
+            getKernelArgTypeQual(F, i);
+        for (SPIRV::Decoration::Decoration Decoration : ArgTypeQualDecs)
+          buildOpDecorate(VRegs[i][0], MIRBuilder, Decoration, {});
       }
-      Node = F.getMetadata("spirv.ParameterDecorations");
+
+      MDNode *Node = F.getMetadata("spirv.ParameterDecorations");
       if (Node && i < Node->getNumOperands() &&
           isa<MDNode>(Node->getOperand(i))) {
         MDNode *MD = cast<MDNode>(Node->getOperand(i));
