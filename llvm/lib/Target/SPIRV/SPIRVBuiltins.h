@@ -14,27 +14,30 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
 
 #include "SPIRVGlobalRegistry.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace llvm {
+namespace SPIRV {
 /// Lowers a builtin funtion call using the provided \p DemangledCall skeleton
 /// and external instruction \p Set.
 ///
-/// \return A pair of boolean values, the first true means the call recognized
-/// as a builtin, the second one indicates the successful lowering.
+/// \return A boolean value indicating the successful lowering, if the callee
+/// is recognized as a builtin function.
 ///
 /// \p DemangledCall is the skeleton of the lowered builtin function call.
 /// \p Set is the external instruction set containing the given builtin.
 /// \p OrigRet is the single original virtual return register if defined,
-/// Register(0) otherwise. 
-/// \p OrigRetTy is the type of the \p OrigRet. 
+/// Register(0) otherwise.
+/// \p OrigRetTy is the type of the \p OrigRet.
 /// \p Args are the arguments of the lowered builtin call.
-std::pair<bool, bool> lowerBuiltin(
-    const StringRef DemangledCall, SPIRV::InstructionSet::InstructionSet Set,
-    MachineIRBuilder &MIRBuilder, const Register OrigRet, const Type *OrigRetTy,
-    const SmallVectorImpl<Register> &Args, SPIRVGlobalRegistry *GR);
-
+Optional<bool> lowerBuiltin(const StringRef DemangledCall,
+                            InstructionSet::InstructionSet Set,
+                            MachineIRBuilder &MIRBuilder,
+                            const Register OrigRet, const Type *OrigRetTy,
+                            const SmallVectorImpl<Register> &Args,
+                            SPIRVGlobalRegistry *GR);
 /// Handles the translation of the provided special opaque/builtin type \p Type
 /// to SPIR-V type. Generates the corresponding machine instructions for the
 /// target type or gets the already existing OpType<...> register from the
@@ -44,8 +47,9 @@ std::pair<bool, bool> lowerBuiltin(
 ///
 /// \p Type is the special opaque/builtin type to be lowered.
 SPIRVType *lowerBuiltinType(const StructType *Type,
-                            AQ::AccessQualifier AccessQual,
+                            AccessQualifier::AccessQualifier AccessQual,
                             MachineIRBuilder &MIRBuilder,
                             SPIRVGlobalRegistry *GR);
-} // end namespace llvm
+} // namespace SPIRV
+} // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H

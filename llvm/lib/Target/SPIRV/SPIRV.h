@@ -25,7 +25,6 @@ FunctionPass *createSPIRVBasicBlockDominancePass();
 ModulePass *createSPIRVLowerConstExprLegacyPass();
 FunctionPass *createSPIRVPreLegalizerPass();
 FunctionPass *createSPIRVEmitIntrinsicsPass(SPIRVTargetMachine *TM);
-
 InstructionSelector *
 createSPIRVInstructionSelector(const SPIRVTargetMachine &TM,
                                const SPIRVSubtarget &Subtarget,

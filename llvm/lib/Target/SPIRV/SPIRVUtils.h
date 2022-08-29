@@ -64,12 +64,6 @@ unsigned storageClassToAddressSpace(SPIRV::StorageClass::StorageClass SC);
 SPIRV::StorageClass::StorageClass
 addressSpaceToStorageClass(unsigned AddrSpace);
 
-// Utility method to constrain an instruction's operands to the correct
-// register classes, and return true if this worked.
-// TODO: get rid of using this function.
-bool constrainRegOperands(MachineInstrBuilder &MIB,
-                          MachineFunction *MF = nullptr);
-
 SPIRV::MemorySemantics::MemorySemantics
 getMemSemanticsForStorageClass(SPIRV::StorageClass::StorageClass SC);
 
@@ -90,9 +84,9 @@ bool isSpvIntrinsic(MachineInstr &MI, Intrinsic::ID IntrinsicID);
 // Get type of i-th operand of the metadata node.
 Type *getMDOperandAsType(const MDNode *N, unsigned I);
 
-// Return a demangled name with arg type info by itaniumDemangle().
-// If the parser fails, return only function name.
-std::string isOclOrSpirvBuiltin(StringRef Name);
+// If OpenCL or SPIR-V builtin function name is recognized, return a demangled
+// name, otherwise return an empty string.
+std::string getOclOrSpirvBuiltinDemangledName(StringRef Name);
 
 // Check if given LLVM type is a special opaque builtin type.
 bool isSpecialOpaqueType(const Type *Ty);

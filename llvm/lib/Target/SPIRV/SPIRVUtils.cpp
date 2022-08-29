@@ -209,17 +209,6 @@ SPIRV::MemorySemantics::MemorySemantics getMemSemantics(AtomicOrdering Ord) {
   }
 }
 
-bool constrainRegOperands(MachineInstrBuilder &MIB, MachineFunction *MF) {
-  if (!MF)
-    MF = MIB->getMF();
-  const auto &Subtarget = MF->getSubtarget();
-  const TargetInstrInfo *TII = Subtarget.getInstrInfo();
-  const TargetRegisterInfo *TRI = Subtarget.getRegisterInfo();
-  const RegisterBankInfo *RBI = Subtarget.getRegBankInfo();
-
-  return constrainSelectedInstRegOperands(*MIB, *TII, *TRI, *RBI);
-}
-
 MachineInstr *getDefInstrMaybeConstant(Register &ConstReg,
                                        const MachineRegisterInfo *MRI) {
   MachineInstr *ConstInstr = MRI->getVRegDef(ConstReg);
@@ -298,7 +287,7 @@ static bool isNonMangledOCLBuiltin(StringRef Name) {
          Name == "__translate_sampler_initializer";
 }
 
-std::string isOclOrSpirvBuiltin(StringRef Name) {
+std::string getOclOrSpirvBuiltinDemangledName(StringRef Name) {
   bool IsNonMangledOCL = isNonMangledOCLBuiltin(Name);
   bool IsNonMangledSPIRV = Name.startswith("__spirv_");
   bool IsMangled = Name.startswith("_Z");

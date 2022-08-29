@@ -380,29 +380,26 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   Register ResVReg =
       Info.OrigRet.Regs.empty() ? Register(0) : Info.OrigRet.Regs[0];
   std::string FuncName = Info.Callee.getGlobal()->getGlobalIdentifier();
-  std::string DemangledName = isOclOrSpirvBuiltin(FuncName);
-  if (!DemangledName.empty() && CF && CF->isDeclaration()) {
-    // TODO: check that it's OCL builtin, then apply OpenCL_std.
-    const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
-    if (ST->canUseExtInstSet(SPIRV::InstructionSet::OpenCL_std)) {
-      // Mangled names are for OpenCL builtins, so pass off to OpenCLBIFs.cpp.
-      const Type *OrigRetTy = Info.OrigRet.Ty;
-      if (FTy)
-        OrigRetTy = FTy->getReturnType();
-      SmallVector<Register, 8> ArgVRegs;
-      for (auto Arg : Info.OrigArgs) {
-        assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
-        ArgVRegs.push_back(Arg.Regs[0]);
-        SPIRVType *SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
-        GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
-      }
-      auto Res = lowerBuiltin(DemangledName, SPIRV::InstructionSet::OpenCL_std,
-                              MIRBuilder, ResVReg, OrigRetTy, ArgVRegs, GR);
-      if (Res.first)
-        return Res.second;
+  std::string DemangledName = getOclOrSpirvBuiltinDemangledName(FuncName);
+  const auto *ST = static_cast<const SPIRVSubtarget *>(&MF.getSubtarget());
+  // TODO: check that it's OCL builtin, then apply OpenCL_std.
+  if (!DemangledName.empty() && CF && CF->isDeclaration() &&
+      ST->canUseExtInstSet(SPIRV::InstructionSet::OpenCL_std)) {
+    const Type *OrigRetTy = Info.OrigRet.Ty;
+    if (FTy)
+      OrigRetTy = FTy->getReturnType();
+    SmallVector<Register, 8> ArgVRegs;
+    for (auto Arg : Info.OrigArgs) {
+      assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
+      ArgVRegs.push_back(Arg.Regs[0]);
+      SPIRVType *SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
+      GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
     }
+    if (Optional<bool> Res = SPIRV::lowerBuiltin(
+            DemangledName, SPIRV::InstructionSet::OpenCL_std, MIRBuilder,
+            ResVReg, OrigRetTy, ArgVRegs, GR))
+      return *Res;
   }
-
   if (CF && CF->isDeclaration() &&
       !GR->find(CF, &MIRBuilder.getMF()).isValid()) {
     // Emit the type info and forward function declaration to the first MBB
@@ -441,7 +438,6 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     assert(arg.Regs.size() == 1 && "Call arg has multiple VRegs");
     MIB.addUse(arg.Regs[0]);
   }
-  const auto &STI = MF.getSubtarget();
-  return MIB.constrainAllUses(MIRBuilder.getTII(), *STI.getRegisterInfo(),
-                              *STI.getRegBankInfo());
+  return MIB.constrainAllUses(MIRBuilder.getTII(), *ST->getRegisterInfo(),
+                              *ST->getRegBankInfo());
 }
