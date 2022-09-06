@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//  Declarations that describe the SPIR-V register file
+//
+//  Declarations that describe the SPIR-V register file.
+//
 //===----------------------------------------------------------------------===//
 
 let Namespace = "SPIRV" in {
-  def p0 : PtrValueType <i32, 0>;
+  def p0 : PtrValueType<i32, 0>;
   // All registers are for 32-bit identifiers, so have a single dummy register
 
   // Class for registers that are the result of OpTypeXXX instructions

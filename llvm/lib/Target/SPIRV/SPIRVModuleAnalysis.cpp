@@ -112,7 +112,6 @@ void SPIRVModuleAnalysis::setBaseInfo(const Module &M) {
                : PtrSize == 64 ? SPIRV::AddressingModel::Physical64
                                : SPIRV::AddressingModel::Logical;
   }
-
   // Get the OpenCL version number from metadata.
   // TODO: support other source languages.
   if (auto VerNode = M.getNamedMetadata("opencl.ocl.version")) {
@@ -230,7 +229,7 @@ void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
     MachineFunction *MF = MMI->getMachineFunction(*F);
     if (!MF)
       continue;
-    // Iterate through and hoist any instructions we can at this stage.
+    // Iterate through and collect opextension/opcapability instructions.
     for (MachineBasicBlock &MBB : *MF) {
       for (MachineInstr &MI : MBB) {
         if (MI.getOpcode() == SPIRV::OpExtension) {

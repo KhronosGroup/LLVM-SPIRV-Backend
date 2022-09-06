@@ -20,7 +20,9 @@ using namespace llvm;
 
 unsigned SPIRVTargetLowering::getNumRegistersForCallingConv(
     LLVMContext &Context, CallingConv::ID CC, EVT VT) const {
-  // Avoid fail on v3i1 argument. Maybe we need to return 1 for all types.
+  // This code avoids CallLowering fail inside getVectorTypeBreakdown
+  // on v3i1 arguments. Maybe we need to return 1 for all types.
+  // TODO: remove it once this case is supported by the default implementation.
   if (VT.isVector() && VT.getVectorNumElements() == 3 &&
       (VT.getVectorElementType() == MVT::i1 ||
        VT.getVectorElementType() == MVT::i8))
@@ -31,7 +33,9 @@ unsigned SPIRVTargetLowering::getNumRegistersForCallingConv(
 MVT SPIRVTargetLowering::getRegisterTypeForCallingConv(LLVMContext &Context,
                                                        CallingConv::ID CC,
                                                        EVT VT) const {
-  // Avoid fail on v3i1 argument. Maybe we need to return i32 for all types.
+  // This code avoids CallLowering fail inside getVectorTypeBreakdown
+  // on v3i1 arguments. Maybe we need to return i32 for all types.
+  // TODO: remove it once this case is supported by the default implementation.
   if (VT.isVector() && VT.getVectorNumElements() == 3) {
     if (VT.getVectorElementType() == MVT::i1)
       return MVT::v4i1;

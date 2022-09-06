@@ -308,10 +308,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   // Generate a SPIR-V type for the function.
   auto MRI = MIRBuilder.getMRI();
   Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+  MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
   if (F.isDeclaration())
     GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
-  MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
-
   SPIRVType *RetTy = GR->getOrCreateSPIRVType(FTy->getReturnType(), MIRBuilder);
   SPIRVType *FuncTy = GR->getOrCreateOpTypeFunctionWithArgs(
       FTy, RetTy, ArgTypeVRegs, MIRBuilder);
@@ -337,7 +336,6 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       GR->add(&Arg, &MIRBuilder.getMF(), VRegs[i][0]);
     i++;
   }
-
   // Name the function.
   if (F.hasName())
     buildOpName(FuncVReg, F.getName(), MIRBuilder);

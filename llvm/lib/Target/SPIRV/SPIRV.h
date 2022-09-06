@@ -22,7 +22,7 @@ class RegisterBankInfo;
 ModulePass *createSPIRVPrepareFunctionsPass();
 FunctionPass *createSPIRVOCLRegularizerPass();
 FunctionPass *createSPIRVBasicBlockDominancePass();
-ModulePass *createSPIRVLowerConstExprLegacyPass();
+FunctionPass *createSPIRVLowerConstExprLegacyPass();
 FunctionPass *createSPIRVPreLegalizerPass();
 FunctionPass *createSPIRVEmitIntrinsicsPass(SPIRVTargetMachine *TM);
 InstructionSelector *
