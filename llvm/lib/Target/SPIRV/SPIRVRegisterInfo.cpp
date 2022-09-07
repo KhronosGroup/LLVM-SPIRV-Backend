@@ -22,8 +22,7 @@ using namespace llvm;
 SPIRVRegisterInfo::SPIRVRegisterInfo() : SPIRVGenRegisterInfo(SPIRV::ID0) {}
 
 BitVector SPIRVRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
-  BitVector Reserved(getNumRegs());
-  return Reserved;
+  return BitVector(getNumRegs());
 }
 
 const MCPhysReg *

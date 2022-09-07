@@ -22,9 +22,8 @@
 
 using namespace llvm;
 
-// This required for .td selection patterns to work or we'd end up
-// with RegClass checks being redundant as all the classes would be mapped
-// to the same bank
+// This required for .td selection patterns to work or we'd end up with RegClass
+// checks being redundant as all the classes would be mapped to the same bank.
 const RegisterBank &
 SPIRVRegisterBankInfo::getRegBankFromRegClass(const TargetRegisterClass &RC,
                                               LLT Ty) const {

@@ -25,15 +25,14 @@ public:
                                const SPIRVSubtarget &STI)
       : TargetLowering(TM) {}
 
-  // Stop IRTranslator breaking up FMA instrs to preserve types information
+  // Stop IRTranslator breaking up FMA instrs to preserve types information.
   bool isFMAFasterThanFMulAndFAdd(const MachineFunction &MF,
                                   EVT) const override {
     return true;
   }
 
-  // This is to prevent sexts of non-i64 vector indices
-  // which are generated within general IRTranslator hence
-  // type generation for it is omitted
+  // This is to prevent sexts of non-i64 vector indices which are generated
+  // within general IRTranslator hence type generation for it is omitted.
   MVT getVectorIdxTy(const DataLayout &DL) const override {
     return MVT::getIntegerVT(32);
   }
