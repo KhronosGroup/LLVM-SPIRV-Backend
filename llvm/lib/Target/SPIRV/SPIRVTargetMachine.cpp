@@ -149,8 +149,7 @@ TargetPassConfig *SPIRVTargetMachine::createPassConfig(PassManagerBase &PM) {
 
 void SPIRVPassConfig::addIRPasses() {
   TargetPassConfig::addIRPasses();
-  addPass(createSPIRVLowerConstExprLegacyPass());
-  addPass(createSPIRVOCLRegularizerPass());
+  addPass(createSPIRVRegularizerPass());
   addPass(createSPIRVPrepareFunctionsPass());
 }
 
