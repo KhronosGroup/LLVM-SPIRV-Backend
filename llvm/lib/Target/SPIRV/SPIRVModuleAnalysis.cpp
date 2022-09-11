@@ -304,7 +304,11 @@ void SPIRVModuleAnalysis::collectFuncNames(MachineInstr &MI,
     Register GlobalReg = MAI.getRegisterAlias(MI.getMF(), Reg);
     assert(GlobalReg.isValid());
     // TODO: check that it does not conflict with existing entries.
-    MAI.FuncNameMap[F.getGlobalIdentifier()] = GlobalReg;
+    GlobalValue::LinkageTypes Linkage = F.getLinkage();
+    StringRef Name = F.hasName() ? F.getName() : ".anonymous";
+    StringRef ModuleFileName = F.getParent()->getSourceFileName();
+    MAI.FuncNameMap[GlobalValue::getGlobalIdentifier(
+        Name, Linkage, ModuleFileName)] = GlobalReg;
   }
 }
 
