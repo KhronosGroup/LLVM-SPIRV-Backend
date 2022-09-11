@@ -391,7 +391,7 @@ static void addOpsFromMDNode(MDNode *MDN, MCInst &Inst,
       if (ConstantInt *Const = dyn_cast<ConstantInt>(C)) {
         Inst.addOperand(MCOperand::createImm(Const->getZExtValue()));
       } else if (auto *CE = dyn_cast<Function>(C)) {
-        Register FuncReg = MAI->getFuncReg(CE->getName().str());
+        Register FuncReg = MAI->getFuncReg(CE);
         assert(FuncReg.isValid());
         Inst.addOperand(MCOperand::createReg(FuncReg));
       }
@@ -423,7 +423,7 @@ void SPIRVAsmPrinter::outputExecutionMode(const Module &M) {
     const Function &F = *FI;
     if (F.isDeclaration())
       continue;
-    Register FReg = MAI->getFuncReg(F.getGlobalIdentifier());
+    Register FReg = MAI->getFuncReg(&F);
     assert(FReg.isValid());
     if (MDNode *Node = F.getMetadata("reqd_work_group_size"))
       outputExecutionModeFromMDNode(FReg, Node,
@@ -462,7 +462,7 @@ void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
       if (!isa<Function>(AnnotatedVar))
         llvm_unreachable("Unsupported value in llvm.global.annotations");
       Function *Func = cast<Function>(AnnotatedVar);
-      Register Reg = MAI->getFuncReg(Func->getGlobalIdentifier());
+      Register Reg = MAI->getFuncReg(Func);
 
       // The second field contains a pointer to a global annotation string.
       GlobalVariable *GV =

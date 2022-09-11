@@ -154,8 +154,12 @@ struct ModuleAnalysisInfo {
   // The table maps MBB number to SPIR-V unique ID register.
   DenseMap<int, Register> BBNumToRegMap;
 
-  Register getFuncReg(std::string FuncName) {
-    auto FuncReg = FuncNameMap.find(FuncName);
+  Register getFuncReg(const Function *F) {
+    GlobalValue::LinkageTypes Linkage = F->getLinkage();
+    StringRef Name = F->hasName() ? F->getName() : ".anonymous";
+    StringRef ModuleFileName = F->getParent()->getSourceFileName();
+    auto FuncReg = FuncNameMap.find(
+        GlobalValue::getGlobalIdentifier(Name, Linkage, ModuleFileName));
     assert(FuncReg != FuncNameMap.end() && "Cannot find function Id");
     return FuncReg->second;
   }
