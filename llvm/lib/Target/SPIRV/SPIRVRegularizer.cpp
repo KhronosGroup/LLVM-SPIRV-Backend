@@ -221,12 +221,12 @@ void SPIRVRegularizer::visitCallScalToVec(CallInst *CI, StringRef MangledName,
   assert(NewF);
 
   auto ConstInt = ConstantInt::get(IntegerType::get(CI->getContext(), 32), 0);
-  UndefValue *UndefVal = UndefValue::get(Arg0Ty);
+  PoisonValue *PVal = PoisonValue::get(Arg0Ty);
   Instruction *Inst =
-      InsertElementInst::Create(UndefVal, CI->getOperand(1), ConstInt, "", CI);
+      InsertElementInst::Create(PVal, CI->getOperand(1), ConstInt, "", CI);
   ElementCount VecElemCount = cast<VectorType>(Arg0Ty)->getElementCount();
   Constant *ConstVec = ConstantVector::getSplat(VecElemCount, ConstInt);
-  Value *NewVec = new ShuffleVectorInst(Inst, UndefVal, ConstVec, "", CI);
+  Value *NewVec = new ShuffleVectorInst(Inst, PVal, ConstVec, "", CI);
   CI->setOperand(1, NewVec);
   CI->replaceUsesOfWith(OldF, NewF);
   CI->mutateFunctionType(NewF->getFunctionType());
