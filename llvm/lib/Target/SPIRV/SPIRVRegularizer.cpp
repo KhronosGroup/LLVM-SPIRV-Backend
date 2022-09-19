@@ -220,6 +220,9 @@ void SPIRVRegularizer::visitCallScalToVec(CallInst *CI, StringRef MangledName,
   }
   assert(NewF);
 
+  // This produces an instruction sequence that implements a splat of
+  // CI->getOperand(1) to a vector Arg0Ty. However, we use InsertElementInst
+  // and ShuffleVectorInst to generate the same code as the SPIR-V translator.
   auto ConstInt = ConstantInt::get(IntegerType::get(CI->getContext(), 32), 0);
   PoisonValue *PVal = PoisonValue::get(Arg0Ty);
   Instruction *Inst =
