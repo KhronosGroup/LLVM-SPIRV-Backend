@@ -146,9 +146,8 @@ static MDString *getKernelArgAttribute(const Function &KernelFunction,
   bool FoundLoweredKernelFunction = false;
   for (const MDOperand &Operand : KernelToMDNodeList->operands()) {
     ValueAsMetadata *MaybeValue = dyn_cast<ValueAsMetadata>(Operand);
-    if (MaybeValue &&
-        dyn_cast_or_null<Function>(MaybeValue->getValue())->getName() ==
-            KernelFunction.getName()) {
+    if (MaybeValue && dyn_cast<Function>(MaybeValue->getValue())->getName() ==
+                          KernelFunction.getName()) {
       FoundLoweredKernelFunction = true;
       continue;
     } else if (MaybeValue && FoundLoweredKernelFunction) {
