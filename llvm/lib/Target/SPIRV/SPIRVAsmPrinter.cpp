@@ -460,7 +460,7 @@ void SPIRVAsmPrinter::outputAnnotations(const Module &M) {
       // the annotated variable.
       Value *AnnotatedVar = CS->getOperand(0)->stripPointerCasts();
       if (!isa<Function>(AnnotatedVar))
-        llvm_unreachable("Unsupported value in llvm.global.annotations");
+        report_fatal_error("Unsupported value in llvm.global.annotations");
       Function *Func = cast<Function>(AnnotatedVar);
       Register Reg = MAI->getFuncReg(Func);
 
