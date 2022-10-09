@@ -16,6 +16,7 @@
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVGlobalRegistry.h"
+#include "SPIRVUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallSet.h"
@@ -155,11 +156,8 @@ struct ModuleAnalysisInfo {
   DenseMap<int, Register> BBNumToRegMap;
 
   Register getFuncReg(const Function *F) {
-    GlobalValue::LinkageTypes Linkage = F->getLinkage();
-    StringRef Name = F->hasName() ? F->getName() : ".anonymous";
-    StringRef ModuleFileName = F->getParent()->getSourceFileName();
-    auto FuncReg = FuncNameMap.find(
-        GlobalValue::getGlobalIdentifier(Name, Linkage, ModuleFileName));
+    assert(F && "Function is null");
+    auto FuncReg = FuncNameMap.find(getFunctionGlobalIdentifier(F));
     assert(FuncReg != FuncNameMap.end() && "Cannot find function Id");
     return FuncReg->second;
   }
