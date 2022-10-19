@@ -1,30 +1,30 @@
 ; RUN: llc -O0 -mtriple=spirv64-unknown-unknown %s -o - | FileCheck %s
 
 ;; Types:
-; CHECK-DAG: %[[#INT:]] = OpTypeInt 32
-; CHECK-DAG: %[[#VOID:]] = OpTypeVoid
-; CHECK-DAG: %[[#IMAGE1D_T:]] = OpTypeImage %[[#VOID]] 1D 0 0 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE2D_T:]] = OpTypeImage %[[#VOID]] 2D 0 0 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE3D_T:]] = OpTypeImage %[[#VOID]] 3D 0 0 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE1D_ARRAY_T:]] = OpTypeImage %[[#VOID]] 1D 0 1 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE2D_ARRAY_T:]] = OpTypeImage %[[#VOID]] 2D 0 1 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE2D_DEPTH_T:]] = OpTypeImage %[[#VOID]] 2D 1 0 0 0 Unknown ReadOnly
-; CHECK-DAG: %[[#IMAGE2D_ARRAY_DEPTH_T:]] = OpTypeImage %[[#VOID]] 2D 1 1 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#INT:]] = OpTypeInt 32
+; CHECK-DAG:  %[[#VOID:]] = OpTypeVoid
+; CHECK-DAG:  %[[#IMAGE1D_T:]] = OpTypeImage %[[#VOID]] 1D 0 0 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE2D_T:]] = OpTypeImage %[[#VOID]] 2D 0 0 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE3D_T:]] = OpTypeImage %[[#VOID]] 3D 0 0 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE1D_ARRAY_T:]] = OpTypeImage %[[#VOID]] 1D 0 1 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE2D_ARRAY_T:]] = OpTypeImage %[[#VOID]] 2D 0 1 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE2D_DEPTH_T:]] = OpTypeImage %[[#VOID]] 2D 1 0 0 0 Unknown ReadOnly
+; CHECK-DAG:  %[[#IMAGE2D_ARRAY_DEPTH_T:]] = OpTypeImage %[[#VOID]] 2D 1 1 0 0 Unknown ReadOnly
 ;; Instructions:
-; CHECK: %[[#IMAGE1D:]] = OpLoad %[[#IMAGE1D_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE1D]]
-; CHECK: %[[#IMAGE2D:]] = OpLoad %[[#IMAGE2D_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D]]
-; CHECK: %[[#IMAGE3D:]] = OpLoad %[[#IMAGE3D_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE3D]]
-; CHECK: %[[#IMAGE1D_ARRAY:]] = OpLoad %[[#IMAGE1D_ARRAY_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE1D_ARRAY]]
-; CHECK: %[[#IMAGE2D_ARRAY:]] = OpLoad %[[#IMAGE2D_ARRAY_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_ARRAY]]
-; CHECK: %[[#IMAGE2D_DEPTH:]] = OpLoad %[[#IMAGE2D_DEPTH_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_DEPTH]]
-; CHECK: %[[#IMAGE2D_ARRAY_DEPTH:]] = OpLoad %[[#IMAGE2D_ARRAY_DEPTH_T]]
-; CHECK-NEXT: %{{[0-9]+}} = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_ARRAY_DEPTH]]
+; CHECK:      %[[#IMAGE1D:]] = OpLoad %[[#IMAGE1D_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE1D]]
+; CHECK:      %[[#IMAGE2D:]] = OpLoad %[[#IMAGE2D_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D]]
+; CHECK:      %[[#IMAGE3D:]] = OpLoad %[[#IMAGE3D_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE3D]]
+; CHECK:      %[[#IMAGE1D_ARRAY:]] = OpLoad %[[#IMAGE1D_ARRAY_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE1D_ARRAY]]
+; CHECK:      %[[#IMAGE2D_ARRAY:]] = OpLoad %[[#IMAGE2D_ARRAY_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_ARRAY]]
+; CHECK:      %[[#IMAGE2D_DEPTH:]] = OpLoad %[[#IMAGE2D_DEPTH_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_DEPTH]]
+; CHECK:      %[[#IMAGE2D_ARRAY_DEPTH:]] = OpLoad %[[#IMAGE2D_ARRAY_DEPTH_T]]
+; CHECK-NEXT: %[[#]] = OpImageQueryLevels %[[#INT]] %[[#IMAGE2D_ARRAY_DEPTH]]
 
 %opencl.image1d_ro_t = type opaque
 %opencl.image2d_ro_t = type opaque
