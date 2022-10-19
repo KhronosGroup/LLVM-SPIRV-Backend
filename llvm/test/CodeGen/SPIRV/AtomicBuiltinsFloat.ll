@@ -1,11 +1,11 @@
 ; RUN: llc -O0 -mtriple=spirv64-unknown-unknown %s -o - | FileCheck %s
 
 ;; Types:
-; CHECK:  %[[#F32:]] = OpTypeFloat 32
+; CHECK:         %[[#F32:]] = OpTypeFloat 32
 ;; Constants:
-; CHECK:  %[[#CONST:]] = OpConstant %[[#F32]] 1065353216
+; CHECK:         %[[#CONST:]] = OpConstant %[[#F32]] 1065353216
 ;; Atomic instructions:
-; CHECK: OpStore {{%.+}} %[[#CONST]]
+; CHECK: OpStore %[[#]] %[[#CONST]]
 ; CHECK-COUNT-3: OpAtomicStore
 ; CHECK-COUNT-3: OpAtomicLoad
 ; CHECK-COUNT-3: OpAtomicExchange
