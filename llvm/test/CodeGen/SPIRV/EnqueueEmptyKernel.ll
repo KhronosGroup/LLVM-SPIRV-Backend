@@ -28,7 +28,6 @@
 ; CHECK-SPIRV: %[[#Int8Ptr:]] = OpTypePointer CrossWorkgroup %[[#Int8]]
 ; CHECK-SPIRV: %[[#Block]] = OpVariable %[[#]]
 
-; Function Attrs: convergent nounwind
 define spir_kernel void @test_enqueue_empty() {
 entry:
   %tmp = alloca %struct.ndrange_t, align 8
@@ -36,18 +35,15 @@ entry:
   call spir_func void @_Z10ndrange_1Dm(%struct.ndrange_t* sret(%struct.ndrange_t*) %tmp, i64 1)
   %0 = call i32 @__enqueue_kernel_basic_events(%opencl.queue_t* %call, i32 1, %struct.ndrange_t* %tmp, i32 0, %opencl.clk_event_t* addrspace(4)* null, %opencl.clk_event_t* addrspace(4)* null, i8 addrspace(4)* addrspacecast (i8* bitcast (void (i8 addrspace(4)*)* @__test_enqueue_empty_block_invoke_kernel to i8*) to i8 addrspace(4)*), i8 addrspace(4)* addrspacecast (i8 addrspace(1)* bitcast ({ i32, i32 } addrspace(1)* @__block_literal_global to i8 addrspace(1)*) to i8 addrspace(4)*))
   ret void
-; CHECK-SPIRV: %[[Int8PtrBlock:[0-9]+]] = OpBitcast %[[#Int8Ptr]] %[[#Block]]
-; CHECK-SPIRV: %[[Int8PtrGenBlock:[0-9]+]] = OpPtrCastToGeneric %[[#Int8PtrGen]] %[[Int8PtrBlock]]
-; CHECK-SPIRV: %[[#]] = OpEnqueueKernel %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#Invoke:]] %[[Int8PtrGenBlock]] %[[#]] %[[#]]
+; CHECK-SPIRV: %[[#Int8PtrBlock:]] = OpBitcast %[[#Int8Ptr]] %[[#Block]]
+; CHECK-SPIRV: %[[#Int8PtrGenBlock:]] = OpPtrCastToGeneric %[[#Int8PtrGen]] %[[#Int8PtrBlock]]
+; CHECK-SPIRV: %[[#]] = OpEnqueueKernel %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#]] %[[#Invoke:]] %[[#Int8PtrGenBlock]] %[[#]] %[[#]]
 }
 
-; Function Attrs: convergent
 declare spir_func %opencl.queue_t* @_Z17get_default_queuev()
 
-; Function Attrs: convergent
 declare spir_func void @_Z10ndrange_1Dm(%struct.ndrange_t* sret(%struct.ndrange_t*), i64)
 
-; Function Attrs: convergent nounwind
 define internal spir_func void @__test_enqueue_empty_block_invoke(i8 addrspace(4)* %.block_descriptor) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 8
@@ -56,7 +52,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define internal spir_kernel void @__test_enqueue_empty_block_invoke_kernel(i8 addrspace(4)*) {
 entry:
   call void @__test_enqueue_empty_block_invoke(i8 addrspace(4)* %0)
@@ -65,5 +60,5 @@ entry:
 
 declare i32 @__enqueue_kernel_basic_events(%opencl.queue_t*, i32, %struct.ndrange_t*, i32, %opencl.clk_event_t* addrspace(4)*, %opencl.clk_event_t* addrspace(4)*, i8 addrspace(4)*, i8 addrspace(4)*)
 
-; CHECK-SPIRV: %[[#Invoke]] = OpFunction %[[#Void]] None %[[#]]
+; CHECK-SPIRV:      %[[#Invoke]] = OpFunction %[[#Void]] None %[[#]]
 ; CHECK-SPIRV-NEXT: %[[#]] = OpFunctionParameter %[[#Int8PtrGen]]

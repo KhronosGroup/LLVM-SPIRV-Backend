@@ -391,8 +391,8 @@ SPIRVGlobalRegistry::getOrCreateConsIntArray(uint64_t Val,
 }
 
 Register
-SPIRVGlobalRegistry::getOrCreateConsNullPtr(MachineIRBuilder &MIRBuilder,
-                                            SPIRVType *SpvType) {
+SPIRVGlobalRegistry::getOrCreateConstNullPtr(MachineIRBuilder &MIRBuilder,
+                                             SPIRVType *SpvType) {
   const Type *LLVMTy = getTypeForSPIRVType(SpvType);
   const PointerType *LLVMPtrTy = cast<PointerType>(LLVMTy);
   // Find a constant in DT or build a new one.

@@ -90,7 +90,7 @@ std::string getOclOrSpirvBuiltinDemangledName(StringRef Name);
 
 // If Type is a pointer type and it is not opaque pointer, return its
 // element type, otherwise return Type.
-const Type *maybeGetPointerEltType(const Type *Type);
+const Type *getTypedPtrEltType(const Type *Type);
 
 // Check if given LLVM type is a special opaque builtin type.
 bool isSpecialOpaqueType(const Type *Ty);

@@ -342,7 +342,7 @@ static bool isSPIRVBuiltinType(const StructType *SType) {
          SType->getName().startswith("spirv.");
 }
 
-const Type *maybeGetPointerEltType(const Type *Ty) {
+const Type *getTypedPtrEltType(const Type *Ty) {
   auto PType = dyn_cast<PointerType>(Ty);
   if (!PType || PType->isOpaque())
     return Ty;
@@ -350,7 +350,7 @@ const Type *maybeGetPointerEltType(const Type *Ty) {
 }
 
 bool isSpecialOpaqueType(const Type *Ty) {
-  if (auto SType = dyn_cast<StructType>(maybeGetPointerEltType(Ty)))
+  if (auto SType = dyn_cast<StructType>(getTypedPtrEltType(Ty)))
     return isOpenCLBuiltinType(SType) || isSPIRVBuiltinType(SType);
   return false;
 }

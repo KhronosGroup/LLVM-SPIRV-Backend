@@ -1393,7 +1393,7 @@ static const Type *getMachineInstrType(MachineInstr *MI) {
     return nullptr;
   Type *Ty = getMDOperandAsType(NextMI->getOperand(2).getMetadata(), 0);
   assert(Ty && "Type is expected");
-  return maybeGetPointerEltType(Ty);
+  return getTypedPtrEltType(Ty);
 }
 
 static const Type *getBlockStructType(Register ParamReg,
@@ -1405,7 +1405,7 @@ static const Type *getBlockStructType(Register ParamReg,
   // section 6.12.5 should guarantee that we can do this.
   MachineInstr *MI = getBlockStructInstr(ParamReg, MRI);
   if (MI->getOpcode() == TargetOpcode::G_GLOBAL_VALUE)
-    return maybeGetPointerEltType(MI->getOperand(1).getGlobal()->getType());
+    return getTypedPtrEltType(MI->getOperand(1).getGlobal()->getType());
   assert(isSpvIntrinsic(*MI, Intrinsic::spv_alloca) &&
          "Blocks in OpenCL C must be traceable to allocation site");
   return getMachineInstrType(MI);
@@ -1484,7 +1484,7 @@ static bool buildEnqueueKernel(const SPIRV::IncomingCall *Call,
   // If there are no event arguments in the original call, add dummy ones.
   if (!HasEvents) {
     MIB.addUse(buildConstantIntReg(0, MIRBuilder, GR)); // Dummy num events.
-    Register NullPtr = GR->getOrCreateConsNullPtr(
+    Register NullPtr = GR->getOrCreateConstNullPtr(
         MIRBuilder, getOrCreateSPIRVDeviceEventPointer(MIRBuilder, GR));
     MIB.addUse(NullPtr); // Dummy wait events.
     MIB.addUse(NullPtr); // Dummy ret event.

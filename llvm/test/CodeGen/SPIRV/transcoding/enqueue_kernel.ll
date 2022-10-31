@@ -122,7 +122,6 @@
 @__block_literal_global = internal addrspace(1) constant { i32, i32, i8 addrspace(4)* } { i32 12, i32 4, i8 addrspace(4)* addrspacecast (i8* bitcast (void (i8 addrspace(4)*, i8 addrspace(3)*)* @__device_side_enqueue_block_invoke_3 to i8*) to i8 addrspace(4)*) }, align 4
 @__block_literal_global.1 = internal addrspace(1) constant { i32, i32, i8 addrspace(4)* } { i32 12, i32 4, i8 addrspace(4)* addrspacecast (i8* bitcast (void (i8 addrspace(4)*, i8 addrspace(3)*, i8 addrspace(3)*, i8 addrspace(3)*)* @__device_side_enqueue_block_invoke_4 to i8*) to i8 addrspace(4)*) }, align 4
 
-; Function Attrs: convergent noinline norecurse nounwind optnone
 define dso_local spir_kernel void @device_side_enqueue(i32 addrspace(1)* noundef %a, i32 addrspace(1)* noundef %b, i32 noundef %i, i8 noundef signext %c0) {
 entry:
   %a.addr = alloca i32 addrspace(1)*, align 4
@@ -254,10 +253,8 @@ entry:
   ret void
 }
 
-; Function Attrs: argmemonly nofree nounwind willreturn
 declare void @llvm.memcpy.p0i8.p0i8.i32(i8* noalias nocapture writeonly, i8* noalias nocapture readonly, i32, i1 immarg)
 
-; Function Attrs: convergent noinline nounwind optnone
 define internal spir_func void @__device_side_enqueue_block_invoke(i8 addrspace(4)* noundef %.block_descriptor) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 4
@@ -277,7 +274,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define spir_kernel void @__device_side_enqueue_block_invoke_kernel(i8 addrspace(4)* %0) {
 entry:
   call spir_func void @__device_side_enqueue_block_invoke(i8 addrspace(4)* %0)
@@ -286,7 +282,6 @@ entry:
 
 declare spir_func i32 @__enqueue_kernel_basic(%opencl.queue_t*, i32, %struct.ndrange_t*, i8 addrspace(4)*, i8 addrspace(4)*)
 
-; Function Attrs: convergent noinline nounwind optnone
 define internal spir_func void @__device_side_enqueue_block_invoke_2(i8 addrspace(4)* noundef %.block_descriptor) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 4
@@ -309,7 +304,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define spir_kernel void @__device_side_enqueue_block_invoke_2_kernel(i8 addrspace(4)* %0) {
 entry:
   call spir_func void @__device_side_enqueue_block_invoke_2(i8 addrspace(4)* %0)
@@ -318,7 +312,6 @@ entry:
 
 declare spir_func i32 @__enqueue_kernel_basic_events(%opencl.queue_t*, i32, %struct.ndrange_t*, i32, %opencl.clk_event_t* addrspace(4)*, %opencl.clk_event_t* addrspace(4)*, i8 addrspace(4)*, i8 addrspace(4)*)
 
-; Function Attrs: convergent noinline nounwind optnone
 define internal spir_func void @__device_side_enqueue_block_invoke_3(i8 addrspace(4)* noundef %.block_descriptor, i8 addrspace(3)* noundef %p) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 4
@@ -331,7 +324,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define spir_kernel void @__device_side_enqueue_block_invoke_3_kernel(i8 addrspace(4)* %0, i8 addrspace(3)* %1) {
 entry:
   call spir_func void @__device_side_enqueue_block_invoke_3(i8 addrspace(4)* %0, i8 addrspace(3)* %1)
@@ -340,7 +332,6 @@ entry:
 
 declare spir_func i32 @__enqueue_kernel_events_varargs(%opencl.queue_t*, i32, %struct.ndrange_t*, i32, %opencl.clk_event_t* addrspace(4)*, %opencl.clk_event_t* addrspace(4)*, i8 addrspace(4)*, i8 addrspace(4)*, i32, i32*)
 
-; Function Attrs: convergent noinline nounwind optnone
 define internal spir_func void @__device_side_enqueue_block_invoke_4(i8 addrspace(4)* noundef %.block_descriptor, i8 addrspace(3)* noundef %p1, i8 addrspace(3)* noundef %p2, i8 addrspace(3)* noundef %p3) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 4
@@ -357,7 +348,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define spir_kernel void @__device_side_enqueue_block_invoke_4_kernel(i8 addrspace(4)* %0, i8 addrspace(3)* %1, i8 addrspace(3)* %2, i8 addrspace(3)* %3) {
 entry:
   call spir_func void @__device_side_enqueue_block_invoke_4(i8 addrspace(4)* %0, i8 addrspace(3)* %1, i8 addrspace(3)* %2, i8 addrspace(3)* %3)
@@ -366,7 +356,6 @@ entry:
 
 declare spir_func i32 @__enqueue_kernel_varargs(%opencl.queue_t*, i32, %struct.ndrange_t*, i8 addrspace(4)*, i8 addrspace(4)*, i32, i32*)
 
-; Function Attrs: convergent noinline nounwind optnone
 define internal spir_func void @__device_side_enqueue_block_invoke_5(i8 addrspace(4)* noundef %.block_descriptor) {
 entry:
   %.block_descriptor.addr = alloca i8 addrspace(4)*, align 4
@@ -389,7 +378,6 @@ entry:
   ret void
 }
 
-; Function Attrs: nounwind
 define spir_kernel void @__device_side_enqueue_block_invoke_5_kernel(i8 addrspace(4)* %0) {
 entry:
   call spir_func void @__device_side_enqueue_block_invoke_5(i8 addrspace(4)* %0)

@@ -245,8 +245,8 @@ public:
                                     SPIRVType *SpvType, bool EmitIR = true);
   Register getOrCreateConsIntArray(uint64_t Val, MachineIRBuilder &MIRBuilder,
                                    SPIRVType *SpvType, bool EmitIR = true);
-  Register getOrCreateConsNullPtr(MachineIRBuilder &MIRBuilder,
-                                  SPIRVType *SpvType);
+  Register getOrCreateConstNullPtr(MachineIRBuilder &MIRBuilder,
+                                   SPIRVType *SpvType);
   Register buildConstantSampler(Register Res, unsigned AddrMode, unsigned Param,
                                 unsigned FilerMode,
                                 MachineIRBuilder &MIRBuilder,
