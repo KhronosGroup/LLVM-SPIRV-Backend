@@ -176,6 +176,13 @@ void SPIRVEmitIntrinsics::preprocessCompositeConstants() {
       if (auto *AggrC = dyn_cast<ConstantAggregate>(Op)) {
         SmallVector<Value *> Args(AggrC->op_begin(), AggrC->op_end());
         BuildCompositeIntrinsic(AggrC, Args);
+      } else if (isa<UndefValue>(Op) && Op->getType()->isAggregateType()) {
+        auto *AggrC = dyn_cast<Constant>(Op);
+        SmallVector<Value *> Args;
+        unsigned Idx = 0;
+        while (auto Elt = AggrC->getAggregateElement(Idx++))
+          Args.push_back(Elt);
+        BuildCompositeIntrinsic(AggrC, Args);
       } else if (auto *AggrC = dyn_cast<ConstantDataArray>(Op)) {
         SmallVector<Value *> Args;
         for (unsigned i = 0; i < AggrC->getNumElements(); ++i)
