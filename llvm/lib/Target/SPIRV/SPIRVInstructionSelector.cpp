@@ -1344,6 +1344,12 @@ bool SPIRVInstructionSelector::selectIntrinsic(Register ResVReg,
     assert(MI);
     return selectGlobalValue(MI->getOperand(0).getReg(), *MI, Init);
   } break;
+  case Intrinsic::spv_undef: {
+    auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpUndef))
+                   .addDef(ResVReg)
+                   .addUse(GR.getSPIRVTypeID(ResType));
+    return MIB.constrainAllUses(TII, TRI, RBI);
+  } break;
   case Intrinsic::spv_const_composite: {
     // If no values are attached, the composite is null constant.
     bool IsNull = I.getNumExplicitDefs() + 1 == I.getNumExplicitOperands();
