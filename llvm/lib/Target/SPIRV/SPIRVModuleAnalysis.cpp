@@ -593,6 +593,12 @@ void RequirementHandler::initAvailableCapabilities(const SPIRVSubtarget &ST) {
   // TODO: verify if this needs some checks.
   addAvailableCaps({Capability::Float16, Capability::Float64});
 
+  // Add capabilities enabled by extensions.
+  for (auto Extension : ST.getAllAvailableExtensions()) {
+    CapabilityList EnabledCapabilities =
+        getCapabilitiesEnabledByExtension(Extension);
+    addAvailableCaps(EnabledCapabilities);
+  }
   // TODO: add OpenCL extensions.
 }
 } // namespace SPIRV
