@@ -27,6 +27,19 @@ using namespace llvm;
 #define GET_SUBTARGETINFO_CTOR
 #include "SPIRVGenSubtargetInfo.inc"
 
+cl::list<SPIRV::Extension::Extension> Extensions(
+    "spirv-extensions", cl::desc("SPIR-V extensions"), cl::ZeroOrMore,
+    cl::Hidden,
+    cl::values(
+        clEnumValN(
+            SPIRV::Extension::SPV_INTEL_arbitrary_precision_integers,
+            "SPV_INTEL_arbitrary_precision_integers",
+            "Allows generating arbitrary width integer types"),
+        clEnumValN(SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration,
+                   "SPV_KHR_no_integer_wrap_decoration",
+                   "Adds decorations to indicate that a given instruction does "
+                   "not cause integer wrapping")));
+
 // Compare version numbers, but allow 0 to mean unspecified.
 static bool isAtLeastVer(uint32_t Target, uint32_t VerToCompareTo) {
   return Target == 0 || Target >= VerToCompareTo;
@@ -90,14 +103,14 @@ bool SPIRVSubtarget::canDirectlyComparePointers() const {
   return isAtLeastVer(SPIRVVersion, 14);
 }
 
-// TODO: use command line args for this rather than defaults.
 void SPIRVSubtarget::initAvailableExtensions() {
   AvailableExtensions.clear();
   if (!isOpenCLEnv())
     return;
-  // A default extension for testing.
-  AvailableExtensions.insert(
-      SPIRV::Extension::SPV_KHR_no_integer_wrap_decoration);
+
+  for (auto Extension : Extensions) {
+    AvailableExtensions.insert(Extension);
+  }
 }
 
 // TODO: use command line args for this rather than just defaults.

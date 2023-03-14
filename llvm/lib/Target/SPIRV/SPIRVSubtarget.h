@@ -79,6 +79,10 @@ public:
   // TODO: implement command line args or other ways to determine this.
   bool hasOpenCLFullProfile() const { return true; }
   bool hasOpenCLImageSupport() const { return true; }
+  const SmallSet<SPIRV::Extension::Extension, 4> &
+  getAllAvailableExtensions() const {
+    return AvailableExtensions;
+  }
   bool canUseExtension(SPIRV::Extension::Extension E) const;
   bool canUseExtInstSet(SPIRV::InstructionSet::InstructionSet E) const;
 
@@ -105,6 +109,10 @@ public:
   }
   const SPIRVRegisterInfo *getRegisterInfo() const override {
     return &InstrInfo.getRegisterInfo();
+  }
+
+  static bool classof(const TargetSubtargetInfo *ST) {
+    return ST->getTargetTriple().isSPIRV();
   }
 };
 } // namespace llvm

@@ -582,6 +582,7 @@ MVT MVT::getVT(Type *Ty, bool HandleUnknown){
       getVT(VTy->getElementType(), /*HandleUnknown=*/ false),
             VTy->getElementCount());
   }
+  case Type::TargetExtTyID: return MVT(MVT::Other);
   }
 }
 

@@ -80,6 +80,24 @@ SPIRVType *SPIRVGlobalRegistry::getOpTypeBool(MachineIRBuilder &MIRBuilder) {
 SPIRVType *SPIRVGlobalRegistry::getOpTypeInt(uint32_t Width,
                                              MachineIRBuilder &MIRBuilder,
                                              bool IsSigned) {
+  assert(Width <= 64 && "Unsupported integer width!");
+  const SPIRVSubtarget &ST =
+      cast<SPIRVSubtarget>(MIRBuilder.getMF().getSubtarget());
+  if (ST.canUseExtension(
+          SPIRV::Extension::SPV_INTEL_arbitrary_precision_integers)) {
+    MIRBuilder.buildInstr(SPIRV::OpExtension)
+        .addImm(SPIRV::Extension::SPV_INTEL_arbitrary_precision_integers);
+    MIRBuilder.buildInstr(SPIRV::OpCapability)
+        .addImm(SPIRV::Capability::ArbitraryPrecisionIntegersINTEL);
+  } else if (Width <= 8)
+    Width = 8;
+  else if (Width <= 16)
+    Width = 16;
+  else if (Width <= 32)
+    Width = 32;
+  else if (Width <= 64)
+    Width = 64;
+
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeInt)
                  .addDef(createTypeVReg(MIRBuilder))
                  .addImm(Width)
@@ -573,9 +591,8 @@ SPIRVType *SPIRVGlobalRegistry::getOrCreateSpecialType(
     assert(!PType->isOpaque());
     Ty = PType->getNonOpaquePointerElementType();
   }
-  auto SType = cast<StructType>(Ty);
-  assert(isSpecialOpaqueType(SType) && "Not a special opaque builtin type");
-  return SPIRV::lowerBuiltinType(SType, AccQual, MIRBuilder, this);
+  assert(isSpecialOpaqueType(Ty) && "Not a special opaque builtin type");
+  return SPIRV::lowerBuiltinType(Ty, AccQual, MIRBuilder, this);
 }
 
 SPIRVType *SPIRVGlobalRegistry::getOpTypePointer(
