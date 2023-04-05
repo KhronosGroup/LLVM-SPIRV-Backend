@@ -15,7 +15,7 @@
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRV.h"
 #include "SPIRVBuiltins.h"
-#include "SPIRVGlobalRegistry.h"
+#include "Registries/SPIRVGlobalTypeRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
@@ -26,8 +26,8 @@
 using namespace llvm;
 
 SPIRVCallLowering::SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                                     SPIRVGlobalRegistry *GR)
-    : CallLowering(&TLI), GR(GR) {}
+                                     SPIRVGlobalTypeRegistry *GTR)
+    : CallLowering(&TLI), GTR(GTR) {}
 
 bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     const Value *Val, ArrayRef<Register> VRegs,
@@ -217,8 +217,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
                                              const Function &F,
                                              ArrayRef<ArrayRef<Register>> VRegs,
                                              FunctionLoweringInfo &FLI) const {
-  assert(GR && "Must initialize the SPIRV type registry before lowering args.");
-  GR->setCurrentFunc(MIRBuilder.getMF());
+  assert(GTR &&
+         "Must initialize the SPIRV type registry before lowering args.");
+  GTR->setCurrentFunc(MIRBuilder.getMF());
 
   // Assign types and names to all args, and store their types for later.
   FunctionType *FTy = getOriginalFunctionType(F);
@@ -232,8 +233,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
         return false;
       SPIRV::AccessQualifier::AccessQualifier ArgAccessQual =
           getArgAccessQual(F, i);
-      auto *SpirvTy = GR->assignTypeToVReg(getArgType(F, i), VRegs[i][0],
-                                           MIRBuilder, ArgAccessQual);
+      auto *SpirvTy = GTR->assignTypeToVReg(getArgType(F, i), VRegs[i][0],
+                                            MIRBuilder, ArgAccessQual);
       ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
@@ -305,9 +306,10 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
   MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
   if (F.isDeclaration())
-    GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
-  SPIRVType *RetTy = GR->getOrCreateSPIRVType(FTy->getReturnType(), MIRBuilder);
-  SPIRVType *FuncTy = GR->getOrCreateOpTypeFunctionWithArgs(
+    GTR->add(&F, &MIRBuilder.getMF(), FuncVReg);
+  SPIRVType *RetTy =
+      GTR->getOrCreateSPIRVType(FTy->getReturnType(), MIRBuilder);
+  SPIRVType *FuncTy = GTR->getOrCreateOpTypeFunctionWithArgs(
       FTy, RetTy, ArgTypeVRegs, MIRBuilder);
 
   // Build the OpTypeFunction declaring it.
@@ -315,9 +317,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   MIRBuilder.buildInstr(SPIRV::OpFunction)
       .addDef(FuncVReg)
-      .addUse(GR->getSPIRVTypeID(RetTy))
+      .addUse(GTR->getSPIRVTypeID(RetTy))
       .addImm(FuncControl)
-      .addUse(GR->getSPIRVTypeID(FuncTy));
+      .addUse(GTR->getSPIRVTypeID(FuncTy));
 
   // Add OpFunctionParameters.
   int i = 0;
@@ -326,9 +328,9 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
     MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
     MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
         .addDef(VRegs[i][0])
-        .addUse(GR->getSPIRVTypeID(ArgTypeVRegs[i]));
+        .addUse(GTR->getSPIRVTypeID(ArgTypeVRegs[i]));
     if (F.isDeclaration())
-      GR->add(&Arg, &MIRBuilder.getMF(), VRegs[i][0]);
+      GTR->add(&Arg, &MIRBuilder.getMF(), VRegs[i][0]);
     i++;
   }
   // Name the function.
@@ -359,7 +361,7 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   if (Info.OrigRet.Regs.size() > 1)
     return false;
   MachineFunction &MF = MIRBuilder.getMF();
-  GR->setCurrentFunc(MF);
+  GTR->setCurrentFunc(MF);
   FunctionType *FTy = nullptr;
   const Function *CF = nullptr;
 
@@ -389,16 +391,16 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     for (auto Arg : Info.OrigArgs) {
       assert(Arg.Regs.size() == 1 && "Call arg has multiple VRegs");
       ArgVRegs.push_back(Arg.Regs[0]);
-      SPIRVType *SPIRVTy = GR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
-      GR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
+      SPIRVType *SPIRVTy = GTR->getOrCreateSPIRVType(Arg.Ty, MIRBuilder);
+      GTR->assignSPIRVTypeToVReg(SPIRVTy, Arg.Regs[0], MIRBuilder.getMF());
     }
     if (auto Res = SPIRV::lowerBuiltin(
             DemangledName, SPIRV::InstructionSet::OpenCL_std, MIRBuilder,
-            ResVReg, OrigRetTy, ArgVRegs, GR))
+            ResVReg, OrigRetTy, ArgVRegs, GTR))
       return *Res;
   }
   if (CF && CF->isDeclaration() &&
-      !GR->find(CF, &MIRBuilder.getMF()).isValid()) {
+      !GTR->find(CF, &MIRBuilder.getMF()).isValid()) {
     // Emit the type info and forward function declaration to the first MBB
     // to ensure VReg definition dependencies are valid across all MBBs.
     MachineIRBuilder FirstBlockBuilder;
@@ -423,12 +425,12 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   if (!ResVReg.isValid())
     ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
   SPIRVType *RetType =
-      GR->assignTypeToVReg(FTy->getReturnType(), ResVReg, MIRBuilder);
+      GTR->assignTypeToVReg(FTy->getReturnType(), ResVReg, MIRBuilder);
 
   // Emit the OpFunctionCall and its args.
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpFunctionCall)
                  .addDef(ResVReg)
-                 .addUse(GR->getSPIRVTypeID(RetType))
+                 .addUse(GTR->getSPIRVTypeID(RetType))
                  .add(Info.Callee);
 
   for (const auto &Arg : Info.OrigArgs) {

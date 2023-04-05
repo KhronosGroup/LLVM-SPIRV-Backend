@@ -12,7 +12,7 @@
 
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRV.h"
-#include "SPIRVGlobalRegistry.h"
+#include "Registries/SPIRVGlobalTypeRegistry.h"
 #include "SPIRVSubtarget.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerHelper.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
@@ -58,7 +58,7 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   using namespace TargetOpcode;
 
   this->ST = &ST;
-  GR = ST.getSPIRVGlobalRegistry();
+  GTR = ST.getSPIRVGlobalTypeRegistry();
 
   const LLT s1 = LLT::scalar(1);
   const LLT s8 = LLT::scalar(8);
@@ -277,9 +277,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
 static Register convertPtrToInt(Register Reg, LLT ConvTy, SPIRVType *SpirvType,
                                 LegalizerHelper &Helper,
                                 MachineRegisterInfo &MRI,
-                                SPIRVGlobalRegistry *GR) {
+                                SPIRVGlobalTypeRegistry *GTR) {
   Register ConvReg = MRI.createGenericVirtualRegister(ConvTy);
-  GR->assignSPIRVTypeToVReg(SpirvType, ConvReg, Helper.MIRBuilder.getMF());
+  GTR->assignSPIRVTypeToVReg(SpirvType, ConvReg, Helper.MIRBuilder.getMF());
   Helper.MIRBuilder.buildInstr(TargetOpcode::G_PTRTOINT)
       .addDef(ConvReg)
       .addUse(Reg);
@@ -292,7 +292,7 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
   MachineRegisterInfo &MRI = MI.getMF()->getRegInfo();
   if (!isTypeFoldingSupported(Opc)) {
     assert(Opc == TargetOpcode::G_ICMP);
-    assert(GR->getSPIRVTypeForVReg(MI.getOperand(0).getReg()));
+    assert(GTR->getSPIRVTypeForVReg(MI.getOperand(0).getReg()));
     auto &Op0 = MI.getOperand(2);
     auto &Op1 = MI.getOperand(3);
     Register Reg0 = Op0.getReg();
@@ -305,9 +305,9 @@ bool SPIRVLegalizerInfo::legalizeCustom(LegalizerHelper &Helper,
       LLT ConvT = LLT::scalar(ST->getPointerSize());
       Type *LLVMTy = IntegerType::get(MI.getMF()->getFunction().getContext(),
                                       ST->getPointerSize());
-      SPIRVType *SpirvTy = GR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
-      Op0.setReg(convertPtrToInt(Reg0, ConvT, SpirvTy, Helper, MRI, GR));
-      Op1.setReg(convertPtrToInt(Reg1, ConvT, SpirvTy, Helper, MRI, GR));
+      SPIRVType *SpirvTy = GTR->getOrCreateSPIRVType(LLVMTy, Helper.MIRBuilder);
+      Op0.setReg(convertPtrToInt(Reg0, ConvT, SpirvTy, Helper, MRI, GTR));
+      Op1.setReg(convertPtrToInt(Reg1, ConvT, SpirvTy, Helper, MRI, GTR));
     }
     return true;
   }

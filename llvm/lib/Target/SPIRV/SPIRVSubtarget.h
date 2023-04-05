@@ -40,7 +40,7 @@ private:
 
   SmallSet<SPIRV::Extension::Extension, 4> AvailableExtensions;
   SmallSet<SPIRV::InstructionSet::InstructionSet, 4> AvailableExtInstSets;
-  std::unique_ptr<SPIRVGlobalRegistry> GR;
+  std::unique_ptr<SPIRVGlobalTypeRegistry> GTR;
 
   SPIRVInstrInfo InstrInfo;
   SPIRVFrameLowering FrameLowering;
@@ -82,7 +82,9 @@ public:
   bool canUseExtension(SPIRV::Extension::Extension E) const;
   bool canUseExtInstSet(SPIRV::InstructionSet::InstructionSet E) const;
 
-  SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
+  SPIRVGlobalTypeRegistry *getSPIRVGlobalTypeRegistry() const {
+    return GTR.get();
+  }
 
   const CallLowering *getCallLowering() const override {
     return CallLoweringInfo.get();

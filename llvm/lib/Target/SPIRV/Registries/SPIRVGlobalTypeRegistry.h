@@ -1,4 +1,4 @@
-//===-- SPIRVGlobalRegistry.h - SPIR-V Global Registry ----------*- C++ -*-===//
+//===-- SPIRVGlobalTypeRegistry.h - SPIR-V Global Registry ----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,15 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SPIRVGlobalRegistry is used to maintain rich type information required for
+// SPIRVGlobalTypeRegistry is used to maintain rich type information required for
 // SPIR-V even after lowering from LLVM IR to GMIR. It can convert an llvm::Type
 // into an OpTypeXXX instruction, and map it to a virtual register. Also it
 // builds and supports consistency of constants and global variables.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
-#define LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
+#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H
+#define LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVDuplicatesTracker.h"
@@ -24,7 +24,7 @@
 namespace llvm {
 using SPIRVType = const MachineInstr;
 
-class SPIRVGlobalRegistry {
+class SPIRVGlobalTypeRegistry {
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
   // Do not confuse this with DuplicatesTracker as DT maps Type* to <MF, Reg>
@@ -64,7 +64,7 @@ class SPIRVGlobalRegistry {
                         bool EmitIR);
 
 public:
-  SPIRVGlobalRegistry(unsigned PointerSize);
+  SPIRVGlobalTypeRegistry(unsigned PointerSize);
 
   MachineFunction *CurMF;
 
@@ -312,4 +312,4 @@ public:
                                        unsigned Opcode);
 };
 } // end namespace llvm
-#endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H

@@ -219,7 +219,7 @@ void SPIRVModuleAnalysis::collectGlobalEntities(
 void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
   std::vector<SPIRV::DTSortableEntry *> DepsGraph;
 
-  GR->buildDepsGraph(DepsGraph, SPVDumpDeps ? MMI : nullptr);
+  GTR->buildDepsGraph(DepsGraph, SPVDumpDeps ? MMI : nullptr);
 
   collectGlobalEntities(
       DepsGraph, SPIRV::MB_TypeConstVars,
@@ -968,7 +968,7 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
   SPIRVTargetMachine &TM =
       getAnalysis<TargetPassConfig>().getTM<SPIRVTargetMachine>();
   ST = TM.getSubtargetImpl();
-  GR = ST->getSPIRVGlobalRegistry();
+  GTR = ST->getSPIRVGlobalTypeRegistry();
   TII = ST->getInstrInfo();
 
   MMI = &getAnalysis<MachineModuleInfoWrapperPass>().getMMI();

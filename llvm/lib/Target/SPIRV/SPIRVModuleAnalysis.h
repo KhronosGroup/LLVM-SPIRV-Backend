@@ -15,7 +15,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMODULEANALYSIS_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
-#include "SPIRVGlobalRegistry.h"
+#include "Registries/SPIRVGlobalTypeRegistry.h"
 #include "SPIRVUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -213,7 +213,7 @@ private:
   void numberRegistersGlobally(const Module &M);
 
   const SPIRVSubtarget *ST;
-  SPIRVGlobalRegistry *GR;
+  SPIRVGlobalTypeRegistry *GTR;
   const SPIRVInstrInfo *TII;
   MachineModuleInfo *MMI;
 };
