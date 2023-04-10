@@ -16,6 +16,7 @@
 #include "SPIRV.h"
 #include "SPIRVBuiltins.h"
 #include "Registries/SPIRVGlobalTypeRegistry.h"
+#include "Registries/SPIRVGlobalInstrRegistry.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVRegisterInfo.h"
 #include "SPIRVSubtarget.h"
@@ -26,8 +27,9 @@
 using namespace llvm;
 
 SPIRVCallLowering::SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                                     SPIRVGlobalTypeRegistry *GTR)
-    : CallLowering(&TLI), GTR(GTR) {}
+                                     SPIRVGlobalTypeRegistry *GTR,
+                                     SPIRVGlobalInstrRegistry *GIR)
+    : CallLowering(&TLI), GTR(GTR), GIR(GIR) {}
 
 bool SPIRVCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
                                     const Value *Val, ArrayRef<Register> VRegs,
@@ -339,10 +341,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
 
   // Handle entry points and function linkage.
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpEntryPoint)
-                   .addImm(static_cast<uint32_t>(SPIRV::ExecutionModel::Kernel))
-                   .addUse(FuncVReg);
-    addStringImm(F.getName(), MIB);
+    GIR->addEntryPoint(SPIRV::ExecutionModel::Kernel, &F);
   } else if (F.getLinkage() == GlobalValue::LinkageTypes::ExternalLinkage ||
              F.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
     auto LnkTy = F.isDeclaration() ? SPIRV::LinkageType::Import

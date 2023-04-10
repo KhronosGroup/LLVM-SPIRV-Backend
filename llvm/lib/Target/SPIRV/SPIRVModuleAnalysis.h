@@ -16,6 +16,7 @@
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "Registries/SPIRVGlobalTypeRegistry.h"
+#include "Registries/SPIRVGlobalInstrRegistry.h"
 #include "SPIRVUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -31,7 +32,6 @@ namespace SPIRV {
 // The enum contains logical module sections for the instruction collection.
 enum ModuleSectionType {
   //  MB_Capabilities, MB_Extensions, MB_ExtInstImports, MB_MemoryModel,
-  MB_EntryPoints, // All OpEntryPoint instructions (if any).
   //  MB_ExecutionModes, MB_DebugSourceAndStrings,
   MB_DebugNames,           // All OpName and OpMemberName intrs.
   MB_DebugModuleProcessed, // All OpModuleProcessed instructions.
@@ -214,6 +214,7 @@ private:
 
   const SPIRVSubtarget *ST;
   SPIRVGlobalTypeRegistry *GTR;
+  SPIRVGlobalInstrRegistry *GIR;
   const SPIRVInstrInfo *TII;
   MachineModuleInfo *MMI;
 };

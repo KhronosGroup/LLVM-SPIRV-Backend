@@ -84,6 +84,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
   SPIRV::ModuleAnalysisInfo *MAI;
+  SPIRVGlobalInstrRegistry *GIR;
 };
 } // namespace
 
@@ -308,10 +309,15 @@ void SPIRVAsmPrinter::outputEntryPoints() {
   }
 
   // Output OpEntryPoints adding interface args to all of them.
-  for (MachineInstr *MI : MAI->getMSInstrs(SPIRV::MB_EntryPoints)) {
-    SPIRVMCInstLower MCInstLowering;
+  for (const SPIRV::OpEntryPointInst &EP : GIR->getAllEntryPoints()) {
     MCInst TmpInst;
-    MCInstLowering.lower(MI, TmpInst, MAI);
+    TmpInst.setOpcode(SPIRV::OpEntryPoint);
+    TmpInst.addOperand(
+        MCOperand::createImm(static_cast<unsigned>(EP.ExecModel)));
+    Register EntryFuncReg = MAI->getFuncReg(EP.EntryFunction);
+    TmpInst.addOperand(MCOperand::createReg(EntryFuncReg));
+    addStringImm(EP.EntryFunction->getName(), TmpInst);
+
     for (Register Reg : InterfaceIDs) {
       assert(Reg.isValid());
       TmpInst.addOperand(MCOperand::createReg(Reg));
@@ -500,6 +506,7 @@ void SPIRVAsmPrinter::outputModuleSections() {
   ST = static_cast<const SPIRVTargetMachine &>(TM).getSubtargetImpl();
   TII = ST->getInstrInfo();
   MAI = &SPIRVModuleAnalysis::MAI;
+  GIR = ST->getSPIRVGlobalInstrRegistry();
   assert(ST && TII && MAI && M && "Module analysis is required");
   // Output instructions according to the Logical Layout of a Module:
   // 1,2. All OpCapability instructions, then optional OpExtension instructions.

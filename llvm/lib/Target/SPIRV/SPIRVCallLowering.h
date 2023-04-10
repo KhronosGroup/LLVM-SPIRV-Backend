@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_SPIRV_SPIRVCALLLOWERING_H
 
 #include "Registries/SPIRVGlobalTypeRegistry.h"
+#include "Registries/SPIRVGlobalInstrRegistry.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 
 namespace llvm {
@@ -26,9 +27,13 @@ private:
   // Used to create and assign function, argument, and return type information.
   SPIRVGlobalTypeRegistry *GTR;
 
+  // Used to create global instructions which do not belong to any function.
+  SPIRVGlobalInstrRegistry *GIR;
+
 public:
   SPIRVCallLowering(const SPIRVTargetLowering &TLI,
-                    SPIRVGlobalTypeRegistry *GTR);
+                    SPIRVGlobalTypeRegistry *GTR,
+                    SPIRVGlobalInstrRegistry *GIR);
 
   // Built OpReturn or OpReturnValue.
   bool lowerReturn(MachineIRBuilder &MIRBuiler, const Value *Val,
