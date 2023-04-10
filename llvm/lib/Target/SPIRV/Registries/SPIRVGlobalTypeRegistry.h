@@ -68,31 +68,32 @@ public:
 
   MachineFunction *CurMF;
 
-  void add(const Constant *C, MachineFunction *MF, Register R) {
+  void add(const Constant *C, const MachineFunction *MF, const Register R) {
     DT.add(C, MF, R);
   }
 
-  void add(const GlobalVariable *GV, MachineFunction *MF, Register R) {
+  void add(const GlobalVariable *GV, const MachineFunction *MF,
+           const Register R) {
     DT.add(GV, MF, R);
   }
 
-  void add(const Function *F, MachineFunction *MF, Register R) {
+  void add(const Function *F, const MachineFunction *MF, const Register R) {
     DT.add(F, MF, R);
   }
 
-  void add(const Argument *Arg, MachineFunction *MF, Register R) {
+  void add(const Argument *Arg, const MachineFunction *MF, const Register R) {
     DT.add(Arg, MF, R);
   }
 
-  Register find(const Constant *C, MachineFunction *MF) {
+  Register find(const Constant *C, const MachineFunction *MF) {
     return DT.find(C, MF);
   }
 
-  Register find(const GlobalVariable *GV, MachineFunction *MF) {
+  Register find(const GlobalVariable *GV, const MachineFunction *MF) {
     return DT.find(GV, MF);
   }
 
-  Register find(const Function *F, MachineFunction *MF) {
+  Register find(const Function *F, const MachineFunction *MF) {
     return DT.find(F, MF);
   }
 
