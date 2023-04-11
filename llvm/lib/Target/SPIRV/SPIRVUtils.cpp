@@ -92,14 +92,6 @@ void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB) {
   report_fatal_error("Unsupported constant bitwidth");
 }
 
-void buildOpName(Register Target, const StringRef &Name,
-                 MachineIRBuilder &MIRBuilder) {
-  if (!Name.empty()) {
-    auto MIB = MIRBuilder.buildInstr(SPIRV::OpName).addUse(Target);
-    addStringImm(Name, MIB);
-  }
-}
-
 static void finishBuildOpDecorate(MachineInstrBuilder &MIB,
                                   const std::vector<uint32_t> &DecArgs,
                                   StringRef StrImm) {

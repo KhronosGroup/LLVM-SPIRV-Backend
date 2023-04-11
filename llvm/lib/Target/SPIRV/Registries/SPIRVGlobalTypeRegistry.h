@@ -1,4 +1,4 @@
-//===-- SPIRVGlobalRegistry.h - SPIR-V Global Registry ----------*- C++ -*-===//
+//===-- SPIRVGlobalTypeRegistry.h - SPIR-V Global Registry ----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,25 +6,26 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// SPIRVGlobalRegistry is used to maintain rich type information required for
+// SPIRVGlobalTypeRegistry is used to maintain rich type information required for
 // SPIR-V even after lowering from LLVM IR to GMIR. It can convert an llvm::Type
 // into an OpTypeXXX instruction, and map it to a virtual register. Also it
 // builds and supports consistency of constants and global variables.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
-#define LLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
+#ifndef LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H
+#define LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H
 
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVDuplicatesTracker.h"
 #include "SPIRVInstrInfo.h"
+#include "SPIRVGlobalInstrRegistry.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace llvm {
 using SPIRVType = const MachineInstr;
 
-class SPIRVGlobalRegistry {
+class SPIRVGlobalTypeRegistry {
   // Registers holding values which have types associated with them.
   // Initialized upon VReg definition in IRTranslator.
   // Do not confuse this with DuplicatesTracker as DT maps Type* to <MF, Reg>
@@ -63,36 +64,39 @@ class SPIRVGlobalRegistry {
                         SPIRV::AccessQualifier::AccessQualifier AccessQual,
                         bool EmitIR);
 
+  SPIRVGlobalInstrRegistry *GIR;
+
 public:
-  SPIRVGlobalRegistry(unsigned PointerSize);
+  SPIRVGlobalTypeRegistry(unsigned PointerSize, SPIRVGlobalInstrRegistry *GIR);
 
   MachineFunction *CurMF;
 
-  void add(const Constant *C, MachineFunction *MF, Register R) {
+  void add(const Constant *C, const MachineFunction *MF, const Register R) {
     DT.add(C, MF, R);
   }
 
-  void add(const GlobalVariable *GV, MachineFunction *MF, Register R) {
+  void add(const GlobalVariable *GV, const MachineFunction *MF,
+           const Register R) {
     DT.add(GV, MF, R);
   }
 
-  void add(const Function *F, MachineFunction *MF, Register R) {
+  void add(const Function *F, const MachineFunction *MF, const Register R) {
     DT.add(F, MF, R);
   }
 
-  void add(const Argument *Arg, MachineFunction *MF, Register R) {
+  void add(const Argument *Arg, const MachineFunction *MF, const Register R) {
     DT.add(Arg, MF, R);
   }
 
-  Register find(const Constant *C, MachineFunction *MF) {
+  Register find(const Constant *C, const MachineFunction *MF) {
     return DT.find(C, MF);
   }
 
-  Register find(const GlobalVariable *GV, MachineFunction *MF) {
+  Register find(const GlobalVariable *GV, const MachineFunction *MF) {
     return DT.find(GV, MF);
   }
 
-  Register find(const Function *F, MachineFunction *MF) {
+  Register find(const Function *F, const MachineFunction *MF) {
     return DT.find(F, MF);
   }
 
@@ -312,4 +316,4 @@ public:
                                        unsigned Opcode);
 };
 } // end namespace llvm
-#endif // LLLVM_LIB_TARGET_SPIRV_SPIRVTYPEMANAGER_H
+#endif // LLVM_LIB_TARGET_SPIRV_SPIRVGLOBALTYPEREGISTRY_H

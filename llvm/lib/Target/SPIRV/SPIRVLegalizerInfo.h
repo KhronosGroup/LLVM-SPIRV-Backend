@@ -13,7 +13,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVMACHINELEGALIZER_H
 
-#include "SPIRVGlobalRegistry.h"
+#include "Registries/SPIRVGlobalTypeRegistry.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
 
 bool isTypeFoldingSupported(unsigned Opcode);
@@ -26,7 +26,7 @@ class SPIRVSubtarget;
 // This class provides the information for legalizing SPIR-V instructions.
 class SPIRVLegalizerInfo : public LegalizerInfo {
   const SPIRVSubtarget *ST;
-  SPIRVGlobalRegistry *GR;
+  SPIRVGlobalTypeRegistry *GTR;
 
 public:
   bool legalizeCustom(LegalizerHelper &Helper, MachineInstr &MI) const override;

@@ -219,7 +219,7 @@ void SPIRVModuleAnalysis::collectGlobalEntities(
 void SPIRVModuleAnalysis::processDefInstrs(const Module &M) {
   std::vector<SPIRV::DTSortableEntry *> DepsGraph;
 
-  GR->buildDepsGraph(DepsGraph, SPVDumpDeps ? MMI : nullptr);
+  GTR->buildDepsGraph(DepsGraph, SPVDumpDeps ? MMI : nullptr);
 
   collectGlobalEntities(
       DepsGraph, SPIRV::MB_TypeConstVars,
@@ -336,11 +336,7 @@ void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
         if (MAI.getSkipEmission(&MI))
           continue;
         const unsigned OpCode = MI.getOpcode();
-        if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
-          collectOtherInstr(MI, MAI, SPIRV::MB_DebugNames);
-        } else if (OpCode == SPIRV::OpEntryPoint) {
-          collectOtherInstr(MI, MAI, SPIRV::MB_EntryPoints);
-        } else if (TII->isDecorationInstr(MI)) {
+        if (TII->isDecorationInstr(MI)) {
           collectOtherInstr(MI, MAI, SPIRV::MB_Annotations);
           collectFuncNames(MI, &*F);
         } else if (TII->isConstantInstr(MI)) {
@@ -968,7 +964,8 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
   SPIRVTargetMachine &TM =
       getAnalysis<TargetPassConfig>().getTM<SPIRVTargetMachine>();
   ST = TM.getSubtargetImpl();
-  GR = ST->getSPIRVGlobalRegistry();
+  GTR = ST->getSPIRVGlobalTypeRegistry();
+  GIR = ST->getSPIRVGlobalInstrRegistry();
   TII = ST->getInstrInfo();
 
   MMI = &getAnalysis<MachineModuleInfoWrapperPass>().getMMI();
@@ -990,7 +987,7 @@ bool SPIRVModuleAnalysis::runOnModule(Module &M) {
   processOtherInstrs(M);
 
   // If there are no entry points, we need the Linkage capability.
-  if (MAI.MS[SPIRV::MB_EntryPoints].empty())
+  if (GIR->getAllEntryPoints().empty())
     MAI.Reqs.addCapability(SPIRV::Capability::Linkage);
 
   return false;

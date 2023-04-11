@@ -17,6 +17,8 @@
 #include "SPIRVFrameLowering.h"
 #include "SPIRVISelLowering.h"
 #include "SPIRVInstrInfo.h"
+#include "Registries/SPIRVGlobalTypeRegistry.h"
+#include "Registries/SPIRVGlobalInstrRegistry.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
@@ -40,7 +42,8 @@ private:
 
   SmallSet<SPIRV::Extension::Extension, 4> AvailableExtensions;
   SmallSet<SPIRV::InstructionSet::InstructionSet, 4> AvailableExtInstSets;
-  std::unique_ptr<SPIRVGlobalRegistry> GR;
+  std::unique_ptr<SPIRVGlobalTypeRegistry> GTR;
+  std::unique_ptr<SPIRVGlobalInstrRegistry> GIR;
 
   SPIRVInstrInfo InstrInfo;
   SPIRVFrameLowering FrameLowering;
@@ -82,7 +85,13 @@ public:
   bool canUseExtension(SPIRV::Extension::Extension E) const;
   bool canUseExtInstSet(SPIRV::InstructionSet::InstructionSet E) const;
 
-  SPIRVGlobalRegistry *getSPIRVGlobalRegistry() const { return GR.get(); }
+  SPIRVGlobalTypeRegistry *getSPIRVGlobalTypeRegistry() const {
+    return GTR.get();
+  }
+
+  SPIRVGlobalInstrRegistry *getSPIRVGlobalInstrRegistry() const {
+    return GIR.get();
+  }
 
   const CallLowering *getCallLowering() const override {
     return CallLoweringInfo.get();
