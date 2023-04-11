@@ -14,6 +14,7 @@
 
 #include "SPIRV.h"
 #include "Registries/SPIRVGlobalTypeRegistry.h"
+#include "Registries/SPIRVGlobalInstrRegistry.h"
 #include "SPIRVInstrInfo.h"
 #include "SPIRVRegisterBankInfo.h"
 #include "SPIRVRegisterInfo.h"
@@ -48,6 +49,8 @@ class SPIRVInstructionSelector : public InstructionSelector {
   const SPIRVRegisterInfo &TRI;
   const RegisterBankInfo &RBI;
   SPIRVGlobalTypeRegistry &GTR;
+  SPIRVGlobalInstrRegistry &GIR;
+  
   MachineRegisterInfo *MRI;
 
 public:
@@ -192,6 +195,7 @@ SPIRVInstructionSelector::SPIRVInstructionSelector(const SPIRVTargetMachine &TM,
     : InstructionSelector(), STI(ST), TII(*ST.getInstrInfo()),
       TRI(*ST.getRegisterInfo()), RBI(RBI),
       GTR(*ST.getSPIRVGlobalTypeRegistry()),
+      GIR(*ST.getSPIRVGlobalInstrRegistry()),
 #define GET_GLOBALISEL_PREDICATES_INIT
 #include "SPIRVGenGlobalISel.inc"
 #undef GET_GLOBALISEL_PREDICATES_INIT
@@ -1360,15 +1364,6 @@ bool SPIRVInstructionSelector::selectIntrinsic(Register ResVReg,
            i < I.getNumExplicitOperands(); ++i) {
         MIB.addUse(I.getOperand(i).getReg());
       }
-    }
-    return MIB.constrainAllUses(TII, TRI, RBI);
-  }
-  case Intrinsic::spv_assign_name: {
-    auto MIB = BuildMI(BB, I, I.getDebugLoc(), TII.get(SPIRV::OpName));
-    MIB.addUse(I.getOperand(I.getNumExplicitDefs() + 1).getReg());
-    for (unsigned i = I.getNumExplicitDefs() + 2;
-         i < I.getNumExplicitOperands(); ++i) {
-      MIB.addImm(I.getOperand(i).getImm());
     }
     return MIB.constrainAllUses(TII, TRI, RBI);
   }

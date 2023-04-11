@@ -48,7 +48,8 @@ std::optional<bool> lowerBuiltin(const StringRef DemangledCall,
 SPIRVType *lowerBuiltinType(const Type *Type,
                             AccessQualifier::AccessQualifier AccessQual,
                             MachineIRBuilder &MIRBuilder,
-                            SPIRVGlobalTypeRegistry *GTR);
+                            SPIRVGlobalTypeRegistry *GTR,
+                            SPIRVGlobalInstrRegistry *GIR);
 } // namespace SPIRV
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H

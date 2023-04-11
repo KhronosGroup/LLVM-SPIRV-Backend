@@ -43,10 +43,6 @@ std::string getStringImm(const MachineInstr &MI, unsigned StartIndex);
 // Add the given numerical immediate to MIB.
 void addNumImm(const APInt &Imm, MachineInstrBuilder &MIB);
 
-// Add an OpName instruction for the given target register.
-void buildOpName(Register Target, const StringRef &Name,
-                 MachineIRBuilder &MIRBuilder);
-
 // Add an OpDecorate instruction for the given Reg.
 void buildOpDecorate(Register Reg, MachineIRBuilder &MIRBuilder,
                      SPIRV::Decoration::Decoration Dec,

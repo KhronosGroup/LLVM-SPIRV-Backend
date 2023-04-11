@@ -224,7 +224,7 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
 }
 } // namespace llvm
 
-static void generateAssignInstrs(MachineFunction &MF,
+static void generateAssignTypeInstrs(MachineFunction &MF,
                                  SPIRVGlobalTypeRegistry *GTR,
                                  MachineIRBuilder MIB) {
   MachineRegisterInfo &MRI = MF.getRegInfo();
@@ -296,6 +296,24 @@ static void generateAssignInstrs(MachineFunction &MF,
         ReachedBegin = true;
       else
         --MII;
+    }
+  }
+  for (MachineInstr *MI : ToErase)
+    MI->eraseFromParent();
+}
+
+static void processAssignNameInstrs(MachineFunction &MF,
+                                    SPIRVGlobalInstrRegistry *GIR) {
+  SmallVector<MachineInstr *> ToErase;
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : MBB) {
+      if (!isSpvIntrinsic(MI, Intrinsic::spv_assign_name))
+        continue;
+
+      std::string Name = getStringImm(MI, 2);
+      GIR->nameResultId(MI.getOperand(MI.getNumExplicitDefs() + 1).getReg(),
+                        &MF, Name);
+      ToErase.push_back(&MI);
     }
   }
   for (MachineInstr *MI : ToErase)
@@ -576,12 +594,14 @@ bool SPIRVPreLegalizer::runOnMachineFunction(MachineFunction &MF) {
   // Initialize the type registry.
   const SPIRVSubtarget &ST = MF.getSubtarget<SPIRVSubtarget>();
   SPIRVGlobalTypeRegistry *GTR = ST.getSPIRVGlobalTypeRegistry();
+  SPIRVGlobalInstrRegistry *GIR = ST.getSPIRVGlobalInstrRegistry();
   GTR->setCurrentFunc(MF);
   MachineIRBuilder MIB(MF);
   addConstantsToTrack(MF, GTR);
   foldConstantsIntoIntrinsics(MF);
   insertBitcasts(MF, GTR, MIB);
-  generateAssignInstrs(MF, GTR, MIB);
+  generateAssignTypeInstrs(MF, GTR, MIB);
+  processAssignNameInstrs(MF, GIR);
   processSwitches(MF, GTR, MIB);
   processInstrsWithTypeFolding(MF, GTR, MIB);
 

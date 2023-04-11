@@ -2070,7 +2070,8 @@ namespace SPIRV {
 SPIRVType *lowerBuiltinType(const Type *OpaqueType,
                             SPIRV::AccessQualifier::AccessQualifier AccessQual,
                             MachineIRBuilder &MIRBuilder,
-                            SPIRVGlobalTypeRegistry *GTR) {
+                            SPIRVGlobalTypeRegistry *GTR,
+                            SPIRVGlobalInstrRegistry *GIR) {
   // In LLVM IR, SPIR-V and OpenCL builtin types are represented as either
   // target(...) target extension types or pointers-to-opaque-structs. The
   // approach relying on structs is deprecated and works only in the non-opaque
@@ -2123,7 +2124,8 @@ SPIRVType *lowerBuiltinType(const Type *OpaqueType,
   // Emit OpName instruction if a new OpType<...> instruction was added
   // (equivalent type was not found in GlobalRegistry).
   if (NumStartingVRegs < MIRBuilder.getMRI()->getNumVirtRegs())
-    buildOpName(GTR->getSPIRVTypeID(TargetType), Name, MIRBuilder);
+    GIR->nameResultId(GTR->getSPIRVTypeID(TargetType), &MIRBuilder.getMF(),
+                      Name.str());
 
   return TargetType;
 }

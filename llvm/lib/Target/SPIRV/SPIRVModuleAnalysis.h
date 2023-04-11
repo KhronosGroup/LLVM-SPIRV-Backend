@@ -33,7 +33,6 @@ namespace SPIRV {
 enum ModuleSectionType {
   //  MB_Capabilities, MB_Extensions, MB_ExtInstImports, MB_MemoryModel,
   //  MB_ExecutionModes, MB_DebugSourceAndStrings,
-  MB_DebugNames,           // All OpName and OpMemberName intrs.
   MB_DebugModuleProcessed, // All OpModuleProcessed instructions.
   MB_Annotations,          // OpDecorate, OpMemberDecorate etc.
   MB_TypeConstVars,        // OpTypeXXX, OpConstantXXX, and global OpVariables.

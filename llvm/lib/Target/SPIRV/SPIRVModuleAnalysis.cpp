@@ -336,9 +336,7 @@ void SPIRVModuleAnalysis::processOtherInstrs(const Module &M) {
         if (MAI.getSkipEmission(&MI))
           continue;
         const unsigned OpCode = MI.getOpcode();
-        if (OpCode == SPIRV::OpName || OpCode == SPIRV::OpMemberName) {
-          collectOtherInstr(MI, MAI, SPIRV::MB_DebugNames);
-        } else if (TII->isDecorationInstr(MI)) {
+        if (TII->isDecorationInstr(MI)) {
           collectOtherInstr(MI, MAI, SPIRV::MB_Annotations);
           collectFuncNames(MI, &*F);
         } else if (TII->isConstantInstr(MI)) {

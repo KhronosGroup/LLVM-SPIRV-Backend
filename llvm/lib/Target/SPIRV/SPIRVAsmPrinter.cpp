@@ -59,6 +59,7 @@ public:
   void outputModuleSection(SPIRV::ModuleSectionType MSType);
   void outputGlobalRequirements();
   void outputEntryPoints();
+  void outputDebugNames();
   void outputDebugSourceAndStrings(const Module &M);
   void outputOpExtInstImports(const Module &M);
   void outputOpMemoryModel();
@@ -244,6 +245,18 @@ void SPIRVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 void SPIRVAsmPrinter::outputModuleSection(SPIRV::ModuleSectionType MSType) {
   for (MachineInstr *MI : MAI->getMSInstrs(MSType))
     outputInstruction(MI);
+}
+
+void SPIRVAsmPrinter::outputDebugNames() {
+  for (const SPIRV::OpNameInst &NI : GIR->getAllOpNameInst()) {
+    MCInst TmpInst;
+    TmpInst.setOpcode(SPIRV::OpName);
+    Register NewReg = MAI->getRegisterAlias(NI.NamedIdFunction, NI.NamedId);
+    TmpInst.addOperand(
+        MCOperand::createReg(NewReg.isValid() ? NewReg : NI.NamedId));
+    addStringImm(NI.Name, TmpInst);
+    outputMCInst(TmpInst);
+  }
 }
 
 void SPIRVAsmPrinter::outputDebugSourceAndStrings(const Module &M) {
@@ -523,7 +536,7 @@ void SPIRVAsmPrinter::outputModuleSections() {
   // OpSourceContinued, without forward references.
   outputDebugSourceAndStrings(*M);
   // 7b. Debug: all OpName and all OpMemberName.
-  outputModuleSection(SPIRV::MB_DebugNames);
+  outputDebugNames();
   // 7c. Debug: all OpModuleProcessed instructions.
   outputModuleSection(SPIRV::MB_DebugModuleProcessed);
   // 8. All annotation instructions (all decorations).

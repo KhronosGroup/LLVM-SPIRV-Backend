@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Function.h"
+#include "llvm/CodeGen/MachineFunction.h"
 
 namespace llvm {
 namespace SPIRV {
@@ -31,7 +32,17 @@ struct OpEntryPointInst {
   OpEntryPointInst(const SPIRV::ExecutionModel::ExecutionModel ExecModel,
                    const Function *const EntryFunction)
       : ExecModel(ExecModel), EntryFunction(EntryFunction) {}
-  OpEntryPointInst &operator=(const OpEntryPointInst &) = delete;
+};
+
+/// Struct representing a global OpName instruction for later printing.
+struct OpNameInst {
+  const Register NamedId;
+  const MachineFunction *const NamedIdFunction;
+  const std::string Name;
+
+  OpNameInst(const Register NamedId, const MachineFunction *const NamedIdFunction,
+             const std::string Name)
+      : NamedId(NamedId), NamedIdFunction(NamedIdFunction), Name(Name) {}
 };
 } // namespace SPIRV
 
@@ -39,7 +50,8 @@ struct OpEntryPointInst {
 /// emitting SPIR-V global instructions.
 class SPIRVGlobalInstrRegistry {
 private:
-  SmallVector<SPIRV::OpEntryPointInst> OpEntryPoints;
+  SmallVector<SPIRV::OpEntryPointInst> OpEntryPointInsts;
+  SmallVector<SPIRV::OpNameInst> OpNameInsts;
 
 public:
   SPIRVGlobalInstrRegistry() {}
@@ -47,12 +59,23 @@ public:
   /// Declare a new SPIR-V entry point.
   void addEntryPoint(const SPIRV::ExecutionModel::ExecutionModel ExecModel,
                      const Function *const EntryFunction) {
-    OpEntryPoints.push_back(SPIRV::OpEntryPointInst(ExecModel, EntryFunction));
+    OpEntryPointInsts.push_back(
+        SPIRV::OpEntryPointInst(ExecModel, EntryFunction));
   }
 
   /// Get all already declared SPIR-V entry points.
   const SmallVector<SPIRV::OpEntryPointInst> &getAllEntryPoints() const {
-    return OpEntryPoints;
+    return OpEntryPointInsts;
+  }
+
+  void nameResultId(const Register NamedId,
+                    const MachineFunction *const NamedIdFunction,
+                    const std::string Name) {
+    OpNameInsts.push_back(SPIRV::OpNameInst(NamedId, NamedIdFunction, Name));
+  }
+
+  const SmallVector<SPIRV::OpNameInst> &getAllOpNameInst() const {
+    return OpNameInsts;
   }
 };
 

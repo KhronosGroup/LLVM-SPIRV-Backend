@@ -19,6 +19,7 @@
 #include "MCTargetDesc/SPIRVBaseInfo.h"
 #include "SPIRVDuplicatesTracker.h"
 #include "SPIRVInstrInfo.h"
+#include "SPIRVGlobalInstrRegistry.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
 namespace llvm {
@@ -63,8 +64,10 @@ class SPIRVGlobalTypeRegistry {
                         SPIRV::AccessQualifier::AccessQualifier AccessQual,
                         bool EmitIR);
 
+  SPIRVGlobalInstrRegistry *GIR;
+
 public:
-  SPIRVGlobalTypeRegistry(unsigned PointerSize);
+  SPIRVGlobalTypeRegistry(unsigned PointerSize, SPIRVGlobalInstrRegistry *GIR);
 
   MachineFunction *CurMF;
 

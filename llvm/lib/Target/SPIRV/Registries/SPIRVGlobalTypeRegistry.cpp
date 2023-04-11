@@ -22,8 +22,9 @@
 #include "SPIRVUtils.h"
 
 using namespace llvm;
-SPIRVGlobalTypeRegistry::SPIRVGlobalTypeRegistry(unsigned PointerSize)
-    : PointerSize(PointerSize) {}
+SPIRVGlobalTypeRegistry::SPIRVGlobalTypeRegistry(unsigned PointerSize,
+                                                 SPIRVGlobalInstrRegistry *GIR)
+    : PointerSize(PointerSize), GIR(GIR) {}
 
 SPIRVType *SPIRVGlobalTypeRegistry::assignIntTypeToVReg(unsigned BitWidth,
                                                     Register VReg,
@@ -503,7 +504,7 @@ Register SPIRVGlobalTypeRegistry::buildGlobalVariable(
 
   // If it's a global variable with name, output OpName for it.
   if (GVar && GVar->hasName())
-    buildOpName(Reg, GVar->getName(), MIRBuilder);
+    GIR->nameResultId(Reg, &MIRBuilder.getMF(), GVar->getName().str());
 
   // Output decorations for the GV.
   // TODO: maybe move to GenerateDecorations pass.
@@ -549,7 +550,7 @@ SPIRVType *SPIRVGlobalTypeRegistry::getOpTypeOpaque(const StructType *Ty,
   Register ResVReg = createTypeVReg(MIRBuilder);
   auto MIB = MIRBuilder.buildInstr(SPIRV::OpTypeOpaque).addDef(ResVReg);
   addStringImm(Name, MIB);
-  buildOpName(ResVReg, Name, MIRBuilder);
+  GIR->nameResultId(ResVReg, &MIRBuilder.getMF(), Name.str());
   return MIB;
 }
 
@@ -568,7 +569,7 @@ SPIRVType *SPIRVGlobalTypeRegistry::getOpTypeStruct(const StructType *Ty,
   for (const auto &Ty : FieldTypes)
     MIB.addUse(Ty);
   if (Ty->hasName())
-    buildOpName(ResVReg, Ty->getName(), MIRBuilder);
+    GIR->nameResultId(ResVReg, &MIRBuilder.getMF(), Ty->getName().str());
   if (Ty->isPacked())
     buildOpDecorate(ResVReg, MIRBuilder, SPIRV::Decoration::CPacked, {});
   return MIB;
@@ -584,7 +585,7 @@ SPIRVType *SPIRVGlobalTypeRegistry::getOrCreateSpecialType(
     Ty = PType->getNonOpaquePointerElementType();
   }
   assert(isSpecialOpaqueType(Ty) && "Not a special opaque builtin type");
-  return SPIRV::lowerBuiltinType(Ty, AccQual, MIRBuilder, this);
+  return SPIRV::lowerBuiltinType(Ty, AccQual, MIRBuilder, this, GIR);
 }
 
 SPIRVType *SPIRVGlobalTypeRegistry::getOpTypePointer(

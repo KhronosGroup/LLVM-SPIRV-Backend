@@ -240,7 +240,8 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       ArgTypeVRegs.push_back(SpirvTy);
 
       if (Arg.hasName())
-        buildOpName(VRegs[i][0], Arg.getName(), MIRBuilder);
+        GIR->nameResultId(VRegs[i][0], &MIRBuilder.getMF(),
+                          Arg.getName().str());
       if (Arg.getType()->isPointerTy()) {
         auto DerefBytes = static_cast<unsigned>(Arg.getDereferenceableBytes());
         if (DerefBytes != 0)
@@ -337,7 +338,7 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   }
   // Name the function.
   if (F.hasName())
-    buildOpName(FuncVReg, F.getName(), MIRBuilder);
+    GIR->nameResultId(FuncVReg, &MIRBuilder.getMF(), F.getName().str());
 
   // Handle entry points and function linkage.
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
