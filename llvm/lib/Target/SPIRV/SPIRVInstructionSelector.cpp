@@ -127,8 +127,10 @@ private:
   bool selectConst(Register ResVReg, const SPIRVType *ResType, const APInt &Imm,
                    MachineInstr &I) const;
 
-  bool selectSelect(Register ResVReg, const SPIRVType *ResType, MachineInstr &I,
-                    bool IsSigned) const;
+  bool selectBoolSelect(Register ResVReg, const SPIRVType *ResType,
+                        MachineInstr &I, bool IsSigned) const;
+  bool selectSelect(Register ResVReg, const SPIRVType *ResType,
+                    MachineInstr &I) const;
   bool selectIToF(Register ResVReg, const SPIRVType *ResType, MachineInstr &I,
                   bool IsSigned, unsigned Opcode) const;
   bool selectExt(Register ResVReg, const SPIRVType *ResType, MachineInstr &I,
@@ -178,6 +180,8 @@ private:
   Register buildZerosVal(const SPIRVType *ResType, MachineInstr &I) const;
   Register buildOnesVal(bool AllOnes, const SPIRVType *ResType,
                         MachineInstr &I) const;
+  bool buildSelect(Register ResVReg, const SPIRVType *ResType, MachineInstr &I,
+                   Register TrueValue, Register FalseValue) const;
 };
 
 } // end anonymous namespace
@@ -318,6 +322,9 @@ bool SPIRVInstructionSelector::spvSelect(Register ResVReg,
 
   case TargetOpcode::G_PHI:
     return selectPhi(ResVReg, ResType, I);
+
+  case TargetOpcode::G_SELECT:
+    return selectSelect(ResVReg, ResType, I);
 
   case TargetOpcode::G_FPTOSI:
     return selectUnOp(ResVReg, ResType, I, SPIRV::OpConvertFToS);
@@ -1087,23 +1094,34 @@ Register SPIRVInstructionSelector::buildOnesVal(bool AllOnes,
   return GR.getOrCreateConstInt(One.getZExtValue(), I, ResType, TII);
 }
 
-bool SPIRVInstructionSelector::selectSelect(Register ResVReg,
-                                            const SPIRVType *ResType,
-                                            MachineInstr &I,
-                                            bool IsSigned) const {
+bool SPIRVInstructionSelector::selectBoolSelect(Register ResVReg,
+                                                const SPIRVType *ResType,
+                                                MachineInstr &I,
+                                                bool IsSigned) const {
   // To extend a bool, we need to use OpSelect between constants.
   Register ZeroReg = buildZerosVal(ResType, I);
   Register OneReg = buildOnesVal(IsSigned, ResType, I);
-  bool IsScalarBool =
-      GR.isScalarOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool);
-  unsigned Opcode =
-      IsScalarBool ? SPIRV::OpSelectSISCond : SPIRV::OpSelectSIVCond;
-  return BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(Opcode))
+  return buildSelect(ResVReg, ResType, I, OneReg, ZeroReg);
+}
+
+bool SPIRVInstructionSelector::selectSelect(Register ResVReg,
+                                            const SPIRVType *ResType,
+                                            MachineInstr &I) const {
+  return buildSelect(ResVReg, ResType, I, I.getOperand(2).getReg(),
+                     I.getOperand(3).getReg());
+}
+
+bool SPIRVInstructionSelector::buildSelect(Register ResVReg,
+                                           const SPIRVType *ResType,
+                                           MachineInstr &I, Register TrueValue,
+                                           Register FalseValue) const {
+  // To extend a bool, we need to use OpSelect between constants.
+  return BuildMI(*I.getParent(), I, I.getDebugLoc(), TII.get(SPIRV::OpSelect))
       .addDef(ResVReg)
       .addUse(GR.getSPIRVTypeID(ResType))
       .addUse(I.getOperand(1).getReg())
-      .addUse(OneReg)
-      .addUse(ZeroReg)
+      .addUse(TrueValue)
+      .addUse(FalseValue)
       .constrainAllUses(TII, TRI, RBI);
 }
 
@@ -1122,7 +1140,7 @@ bool SPIRVInstructionSelector::selectIToF(Register ResVReg,
       TmpType = GR.getOrCreateSPIRVVectorType(TmpType, NumElts, I, TII);
     }
     SrcReg = MRI->createVirtualRegister(&SPIRV::IDRegClass);
-    selectSelect(SrcReg, TmpType, I, false);
+    selectBoolSelect(SrcReg, TmpType, I, false);
   }
   return selectUnOpWithSrc(ResVReg, ResType, I, SrcReg, Opcode);
 }
@@ -1131,7 +1149,7 @@ bool SPIRVInstructionSelector::selectExt(Register ResVReg,
                                          const SPIRVType *ResType,
                                          MachineInstr &I, bool IsSigned) const {
   if (GR.isScalarOrVectorOfType(I.getOperand(1).getReg(), SPIRV::OpTypeBool))
-    return selectSelect(ResVReg, ResType, I, IsSigned);
+    return selectBoolSelect(ResVReg, ResType, I, IsSigned);
   unsigned Opcode = IsSigned ? SPIRV::OpSConvert : SPIRV::OpUConvert;
   return selectUnOp(ResVReg, ResType, I, Opcode);
 }
