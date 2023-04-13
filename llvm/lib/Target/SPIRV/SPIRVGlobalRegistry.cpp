@@ -727,6 +727,10 @@ SPIRVType *SPIRVGlobalRegistry::restOfCreateSPIRVType(
     return nullptr;
   TypesInProcessing.insert(Ty);
   SPIRVType *SpirvType = createSPIRVType(Ty, MIRBuilder, AccessQual, EmitIR);
+  const auto &ST = CurMF->getSubtarget();
+  constrainSelectedInstRegOperands(*const_cast<MachineInstr *>(SpirvType),
+                                   *ST.getInstrInfo(), *ST.getRegisterInfo(),
+                                   *ST.getRegBankInfo());
   TypesInProcessing.erase(Ty);
   VRegToTypeMap[&MIRBuilder.getMF()][getSPIRVTypeID(SpirvType)] = SpirvType;
   SPIRVToLLVMType[SpirvType] = Ty;
@@ -972,6 +976,10 @@ SPIRVType *SPIRVGlobalRegistry::finishCreatingSPIRVType(const Type *LLVMTy,
   VRegToTypeMap[CurMF][getSPIRVTypeID(SpirvType)] = SpirvType;
   SPIRVToLLVMType[SpirvType] = LLVMTy;
   DT.add(LLVMTy, CurMF, getSPIRVTypeID(SpirvType));
+  const auto &ST = CurMF->getSubtarget();
+  constrainSelectedInstRegOperands(*const_cast<MachineInstr *>(SpirvType),
+                                   *ST.getInstrInfo(), *ST.getRegisterInfo(),
+                                   *ST.getRegBankInfo());
   return SpirvType;
 }
 

@@ -179,8 +179,6 @@ static SPIRVType *propagateSPIRVType(MachineInstr *MI, SPIRVGlobalRegistry *GR,
       }
       if (SpirvTy)
         GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB.getMF());
-      if (!MRI.getRegClassOrNull(Reg))
-        MRI.setRegClass(Reg, &SPIRV::IDRegClass);
     }
   }
   return SpirvTy;
@@ -201,8 +199,6 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
                   (Def->getNextNode() ? Def->getNextNode()->getIterator()
                                       : Def->getParent()->end()));
   Register NewReg = MRI.createGenericVirtualRegister(MRI.getType(Reg));
-  if (auto *RC = MRI.getRegClassOrNull(Reg))
-    MRI.setRegClass(NewReg, RC);
   SpirvTy = SpirvTy ? SpirvTy : GR->getOrCreateSPIRVType(Ty, MIB);
   GR->assignSPIRVTypeToVReg(SpirvTy, Reg, MIB.getMF());
   // This is to make it convenient for Legalizer to get the SPIRVType
@@ -211,13 +207,15 @@ Register insertAssignInstr(Register Reg, Type *Ty, SPIRVType *SpirvTy,
   // Copy MIFlags from Def to ASSIGN_TYPE instruction. It's required to keep
   // the flags after instruction selection.
   const uint16_t Flags = Def->getFlags();
-  MIB.buildInstr(SPIRV::ASSIGN_TYPE)
-      .addDef(Reg)
-      .addUse(NewReg)
-      .addUse(GR->getSPIRVTypeID(SpirvTy))
-      .setMIFlags(Flags);
+  auto B = MIB.buildInstr(SPIRV::ASSIGN_TYPE)
+               .addDef(Reg)
+               .addUse(NewReg)
+               .addUse(GR->getSPIRVTypeID(SpirvTy))
+               .setMIFlags(Flags);
   Def->getOperand(0).setReg(NewReg);
-  MRI.setRegClass(Reg, &SPIRV::ANYIDRegClass);
+  const auto &ST = GR->CurMF->getSubtarget();
+  constrainSelectedInstRegOperands(*B.getInstr(), *ST.getInstrInfo(),
+                                   *ST.getRegisterInfo(), *ST.getRegBankInfo());
   return NewReg;
 }
 } // namespace llvm
@@ -305,25 +303,12 @@ createNewIdReg(Register ValReg, unsigned Opcode, MachineRegisterInfo &MRI,
   LLT NewT = LLT::scalar(32);
   SPIRVType *SpvType = GR.getSPIRVTypeForVReg(ValReg);
   assert(SpvType && "VReg is expected to have SPIRV type");
-  bool IsFloat = SpvType->getOpcode() == SPIRV::OpTypeFloat;
-  bool IsVectorFloat =
-      SpvType->getOpcode() == SPIRV::OpTypeVector &&
-      GR.getSPIRVTypeForVReg(SpvType->getOperand(1).getReg())->getOpcode() ==
-          SPIRV::OpTypeFloat;
-  IsFloat |= IsVectorFloat;
-  auto GetIdOp = IsFloat ? SPIRV::GET_fID : SPIRV::GET_ID;
-  auto DstClass = IsFloat ? &SPIRV::fIDRegClass : &SPIRV::IDRegClass;
-  if (MRI.getType(ValReg).isPointer()) {
-    NewT = LLT::pointer(0, 32);
-    GetIdOp = SPIRV::GET_pID;
-    DstClass = &SPIRV::pIDRegClass;
-  } else if (MRI.getType(ValReg).isVector()) {
+  auto GetIdOp = SPIRV::GET_SID;
+  if (MRI.getType(ValReg).isVector()) {
     NewT = LLT::fixed_vector(2, NewT);
-    GetIdOp = IsFloat ? SPIRV::GET_vfID : SPIRV::GET_vID;
-    DstClass = IsFloat ? &SPIRV::vfIDRegClass : &SPIRV::vIDRegClass;
+    GetIdOp = SPIRV::GET_VID;
   }
   Register IdReg = MRI.createGenericVirtualRegister(NewT);
-  MRI.setRegClass(IdReg, DstClass);
   return {IdReg, GetIdOp};
 }
 
@@ -336,15 +321,20 @@ static void processInstr(MachineInstr &MI, MachineIRBuilder &MIB,
   auto NewReg = createNewIdReg(MI.getOperand(0).getReg(), Opc, MRI, *GR).first;
   AssignTypeInst.getOperand(1).setReg(NewReg);
   MI.getOperand(0).setReg(NewReg);
-  MIB.setInsertPt(*MI.getParent(),
-                  (MI.getNextNode() ? MI.getNextNode()->getIterator()
-                                    : MI.getParent()->end()));
+  MIB.setInsertPt(*MI.getParent(), MI.getIterator());
   for (auto &Op : MI.operands()) {
     if (!Op.isReg() || Op.isDef())
       continue;
     auto IdOpInfo = createNewIdReg(Op.getReg(), Opc, MRI, *GR);
-    MIB.buildInstr(IdOpInfo.second).addDef(IdOpInfo.first).addUse(Op.getReg());
+    auto B = MIB.buildInstr(IdOpInfo.second)
+                 .addDef(IdOpInfo.first)
+                 .addUse(Op.getReg());
     Op.setReg(IdOpInfo.first);
+
+    const auto &ST = GR->CurMF->getSubtarget();
+    constrainSelectedInstRegOperands(*B.getInstr(), *ST.getInstrInfo(),
+                                     *ST.getRegisterInfo(),
+                                     *ST.getRegBankInfo());
   }
 }
 
@@ -373,8 +363,6 @@ static void processInstrsWithTypeFolding(MachineFunction &MF,
       if (!isTypeFoldingSupported(Opcode))
         continue;
       Register DstReg = MI.getOperand(0).getReg();
-      if (MRI.getType(DstReg).isVector())
-        MRI.setRegClass(DstReg, &SPIRV::IDRegClass);
       // Don't need to reset type of register holding constant and used in
       // G_ADDRSPACE_CAST, since it braaks legalizer.
       if (Opcode == TargetOpcode::G_CONSTANT && MRI.hasOneUse(DstReg)) {

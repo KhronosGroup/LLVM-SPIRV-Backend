@@ -46,7 +46,6 @@ static const std::set<unsigned> TypeFoldingSupportingOpcs = {
     TargetOpcode::G_SHL,
     TargetOpcode::G_ASHR,
     TargetOpcode::G_LSHR,
-    TargetOpcode::G_SELECT,
     TargetOpcode::G_EXTRACT_VECTOR_ELT,
 };
 
@@ -198,6 +197,9 @@ SPIRVLegalizerInfo::SPIRVLegalizerInfo(const SPIRVSubtarget &ST) {
   getActionDefinitionsBuilder(G_FCMP).legalIf(
       all(typeInSet(0, allBoolScalarsAndVectors),
           typeInSet(1, allFloatScalarsAndVectors)));
+
+  getActionDefinitionsBuilder(G_SELECT).legalIf(all(
+      typeInSet(0, allScalarsAndVectors), typeInSet(1, allScalarsAndVectors)));
 
   getActionDefinitionsBuilder({G_ATOMICRMW_OR, G_ATOMICRMW_ADD, G_ATOMICRMW_AND,
                                G_ATOMICRMW_MAX, G_ATOMICRMW_MIN,

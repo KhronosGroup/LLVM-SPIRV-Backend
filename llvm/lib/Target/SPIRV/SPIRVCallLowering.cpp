@@ -303,7 +303,6 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   // Generate a SPIR-V type for the function.
   auto MRI = MIRBuilder.getMRI();
   Register FuncVReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
-  MRI->setRegClass(FuncVReg, &SPIRV::IDRegClass);
   if (F.isDeclaration())
     GR->add(&F, &MIRBuilder.getMF(), FuncVReg);
   SPIRVType *RetTy = GR->getOrCreateSPIRVType(FTy->getReturnType(), MIRBuilder);
@@ -313,22 +312,28 @@ bool SPIRVCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   // Build the OpTypeFunction declaring it.
   uint32_t FuncControl = getFunctionControl(F);
 
-  MIRBuilder.buildInstr(SPIRV::OpFunction)
-      .addDef(FuncVReg)
-      .addUse(GR->getSPIRVTypeID(RetTy))
-      .addImm(FuncControl)
-      .addUse(GR->getSPIRVTypeID(FuncTy));
+  auto B = MIRBuilder.buildInstr(SPIRV::OpFunction)
+               .addDef(FuncVReg)
+               .addUse(GR->getSPIRVTypeID(RetTy))
+               .addImm(FuncControl)
+               .addUse(GR->getSPIRVTypeID(FuncTy));
+  const auto &ST = GR->CurMF->getSubtarget();
+  constrainSelectedInstRegOperands(*B.getInstr(), *ST.getInstrInfo(),
+                                   *ST.getRegisterInfo(), *ST.getRegBankInfo());
 
   // Add OpFunctionParameters.
   int i = 0;
   for (const auto &Arg : F.args()) {
     assert(VRegs[i].size() == 1 && "Formal arg has multiple vregs");
-    MRI->setRegClass(VRegs[i][0], &SPIRV::IDRegClass);
-    MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
-        .addDef(VRegs[i][0])
-        .addUse(GR->getSPIRVTypeID(ArgTypeVRegs[i]));
+    auto B = MIRBuilder.buildInstr(SPIRV::OpFunctionParameter)
+                 .addDef(VRegs[i][0])
+                 .addUse(GR->getSPIRVTypeID(ArgTypeVRegs[i]));
     if (F.isDeclaration())
       GR->add(&Arg, &MIRBuilder.getMF(), VRegs[i][0]);
+    const auto &ST = GR->CurMF->getSubtarget();
+    constrainSelectedInstRegOperands(*B.getInstr(), *ST.getInstrInfo(),
+                                     *ST.getRegisterInfo(),
+                                     *ST.getRegBankInfo());
     i++;
   }
   // Name the function.
@@ -421,7 +426,8 @@ bool SPIRVCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
 
   // Make sure there's a valid return reg, even for functions returning void.
   if (!ResVReg.isValid())
-    ResVReg = MIRBuilder.getMRI()->createVirtualRegister(&SPIRV::IDRegClass);
+    ResVReg =
+        MIRBuilder.getMRI()->createGenericVirtualRegister(LLT::scalar(32));
   SPIRVType *RetType =
       GR->assignTypeToVReg(FTy->getReturnType(), ResVReg, MIRBuilder);
 
