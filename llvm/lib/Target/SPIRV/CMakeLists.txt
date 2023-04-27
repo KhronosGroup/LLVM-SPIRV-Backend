@@ -14,12 +14,12 @@ tablegen(LLVM SPIRVGenTables.inc -gen-searchable-tables)
 add_public_tablegen_target(SPIRVCommonTableGen)
 
 add_llvm_target(SPIRVCodeGen
+  Registries/SPIRVGlobalObjectRegistry.cpp  
   SPIRVAsmPrinter.cpp
   SPIRVBuiltins.cpp
   SPIRVCallLowering.cpp
   SPIRVDuplicatesTracker.cpp
   SPIRVEmitIntrinsics.cpp
-  SPIRVGlobalRegistry.cpp
   SPIRVInstrInfo.cpp
   SPIRVInstructionSelector.cpp
   SPIRVISelLowering.cpp

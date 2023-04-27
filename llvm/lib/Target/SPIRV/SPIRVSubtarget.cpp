@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "SPIRVSubtarget.h"
+#include "Registries/SPIRVGlobalObjectRegistry.h"
 #include "SPIRV.h"
-#include "SPIRVGlobalRegistry.h"
 #include "SPIRVLegalizerInfo.h"
 #include "SPIRVRegisterBankInfo.h"
 #include "SPIRVTargetMachine.h"
@@ -50,8 +50,8 @@ SPIRVSubtarget::SPIRVSubtarget(const Triple &TT, const std::string &CPU,
   initAvailableExtensions();
   initAvailableExtInstSets();
 
-  GR = std::make_unique<SPIRVGlobalRegistry>(PointerSize);
-  CallLoweringInfo = std::make_unique<SPIRVCallLowering>(TLInfo, GR.get());
+  GOR = std::make_unique<SPIRVGlobalObjectRegistry>(PointerSize);
+  CallLoweringInfo = std::make_unique<SPIRVCallLowering>(TLInfo, GOR.get());
   Legalizer = std::make_unique<SPIRVLegalizerInfo>(*this);
   RegBankInfo = std::make_unique<SPIRVRegisterBankInfo>();
   InstSelector.reset(

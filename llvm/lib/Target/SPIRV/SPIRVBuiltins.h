@@ -13,7 +13,7 @@
 #ifndef LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
 #define LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
 
-#include "SPIRVGlobalRegistry.h"
+#include "Registries/SPIRVGlobalObjectRegistry.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 
@@ -36,11 +36,11 @@ std::optional<bool> lowerBuiltin(const StringRef DemangledCall,
                                  MachineIRBuilder &MIRBuilder,
                                  const Register OrigRet, const Type *OrigRetTy,
                                  const SmallVectorImpl<Register> &Args,
-                                 SPIRVGlobalRegistry *GR);
+                                 SPIRVGlobalObjectRegistry *GOR);
 /// Handles the translation of the provided special opaque/builtin type \p Type
 /// to SPIR-V type. Generates the corresponding machine instructions for the
 /// target type or gets the already existing OpType<...> register from the
-/// global registry \p GR.
+/// global registry \p GOR.
 ///
 /// \return A machine instruction representing the OpType<...> SPIR-V type.
 ///
@@ -48,7 +48,7 @@ std::optional<bool> lowerBuiltin(const StringRef DemangledCall,
 SPIRVType *lowerBuiltinType(const Type *Type,
                             AccessQualifier::AccessQualifier AccessQual,
                             MachineIRBuilder &MIRBuilder,
-                            SPIRVGlobalRegistry *GR);
+                            SPIRVGlobalObjectRegistry *GOR);
 } // namespace SPIRV
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVBUILTINS_H
